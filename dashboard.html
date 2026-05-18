@@ -438,20 +438,47 @@ function updateStats() {
 }
 
 /* ── INIT ── */
+/* ── POLLING: cek pesan baru tiap 5 detik ── */
+let lastPollTs = {};
+let pollingActive = true;
+
+async function pollMessages() {
+  if (!pollingActive || !activeContactId) return;
+  try {
+    const msgs = await ChatHistory.get(activeContactId, 100);
+    const existing = document.getElementById('messages-area');
+    const currentCount = existing.querySelectorAll('.msg-row').length;
+    if (msgs.length > currentCount) {
+      renderChat();
+    }
+  } catch {}
+}
+
+async function pollInbox() {
+  try {
+    const contacts = await Contacts.getAll();
+    const el = document.getElementById('conv-list');
+    if (el) renderInbox();
+  } catch {}
+}
+
 window.addEventListener('load', async () => {
-  // Load config dari Supabase dulu sebelum apapun
   await Config.load();
 
   renderInbox();
   updatePKStatus();
 
-  // Auto-select contact from URL
   const params = new URLSearchParams(location.search);
   const cid = params.get('contact');
   if (cid) selectContact(cid);
 
-  // Check WA setelah config loaded
   checkWA();
+
+  // Polling pesan masuk tiap 5 detik
+  setInterval(async () => {
+    await pollMessages();
+    await pollInbox();
+  }, 5000);
 });
 </script>
 </body>
