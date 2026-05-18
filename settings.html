@@ -267,9 +267,9 @@ function showSection(name, el) {
 }
 
 /* Load saved values on page load */
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   const user = Auth.getUser();
-  const cfg = Config.get();
+  const cfg = await Config.load();
 
   // Account
   document.getElementById('account-info').innerHTML = `
@@ -284,20 +284,20 @@ window.addEventListener('load', () => {
   document.getElementById('acc-email').value = user?.email || '';
 
   // API
-  document.getElementById('cfg-anthropic').value = cfg.anthropicKey || '';
-  document.getElementById('cfg-fonnte').value = cfg.fonnteToken || '';
+  document.getElementById('cfg-anthropic').value = cfg.anthropic_key || '';
+  document.getElementById('cfg-fonnte').value = cfg.fonnte_token || '';
 
   // WA
-  document.getElementById('cfg-cs-number').value = cfg.csNumber || '';
+  document.getElementById('cfg-cs-number').value = cfg.cs_number || '';
 
   // AI
-  document.getElementById('ai-store-name').value = cfg.storeName || user?.store || 'HerbalCare';
-  document.getElementById('ai-extra').value = cfg.aiExtra || '';
-  document.getElementById('ai-max-len').value = cfg.aiMaxLen || '1000';
+  document.getElementById('ai-store-name').value = cfg.store_name || user?.store || 'HerbalCare';
+  document.getElementById('ai-extra').value = cfg.ai_extra || '';
+  document.getElementById('ai-max-len').value = cfg.ai_max_len || '1000';
 
   // PK
-  pkText = cfg.productKnowledge || '';
-  if (pkText) showPKLoaded(cfg.pkFilename || 'katalog.txt', pkText);
+  pkText = cfg.product_knowledge || '';
+  if (pkText) showPKLoaded(cfg.pk_filename || 'katalog.txt', pkText);
 });
 
 function saveAccount() {
@@ -321,35 +321,41 @@ function saveAccount() {
   showToast('✅ Akun diperbarui');
 }
 
-function saveConfig() {
-  const cfg = Config.get();
-  cfg.anthropicKey = document.getElementById('cfg-anthropic').value.trim();
-  cfg.fonnteToken = document.getElementById('cfg-fonnte').value.trim();
-  Config.set(cfg);
-  showToast('✅ API keys disimpan');
+async function saveConfig() {
+  try {
+    await Config.save({
+      anthropic_key: document.getElementById('cfg-anthropic').value.trim(),
+      fonnte_token:  document.getElementById('cfg-fonnte').value.trim(),
+    });
+    showToast('✅ API keys disimpan');
+  } catch(e) { showToast('❌ Gagal simpan: ' + e.message); }
 }
 
-function saveWAConfig() {
-  const cfg = Config.get();
-  cfg.csNumber = document.getElementById('cfg-cs-number').value.trim().replace(/\D/g,'');
-  Config.set(cfg);
-  showToast('✅ Konfigurasi WA disimpan');
+async function saveWAConfig() {
+  try {
+    await Config.save({
+      cs_number: document.getElementById('cfg-cs-number').value.trim().replace(/\D/g,''),
+    });
+    showToast('✅ Konfigurasi WA disimpan');
+  } catch(e) { showToast('❌ Gagal simpan: ' + e.message); }
 }
 
-function saveAIConfig() {
-  const cfg = Config.get();
-  cfg.storeName = document.getElementById('ai-store-name').value.trim() || 'HerbalCare';
-  cfg.aiExtra = document.getElementById('ai-extra').value.trim();
-  cfg.aiMaxLen = document.getElementById('ai-max-len').value;
-  Config.set(cfg);
-  showToast('✅ Konfigurasi AI disimpan');
+async function saveAIConfig() {
+  try {
+    await Config.save({
+      store_name: document.getElementById('ai-store-name').value.trim() || 'HerbalCare',
+      ai_extra:   document.getElementById('ai-extra').value.trim(),
+      ai_max_len: document.getElementById('ai-max-len').value,
+    });
+    showToast('✅ Konfigurasi AI disimpan');
+  } catch(e) { showToast('❌ Gagal simpan: ' + e.message); }
 }
 
 function savePK() {
   if (!pkText) return showToast('⚠️ Upload katalog terlebih dahulu');
   const cfg = Config.get();
-  cfg.productKnowledge = pkText;
-  cfg.pkFilename = document.getElementById('pk-filename-badge').textContent.replace('📄 ','');
+  cfg.product_knowledge = pkText;
+  cfg.pk_filename = document.getElementById('pk-filename-badge').textContent.replace('📄 ','');
   Config.set(cfg);
   showToast('✅ Product knowledge disimpan');
 }
@@ -403,12 +409,10 @@ function showPKLoaded(filename, text) {
   document.getElementById('pk-preview-box').textContent = text.slice(0, 800) + (text.length > 800 ? '\n...' : '');
 }
 
-function clearPK() {
+async function clearPK() {
   pkText = '';
-  const cfg = Config.get();
-  cfg.productKnowledge = '';
-  cfg.pkFilename = '';
-  Config.set(cfg);
+  try { await Config.save({ product_knowledge: '', pk_filename: '' }); } catch {}
+
   document.getElementById('pk-upload-zone').style.display = 'block';
   document.getElementById('pk-loaded-info').style.display = 'none';
   showToast('🗑 Product knowledge dihapus');
