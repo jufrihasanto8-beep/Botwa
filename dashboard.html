@@ -3,178 +3,321 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard · HerbalCare CS</title>
+<title>HerbalCare CS</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
-.dashboard-layout {
-  display: flex;
-  height: 100vh;
-  padding-left: var(--sidebar-w);
-  overflow: hidden;
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #1a1d23; font-size: 14px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+/* ── TOP NAVBAR ── */
+#topbar {
+  height: 52px; background: #fff; border-bottom: 1px solid #e8eaed;
+  display: flex; align-items: center; padding: 0 16px; gap: 0; flex-shrink: 0; z-index: 50;
 }
-#inbox {
-  width: var(--inbox-w);
-  background: var(--white);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
+.tb-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #16a679; margin-right: 24px; text-decoration: none; }
+.tb-logo span { font-size: 20px; }
+.tb-nav { display: flex; align-items: center; gap: 2px; flex: 1; }
+.tb-link {
+  display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border-radius: 8px; font-size: 13px; font-weight: 500; color: #6b7280;
+  cursor: pointer; text-decoration: none; transition: all .15s; border: none; background: none;
+  white-space: nowrap;
 }
-#inbox-top { padding: 14px 14px 8px; border-bottom: 1px solid var(--border); }
-#inbox-top h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
-.search-bar {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: 8px; padding: 7px 10px;
+.tb-link:hover { background: #f3f4f6; color: #1a1d23; text-decoration: none; }
+.tb-link.active { background: #e6f7f2; color: #0e7a58; }
+.tb-link .icon { font-size: 15px; }
+.tb-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.tb-avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: #16a679;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff; cursor: pointer;
 }
-.search-bar input { border: none; background: none; font-size: 13px; flex: 1; color: var(--text); outline: none; }
-.tab-row { display: flex; gap: 2px; padding: 8px 10px 0; }
-.tab { font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer; color: var(--text-2); font-weight: 500; border: none; background: none; transition: all .15s; }
-.tab.active { background: var(--green-light); color: var(--green-dark); }
+.tb-name { font-size: 13px; font-weight: 500; color: #374151; }
+.tb-logout { font-size: 12px; color: #9ca3af; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: none; background: none; }
+.tb-logout:hover { background: #fee2e2; color: #991b1b; }
+
+/* ── MAIN BODY ── */
+#main-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── LEFT SIDEBAR (secondary nav) ── */
+#left-nav {
+  width: 200px; background: #fff; border-right: 1px solid #e8eaed;
+  display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; flex-shrink: 0;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: 8px; font-size: 13px; font-weight: 500; color: #6b7280;
+  cursor: pointer; text-decoration: none; transition: all .15s;
+}
+.nav-item:hover { background: #f3f4f6; color: #1a1d23; text-decoration: none; }
+.nav-item.active { background: #e6f7f2; color: #0e7a58; }
+.nav-item .ni { font-size: 16px; }
+.nav-badge {
+  margin-left: auto; min-width: 18px; height: 18px; background: #ef4444;
+  border-radius: 9px; font-size: 10px; color: #fff; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; padding: 0 4px;
+}
+.nav-section { font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; padding: 8px 10px 4px; margin-top: 8px; }
+
+/* ── PAGE CONTENT ── */
+#page-content { flex: 1; display: flex; overflow: hidden; min-width: 0; }
+
+/* ── COMING SOON PAGE ── */
+.coming-soon {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px; color: #9ca3af; background: #f9fafb;
+}
+.coming-soon .cs-icon { font-size: 48px; }
+.coming-soon h2 { font-size: 18px; font-weight: 600; color: #374151; }
+.coming-soon p { font-size: 13px; }
+
+/* ── CHAT PAGE ── */
+#chat-page { display: flex; flex: 1; overflow: hidden; }
+
+/* INBOX */
+#inbox { width: 280px; background: #fff; border-right: 1px solid #e8eaed; display: flex; flex-direction: column; flex-shrink: 0; }
+#inbox-top { padding: 12px 12px 8px; border-bottom: 1px solid #e8eaed; }
+#inbox-top h2 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.search-bar { display: flex; align-items: center; gap: 8px; background: #f5f7fa; border: 1px solid #e8eaed; border-radius: 8px; padding: 6px 10px; }
+.search-bar input { border: none; background: none; font-size: 13px; flex: 1; color: #1a1d23; outline: none; }
+.tab-row { display: flex; gap: 2px; padding: 6px 8px 0; }
+.tab { font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer; color: #6b7280; font-weight: 500; border: none; background: none; transition: all .15s; }
+.tab.active { background: #e6f7f2; color: #0e7a58; }
 #conv-list { flex: 1; overflow-y: auto; }
-.conv-item { display: flex; gap: 10px; padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background .1s; align-items: flex-start; }
-.conv-item:hover { background: var(--bg); }
-.conv-item.active { background: var(--green-light); }
-.conv-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #fff; }
+.conv-item { display: flex; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: background .1s; align-items: flex-start; }
+.conv-item:hover { background: #f9fafb; }
+.conv-item.active { background: #e6f7f2; }
+.conv-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; }
 .conv-info { flex: 1; min-width: 0; }
 .conv-name { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; }
-.conv-name .time { font-weight: 400; font-size: 11px; color: var(--text-3); }
-.conv-preview { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.conv-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.conv-name .ctime { font-weight: 400; font-size: 11px; color: #9ca3af; }
+.conv-preview { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.conv-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 3px; }
 .ch-wa { background: #dcfce7; color: #15803d; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
-.unread-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; }
+.unread-dot { width: 7px; height: 7px; background: #16a679; border-radius: 50%; }
+.empty-inbox { text-align: center; padding: 40px 20px; color: #9ca3af; }
 
+/* CHAT PANEL */
 #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-#chat-header { background: var(--white); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
-.ch-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #fff; flex-shrink: 0; }
+#chat-header { background: #fff; border-bottom: 1px solid #e8eaed; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+.ch-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .ch-name { font-weight: 600; font-size: 14px; }
-.ch-sub { font-size: 11px; color: var(--text-2); display: flex; align-items: center; gap: 4px; }
+.ch-sub { font-size: 11px; color: #6b7280; display: flex; align-items: center; gap: 4px; }
 .online-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; }
-.ch-acts { display: flex; gap: 6px; }
-.action-btn { width: 32px; height: 32px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: var(--text-2); transition: all .15s; }
-.action-btn:hover { background: var(--green-light); color: var(--green); }
+.ch-acts { display: flex; gap: 6px; margin-left: auto; }
+.action-btn { width: 32px; height: 32px; border-radius: 8px; background: #f5f7fa; border: 1px solid #e8eaed; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #6b7280; transition: all .15s; }
+.action-btn:hover { background: #e6f7f2; color: #16a679; }
 
-#messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
-.day-divider { text-align: center; font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 8px; }
-.day-divider::before,.day-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+#messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #f9fafb; }
+.day-divider { text-align: center; font-size: 11px; color: #9ca3af; display: flex; align-items: center; gap: 8px; }
+.day-divider::before,.day-divider::after { content: ''; flex: 1; height: 1px; background: #e8eaed; }
 .msg-row { display: flex; gap: 8px; align-items: flex-end; }
 .msg-row.from-customer { justify-content: flex-start; }
-.msg-row.from-bot, .msg-row.from-agent { justify-content: flex-end; }
-.msg-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; flex-shrink: 0; font-weight: 600; }
-.bubble { max-width: 70%; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.55; }
-.from-customer .bubble { background: var(--white); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-.from-bot .bubble, .from-agent .bubble { background: var(--green); color: #fff; border-bottom-right-radius: 4px; }
-.msg-meta { font-size: 10px; color: var(--text-3); margin-top: 2px; }
-.from-bot .msg-meta, .from-agent .msg-meta { text-align: right; }
-.bot-label { font-size: 10px; color: var(--green); font-weight: 500; margin-bottom: 2px; text-align: right; }
+.msg-row.from-bot,.msg-row.from-agent { justify-content: flex-end; }
+.msg-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; flex-shrink: 0; font-weight: 700; }
+.bubble { max-width: 68%; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.55; }
+.from-customer .bubble { background: #fff; border: 1px solid #e8eaed; border-bottom-left-radius: 4px; }
+.from-bot .bubble,.from-agent .bubble { background: #16a679; color: #fff; border-bottom-right-radius: 4px; }
+.msg-meta { font-size: 10px; color: #9ca3af; margin-top: 2px; }
+.from-bot .msg-meta,.from-agent .msg-meta { text-align: right; }
+.bot-label { font-size: 10px; color: #16a679; font-weight: 500; margin-bottom: 2px; text-align: right; }
 .wa-sent { font-size: 10px; color: #15803d; margin-top: 2px; text-align: right; }
-.wa-fail { font-size: 10px; color: var(--badge); margin-top: 2px; text-align: right; }
+.wa-fail { font-size: 10px; color: #ef4444; margin-top: 2px; text-align: right; }
+.no-chat { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #9ca3af; }
 
-#input-box { background: var(--white); border-top: 1px solid var(--border); padding: 10px 14px; }
+#input-box { background: #fff; border-top: 1px solid #e8eaed; padding: 10px 14px; }
 .input-tools { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-.tool-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); font-size: 11px; color: var(--text-2); cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .15s; }
-.tool-btn:hover, .tool-btn.on { background: var(--green-light); color: var(--green); border-color: var(--green-mid); }
+.tool-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid #e8eaed; background: #f5f7fa; font-size: 11px; color: #6b7280; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .15s; }
+.tool-btn:hover,.tool-btn.on { background: #e6f7f2; color: #0e7a58; border-color: #b2e8d8; }
 .input-row { display: flex; gap: 8px; align-items: flex-end; }
-#msg-input { flex: 1; resize: none; border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 12px; font-size: 13px; font-family: inherit; line-height: 1.4; background: var(--bg); color: var(--text); min-height: 40px; max-height: 100px; transition: border-color .2s; }
-#msg-input:focus { outline: none; border-color: var(--green); background: var(--white); }
-#send-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--green); color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background .15s; flex-shrink: 0; }
-#send-btn:hover { background: var(--green-dark); }
-#send-btn:disabled { background: var(--border); cursor: not-allowed; }
+#msg-input { flex: 1; resize: none; border: 1.5px solid #e8eaed; border-radius: 10px; padding: 9px 12px; font-size: 13px; font-family: inherit; line-height: 1.4; background: #f5f7fa; color: #1a1d23; min-height: 40px; max-height: 100px; transition: border-color .2s; }
+#msg-input:focus { outline: none; border-color: #16a679; background: #fff; }
+#send-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: #16a679; color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background .15s; flex-shrink: 0; }
+#send-btn:hover { background: #0e7a58; }
+#send-btn:disabled { background: #e8eaed; cursor: not-allowed; }
 
-#right-panel { width: 250px; background: var(--white); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
-.rp-section { padding: 14px; border-bottom: 1px solid var(--border); }
-.rp-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+/* RIGHT DETAIL */
+#right-detail { width: 240px; background: #fff; border-left: 1px solid #e8eaed; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.rd-section { padding: 12px 14px; border-bottom: 1px solid #e8eaed; }
+.rd-title { font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.rd-contact-av { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; margin: 0 auto 8px; }
 .stat-row { display: flex; gap: 8px; }
-.stat-card { flex: 1; background: var(--bg); border-radius: 8px; padding: 8px 10px; }
-.stat-num { font-size: 18px; font-weight: 700; color: var(--green); }
-.stat-label { font-size: 10px; color: var(--text-2); margin-top: 1px; }
-.contact-av-rp { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; margin: 0 auto 8px; }
+.stat-card { flex: 1; background: #f5f7fa; border-radius: 8px; padding: 8px 10px; }
+.stat-num { font-size: 18px; font-weight: 700; color: #16a679; }
+.stat-label { font-size: 10px; color: #6b7280; margin-top: 1px; }
+.wa-badge { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; }
+.wa-badge.connected { background: #dcfce7; color: #15803d; }
+.wa-badge.disconnected { background: #fee2e2; color: #991b1b; }
+.wa-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.wa-dot.on { background: #16a34a; }
+.wa-dot.off { background: #dc2626; }
 
-.empty-inbox { text-align: center; padding: 40px 20px; color: var(--text-3); }
-.no-chat { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: var(--text-3); background: var(--bg); }
+/* Typing */
+.typing-dots { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+.typing-dots span { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: bounce 1s infinite; }
+.typing-dots span:nth-child(2) { animation-delay: .15s; }
+.typing-dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)} }
+
+#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1d23; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; z-index: 9999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+#toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 <div id="toast"></div>
-<div id="sidebar-container"></div>
-<div class="dashboard-layout">
 
-  <!-- Inbox -->
-  <div id="inbox">
-    <div id="inbox-top">
-      <h2>Inbox</h2>
-      <div class="search-bar">
-        <span style="color:#9ca3af;">🔍</span>
-        <input placeholder="Cari..." oninput="filterConvs(this.value)" />
-      </div>
+<!-- TOP NAVBAR -->
+<div id="topbar">
+  <a class="tb-logo" href="dashboard.html">
+    <span>🌿</span> HerbalCare
+  </a>
+  <div class="tb-nav">
+    <button class="tb-link active" onclick="showPage('chat',this)"><span class="icon">💬</span> Chat</button>
+    <button class="tb-link" onclick="showPage('fanpage',this)"><span class="icon">📘</span> Fanpage</button>
+    <button class="tb-link" onclick="showPage('analytics',this)"><span class="icon">📊</span> Analytics</button>
+    <button class="tb-link" onclick="showPage('conversations',this)"><span class="icon">🗂</span> Conversations</button>
+    <button class="tb-link" onclick="showPage('broadcast',this)"><span class="icon">📢</span> Broadcast</button>
+    <button class="tb-link" onclick="showPage('aiagents',this)"><span class="icon">🤖</span> AI Agents</button>
+  </div>
+  <div class="tb-right">
+    <div class="tb-avatar" id="tb-av">A</div>
+    <span class="tb-name" id="tb-name">Admin</span>
+    <button class="tb-logout" onclick="Auth.logout()">Logout</button>
+  </div>
+</div>
+
+<!-- MAIN BODY -->
+<div id="main-body">
+
+  <!-- LEFT NAV -->
+  <div id="left-nav" id="left-nav-el">
+    <div class="nav-item active" onclick="switchInbox('all',this)" data-filter="all">
+      <span class="ni">💬</span> Semua Chat
+      <span class="nav-badge" id="unread-badge">0</span>
     </div>
-    <div class="tab-row">
-      <button class="tab active" onclick="setTab('all',this)">Semua</button>
-      <button class="tab" onclick="setTab('unread',this)">Belum balas</button>
+    <div class="nav-item" onclick="switchInbox('unread',this)" data-filter="unread">
+      <span class="ni">🔴</span> Belum Dibalas
     </div>
-    <div id="conv-list"></div>
+    <div class="nav-item" onclick="switchInbox('bot',this)" data-filter="bot">
+      <span class="ni">🤖</span> Ditangani AI
+    </div>
+    <div class="nav-section">Pengaturan</div>
+    <a class="nav-item" href="contacts.html"><span class="ni">👥</span> Kontak</a>
+    <a class="nav-item" href="settings.html"><span class="ni">⚙️</span> Pengaturan</a>
   </div>
 
-  <!-- Chat -->
-  <div id="chat-panel">
-    <div id="chat-header">
-      <div class="ch-avatar" id="ch-av" style="background:#ccc;">?</div>
-      <div style="flex:1;">
-        <div class="ch-name" id="ch-name">Pilih percakapan</div>
-        <div class="ch-sub" id="ch-sub"><span>—</span></div>
-      </div>
-      <div class="ch-acts">
-        <button class="action-btn" title="Lihat kontak" onclick="goContact()">👤</button>
-        <button class="action-btn" title="Hapus chat" onclick="clearChat()">🗑</button>
-      </div>
-    </div>
-    <div id="messages-area">
-      <div class="no-chat">
-        <div style="font-size:40px;">💬</div>
-        <div style="font-size:14px;font-weight:500;">Pilih percakapan</div>
-        <div style="font-size:12px;">atau tambah kontak baru</div>
-      </div>
-    </div>
-    <div id="input-box">
-      <div class="input-tools">
-        <button class="tool-btn on" id="ai-btn" onclick="toggleAI()">🤖 AI: <span id="ai-lbl">ON</span></button>
-        <button class="tool-btn on" id="wa-btn" onclick="toggleWA()">📱 Kirim WA: <span id="wa-lbl">ON</span></button>
-        <a href="settings.html" class="tool-btn">⚙️ Pengaturan</a>
-      </div>
-      <div class="input-row">
-        <textarea id="msg-input" placeholder="Tulis pesan pelanggan / biarkan AI menjawab otomatis..." rows="1"
-          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-        <button id="send-btn" onclick="sendMsg()">➤</button>
-      </div>
-    </div>
-  </div>
+  <!-- PAGE CONTENT -->
+  <div id="page-content">
 
-  <!-- Right Panel -->
-  <div id="right-panel">
-    <div class="rp-section">
-      <div class="rp-title">Kontak Aktif</div>
-      <div id="rp-contact" style="text-align:center;color:var(--text-3);font-size:12px;">—</div>
-    </div>
-    <div class="rp-section">
-      <div class="rp-title">WhatsApp</div>
-      <div class="wa-badge disconnected" id="wa-status-badge">
-        <div class="wa-dot off" id="wa-dot"></div>
-        <span id="wa-status-txt">Belum dicek</span>
+    <!-- CHAT PAGE -->
+    <div id="chat-page" style="display:flex;flex:1;overflow:hidden;">
+
+      <!-- INBOX -->
+      <div id="inbox">
+        <div id="inbox-top">
+          <h2>Inbox</h2>
+          <div class="search-bar">
+            <span style="color:#9ca3af;font-size:13px;">🔍</span>
+            <input placeholder="Cari kontak..." oninput="filterConvs(this.value)" />
+          </div>
+        </div>
+        <div class="tab-row">
+          <button class="tab active" onclick="setTab('all',this)">Semua</button>
+          <button class="tab" onclick="setTab('unread',this)">Belum balas</button>
+        </div>
+        <div id="conv-list"></div>
       </div>
-      <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%;" onclick="checkWA()">Cek koneksi</button>
-    </div>
-    <div class="rp-section">
-      <div class="rp-title">Product Knowledge</div>
-      <div id="pk-rp-status"></div>
-    </div>
-    <div class="rp-section">
-      <div class="rp-title">Statistik Hari Ini</div>
-      <div class="stat-row">
-        <div class="stat-card"><div class="stat-num" id="s-msg">0</div><div class="stat-label">Pesan</div></div>
-        <div class="stat-card"><div class="stat-num" id="s-ai">0</div><div class="stat-label">AI reply</div></div>
-        <div class="stat-card"><div class="stat-num" id="s-wa">0</div><div class="stat-label">Terkirim</div></div>
+
+      <!-- CHAT PANEL -->
+      <div id="chat-panel">
+        <div id="chat-header">
+          <div class="ch-avatar" id="ch-av" style="background:#ccc;">?</div>
+          <div style="flex:1;">
+            <div class="ch-name" id="ch-name">Pilih percakapan</div>
+            <div class="ch-sub" id="ch-sub"><span>—</span></div>
+          </div>
+          <div class="ch-acts">
+            <button class="action-btn" title="Lihat kontak" onclick="goContact()">👤</button>
+            <button class="action-btn" title="Hapus chat" onclick="clearChat()">🗑</button>
+          </div>
+        </div>
+        <div id="messages-area">
+          <div class="no-chat">
+            <div style="font-size:40px;">💬</div>
+            <div style="font-size:14px;font-weight:500;">Pilih percakapan</div>
+            <div style="font-size:12px;">atau tambah kontak baru</div>
+          </div>
+        </div>
+        <div id="input-box">
+          <div class="input-tools">
+            <button class="tool-btn on" id="ai-btn" onclick="toggleAI()">🤖 AI: <span id="ai-lbl">ON</span></button>
+            <button class="tool-btn on" id="wa-btn" onclick="toggleWA()">📱 Kirim WA: <span id="wa-lbl">ON</span></button>
+            <a href="settings.html" class="tool-btn">⚙️ Pengaturan</a>
+          </div>
+          <div class="input-row">
+            <textarea id="msg-input" placeholder="Tulis pesan..." rows="1"
+              onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+            <button id="send-btn" onclick="sendMsg()">&#10148;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT DETAIL -->
+      <div id="right-detail">
+        <div class="rd-section">
+          <div class="rd-title">Kontak Aktif</div>
+          <div id="rd-contact" style="text-align:center;color:#9ca3af;font-size:12px;">Pilih percakapan</div>
+        </div>
+        <div class="rd-section">
+          <div class="rd-title">WhatsApp</div>
+          <div class="wa-badge disconnected" id="wa-status-badge">
+            <div class="wa-dot off" id="wa-dot"></div>
+            <span id="wa-status-txt">Belum dicek</span>
+          </div>
+          <button style="margin-top:8px;width:100%;padding:6px;border-radius:8px;border:1px solid #e8eaed;background:#f5f7fa;font-size:12px;cursor:pointer;" onclick="checkWA()">Cek koneksi</button>
+        </div>
+        <div class="rd-section">
+          <div class="rd-title">Statistik Hari Ini</div>
+          <div class="stat-row">
+            <div class="stat-card"><div class="stat-num" id="s-msg">0</div><div class="stat-label">Pesan</div></div>
+            <div class="stat-card"><div class="stat-num" id="s-ai">0</div><div class="stat-label">AI reply</div></div>
+            <div class="stat-card"><div class="stat-num" id="s-wa">0</div><div class="stat-label">Terkirim</div></div>
+          </div>
+        </div>
+        <div class="rd-section">
+          <div class="rd-title">Product Knowledge</div>
+          <div id="pk-rp-status" style="font-size:12px;color:#6b7280;"></div>
+        </div>
       </div>
     </div>
+
+    <!-- OTHER PAGES (coming soon) -->
+    <div id="fanpage-page" class="coming-soon" style="display:none;">
+      <div class="cs-icon">📘</div>
+      <h2>Fanpage</h2>
+      <p>Segera hadir — integrasi Facebook & Instagram</p>
+    </div>
+    <div id="analytics-page" class="coming-soon" style="display:none;">
+      <div class="cs-icon">📊</div>
+      <h2>Analytics</h2>
+      <p>Segera hadir — laporan dan statistik lengkap</p>
+    </div>
+    <div id="conversations-page" class="coming-soon" style="display:none;">
+      <div class="cs-icon">🗂</div>
+      <h2>Conversations</h2>
+      <p>Segera hadir — manajemen percakapan lanjutan</p>
+    </div>
+    <div id="broadcast-page" class="coming-soon" style="display:none;">
+      <div class="cs-icon">📢</div>
+      <h2>Broadcast</h2>
+      <p>Segera hadir — kirim pesan massal ke kontak</p>
+    </div>
+    <div id="aiagents-page" class="coming-soon" style="display:none;">
+      <div class="cs-icon">🤖</div>
+      <h2>AI Agents</h2>
+      <p>Segera hadir — konfigurasi dan monitor AI agent</p>
+    </div>
+
   </div>
 </div>
 
@@ -182,43 +325,55 @@
 <script src="js/app.js"></script>
 <script>
 Auth.guard();
-document.getElementById('sidebar-container').innerHTML = renderSidebar('dashboard');
 
 let activeContactId = null;
 let aiOn = true, waOn = true, busy = false;
-let stats = {msg:0, ai:0, wa:0};
+let stats = { msg:0, ai:0, wa:0 };
 let tabFilter = 'all', searchFilter = '';
 
+/* Init user info */
+const user = Auth.getUser();
+document.getElementById('tb-av').textContent = initials(user?.name || '?');
+document.getElementById('tb-name').textContent = user?.name || 'Admin';
+
+/* ── PAGE SWITCHING ── */
+const pages = ['chat','fanpage','analytics','conversations','broadcast','aiagents'];
+function showPage(name, btn) {
+  pages.forEach(p => {
+    const el = document.getElementById(p + '-page');
+    if (el) el.style.display = p === name ? 'flex' : 'none';
+  });
+  document.querySelectorAll('.tb-link').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  // Show/hide left nav only for chat
+  document.getElementById('left-nav').style.display = name === 'chat' ? 'flex' : 'none';
+}
+
+function switchInbox(filter, el) {
+  tabFilter = filter;
+  document.querySelectorAll('#left-nav .nav-item[data-filter]').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  renderInbox();
+}
+
 /* ── SYSTEM PROMPT ── */
-function buildSystem() {
+function buildSystemPrompt() {
   const cfg = Config.get();
-  const storeName = cfg.storeName || Auth.getUser()?.store || 'HerbalCare';
-  const extra = cfg.aiExtra || '';
-  const pk = cfg.productKnowledge || '';
+  const storeName = cfg.store_name || user?.store || 'HerbalCare';
   let sys = `Kamu adalah AI Agent customer service ${storeName}, toko herbal terpercaya Indonesia.
 Kamu ramah, jujur, dan sangat membantu. Jawab HANYA berdasarkan informasi produk yang tersedia di katalog.
-Jika ditanya produk yang tidak ada di katalog, katakan jujur bahwa produk tersebut tidak tersedia saat ini.
-Gunakan bahasa Indonesia yang hangat dan profesional. Jawab ringkas. Gunakan emoji sesekali.
-Untuk pertanyaan medis serius, sarankan konsultasi dokter atau apoteker.
-Jangan pernah mengarang informasi harga, stok, atau manfaat yang tidak ada di katalog.
-Jangan menyebut nama AI atau Claude — kamu adalah CS ${storeName}.`;
-  if (extra) sys += `\n\nInstruksi tambahan:\n${extra}`;
-  if (pk) sys += `\n\n== KATALOG PRODUK ==\n${pk}\n== AKHIR KATALOG ==\n\nGunakan HANYA katalog di atas.`;
-  else sys += `\n\nCatatan: Katalog belum diisi. Minta pelanggan menunggu sementara Anda mengecek.`;
+Jika ditanya produk yang tidak ada, katakan jujur tidak tersedia. Gunakan bahasa Indonesia yang hangat.
+Jawab ringkas. Gunakan emoji sesekali. Untuk pertanyaan medis serius, sarankan konsultasi dokter.
+Jangan menyebut nama AI atau Claude.`;
+  if (cfg.ai_extra) sys += `\n\nInstruksi tambahan:\n${cfg.ai_extra}`;
+  if (cfg.product_knowledge) sys += `\n\n== KATALOG PRODUK ==\n${cfg.product_knowledge}\n== AKHIR KATALOG ==`;
+  else sys += `\n\nKatalog belum diisi. Minta pelanggan menunggu.`;
   return sys;
 }
 
-/* ── CONTACTS / INBOX ── */
+/* ── INBOX ── */
 async function renderInbox() {
   let list = await Contacts.getAll();
-  if (tabFilter === 'unread') {
-    const unreadList = [];
-    for (const c of list) {
-      const h = await ChatHistory.get(c.id, 1);
-      if (h.length && h[h.length-1]?.role === 'user') unreadList.push(c);
-    }
-    list = unreadList;
-  }
   if (searchFilter) list = list.filter(c => c.name.toLowerCase().includes(searchFilter) || c.phone.includes(searchFilter));
 
   const el = document.getElementById('conv-list');
@@ -226,17 +381,27 @@ async function renderInbox() {
     el.innerHTML = `<div class="empty-inbox">
       <div style="font-size:32px;margin-bottom:8px;">📭</div>
       <div style="font-size:13px;font-weight:500;">Belum ada kontak</div>
-      <a href="contacts.html" style="font-size:12px;color:var(--green);">+ Tambah kontak</a>
+      <a href="contacts.html" style="font-size:12px;color:#16a679;">+ Tambah kontak</a>
     </div>`;
     return;
   }
 
-  // Load last message per contact
   const rows = await Promise.all(list.map(async c => {
     const hist = await ChatHistory.get(c.id, 1);
     const last = hist[hist.length - 1];
     return { c, last };
   }));
+
+  // Sort by last message time
+  rows.sort((a, b) => {
+    const ta = a.last?.created_at || a.c.created_at || '';
+    const tb = b.last?.created_at || b.c.created_at || '';
+    return tb.localeCompare(ta);
+  });
+
+  if (tabFilter === 'unread') {
+    rows.filter(r => r.last?.role === 'user');
+  }
 
   el.innerHTML = rows.map(({ c, last }) => {
     const preview = last ? last.content.slice(0,50) : 'Belum ada pesan';
@@ -245,15 +410,15 @@ async function renderInbox() {
     return `<div class="conv-item ${activeContactId===c.id?'active':''}" onclick="selectContact('${c.id}')">
       <div class="conv-avatar" style="background:${color}">${initials(c.name)}</div>
       <div class="conv-info">
-        <div class="conv-name">${c.name}<span class="time">${last ? timeStr(last.created_at) : ''}</span></div>
+        <div class="conv-name">${c.name}<span class="ctime">${last ? timeStr(last.created_at) : ''}</span></div>
         <div class="conv-preview">${preview}</div>
         <div class="conv-meta"><span class="ch-wa">WhatsApp</span>${isUnread?'<div class="unread-dot"></div>':''}</div>
       </div>
     </div>`;
   }).join('');
 
-  const unreadCount = rows.filter(({last}) => last?.role === 'user').length;
-  document.getElementById('unread-badge').textContent = unreadCount;
+  const unreadCount = rows.filter(r => r.last?.role === 'user').length;
+  document.getElementById('unread-badge').textContent = unreadCount || '0';
 }
 
 function setTab(tab, btn) {
@@ -282,10 +447,10 @@ async function renderChat() {
   document.getElementById('ch-av').textContent = initials(c.name);
   document.getElementById('ch-av').style.background = avatarColor(c.name);
   document.getElementById('ch-name').textContent = c.name;
-  document.getElementById('ch-sub').innerHTML = `<span class="online-dot"></span> WhatsApp · +${c.phone}`;
+  document.getElementById('ch-sub').innerHTML = `<span class="online-dot"></span> WhatsApp &middot; +${c.phone}`;
 
   area.innerHTML = '<div class="day-divider">Hari ini</div>';
-  const hist = await ChatHistory.get(activeContactId);
+  const hist = await ChatHistory.get(activeContactId, 100);
   hist.forEach(m => appendBubble(m.role === 'user' ? 'customer' : 'bot', m.content, false, m.created_at));
   area.scrollTop = area.scrollHeight;
 }
@@ -301,8 +466,8 @@ function appendBubble(type, text, scroll=true, ts=null) {
   const t = timeStr(ts);
 
   if (type === 'customer') {
-    const c = Contacts.find(activeContactId);
-    div.innerHTML = `<div class="msg-av" style="background:${avatarColor(c?.name||'?')}">${initials(c?.name||'?')}</div>
+    const c = { name: document.getElementById('ch-name').textContent };
+    div.innerHTML = `<div class="msg-av" style="background:${avatarColor(c.name)}">${initials(c.name)}</div>
       <div><div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
   } else {
     div.innerHTML = `<div>
@@ -337,7 +502,7 @@ async function sendMsg() {
   if (!text) return;
   input.value = ''; autoResize(input);
 
-  ChatHistory.add(activeContactId, 'user', text);
+  await ChatHistory.add(activeContactId, 'user', text);
   appendBubble('customer', text);
   stats.msg++; updateStats();
   renderInbox();
@@ -349,22 +514,23 @@ async function sendMsg() {
   showTyping();
 
   try {
-    const hist = ChatHistory.get(activeContactId).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
-    const reply = await Claude.chat(hist, buildSystem());
-    ChatHistory.add(activeContactId, 'assistant', reply);
+    const hist = await ChatHistory.get(activeContactId, 20);
+    const messages = hist.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+    const reply = await Claude.chat(messages, buildSystemPrompt());
+    await ChatHistory.add(activeContactId, 'assistant', reply);
     removeTyping();
     const msgEl = appendBubble('bot', reply);
     stats.ai++; updateStats();
     renderInbox();
 
     if (waOn) {
-      const c = Contacts.find(activeContactId);
+      const c = await Contacts.find(activeContactId);
       const r = await Fonnte.send(c.phone, reply);
       const inner = msgEl.querySelector('.bubble');
       if (inner) {
         const lbl = document.createElement('div');
         lbl.className = r.ok ? 'wa-sent' : 'wa-fail';
-        lbl.textContent = r.ok ? '✓✓ Terkirim ke WhatsApp' : '✗ Gagal kirim ke WA';
+        lbl.textContent = r.ok ? '&#10003;&#10003; Terkirim ke WhatsApp' : '&#10007; Gagal kirim ke WA';
         inner.after(lbl);
       }
       if (r.ok) { stats.wa++; updateStats(); }
@@ -372,7 +538,7 @@ async function sendMsg() {
   } catch(e) {
     removeTyping();
     appendBubble('bot', 'Maaf, ada kendala: ' + e.message);
-    if (e.message.includes('API key')) showToast('⚠️ Set Anthropic API key di Pengaturan');
+    if (e.message.includes('API key')) showToast('Set Anthropic API key di Pengaturan');
   } finally {
     busy = false;
     document.getElementById('send-btn').disabled = false;
@@ -392,26 +558,23 @@ function toggleWA() {
 }
 
 /* ── RIGHT PANEL ── */
-function updateRightPanel() {
+async function updateRightPanel() {
   if (!activeContactId) return;
-  const c = Contacts.find(activeContactId);
+  const c = await Contacts.find(activeContactId);
   const color = avatarColor(c.name);
-  document.getElementById('rp-contact').innerHTML = `
-    <div class="contact-av-rp" style="background:${color}">${initials(c.name)}</div>
+  document.getElementById('rd-contact').innerHTML = `
+    <div class="rd-contact-av" style="background:${color}">${initials(c.name)}</div>
     <div style="font-weight:600;font-size:14px;">${c.name}</div>
-    <div style="font-size:12px;color:var(--text-2);margin-top:2px;">📱 +${c.phone}</div>
-    ${c.address ? `<div style="font-size:12px;color:var(--text-2)">📍 ${c.address}</div>` : ''}
-    <a href="contacts.html" style="font-size:11px;margin-top:8px;display:inline-block;">Edit kontak →</a>`;
+    <div style="font-size:12px;color:#6b7280;margin-top:2px;">+${c.phone}</div>
+    ${c.address ? `<div style="font-size:12px;color:#6b7280;">&#128205; ${c.address}</div>` : ''}
+    <a href="contacts.html" style="font-size:11px;margin-top:8px;display:inline-block;color:#16a679;">Edit kontak</a>`;
 }
 
 function updatePKStatus() {
-  const pk = Config.getKey('productKnowledge');
+  const pk = Config.getKey('product_knowledge');
   document.getElementById('pk-rp-status').innerHTML = pk
-    ? `<span class="badge badge-green">✅ Katalog aktif</span>
-       <div style="font-size:11px;color:var(--text-2);margin-top:6px;">${pk.length.toLocaleString()} karakter</div>
-       <a href="settings.html" style="font-size:11px;">Ganti katalog →</a>`
-    : `<span class="badge badge-amber">⚠️ Belum ada katalog</span>
-       <div style="font-size:11px;margin-top:6px;"><a href="settings.html">Upload di Pengaturan →</a></div>`;
+    ? `<span style="color:#15803d;font-weight:500;">&#10003; Katalog aktif</span> <span style="color:#9ca3af;">(${pk.length.toLocaleString()} karakter)</span>`
+    : `<span style="color:#92400e;">&#9888; Belum ada katalog</span> <a href="settings.html" style="font-size:11px;display:block;margin-top:4px;">Upload di Pengaturan</a>`;
 }
 
 async function checkWA() {
@@ -423,25 +586,12 @@ async function checkWA() {
   if (r.ok) {
     badge.className = 'wa-badge connected';
     dot.className = 'wa-dot on';
-    txt.textContent = 'Terhubung ✓';
-    showToast('✅ WhatsApp terhubung!');
+    txt.textContent = 'Terhubung';
   } else {
     badge.className = 'wa-badge disconnected';
     dot.className = 'wa-dot off';
     txt.textContent = 'Tidak terhubung';
-    showToast('⚠️ WA belum terhubung — set token di Pengaturan');
   }
-}
-
-function goContact() { if (activeContactId) window.location.href = 'contacts.html'; }
-
-function clearChat() {
-  if (!activeContactId) return;
-  if (!confirm('Hapus riwayat chat ini?')) return;
-  ChatHistory.clear(activeContactId);
-  renderChat();
-  renderInbox();
-  showToast('🗑 Chat dihapus');
 }
 
 function updateStats() {
@@ -450,46 +600,41 @@ function updateStats() {
   document.getElementById('s-wa').textContent = stats.wa;
 }
 
-/* ── INIT ── */
-/* ── POLLING: cek pesan baru tiap 5 detik ── */
-let lastPollTs = {};
-let pollingActive = true;
+function goContact() { if (activeContactId) window.location.href = 'contacts.html'; }
+async function clearChat() {
+  if (!activeContactId) return;
+  if (!confirm('Hapus riwayat chat ini?')) return;
+  await ChatHistory.clear(activeContactId);
+  await renderChat();
+  await renderInbox();
+  showToast('Chat dihapus');
+}
 
-async function pollMessages() {
-  if (!pollingActive || !activeContactId) return;
-  try {
+/* ── POLLING ── */
+let lastMsgCount = 0;
+async function poll() {
+  if (activeContactId) {
     const msgs = await ChatHistory.get(activeContactId, 100);
-    const existing = document.getElementById('messages-area');
-    const currentCount = existing.querySelectorAll('.msg-row').length;
-    if (msgs.length > currentCount) {
-      renderChat();
+    if (msgs.length !== lastMsgCount) {
+      lastMsgCount = msgs.length;
+      await renderChat();
     }
-  } catch {}
+  }
+  await renderInbox();
 }
 
-async function pollInbox() {
-  try {
-    await renderInbox();
-  } catch(e) { console.error('pollInbox:', e); }
-}
-
+/* ── INIT ── */
 window.addEventListener('load', async () => {
   await Config.load();
-
   await renderInbox();
   updatePKStatus();
+  checkWA();
 
   const params = new URLSearchParams(location.search);
   const cid = params.get('contact');
   if (cid) selectContact(cid);
 
-  checkWA();
-
-  // Polling pesan masuk tiap 5 detik
-  setInterval(async () => {
-    await pollMessages();
-    await pollInbox();
-  }, 5000);
+  setInterval(poll, 5000);
 });
 </script>
 </body>
