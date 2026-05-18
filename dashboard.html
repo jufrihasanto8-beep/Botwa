@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · HerbalCare CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.dashboard-layout {
+  display: flex;
+  height: 100vh;
+  padding-left: var(--sidebar-w);
+  overflow: hidden;
+}
+#inbox {
+  width: var(--inbox-w);
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+#inbox-top { padding: 14px 14px 8px; border-bottom: 1px solid var(--border); }
+#inbox-top h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+.search-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px;
+}
+.search-bar input { border: none; background: none; font-size: 13px; flex: 1; color: var(--text); outline: none; }
+.tab-row { display: flex; gap: 2px; padding: 8px 10px 0; }
+.tab { font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer; color: var(--text-2); font-weight: 500; border: none; background: none; transition: all .15s; }
+.tab.active { background: var(--green-light); color: var(--green-dark); }
+#conv-list { flex: 1; overflow-y: auto; }
+.conv-item { display: flex; gap: 10px; padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background .1s; align-items: flex-start; }
+.conv-item:hover { background: var(--bg); }
+.conv-item.active { background: var(--green-light); }
+.conv-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #fff; }
+.conv-info { flex: 1; min-width: 0; }
+.conv-name { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; }
+.conv-name .time { font-weight: 400; font-size: 11px; color: var(--text-3); }
+.conv-preview { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.conv-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.ch-wa { background: #dcfce7; color: #15803d; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+.unread-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; }
+
+#chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#chat-header { background: var(--white); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+.ch-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.ch-name { font-weight: 600; font-size: 14px; }
+.ch-sub { font-size: 11px; color: var(--text-2); display: flex; align-items: center; gap: 4px; }
+.online-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; }
+.ch-acts { display: flex; gap: 6px; }
+.action-btn { width: 32px; height: 32px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: var(--text-2); transition: all .15s; }
+.action-btn:hover { background: var(--green-light); color: var(--green); }
+
+#messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+.day-divider { text-align: center; font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 8px; }
+.day-divider::before,.day-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.msg-row { display: flex; gap: 8px; align-items: flex-end; }
+.msg-row.from-customer { justify-content: flex-start; }
+.msg-row.from-bot, .msg-row.from-agent { justify-content: flex-end; }
+.msg-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; flex-shrink: 0; font-weight: 600; }
+.bubble { max-width: 70%; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.55; }
+.from-customer .bubble { background: var(--white); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.from-bot .bubble, .from-agent .bubble { background: var(--green); color: #fff; border-bottom-right-radius: 4px; }
+.msg-meta { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+.from-bot .msg-meta, .from-agent .msg-meta { text-align: right; }
+.bot-label { font-size: 10px; color: var(--green); font-weight: 500; margin-bottom: 2px; text-align: right; }
+.wa-sent { font-size: 10px; color: #15803d; margin-top: 2px; text-align: right; }
+.wa-fail { font-size: 10px; color: var(--badge); margin-top: 2px; text-align: right; }
+
+#input-box { background: var(--white); border-top: 1px solid var(--border); padding: 10px 14px; }
+.input-tools { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.tool-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); font-size: 11px; color: var(--text-2); cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .15s; }
+.tool-btn:hover, .tool-btn.on { background: var(--green-light); color: var(--green); border-color: var(--green-mid); }
+.input-row { display: flex; gap: 8px; align-items: flex-end; }
+#msg-input { flex: 1; resize: none; border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 12px; font-size: 13px; font-family: inherit; line-height: 1.4; background: var(--bg); color: var(--text); min-height: 40px; max-height: 100px; transition: border-color .2s; }
+#msg-input:focus { outline: none; border-color: var(--green); background: var(--white); }
+#send-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--green); color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background .15s; flex-shrink: 0; }
+#send-btn:hover { background: var(--green-dark); }
+#send-btn:disabled { background: var(--border); cursor: not-allowed; }
+
+#right-panel { width: 250px; background: var(--white); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.rp-section { padding: 14px; border-bottom: 1px solid var(--border); }
+.rp-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+.stat-row { display: flex; gap: 8px; }
+.stat-card { flex: 1; background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.stat-num { font-size: 18px; font-weight: 700; color: var(--green); }
+.stat-label { font-size: 10px; color: var(--text-2); margin-top: 1px; }
+.contact-av-rp { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; margin: 0 auto 8px; }
+
+.empty-inbox { text-align: center; padding: 40px 20px; color: var(--text-3); }
+.no-chat { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: var(--text-3); background: var(--bg); }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div id="sidebar-container"></div>
+<div class="dashboard-layout">
+
+  <!-- Inbox -->
+  <div id="inbox">
+    <div id="inbox-top">
+      <h2>Inbox</h2>
+      <div class="search-bar">
+        <span style="color:#9ca3af;">🔍</span>
+        <input placeholder="Cari..." oninput="filterConvs(this.value)" />
+      </div>
+    </div>
+    <div class="tab-row">
+      <button class="tab active" onclick="setTab('all',this)">Semua</button>
+      <button class="tab" onclick="setTab('unread',this)">Belum balas</button>
+    </div>
+    <div id="conv-list"></div>
+  </div>
+
+  <!-- Chat -->
+  <div id="chat-panel">
+    <div id="chat-header">
+      <div class="ch-avatar" id="ch-av" style="background:#ccc;">?</div>
+      <div style="flex:1;">
+        <div class="ch-name" id="ch-name">Pilih percakapan</div>
+        <div class="ch-sub" id="ch-sub"><span>—</span></div>
+      </div>
+      <div class="ch-acts">
+        <button class="action-btn" title="Lihat kontak" onclick="goContact()">👤</button>
+        <button class="action-btn" title="Hapus chat" onclick="clearChat()">🗑</button>
+      </div>
+    </div>
+    <div id="messages-area">
+      <div class="no-chat">
+        <div style="font-size:40px;">💬</div>
+        <div style="font-size:14px;font-weight:500;">Pilih percakapan</div>
+        <div style="font-size:12px;">atau tambah kontak baru</div>
+      </div>
+    </div>
+    <div id="input-box">
+      <div class="input-tools">
+        <button class="tool-btn on" id="ai-btn" onclick="toggleAI()">🤖 AI: <span id="ai-lbl">ON</span></button>
+        <button class="tool-btn on" id="wa-btn" onclick="toggleWA()">📱 Kirim WA: <span id="wa-lbl">ON</span></button>
+        <a href="settings.html" class="tool-btn">⚙️ Pengaturan</a>
+      </div>
+      <div class="input-row">
+        <textarea id="msg-input" placeholder="Tulis pesan pelanggan / biarkan AI menjawab otomatis..." rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button id="send-btn" onclick="sendMsg()">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div id="right-panel">
+    <div class="rp-section">
+      <div class="rp-title">Kontak Aktif</div>
+      <div id="rp-contact" style="text-align:center;color:var(--text-3);font-size:12px;">—</div>
+    </div>
+    <div class="rp-section">
+      <div class="rp-title">WhatsApp</div>
+      <div class="wa-badge disconnected" id="wa-status-badge">
+        <div class="wa-dot off" id="wa-dot"></div>
+        <span id="wa-status-txt">Belum dicek</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%;" onclick="checkWA()">Cek koneksi</button>
+    </div>
+    <div class="rp-section">
+      <div class="rp-title">Product Knowledge</div>
+      <div id="pk-rp-status"></div>
+    </div>
+    <div class="rp-section">
+      <div class="rp-title">Statistik Hari Ini</div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-num" id="s-msg">0</div><div class="stat-label">Pesan</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-ai">0</div><div class="stat-label">AI reply</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-wa">0</div><div class="stat-label">Terkirim</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('dashboard');
+
+let activeContactId = null;
+let aiOn = true, waOn = true, busy = false;
+let stats = {msg:0, ai:0, wa:0};
+let tabFilter = 'all', searchFilter = '';
+
+/* ── SYSTEM PROMPT ── */
+function buildSystem() {
+  const cfg = Config.get();
+  const storeName = cfg.storeName || Auth.getUser()?.store || 'HerbalCare';
+  const extra = cfg.aiExtra || '';
+  const pk = cfg.productKnowledge || '';
+  let sys = `Kamu adalah AI Agent customer service ${storeName}, toko herbal terpercaya Indonesia.
+Kamu ramah, jujur, dan sangat membantu. Jawab HANYA berdasarkan informasi produk yang tersedia di katalog.
+Jika ditanya produk yang tidak ada di katalog, katakan jujur bahwa produk tersebut tidak tersedia saat ini.
+Gunakan bahasa Indonesia yang hangat dan profesional. Jawab ringkas. Gunakan emoji sesekali.
+Untuk pertanyaan medis serius, sarankan konsultasi dokter atau apoteker.
+Jangan pernah mengarang informasi harga, stok, atau manfaat yang tidak ada di katalog.
+Jangan menyebut nama AI atau Claude — kamu adalah CS ${storeName}.`;
+  if (extra) sys += `\n\nInstruksi tambahan:\n${extra}`;
+  if (pk) sys += `\n\n== KATALOG PRODUK ==\n${pk}\n== AKHIR KATALOG ==\n\nGunakan HANYA katalog di atas.`;
+  else sys += `\n\nCatatan: Katalog belum diisi. Minta pelanggan menunggu sementara Anda mengecek.`;
+  return sys;
+}
+
+/* ── CONTACTS / INBOX ── */
+function renderInbox() {
+  let list = Contacts.getAll();
+  if (tabFilter === 'unread') list = list.filter(c => ChatHistory.get(c.id).length && ChatHistory.get(c.id).slice(-1)[0]?.role === 'user');
+  if (searchFilter) list = list.filter(c => c.name.toLowerCase().includes(searchFilter) || c.phone.includes(searchFilter));
+
+  const el = document.getElementById('conv-list');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-inbox">
+      <div style="font-size:32px;margin-bottom:8px;">📭</div>
+      <div style="font-size:13px;font-weight:500;">Belum ada kontak</div>
+      <a href="contacts.html" style="font-size:12px;color:var(--green);">+ Tambah kontak</a>
+    </div>`;
+    return;
+  }
+  el.innerHTML = list.map(c => {
+    const hist = ChatHistory.get(c.id);
+    const last = hist[hist.length - 1];
+    const preview = last ? last.content.slice(0,50) : 'Belum ada pesan';
+    const isUnread = last?.role === 'user';
+    const color = avatarColor(c.name);
+    return `<div class="conv-item ${activeContactId===c.id?'active':''}" onclick="selectContact('${c.id}')">
+      <div class="conv-avatar" style="background:${color}">${initials(c.name)}</div>
+      <div class="conv-info">
+        <div class="conv-name">${c.name}<span class="time">${last ? timeStr(last.ts) : ''}</span></div>
+        <div class="conv-preview">${preview}</div>
+        <div class="conv-meta"><span class="ch-wa">WhatsApp</span>${isUnread?'<div class="unread-dot"></div>':''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const unread = Contacts.getAll().filter(c => { const h = ChatHistory.get(c.id); return h.length && h.slice(-1)[0]?.role==='user'; }).length;
+  document.getElementById('unread-badge').textContent = unread;
+}
+
+function setTab(tab, btn) {
+  tabFilter = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderInbox();
+}
+
+function filterConvs(val) { searchFilter = val.toLowerCase(); renderInbox(); }
+
+function selectContact(id) {
+  activeContactId = id;
+  renderInbox();
+  renderChat();
+  updateRightPanel();
+}
+
+/* ── CHAT ── */
+function renderChat() {
+  const area = document.getElementById('messages-area');
+  if (!activeContactId) return;
+  const c = Contacts.find(activeContactId);
+  if (!c) return;
+
+  document.getElementById('ch-av').textContent = initials(c.name);
+  document.getElementById('ch-av').style.background = avatarColor(c.name);
+  document.getElementById('ch-name').textContent = c.name;
+  document.getElementById('ch-sub').innerHTML = `<span class="online-dot"></span> WhatsApp · +${c.phone}`;
+
+  area.innerHTML = '<div class="day-divider">Hari ini</div>';
+  const hist = ChatHistory.get(activeContactId);
+  hist.forEach(m => appendBubble(m.role === 'user' ? 'customer' : 'bot', m.content, false, m.ts));
+  area.scrollTop = area.scrollHeight;
+}
+
+function appendBubble(type, text, scroll=true, ts=null) {
+  const area = document.getElementById('messages-area');
+  const noChat = area.querySelector('.no-chat');
+  if (noChat) noChat.remove();
+
+  const div = document.createElement('div');
+  div.className = `msg-row from-${type}`;
+  const safe = text.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  const t = timeStr(ts);
+
+  if (type === 'customer') {
+    const c = Contacts.find(activeContactId);
+    div.innerHTML = `<div class="msg-av" style="background:${avatarColor(c?.name||'?')}">${initials(c?.name||'?')}</div>
+      <div><div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
+  } else {
+    div.innerHTML = `<div>
+      <div class="bot-label">🤖 AI Agent</div>
+      <div class="bubble">${safe}</div>
+      <div class="msg-meta">${t}</div>
+    </div>`;
+  }
+  area.appendChild(div);
+  if (scroll) area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function showTyping() {
+  const area = document.getElementById('messages-area');
+  const d = document.createElement('div');
+  d.className = 'msg-row from-bot'; d.id = 'typing';
+  d.innerHTML = `<div><div class="bot-label">🤖 AI Agent</div>
+    <div class="bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>`;
+  area.appendChild(d); area.scrollTop = area.scrollHeight;
+}
+function removeTyping() { const e = document.getElementById('typing'); if(e) e.remove(); }
+
+function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
+function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
+
+/* ── SEND ── */
+async function sendMsg() {
+  if (busy || !activeContactId) return;
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = ''; autoResize(input);
+
+  ChatHistory.add(activeContactId, 'user', text);
+  appendBubble('customer', text);
+  stats.msg++; updateStats();
+  renderInbox();
+
+  if (!aiOn) return;
+
+  busy = true;
+  document.getElementById('send-btn').disabled = true;
+  showTyping();
+
+  try {
+    const hist = ChatHistory.get(activeContactId).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+    const reply = await Claude.chat(hist, buildSystem());
+    ChatHistory.add(activeContactId, 'assistant', reply);
+    removeTyping();
+    const msgEl = appendBubble('bot', reply);
+    stats.ai++; updateStats();
+    renderInbox();
+
+    if (waOn) {
+      const c = Contacts.find(activeContactId);
+      const r = await Fonnte.send(c.phone, reply);
+      const inner = msgEl.querySelector('.bubble');
+      if (inner) {
+        const lbl = document.createElement('div');
+        lbl.className = r.ok ? 'wa-sent' : 'wa-fail';
+        lbl.textContent = r.ok ? '✓✓ Terkirim ke WhatsApp' : '✗ Gagal kirim ke WA';
+        inner.after(lbl);
+      }
+      if (r.ok) { stats.wa++; updateStats(); }
+    }
+  } catch(e) {
+    removeTyping();
+    appendBubble('bot', 'Maaf, ada kendala: ' + e.message);
+    if (e.message.includes('API key')) showToast('⚠️ Set Anthropic API key di Pengaturan');
+  } finally {
+    busy = false;
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+/* ── TOGGLES ── */
+function toggleAI() {
+  aiOn = !aiOn;
+  document.getElementById('ai-lbl').textContent = aiOn ? 'ON' : 'OFF';
+  document.getElementById('ai-btn').className = 'tool-btn' + (aiOn ? ' on' : '');
+}
+function toggleWA() {
+  waOn = !waOn;
+  document.getElementById('wa-lbl').textContent = waOn ? 'ON' : 'OFF';
+  document.getElementById('wa-btn').className = 'tool-btn' + (waOn ? ' on' : '');
+}
+
+/* ── RIGHT PANEL ── */
+function updateRightPanel() {
+  if (!activeContactId) return;
+  const c = Contacts.find(activeContactId);
+  const color = avatarColor(c.name);
+  document.getElementById('rp-contact').innerHTML = `
+    <div class="contact-av-rp" style="background:${color}">${initials(c.name)}</div>
+    <div style="font-weight:600;font-size:14px;">${c.name}</div>
+    <div style="font-size:12px;color:var(--text-2);margin-top:2px;">📱 +${c.phone}</div>
+    ${c.address ? `<div style="font-size:12px;color:var(--text-2)">📍 ${c.address}</div>` : ''}
+    <a href="contacts.html" style="font-size:11px;margin-top:8px;display:inline-block;">Edit kontak →</a>`;
+}
+
+function updatePKStatus() {
+  const pk = Config.getKey('productKnowledge');
+  document.getElementById('pk-rp-status').innerHTML = pk
+    ? `<span class="badge badge-green">✅ Katalog aktif</span>
+       <div style="font-size:11px;color:var(--text-2);margin-top:6px;">${pk.length.toLocaleString()} karakter</div>
+       <a href="settings.html" style="font-size:11px;">Ganti katalog →</a>`
+    : `<span class="badge badge-amber">⚠️ Belum ada katalog</span>
+       <div style="font-size:11px;margin-top:6px;"><a href="settings.html">Upload di Pengaturan →</a></div>`;
+}
+
+async function checkWA() {
+  const badge = document.getElementById('wa-status-badge');
+  const dot = document.getElementById('wa-dot');
+  const txt = document.getElementById('wa-status-txt');
+  txt.textContent = 'Mengecek...';
+  const r = await Fonnte.checkDevice();
+  if (r.ok) {
+    badge.className = 'wa-badge connected';
+    dot.className = 'wa-dot on';
+    txt.textContent = 'Terhubung ✓';
+    showToast('✅ WhatsApp terhubung!');
+  } else {
+    badge.className = 'wa-badge disconnected';
+    dot.className = 'wa-dot off';
+    txt.textContent = 'Tidak terhubung';
+    showToast('⚠️ WA belum terhubung — set token di Pengaturan');
+  }
+}
+
+function goContact() { if (activeContactId) window.location.href = 'contacts.html'; }
+
+function clearChat() {
+  if (!activeContactId) return;
+  if (!confirm('Hapus riwayat chat ini?')) return;
+  ChatHistory.clear(activeContactId);
+  renderChat();
+  renderInbox();
+  showToast('🗑 Chat dihapus');
+}
+
+function updateStats() {
+  document.getElementById('s-msg').textContent = stats.msg;
+  document.getElementById('s-ai').textContent = stats.ai;
+  document.getElementById('s-wa').textContent = stats.wa;
+}
+
+/* ── INIT ── */
+window.addEventListener('load', () => {
+  renderInbox();
+  updatePKStatus();
+
+  // Auto-select contact from URL
+  const params = new URLSearchParams(location.search);
+  const cid = params.get('contact');
+  if (cid && Contacts.find(cid)) selectContact(cid);
+
+  // Check WA silently
+  checkWA();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login · HerbalCare CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0e2a22 0%, #1a3d2e 50%, #0e2a22 100%);
+}
+.login-wrap {
+  width: 100%;
+  max-width: 420px;
+  padding: 16px;
+}
+.login-card {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 36px 32px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.logo-area {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.logo-icon {
+  width: 56px; height: 56px;
+  background: var(--green);
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  margin: 0 auto 12px;
+}
+.logo-area h1 { font-size: 22px; font-weight: 700; color: var(--text); }
+.logo-area p { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+.tab-switch {
+  display: flex;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+.tab-switch button {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+}
+.tab-switch button.active {
+  background: var(--white);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.form-section { display: none; }
+.form-section.active { display: block; }
+.divider-text {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 16px 0;
+  position: relative;
+}
+.divider-text::before, .divider-text::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--border);
+}
+.divider-text::before { left: 0; }
+.divider-text::after { right: 0; }
+.demo-btn {
+  width: 100%;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all .15s;
+}
+.demo-btn:hover { background: var(--green-light); color: var(--green); border-color: var(--green-mid); }
+.error-msg {
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  display: none;
+}
+.success-msg {
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  display: none;
+}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="logo-area">
+      <div class="logo-icon">🌿</div>
+      <h1>HerbalCare CS</h1>
+      <p>Dashboard Customer Service berbasis AI</p>
+    </div>
+
+    <div class="tab-switch">
+      <button class="active" onclick="switchTab('login')">Masuk</button>
+      <button onclick="switchTab('register')">Daftar</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="form-section active" id="section-login">
+      <div class="error-msg" id="login-error"></div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="nama@email.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <button class="btn btn-primary btn-block" onclick="doLogin()">Masuk →</button>
+      <div class="divider-text">atau</div>
+      <button class="demo-btn" onclick="loginDemo()">🚀 Coba dengan akun demo</button>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="form-section" id="section-register">
+      <div class="error-msg" id="reg-error"></div>
+      <div class="success-msg" id="reg-success"></div>
+      <div class="form-group">
+        <label>Nama Lengkap</label>
+        <input type="text" id="reg-name" placeholder="Nama Anda" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="nama@email.com" />
+      </div>
+      <div class="form-group">
+        <label>Nama Toko / Bisnis</label>
+        <input type="text" id="reg-store" placeholder="HerbalCare" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="reg-pass" placeholder="Min. 6 karakter" />
+      </div>
+      <div class="form-group">
+        <label>Konfirmasi Password</label>
+        <input type="password" id="reg-pass2" placeholder="Ulangi password" onkeydown="if(event.key==='Enter')doRegister()" />
+      </div>
+      <button class="btn btn-primary btn-block" onclick="doRegister()">Buat Akun →</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+/* Redirect if already logged in */
+if (Auth.isLoggedIn()) window.location.href = 'dashboard.html';
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-switch button').forEach((b, i) => {
+    b.classList.toggle('active', (tab === 'login' && i === 0) || (tab === 'register' && i === 1));
+  });
+  document.getElementById('section-login').classList.toggle('active', tab === 'login');
+  document.getElementById('section-register').classList.toggle('active', tab === 'register');
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+function showSuccess(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (!email || !pass) return showError('login-error', 'Email dan password wajib diisi.');
+
+  const users = JSON.parse(localStorage.getItem('hc_users') || '[]');
+  const user = users.find(u => u.email === email && u.password === pass);
+  if (!user) return showError('login-error', 'Email atau password salah.');
+
+  Auth.login({ name: user.name, email: user.email, store: user.store, role: user.role });
+  window.location.href = 'dashboard.html';
+}
+
+function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const store = document.getElementById('reg-store').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+
+  if (!name || !email || !pass) return showError('reg-error', 'Semua field wajib diisi.');
+  if (pass.length < 6) return showError('reg-error', 'Password minimal 6 karakter.');
+  if (pass !== pass2) return showError('reg-error', 'Password tidak cocok.');
+
+  const users = JSON.parse(localStorage.getItem('hc_users') || '[]');
+  if (users.find(u => u.email === email)) return showError('reg-error', 'Email sudah terdaftar.');
+
+  users.push({ name, email, store: store || 'HerbalCare', password: pass, role: 'admin', createdAt: new Date().toISOString() });
+  localStorage.setItem('hc_users', JSON.stringify(users));
+
+  showSuccess('reg-success', '✅ Akun berhasil dibuat! Silakan login.');
+  setTimeout(() => switchTab('login'), 1500);
+}
+
+function loginDemo() {
+  const users = JSON.parse(localStorage.getItem('hc_users') || '[]');
+  if (!users.find(u => u.email === 'demo@herbalcare.id')) {
+    users.push({ name: 'Admin Demo', email: 'demo@herbalcare.id', store: 'HerbalCare Demo', password: 'demo123', role: 'admin', createdAt: new Date().toISOString() });
+    localStorage.setItem('hc_users', JSON.stringify(users));
+  }
+  Auth.login({ name: 'Admin Demo', email: 'demo@herbalcare.id', store: 'HerbalCare Demo', role: 'admin' });
+  window.location.href = 'dashboard.html';
+}
+</script>
+</body>
+</html>

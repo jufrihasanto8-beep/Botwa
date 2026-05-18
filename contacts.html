@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kontak · HerbalCare CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 24px;
+}
+.contact-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow .15s;
+}
+.contact-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.contact-top { display: flex; align-items: center; gap: 12px; }
+.c-avatar {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.c-info { flex: 1; min-width: 0; }
+.c-name { font-weight: 600; font-size: 14px; }
+.c-phone { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.c-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-2);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.empty-state p { font-size: 13px; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+.filter-bar input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+}
+.filter-bar input:focus { outline: none; border-color: var(--green); }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>👥 Kontak Pelanggan</h1>
+        <p>Kelola daftar kontak dan riwayat chat</p>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openModal()">+ Tambah Kontak</button>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" placeholder="🔍 Cari nama, nomor, atau label..." oninput="renderContacts(this.value)" />
+      <select onchange="renderContacts('',this.value)" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+        <option value="">Semua label</option>
+        <option value="VIP">VIP</option>
+        <option value="Herbal">Herbal</option>
+        <option value="Repeat">Repeat buyer</option>
+      </select>
+    </div>
+
+    <div id="contact-list"></div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="contact-modal">
+  <div class="modal">
+    <h2 id="modal-title">Tambah Kontak</h2>
+    <input type="hidden" id="edit-id" />
+    <div class="form-group">
+      <label>Nama Lengkap *</label>
+      <input type="text" id="c-name" placeholder="Nama pelanggan" />
+    </div>
+    <div class="form-group">
+      <label>Nomor WhatsApp *</label>
+      <input type="text" id="c-phone" placeholder="628xxxxxxxxx" />
+      <div class="hint">Format: 628xxxxxxxxx (tanpa + atau spasi)</div>
+    </div>
+    <div class="form-group">
+      <label>Alamat</label>
+      <input type="text" id="c-address" placeholder="Kota, Provinsi" />
+    </div>
+    <div class="form-group">
+      <label>Label</label>
+      <input type="text" id="c-label" placeholder="VIP, Herbal, Repeat buyer..." />
+      <div class="hint">Pisahkan dengan koma untuk beberapa label</div>
+    </div>
+    <div class="form-group">
+      <label>Catatan</label>
+      <textarea id="c-notes" placeholder="Catatan tentang pelanggan..." rows="3" style="resize:vertical;"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveContact()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('contacts');
+
+function renderContacts(search = '', labelFilter = '') {
+  let list = Contacts.getAll();
+  if (search) list = list.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone.includes(search) ||
+    (c.label || '').toLowerCase().includes(search.toLowerCase())
+  );
+  if (labelFilter) list = list.filter(c => (c.label || '').includes(labelFilter));
+
+  const container = document.getElementById('contact-list');
+  if (!list.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">👥</div>
+        <h3>${search ? 'Kontak tidak ditemukan' : 'Belum ada kontak'}</h3>
+        <p>${search ? 'Coba kata kunci lain.' : 'Klik "+ Tambah Kontak" untuk mulai.'}</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="contact-grid">${list.map(c => {
+    const color = avatarColor(c.name);
+    const labels = (c.label || '').split(',').map(l => l.trim()).filter(Boolean);
+    return `
+    <div class="contact-card">
+      <div class="contact-top">
+        <div class="c-avatar" style="background:${color}">${initials(c.name)}</div>
+        <div class="c-info">
+          <div class="c-name">${c.name}</div>
+          <div class="c-phone">📱 +${c.phone}</div>
+          ${c.address ? `<div class="c-phone">📍 ${c.address}</div>` : ''}
+        </div>
+      </div>
+      ${labels.length ? `<div>${labels.map(l => `<span class="badge badge-green" style="margin-right:4px">🏷 ${l}</span>`).join('')}</div>` : ''}
+      ${c.notes ? `<div style="font-size:12px;color:var(--text-2);background:var(--bg);padding:8px 10px;border-radius:8px;">${c.notes}</div>` : ''}
+      <div class="c-actions">
+        <a href="dashboard.html?contact=${c.id}" class="btn btn-secondary btn-sm">💬 Chat</a>
+        <button class="btn btn-secondary btn-sm" onclick="editContact('${c.id}')">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteContact('${c.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function openModal(id = null) {
+  document.getElementById('modal-title').textContent = id ? 'Edit Kontak' : 'Tambah Kontak';
+  document.getElementById('edit-id').value = id || '';
+  if (id) {
+    const c = Contacts.find(id);
+    if (c) {
+      document.getElementById('c-name').value = c.name || '';
+      document.getElementById('c-phone').value = c.phone || '';
+      document.getElementById('c-address').value = c.address || '';
+      document.getElementById('c-label').value = c.label || '';
+      document.getElementById('c-notes').value = c.notes || '';
+    }
+  } else {
+    ['c-name','c-phone','c-address','c-label','c-notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  }
+  document.getElementById('contact-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('contact-modal').classList.remove('open');
+}
+
+function saveContact() {
+  const name = document.getElementById('c-name').value.trim();
+  const phone = document.getElementById('c-phone').value.trim().replace(/\D/g,'');
+  if (!name || !phone) return showToast('⚠️ Nama dan nomor WA wajib diisi');
+
+  const data = {
+    name,
+    phone,
+    address: document.getElementById('c-address').value.trim(),
+    label: document.getElementById('c-label').value.trim(),
+    notes: document.getElementById('c-notes').value.trim(),
+  };
+
+  const editId = document.getElementById('edit-id').value;
+  if (editId) {
+    Contacts.update(editId, data);
+    showToast('✅ Kontak diperbarui');
+  } else {
+    Contacts.add(data);
+    showToast('✅ Kontak ditambahkan');
+  }
+  closeModal();
+  renderContacts();
+}
+
+function editContact(id) { openModal(id); }
+
+function deleteContact(id) {
+  if (!confirm('Hapus kontak ini?')) return;
+  Contacts.delete(id);
+  ChatHistory.clear(id);
+  renderContacts();
+  showToast('🗑 Kontak dihapus');
+}
+
+/* Close modal on overlay click */
+document.getElementById('contact-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+renderContacts();
+</script>
+</body>
+</html>
