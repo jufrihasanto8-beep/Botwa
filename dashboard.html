@@ -209,9 +209,16 @@ Jangan menyebut nama AI atau Claude — kamu adalah CS ${storeName}.`;
 }
 
 /* ── CONTACTS / INBOX ── */
-function renderInbox() {
-  let list = Contacts.getAll();
-  if (tabFilter === 'unread') list = list.filter(c => ChatHistory.get(c.id).length && ChatHistory.get(c.id).slice(-1)[0]?.role === 'user');
+async function renderInbox() {
+  let list = await Contacts.getAll();
+  if (tabFilter === 'unread') {
+    const unreadList = [];
+    for (const c of list) {
+      const h = await ChatHistory.get(c.id, 1);
+      if (h.length && h[h.length-1]?.role === 'user') unreadList.push(c);
+    }
+    list = unreadList;
+  }
   if (searchFilter) list = list.filter(c => c.name.toLowerCase().includes(searchFilter) || c.phone.includes(searchFilter));
 
   const el = document.getElementById('conv-list');
@@ -223,24 +230,30 @@ function renderInbox() {
     </div>`;
     return;
   }
-  el.innerHTML = list.map(c => {
-    const hist = ChatHistory.get(c.id);
+
+  // Load last message per contact
+  const rows = await Promise.all(list.map(async c => {
+    const hist = await ChatHistory.get(c.id, 1);
     const last = hist[hist.length - 1];
+    return { c, last };
+  }));
+
+  el.innerHTML = rows.map(({ c, last }) => {
     const preview = last ? last.content.slice(0,50) : 'Belum ada pesan';
     const isUnread = last?.role === 'user';
     const color = avatarColor(c.name);
     return `<div class="conv-item ${activeContactId===c.id?'active':''}" onclick="selectContact('${c.id}')">
       <div class="conv-avatar" style="background:${color}">${initials(c.name)}</div>
       <div class="conv-info">
-        <div class="conv-name">${c.name}<span class="time">${last ? timeStr(last.ts) : ''}</span></div>
+        <div class="conv-name">${c.name}<span class="time">${last ? timeStr(last.created_at) : ''}</span></div>
         <div class="conv-preview">${preview}</div>
         <div class="conv-meta"><span class="ch-wa">WhatsApp</span>${isUnread?'<div class="unread-dot"></div>':''}</div>
       </div>
     </div>`;
   }).join('');
 
-  const unread = Contacts.getAll().filter(c => { const h = ChatHistory.get(c.id); return h.length && h.slice(-1)[0]?.role==='user'; }).length;
-  document.getElementById('unread-badge').textContent = unread;
+  const unreadCount = rows.filter(({last}) => last?.role === 'user').length;
+  document.getElementById('unread-badge').textContent = unreadCount;
 }
 
 function setTab(tab, btn) {
@@ -254,16 +267,16 @@ function filterConvs(val) { searchFilter = val.toLowerCase(); renderInbox(); }
 
 function selectContact(id) {
   activeContactId = id;
-  renderInbox();
+  await renderInbox();
   renderChat();
   updateRightPanel();
 }
 
 /* ── CHAT ── */
-function renderChat() {
+async function renderChat() {
   const area = document.getElementById('messages-area');
   if (!activeContactId) return;
-  const c = Contacts.find(activeContactId);
+  const c = await Contacts.find(activeContactId);
   if (!c) return;
 
   document.getElementById('ch-av').textContent = initials(c.name);
@@ -272,8 +285,8 @@ function renderChat() {
   document.getElementById('ch-sub').innerHTML = `<span class="online-dot"></span> WhatsApp · +${c.phone}`;
 
   area.innerHTML = '<div class="day-divider">Hari ini</div>';
-  const hist = ChatHistory.get(activeContactId);
-  hist.forEach(m => appendBubble(m.role === 'user' ? 'customer' : 'bot', m.content, false, m.ts));
+  const hist = await ChatHistory.get(activeContactId);
+  hist.forEach(m => appendBubble(m.role === 'user' ? 'customer' : 'bot', m.content, false, m.created_at));
   area.scrollTop = area.scrollHeight;
 }
 
@@ -465,7 +478,7 @@ async function pollInbox() {
 window.addEventListener('load', async () => {
   await Config.load();
 
-  renderInbox();
+  await renderInbox();
   updatePKStatus();
 
   const params = new URLSearchParams(location.search);
