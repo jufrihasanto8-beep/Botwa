@@ -438,16 +438,19 @@ function updateStats() {
 }
 
 /* ── INIT ── */
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  // Load config dari Supabase dulu sebelum apapun
+  await Config.load();
+
   renderInbox();
   updatePKStatus();
 
   // Auto-select contact from URL
   const params = new URLSearchParams(location.search);
   const cid = params.get('contact');
-  if (cid && Contacts.find(cid)) selectContact(cid);
+  if (cid) selectContact(cid);
 
-  // Check WA silently
+  // Check WA setelah config loaded
   checkWA();
 });
 </script>
