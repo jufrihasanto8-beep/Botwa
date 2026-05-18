@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agents · HerbalCare CS</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* TOP BAR */
+#topbar {
+  height: 52px; background: #fff; border-bottom: 1px solid #e8eaed;
+  display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0;
+}
+.tb-back {
+  display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7280;
+  text-decoration: none; padding: 5px 10px; border-radius: 8px; transition: all .15s;
+}
+.tb-back:hover { background: #f3f4f6; color: #1a1d23; text-decoration: none; }
+.tb-title { font-size: 15px; font-weight: 600; }
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* LAYOUT */
+#main { display: flex; flex: 1; overflow: hidden; }
+
+/* AGENT LIST */
+#agent-list-panel {
+  width: 280px; background: #fff; border-right: 1px solid #e8eaed;
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+#agent-list-top {
+  padding: 14px 14px 10px; border-bottom: 1px solid #e8eaed;
+  display: flex; align-items: center; justify-content: space-between;
+}
+#agent-list-top h2 { font-size: 14px; font-weight: 600; }
+#agent-items { flex: 1; overflow-y: auto; padding: 8px; }
+.agent-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 10px;
+  border-radius: 10px; cursor: pointer; transition: all .15s; margin-bottom: 4px;
+}
+.agent-item:hover { background: #f5f7fa; }
+.agent-item.active { background: #e6f7f2; }
+.agent-av {
+  width: 38px; height: 38px; border-radius: 10px; background: #16a679;
+  display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+}
+.agent-info { flex: 1; min-width: 0; }
+.agent-name { font-weight: 600; font-size: 13px; }
+.agent-desc { font-size: 11px; color: #6b7280; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-status { font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 500; }
+.status-active { background: #dcfce7; color: #15803d; }
+.status-off { background: #f3f4f6; color: #6b7280; }
+.empty-agents { text-align: center; padding: 40px 20px; color: #9ca3af; font-size: 13px; }
+
+/* AGENT DETAIL */
+#agent-detail {
+  flex: 1; overflow-y: auto; background: #f9fafb;
+}
+.detail-empty {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 10px; color: #9ca3af;
+}
+.detail-empty .icon { font-size: 48px; }
+
+/* Agent config panel */
+#agent-config { max-width: 720px; margin: 0 auto; padding: 24px; }
+.config-header { text-align: center; margin-bottom: 28px; }
+.config-header h1 { font-size: 20px; font-weight: 700; }
+.config-header p { font-size: 13px; color: #6b7280; margin-top: 4px; }
+
+/* Tabs */
+.config-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid #e8eaed; margin-bottom: 24px;
+}
+.config-tab {
+  padding: 8px 16px; font-size: 13px; font-weight: 500; color: #6b7280;
+  cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: all .15s; background: none; border-top: none; border-left: none; border-right: none;
+}
+.config-tab:hover { color: #1a1d23; }
+.config-tab.active { color: #16a679; border-bottom-color: #16a679; }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Cards */
+.config-card {
+  background: #fff; border-radius: 12px; border: 1px solid #e8eaed;
+  padding: 20px; margin-bottom: 16px;
+}
+.config-card h3 { font-size: 14px; font-weight: 600; color: #16a679; margin-bottom: 4px; }
+.config-card p { font-size: 12px; color: #6b7280; margin-bottom: 14px; line-height: 1.5; }
+.char-count { font-size: 11px; color: #9ca3af; text-align: right; margin-top: 4px; }
+textarea.config-ta {
+  width: 100%; padding: 12px; border: 1.5px solid #e8eaed; border-radius: 10px;
+  font-size: 13px; font-family: inherit; line-height: 1.6; resize: vertical;
+  min-height: 120px; background: #f9fafb; color: #1a1d23; transition: border-color .2s;
+}
+textarea.config-ta:focus { outline: none; border-color: #16a679; background: #fff; }
+
+/* Toggle row */
+.toggle-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-info h4 { font-size: 13px; font-weight: 600; }
+.toggle-info p { font-size: 12px; color: #6b7280; margin-top: 2px; line-height: 1.4; }
+
+/* PK upload */
+.pk-upload-zone {
+  border: 2px dashed #e8eaed; border-radius: 10px; padding: 24px;
+  text-align: center; cursor: pointer; transition: all .2s; position: relative;
+}
+.pk-upload-zone:hover { border-color: #16a679; background: #e6f7f2; }
+.pk-upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.pk-loaded { background: #f0fdf9; border: 1px solid #b2e8d8; border-radius: 10px; padding: 14px 16px; }
+.pk-loaded-top { display: flex; align-items: center; justify-content: space-between; }
+.pk-preview { font-size: 12px; color: #6b7280; margin-top: 8px; font-family: monospace; background: #f5f7fa; padding: 8px 10px; border-radius: 6px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; display: none; }
+
+/* Preview chat */
+#preview-panel {
+  width: 300px; background: #fff; border-left: 1px solid #e8eaed;
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+#preview-header {
+  padding: 12px 14px; border-bottom: 1px solid #e8eaed;
+  font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+}
+#preview-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #f9fafb; }
+.prev-msg { padding: 8px 11px; border-radius: 12px; font-size: 12px; line-height: 1.5; max-width: 85%; }
+.prev-bot { background: #16a679; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+.prev-user { background: #fff; border: 1px solid #e8eaed; align-self: flex-start; border-bottom-left-radius: 4px; }
+.prev-time { font-size: 10px; color: #9ca3af; margin-top: 2px; }
+.from-right { align-items: flex-end; }
+.from-left { align-items: flex-start; }
+#preview-input { border-top: 1px solid #e8eaed; padding: 10px; display: flex; gap: 6px; }
+#preview-input input {
+  flex: 1; padding: 7px 10px; border: 1px solid #e8eaed; border-radius: 8px;
+  font-size: 12px; outline: none; background: #f9fafb;
+}
+#preview-input input:focus { border-color: #16a679; background: #fff; }
+#preview-send {
+  width: 32px; height: 32px; border-radius: 50%; border: none; background: #16a679;
+  color: #fff; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;
+}
+#preview-send:disabled { background: #e8eaed; cursor: not-allowed; }
+.typing-prev { display: flex; gap: 3px; align-items: center; }
+.typing-prev span { width: 5px; height: 5px; border-radius: 50%; background: #fff; animation: bounce 1s infinite; }
+.typing-prev span:nth-child(2) { animation-delay: .15s; }
+.typing-prev span:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)} }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; display: none; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: #fff; border-radius: 16px; padding: 24px; width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1d23; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; z-index: 9999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <a class="tb-back" href="dashboard.html">&#8592; Back</a>
+  <div class="tb-title">AI Agents</div>
+  <div class="tb-right">
+    <button class="btn btn-primary btn-sm" onclick="openCreateModal()">+ Buat Agent Baru</button>
+  </div>
+</div>
+
+<div id="main">
+
+  <!-- AGENT LIST -->
+  <div id="agent-list-panel">
+    <div id="agent-list-top">
+      <h2>Daftar Agent</h2>
+    </div>
+    <div id="agent-items">
+      <div class="empty-agents" id="empty-agents">
+        Belum ada AI agent.<br>Klik "+ Buat Agent Baru"
+      </div>
+    </div>
+  </div>
+
+  <!-- AGENT DETAIL -->
+  <div id="agent-detail">
+    <div class="detail-empty" id="detail-empty">
+      <div class="icon">🤖</div>
+      <div style="font-size:14px;font-weight:500;">Pilih atau buat AI Agent</div>
+      <div style="font-size:12px;">Konfigurasikan perilaku AI untuk CS Anda</div>
+    </div>
+
+    <div id="agent-config" style="display:none;">
+      <div class="config-header">
+        <div style="font-size:32px;margin-bottom:8px;" id="cfg-icon">🤖</div>
+        <h1 id="cfg-title">Nama Agent</h1>
+        <p id="cfg-desc">Deskripsi agent</p>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
+          <span class="agent-status status-active" id="cfg-status">Aktif</span>
+          <button class="btn btn-secondary btn-sm" onclick="deleteAgent()">🗑 Hapus</button>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="config-tabs">
+        <button class="config-tab active" onclick="switchTab('general',this)">General</button>
+        <button class="config-tab" onclick="switchTab('knowledge',this)">Knowledge Sources</button>
+        <button class="config-tab" onclick="switchTab('behavior',this)">Behavior</button>
+      </div>
+
+      <!-- GENERAL TAB -->
+      <div class="tab-content active" id="tab-general">
+        <div class="config-card">
+          <h3>Informasi Agent</h3>
+          <p>Nama dan deskripsi yang ditampilkan kepada tim Anda.</p>
+          <div class="form-group">
+            <label>Nama Agent</label>
+            <input type="text" id="agent-name" placeholder="Contoh: CS HerbalCare" oninput="updateCharCount('agent-name','nc-name',50)" />
+          </div>
+          <div class="form-group">
+            <label>Deskripsi</label>
+            <input type="text" id="agent-desc-input" placeholder="Deskripsi singkat fungsi agent ini" />
+          </div>
+          <div class="form-group">
+            <label>Emoji / Ikon</label>
+            <input type="text" id="agent-icon" placeholder="🤖" maxlength="2" style="width:80px;" />
+          </div>
+        </div>
+
+        <div class="config-card">
+          <h3>Welcome Message</h3>
+          <p>Pesan pertama yang dikirim AI saat pelanggan mulai chat.</p>
+          <textarea class="config-ta" id="agent-welcome" rows="3" placeholder="Halo! Selamat datang di HerbalCare &#127807; Ada yang bisa saya bantu?" oninput="updateCharCount('agent-welcome','nc-welcome',500)"></textarea>
+          <div class="char-count"><span id="nc-welcome">0</span>/500</div>
+        </div>
+
+        <div class="config-card">
+          <h3>Agent Transfer Conditions</h3>
+          <p>Kapan AI harus menyerahkan percakapan ke agen manusia? (opsional)</p>
+          <textarea class="config-ta" id="agent-handoff" rows="3" placeholder="Contoh: Ketika pelanggan ingin melakukan pembelian atau komplain serius..." oninput="updateCharCount('agent-handoff','nc-handoff',1000)"></textarea>
+          <div class="char-count"><span id="nc-handoff">0</span>/1000</div>
+        </div>
+
+        <div class="config-card">
+          <h3>Pengaturan</h3>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <h4>Aktifkan AI Agent</h4>
+              <p>AI akan membalas pesan masuk secara otomatis.</p>
+            </div>
+            <button class="toggle" id="toggle-active" onclick="toggleSetting('active')"></button>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <h4>Stop AI setelah Handoff</h4>
+              <p>AI berhenti membalas setelah diserahkan ke agen manusia.</p>
+            </div>
+            <button class="toggle off" id="toggle-stop-handoff" onclick="toggleSetting('stop_handoff')"></button>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <h4>Kirim ke WhatsApp</h4>
+              <p>Balasan AI langsung dikirimkan ke WA pelanggan via Fonnte.</p>
+            </div>
+            <button class="toggle" id="toggle-send-wa" onclick="toggleSetting('send_wa')"></button>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+          <button class="btn btn-primary" onclick="saveAgent()">Simpan Perubahan</button>
+        </div>
+      </div>
+
+      <!-- KNOWLEDGE SOURCES TAB -->
+      <div class="tab-content" id="tab-knowledge">
+        <div class="config-card">
+          <h3>Knowledge Sources</h3>
+          <p>Upload katalog produk, FAQ, atau dokumen apapun. AI hanya akan menjawab berdasarkan sumber ini.</p>
+
+          <div id="pk-upload-wrap">
+            <div class="pk-upload-zone" id="pk-zone"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handlePKDrop(event)">
+              <input type="file" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" onchange="handlePKFile(this.files[0])" />
+              <div style="font-size:32px;margin-bottom:8px;">&#128194;</div>
+              <div style="font-size:14px;font-weight:500;margin-bottom:4px;">Upload dokumen produk</div>
+              <div style="font-size:12px;color:#9ca3af;">PDF, Excel, Word, CSV, TXT &middot; Drag & drop atau klik</div>
+            </div>
+          </div>
+
+          <div id="pk-loaded-wrap" style="display:none;">
+            <div class="pk-loaded">
+              <div class="pk-loaded-top">
+                <div>
+                  <div style="font-weight:600;font-size:13px;" id="pk-fname">&#128196; —</div>
+                  <div style="font-size:12px;color:#6b7280;margin-top:2px;" id="pk-stats"></div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-secondary btn-sm" onclick="togglePKPreview()">&#128065; Preview</button>
+                  <button class="btn btn-danger btn-sm" onclick="clearPK()">&#128465;</button>
+                </div>
+              </div>
+              <div class="pk-preview" id="pk-preview"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+          <button class="btn btn-primary" onclick="savePK()">Simpan Knowledge</button>
+        </div>
+      </div>
+
+      <!-- BEHAVIOR TAB -->
+      <div class="tab-content" id="tab-behavior">
+        <div class="config-card">
+          <h3>AI Agent Behavior</h3>
+          <p>System prompt yang mendefinisikan gaya bicara dan identitas AI. Ini adalah instruksi utama AI Anda.</p>
+          <textarea class="config-ta" id="agent-behavior" rows="10" placeholder="Kamu adalah CS HerbalCare yang ramah..." oninput="updateCharCount('agent-behavior','nc-behavior',15000)"></textarea>
+          <div class="char-count"><span id="nc-behavior">0</span>/15000</div>
+        </div>
+
+        <div class="config-card">
+          <h3>Instruksi Tambahan</h3>
+          <p>Aturan spesifik tambahan di luar behavior utama. Contoh: jam operasional, promo aktif, dll.</p>
+          <textarea class="config-ta" id="agent-extra" rows="4" placeholder="Contoh: Free ongkir untuk pembelian di atas Rp 150.000..." oninput="updateCharCount('agent-extra','nc-extra',3000)"></textarea>
+          <div class="char-count"><span id="nc-extra">0</span>/3000</div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+          <button class="btn btn-primary" onclick="saveAgent()">Simpan Behavior</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PREVIEW PANEL -->
+  <div id="preview-panel">
+    <div id="preview-header">
+      <span>&#128172;</span> Preview Chat
+    </div>
+    <div id="preview-messages">
+      <div style="text-align:center;color:#9ca3af;font-size:12px;margin-top:20px;">
+        Pilih agent untuk mulai preview
+      </div>
+    </div>
+    <div id="preview-input">
+      <input type="text" id="prev-input" placeholder="Ketik pesan test..." onkeydown="if(event.key==='Enter')sendPreview()" disabled />
+      <button id="preview-send" onclick="sendPreview()" disabled>&#10148;</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- CREATE MODAL -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <h2>Buat AI Agent Baru</h2>
+    <div class="form-group">
+      <label>Nama Agent</label>
+      <input type="text" id="new-agent-name" placeholder="Contoh: CS HerbalCare" />
+    </div>
+    <div class="form-group">
+      <label>Template</label>
+      <select id="new-agent-template">
+        <option value="cs">Customer Service AI</option>
+        <option value="sales">Sales AI</option>
+        <option value="custom">Custom (kosong)</option>
+      </select>
+      <div class="hint" id="template-hint">AI dirancang untuk membantu customer support dan pertanyaan produk.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeCreateModal()">Batal</button>
+      <button class="btn btn-primary" onclick="createAgent()">Buat AI Agent</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+
+const TEMPLATES = {
+  cs: {
+    behavior: `Kamu adalah AI Agent customer service yang ramah dan profesional untuk toko herbal kami.\nKamu membantu pelanggan dengan informasi produk, harga, cara pemesanan, dan pertanyaan umum.\nJawab HANYA berdasarkan informasi produk yang tersedia di katalog.\nGunakan bahasa Indonesia yang hangat. Jawab ringkas 1-4 kalimat. Gunakan emoji sesekali.\nUntuk pertanyaan medis serius, sarankan konsultasi dokter.\nJangan pernah mengarang informasi yang tidak ada di katalog.`,
+    welcome: 'Halo! Selamat datang &#127807; Ada yang bisa saya bantu seputar produk herbal kami?',
+    handoff: 'Ketika pelanggan ingin melakukan pembelian dalam jumlah besar atau mengajukan komplain serius.',
+    hint: 'AI dirancang untuk membantu customer support dan pertanyaan produk.',
+  },
+  sales: {
+    behavior: `Kamu adalah Sales AI yang membantu pelanggan menemukan produk herbal yang tepat untuk kebutuhan mereka.\nTawarkan produk yang relevan berdasarkan kebutuhan pelanggan.\nGunakan pendekatan konsultatif — tanya kebutuhan dulu, baru rekomendasikan.\nSelalu jujur tentang manfaat dan batasan produk.`,
+    welcome: 'Halo! Saya siap membantu Anda menemukan produk herbal yang tepat &#127807; Apa kebutuhan kesehatan Anda hari ini?',
+    handoff: 'Ketika pelanggan siap melakukan pembelian dan butuh konfirmasi order.',
+    hint: 'AI difokuskan untuk konversi penjualan dan rekomendasi produk.',
+  },
+  custom: {
+    behavior: '',
+    welcome: '',
+    handoff: '',
+    hint: 'Mulai dari awal dengan konfigurasi sendiri.',
+  },
+};
+
+let agents = [];
+let activeAgentId = null;
+let pkText = '';
+let previewHistory = [];
+let previewBusy = false;
+
+const settings = { active: true, stop_handoff: false, send_wa: true };
+
+/* ── LOAD ── */
+window.addEventListener('load', async () => {
+  await Config.load();
+  loadAgents();
+});
+
+function loadAgents() {
+  const saved = JSON.parse(localStorage.getItem('hc_agents') || '[]');
+  agents = saved;
+  renderAgentList();
+}
+
+function saveAgents() {
+  localStorage.setItem('hc_agents', JSON.stringify(agents));
+}
+
+/* ── AGENT LIST ── */
+function renderAgentList() {
+  const el = document.getElementById('agent-items');
+  const empty = document.getElementById('empty-agents');
+  if (!agents.length) {
+    empty.style.display = 'block';
+    el.innerHTML = '';
+    el.appendChild(empty);
+    return;
+  }
+  empty.style.display = 'none';
+  el.innerHTML = agents.map(a => `
+    <div class="agent-item ${activeAgentId===a.id?'active':''}" onclick="selectAgent('${a.id}')">
+      <div class="agent-av">${a.icon || '🤖'}</div>
+      <div class="agent-info">
+        <div class="agent-name">${a.name}</div>
+        <div class="agent-desc">${a.desc || 'Belum ada deskripsi'}</div>
+      </div>
+      <span class="agent-status ${a.active?'status-active':'status-off'}">${a.active?'Aktif':'Off'}</span>
+    </div>`).join('');
+}
+
+function selectAgent(id) {
+  activeAgentId = id;
+  const a = agents.find(x => x.id === id);
+  if (!a) return;
+
+  renderAgentList();
+  document.getElementById('detail-empty').style.display = 'none';
+  document.getElementById('agent-config').style.display = 'block';
+
+  // Fill fields
+  document.getElementById('cfg-icon').textContent = a.icon || '🤖';
+  document.getElementById('cfg-title').textContent = a.name;
+  document.getElementById('cfg-desc').textContent = a.desc || '';
+  document.getElementById('cfg-status').textContent = a.active ? 'Aktif' : 'Nonaktif';
+  document.getElementById('cfg-status').className = `agent-status ${a.active?'status-active':'status-off'}`;
+
+  document.getElementById('agent-name').value = a.name || '';
+  document.getElementById('agent-desc-input').value = a.desc || '';
+  document.getElementById('agent-icon').value = a.icon || '🤖';
+  document.getElementById('agent-welcome').value = a.welcome || '';
+  document.getElementById('agent-handoff').value = a.handoff || '';
+  document.getElementById('agent-behavior').value = a.behavior || '';
+  document.getElementById('agent-extra').value = a.extra || '';
+
+  // Toggles
+  Object.assign(settings, { active: a.active??true, stop_handoff: a.stop_handoff??false, send_wa: a.send_wa??true });
+  updateToggles();
+
+  // PK
+  pkText = a.pk || '';
+  if (pkText) showPKLoaded(a.pk_filename || 'katalog.txt', pkText);
+  else clearPKUI();
+
+  // Update char counts
+  ['agent-welcome','agent-handoff','agent-behavior','agent-extra'].forEach(id => {
+    const map = {'agent-welcome':'nc-welcome','agent-handoff':'nc-handoff','agent-behavior':'nc-behavior','agent-extra':'nc-extra'};
+    const el = document.getElementById(id);
+    if (el) updateCharCount(id, map[id], parseInt(document.getElementById(map[id]).parentElement.textContent.split('/')[1])||15000);
+  });
+
+  // Reset preview
+  previewHistory = [];
+  document.getElementById('preview-messages').innerHTML = '';
+  if (a.welcome) addPreviewMsg(a.welcome, 'bot');
+  document.getElementById('prev-input').disabled = false;
+  document.getElementById('preview-send').disabled = false;
+
+  switchTab('general', document.querySelector('.config-tab'));
+}
+
+/* ── CREATE ── */
+function openCreateModal() {
+  document.getElementById('new-agent-name').value = '';
+  document.getElementById('create-modal').classList.add('open');
+}
+function closeCreateModal() { document.getElementById('create-modal').classList.remove('open'); }
+
+document.getElementById('new-agent-template').addEventListener('change', function() {
+  document.getElementById('template-hint').textContent = TEMPLATES[this.value]?.hint || '';
+});
+
+function createAgent() {
+  const name = document.getElementById('new-agent-name').value.trim();
+  if (!name) return showToast('Nama agent wajib diisi');
+  const tmpl = document.getElementById('new-agent-template').value;
+  const t = TEMPLATES[tmpl];
+  const agent = {
+    id: Date.now().toString(),
+    name, icon: '🤖', desc: t.hint,
+    behavior: t.behavior, welcome: t.welcome, handoff: t.handoff,
+    extra: '', pk: '', pk_filename: '',
+    active: true, stop_handoff: false, send_wa: true,
+    createdAt: new Date().toISOString(),
+  };
+  agents.push(agent);
+  saveAgents();
+  closeCreateModal();
+  renderAgentList();
+  selectAgent(agent.id);
+  showToast('AI Agent berhasil dibuat!');
+}
+
+/* ── SAVE ── */
+function saveAgent() {
+  const a = agents.find(x => x.id === activeAgentId);
+  if (!a) return;
+  a.name = document.getElementById('agent-name').value.trim() || a.name;
+  a.desc = document.getElementById('agent-desc-input').value.trim();
+  a.icon = document.getElementById('agent-icon').value.trim() || '🤖';
+  a.welcome = document.getElementById('agent-welcome').value.trim();
+  a.handoff = document.getElementById('agent-handoff').value.trim();
+  a.behavior = document.getElementById('agent-behavior').value.trim();
+  a.extra = document.getElementById('agent-extra').value.trim();
+  Object.assign(a, settings);
+  saveAgents();
+
+  // Juga simpan ke Config Supabase supaya dashboard pakai
+  Config.save({
+    store_name: a.name,
+    ai_extra: (a.extra || '') + (a.handoff ? '\n\nKondisi transfer ke agen manusia: ' + a.handoff : ''),
+    ai_max_len: '1000',
+  });
+
+  renderAgentList();
+  document.getElementById('cfg-title').textContent = a.name;
+  document.getElementById('cfg-icon').textContent = a.icon;
+  showToast('Agent disimpan!');
+}
+
+function deleteAgent() {
+  if (!confirm('Hapus agent ini?')) return;
+  agents = agents.filter(x => x.id !== activeAgentId);
+  saveAgents();
+  activeAgentId = null;
+  renderAgentList();
+  document.getElementById('detail-empty').style.display = 'flex';
+  document.getElementById('agent-config').style.display = 'none';
+  showToast('Agent dihapus');
+}
+
+/* ── TOGGLES ── */
+function toggleSetting(key) {
+  settings[key] = !settings[key];
+  updateToggles();
+}
+function updateToggles() {
+  document.getElementById('toggle-active').className = 'toggle' + (settings.active ? '' : ' off');
+  document.getElementById('toggle-stop-handoff').className = 'toggle' + (settings.stop_handoff ? '' : ' off');
+  document.getElementById('toggle-send-wa').className = 'toggle' + (settings.send_wa ? '' : ' off');
+}
+
+/* ── TABS ── */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.config-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+/* ── CHAR COUNT ── */
+function updateCharCount(inputId, countId, max) {
+  const val = document.getElementById(inputId)?.value?.length || 0;
+  const el = document.getElementById(countId);
+  if (el) el.textContent = val;
+}
+
+/* ── PRODUCT KNOWLEDGE ── */
+function handlePKDrop(e) {
+  e.preventDefault();
+  document.getElementById('pk-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) handlePKFile(file);
+}
+
+async function handlePKFile(file) {
+  if (!file) return;
+  showToast('Membaca file...');
+  try {
+    let text = await FileReader2.auto(file);
+    if (!text || text.trim().length < 5) { showToast('File kosong atau tidak terbaca'); return; }
+    if (text.length > 15000) text = text.slice(0, 15000) + '\n...[dipotong]';
+    pkText = text.trim();
+    showPKLoaded(file.name, pkText);
+    showToast('Katalog berhasil dibaca — klik Simpan Knowledge');
+  } catch(e) { showToast('Gagal baca: ' + e.message); }
+}
+
+function showPKLoaded(filename, text) {
+  document.getElementById('pk-upload-wrap').style.display = 'none';
+  document.getElementById('pk-loaded-wrap').style.display = 'block';
+  document.getElementById('pk-fname').textContent = '&#128196; ' + filename;
+  document.getElementById('pk-stats').textContent = text.length.toLocaleString() + ' karakter · ' + text.split('\n').length + ' baris';
+  document.getElementById('pk-preview').textContent = text.slice(0, 500) + (text.length > 500 ? '\n...' : '');
+}
+
+function clearPKUI() {
+  pkText = '';
+  document.getElementById('pk-upload-wrap').style.display = 'block';
+  document.getElementById('pk-loaded-wrap').style.display = 'none';
+}
+
+function clearPK() {
+  clearPKUI();
+  const a = agents.find(x => x.id === activeAgentId);
+  if (a) { a.pk = ''; a.pk_filename = ''; saveAgents(); }
+  showToast('Knowledge dihapus');
+}
+
+function togglePKPreview() {
+  const el = document.getElementById('pk-preview');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function savePK() {
+  if (!pkText) return showToast('Upload file terlebih dahulu');
+  const a = agents.find(x => x.id === activeAgentId);
+  if (!a) return;
+  a.pk = pkText;
+  a.pk_filename = document.getElementById('pk-fname').textContent.replace('📄 ', '');
+  saveAgents();
+
+  // Simpan ke Config Supabase
+  await Config.save({ product_knowledge: pkText, pk_filename: a.pk_filename });
+  showToast('Knowledge disimpan!');
+}
+
+/* ── PREVIEW CHAT ── */
+function addPreviewMsg(text, type) {
+  const area = document.getElementById('preview-messages');
+  const empty = area.querySelector('div[style*="margin-top"]');
+  if (empty) empty.remove();
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `display:flex;flex-direction:column;${type==='bot'?'align-items:flex-end':'align-items:flex-start'}`;
+  wrap.innerHTML = `<div class="prev-msg prev-${type}">${text.replace(/\n/g,'<br>')}</div>
+    <div class="prev-time">${new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</div>`;
+  area.appendChild(wrap);
+  area.scrollTop = area.scrollHeight;
+}
+
+async function sendPreview() {
+  if (previewBusy || !activeAgentId) return;
+  const input = document.getElementById('prev-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const a = agents.find(x => x.id === activeAgentId);
+  addPreviewMsg(text, 'user');
+  previewHistory.push({ role: 'user', content: text });
+
+  previewBusy = true;
+  document.getElementById('preview-send').disabled = true;
+
+  // Show typing
+  const area = document.getElementById('preview-messages');
+  const typing = document.createElement('div');
+  typing.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;';
+  typing.id = 'prev-typing';
+  typing.innerHTML = `<div class="prev-msg prev-bot"><div class="typing-prev"><span></span><span></span><span></span></div></div>`;
+  area.appendChild(typing); area.scrollTop = area.scrollHeight;
+
+  try {
+    // Build system prompt dari agent config
+    let sys = a.behavior || 'Kamu adalah CS yang ramah dan membantu.';
+    if (a.extra) sys += '\n\nInstruksi tambahan:\n' + a.extra;
+    if (a.pk) sys += '\n\n== KATALOG PRODUK ==\n' + a.pk + '\n== AKHIR KATALOG ==';
+
+    const reply = await Claude.chat(previewHistory, sys);
+    previewHistory.push({ role: 'assistant', content: reply });
+    typing.remove();
+    addPreviewMsg(reply, 'bot');
+  } catch(e) {
+    typing.remove();
+    addPreviewMsg('Error: ' + e.message, 'bot');
+  } finally {
+    previewBusy = false;
+    document.getElementById('preview-send').disabled = false;
+  }
+}
+
+/* Close modal on overlay click */
+document.getElementById('create-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeCreateModal();
+});
+</script>
+</body>
+</html>
