@@ -10,40 +10,27 @@
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #1a1d23; font-size: 14px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
 /* ── TOP NAVBAR ── */
-#topbar {
-  height: 52px; background: #fff; border-bottom: 1px solid #e8eaed;
-  display: flex; align-items: center; padding: 0 16px; gap: 0; flex-shrink: 0; z-index: 50;
-}
-.tb-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #16a679; margin-right: 24px; text-decoration: none; }
-.tb-logo span { font-size: 20px; }
-.tb-nav { display: flex; align-items: center; gap: 2px; flex: 1; }
-.tb-link {
-  display: flex; align-items: center; gap: 6px; padding: 6px 12px;
-  border-radius: 8px; font-size: 13px; font-weight: 500; color: #6b7280;
-  cursor: pointer; text-decoration: none; transition: all .15s; border: none; background: none;
-  white-space: nowrap;
-}
-.tb-link:hover { background: #f3f4f6; color: #1a1d23; text-decoration: none; }
-.tb-link.active { background: #e6f7f2; color: #0e7a58; }
-.tb-link .icon { font-size: 15px; }
-.tb-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+#topbar { display: none; }
 .tb-avatar {
-  width: 32px; height: 32px; border-radius: 50%; background: #16a679;
+  width: 28px; height: 28px; border-radius: 50%; background: #16a679;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; color: #fff; cursor: pointer;
+  font-size: 11px; font-weight: 700; color: #fff; cursor: pointer; flex-shrink: 0;
 }
-.tb-name { font-size: 13px; font-weight: 500; color: #374151; }
-.tb-logout { font-size: 12px; color: #9ca3af; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: none; background: none; }
-.tb-logout:hover { background: #fee2e2; color: #991b1b; }
 
 /* ── MAIN BODY ── */
 #main-body { display: flex; flex: 1; overflow: hidden; }
 
 /* ── LEFT SIDEBAR (secondary nav) ── */
 #left-nav {
-  width: 200px; background: #fff; border-right: 1px solid #e8eaed;
-  display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; flex-shrink: 0;
+  width: 220px; background: #fff; border-right: 1px solid #e8eaed;
+  display: flex; flex-direction: column; padding: 0 8px 8px; gap: 2px; flex-shrink: 0;
 }
+.nav-logo {
+  display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px;
+  color: #16a679; padding: 14px 10px 12px; margin-bottom: 4px;
+  border-bottom: 1px solid #f3f4f6; font-size: 16px;
+}
+.nav-logo span { font-size: 22px; }
 .nav-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 10px;
   border-radius: 8px; font-size: 13px; font-weight: 500; color: #6b7280;
@@ -168,18 +155,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <!-- TOP NAVBAR -->
 <div id="topbar">
-  <a class="tb-logo" href="dashboard.html">
-    <span>🌿</span> HerbalCare
-  </a>
-  <div class="tb-nav">
-    <button class="tb-link active" onclick="showPage('chat',this)"><span class="icon">💬</span> Chat</button>
-    <button class="tb-link" onclick="showPage('fanpage',this)"><span class="icon">📘</span> Fanpage</button>
-    <button class="tb-link" onclick="showPage('analytics',this)"><span class="icon">📊</span> Analytics</button>
-    <button class="tb-link" onclick="showPage('conversations',this)"><span class="icon">🗂</span> Conversations</button>
-    <button class="tb-link" onclick="showPage('broadcast',this)"><span class="icon">📢</span> Broadcast</button>
-    <button class="tb-link" onclick="showPage('aiagents',this)"><span class="icon">🤖</span> AI Agents</button>
-  </div>
-  <div class="tb-right">
+  <div class="tb-right" style="margin-left:auto;">
     <div class="tb-avatar" id="tb-av">A</div>
     <span class="tb-name" id="tb-name">Admin</span>
     <button class="tb-logout" onclick="Auth.logout()">Logout</button>
@@ -190,20 +166,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div id="main-body">
 
   <!-- LEFT NAV -->
-  <div id="left-nav" id="left-nav-el">
-    <div class="nav-item active" onclick="switchInbox('all',this)" data-filter="all">
-      <span class="ni">💬</span> Semua Chat
+  <div id="left-nav">
+    <div class="nav-logo">
+      <span>🌿</span> HerbalCare
+    </div>
+    <div class="nav-item active" onclick="showPage('chat',this)" data-page="chat">
+      <span class="ni">💬</span> Chat
       <span class="nav-badge" id="unread-badge">0</span>
     </div>
-    <div class="nav-item" onclick="switchInbox('unread',this)" data-filter="unread">
-      <span class="ni">🔴</span> Belum Dibalas
+    <div class="nav-item" onclick="showPage('fanpage',this)" data-page="fanpage">
+      <span class="ni">📘</span> Fanpage
     </div>
-    <div class="nav-item" onclick="switchInbox('bot',this)" data-filter="bot">
-      <span class="ni">🤖</span> Ditangani AI
+    <div class="nav-item" onclick="showPage('analytics',this)" data-page="analytics">
+      <span class="ni">📊</span> Analytics
     </div>
-    <div class="nav-section">Pengaturan</div>
+    <div class="nav-item" onclick="showPage('conversations',this)" data-page="conversations">
+      <span class="ni">🗂</span> Conversations
+    </div>
+    <div class="nav-item" onclick="showPage('broadcast',this)" data-page="broadcast">
+      <span class="ni">📢</span> Broadcast
+    </div>
+    <div class="nav-item" onclick="showPage('aiagents',this)" data-page="aiagents">
+      <span class="ni">🤖</span> AI Agents
+    </div>
+    <div class="nav-section">Lainnya</div>
     <a class="nav-item" href="contacts.html"><span class="ni">👥</span> Kontak</a>
     <a class="nav-item" href="settings.html"><span class="ni">⚙️</span> Pengaturan</a>
+    <div style="margin-top:auto;padding:12px 10px;border-top:1px solid #e8eaed;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="tb-avatar" id="tb-av2" style="width:28px;height:28px;font-size:11px;">A</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:#1a1d23;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="tb-name2">Admin</div>
+          <button style="font-size:11px;color:#9ca3af;border:none;background:none;cursor:pointer;padding:0;" onclick="Auth.logout()">Logout</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- PAGE CONTENT -->
@@ -333,8 +330,8 @@ let tabFilter = 'all', searchFilter = '';
 
 /* Init user info */
 const user = Auth.getUser();
-document.getElementById('tb-av').textContent = initials(user?.name || '?');
-document.getElementById('tb-name').textContent = user?.name || 'Admin';
+document.getElementById('tb-av2').textContent = initials(user?.name || '?');
+document.getElementById('tb-name2').textContent = user?.name || 'Admin';
 
 /* ── PAGE SWITCHING ── */
 const pages = ['chat','fanpage','analytics','conversations','broadcast','aiagents'];
@@ -343,10 +340,8 @@ function showPage(name, btn) {
     const el = document.getElementById(p + '-page');
     if (el) el.style.display = p === name ? 'flex' : 'none';
   });
-  document.querySelectorAll('.tb-link').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-page]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  // Show/hide left nav only for chat
-  document.getElementById('left-nav').style.display = name === 'chat' ? 'flex' : 'none';
 }
 
 function switchInbox(filter, el) {
