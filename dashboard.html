@@ -265,10 +265,10 @@ function setTab(tab, btn) {
 
 function filterConvs(val) { searchFilter = val.toLowerCase(); renderInbox(); }
 
-function selectContact(id) {
+async function selectContact(id) {
   activeContactId = id;
   await renderInbox();
-  renderChat();
+  await renderChat();
   updateRightPanel();
 }
 
@@ -469,10 +469,8 @@ async function pollMessages() {
 
 async function pollInbox() {
   try {
-    const contacts = await Contacts.getAll();
-    const el = document.getElementById('conv-list');
-    if (el) renderInbox();
-  } catch {}
+    await renderInbox();
+  } catch(e) { console.error('pollInbox:', e); }
 }
 
 window.addEventListener('load', async () => {
