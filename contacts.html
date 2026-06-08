@@ -152,8 +152,8 @@
 Auth.guard();
 document.getElementById('sidebar-container').innerHTML = renderSidebar('contacts');
 
-function renderContacts(search = '', labelFilter = '') {
-  let list = Contacts.getAll();
+async function renderContacts(search = '', labelFilter = '') {
+  let list = await Contacts.getAll();
   if (search) list = list.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.phone.includes(search) ||
@@ -196,11 +196,11 @@ function renderContacts(search = '', labelFilter = '') {
   }).join('')}</div>`;
 }
 
-function openModal(id = null) {
+async function openModal(id = null) {
   document.getElementById('modal-title').textContent = id ? 'Edit Kontak' : 'Tambah Kontak';
   document.getElementById('edit-id').value = id || '';
   if (id) {
-    const c = Contacts.find(id);
+    const c = await Contacts.find(id);
     if (c) {
       document.getElementById('c-name').value = c.name || '';
       document.getElementById('c-phone').value = c.phone || '';
@@ -247,10 +247,10 @@ function saveContact() {
 
 function editContact(id) { openModal(id); }
 
-function deleteContact(id) {
+async function deleteContact(id) {
   if (!confirm('Hapus kontak ini?')) return;
-  Contacts.delete(id);
-  ChatHistory.clear(id);
+  await Contacts.delete(id);
+  await ChatHistory.clear(id);
   renderContacts();
   showToast('🗑 Kontak dihapus');
 }
