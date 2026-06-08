@@ -1,9 +1,8 @@
 // Vercel Serverless Function — Terima pesan masuk dari Fonnte → AI balas otomatis
+// Claude API key & Fonnte token dibaca dari config masing-masing user di Supabase
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
-const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 
 /* ── SUPABASE HELPERS ── */
 const sbH = () => ({
@@ -235,18 +234,26 @@ export default async function handler(req, res) {
     // Build system prompt
     const systemPrompt = await buildSystemPrompt(config, userId);
 
-    // Panggil Claude
-    const claudeKey = config.anthropic_key || CLAUDE_API_KEY;
-    const reply = await callClaude(claudeKey, systemPrompt, messages);
+    // Cek API key user — kalau belum diset di Settings, skip
+    if (!config.anthropic_key) {
+      console.error('User belum set Anthropic API key di Settings');
+      return res.status(200).json({ ok: true });
+    }
+    if (!config.fonnte_token) {
+      console.error('User belum set Fonnte token di Settings');
+      return res.status(200).json({ ok: true });
+    }
+
+    // Panggil Claude pakai key milik user
+    const reply = await callClaude(config.anthropic_key, systemPrompt, messages);
 
     if (!reply) return res.status(200).json({ ok: true });
 
     // Simpan balasan AI
     await saveMessage(contact.id, userId, 'assistant', reply);
 
-    // Kirim ke WA pelanggan
-    const fonnteToken = config.fonnte_token || FONNTE_TOKEN;
-    await sendWA(fonnteToken, sender, reply);
+    // Kirim ke WA pelanggan pakai token Fonnte milik user
+    await sendWA(config.fonnte_token, sender, reply);
 
     return res.status(200).json({ ok: true, reply });
 
