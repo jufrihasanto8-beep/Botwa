@@ -351,21 +351,6 @@ function switchInbox(filter, el) {
   renderInbox();
 }
 
-/* ── SYSTEM PROMPT ── */
-function buildSystemPrompt() {
-  const cfg = Config.get();
-  const storeName = cfg.store_name || user?.store || 'HerbalCare';
-  let sys = `Kamu adalah AI Agent customer service ${storeName}, toko herbal terpercaya Indonesia.
-Kamu ramah, jujur, dan sangat membantu. Jawab HANYA berdasarkan informasi produk yang tersedia di katalog.
-Jika ditanya produk yang tidak ada, katakan jujur tidak tersedia. Gunakan bahasa Indonesia yang hangat.
-Jawab ringkas. Gunakan emoji sesekali. Untuk pertanyaan medis serius, sarankan konsultasi dokter.
-Jangan menyebut nama AI atau Claude.`;
-  if (cfg.ai_extra) sys += `\n\nInstruksi tambahan:\n${cfg.ai_extra}`;
-  if (cfg.product_knowledge) sys += `\n\n== KATALOG PRODUK ==\n${cfg.product_knowledge}\n== AKHIR KATALOG ==`;
-  else sys += `\n\nKatalog belum diisi. Minta pelanggan menunggu.`;
-  return sys;
-}
-
 /* ── INBOX ── */
 async function renderInbox() {
   let list = await Contacts.getAll();
@@ -511,7 +496,7 @@ async function sendMsg() {
   try {
     const hist = await ChatHistory.get(activeContactId, 20);
     const messages = hist.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
-    const reply = await Claude.chat(messages, buildSystemPrompt());
+    const reply = await Claude.chat(messages, await buildSystemPrompt());
     await ChatHistory.add(activeContactId, 'assistant', reply);
     removeTyping();
     const msgEl = appendBubble('bot', reply);
