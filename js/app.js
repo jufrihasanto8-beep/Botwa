@@ -205,6 +205,44 @@ const Claude = {
   },
 };
 
+/* ── PRODUCTS ── */
+const Products = {
+  getAll: async () => {
+    const uid = Auth.getUser()?.id;
+    return SB.get('products', `?user_id=eq.${uid}&order=created_at.asc`);
+  },
+  add: async (data) => {
+    const rows = await SB.post('products', { ...data, user_id: Auth.getUser()?.id });
+    return rows[0];
+  },
+  update: async (id, data) => {
+    const rows = await SB.patch('products', `?id=eq.${id}`, data);
+    return rows[0];
+  },
+  delete: async (id) => SB.delete('products', `?id=eq.${id}`),
+  find: async (id) => {
+    const rows = await SB.get('products', `?id=eq.${id}`);
+    return rows[0] || null;
+  },
+};
+
+/* ── FAQS ── */
+const FAQs = {
+  getAll: async () => {
+    const uid = Auth.getUser()?.id;
+    return SB.get('faqs', `?user_id=eq.${uid}&order=created_at.asc`);
+  },
+  add: async (data) => {
+    const rows = await SB.post('faqs', { ...data, user_id: Auth.getUser()?.id });
+    return rows[0];
+  },
+  update: async (id, data) => {
+    const rows = await SB.patch('faqs', `?id=eq.${id}`, data);
+    return rows[0];
+  },
+  delete: async (id) => SB.delete('faqs', `?id=eq.${id}`),
+};
+
 /* ── FILE READER ── */
 const FileReader2 = {
   excel: (file) => new Promise((res, rej) => {
@@ -255,17 +293,61 @@ function initials(name) {
   return (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function buildSystemPrompt() {
+async function buildSystemPrompt() {
   const cfg = Config.get();
-  const storeName = cfg.store_name || Auth.getUser()?.store || 'HerbalCare';
-  let sys = `Kamu adalah AI Agent customer service ${storeName}, toko herbal terpercaya Indonesia.
-Kamu ramah, jujur, dan sangat membantu. Jawab HANYA berdasarkan informasi produk yang tersedia di katalog.
-Jika ditanya produk yang tidak ada, katakan jujur tidak tersedia. Gunakan bahasa Indonesia yang hangat.
-Jawab ringkas. Gunakan emoji sesekali. Untuk pertanyaan medis serius, sarankan konsultasi dokter.
-Jangan menyebut nama AI atau Claude — kamu adalah CS ${storeName}.`;
-  if (cfg.ai_extra) sys += `\n\nInstruksi tambahan:\n${cfg.ai_extra}`;
-  if (cfg.product_knowledge) sys += `\n\n== KATALOG PRODUK ==\n${cfg.product_knowledge}\n== AKHIR KATALOG ==`;
-  else sys += `\n\nKatalog belum diisi. Informasikan kepada pelanggan bahwa Anda akan segera mengecek.`;
+  const storeName = cfg.store_name || Auth.getUser()?.store || 'Toko';
+
+  let sys = `Kamu adalah AI Agent customer service ${storeName}, melayani pelanggan dengan ramah dan profesional.
+Gunakan bahasa Indonesia yang hangat dan natural. Jawab ringkas tapi informatif. Gunakan emoji sesekali.
+Jangan mengarang informasi yang tidak ada di katalog. Jika tidak tahu, bilang jujur dan tawarkan untuk dicek lebih lanjut.
+Jangan menyebut nama AI atau Claude — kamu adalah CS ${storeName}.
+Untuk pertanyaan medis serius, selalu sarankan konsultasi dokter.`;
+
+  // Info toko
+  const infoLines = [];
+  if (cfg.store_hours) infoLines.push(`Jam Operasional: ${cfg.store_hours}`);
+  if (cfg.store_wa) infoLines.push(`No. WhatsApp: ${cfg.store_wa}`);
+  if (cfg.store_address) infoLines.push(`Alamat: ${cfg.store_address}`);
+  if (infoLines.length) sys += `\n\n== INFO TOKO ==\n${infoLines.join('\n')}`;
+  if (cfg.store_policy) sys += `\n\n== KEBIJAKAN TOKO ==\n${cfg.store_policy}`;
+  if (cfg.ai_extra) sys += `\n\nInstruksi Tambahan:\n${cfg.ai_extra}`;
+
+  // Produk dari Supabase
+  try {
+    const products = await Products.getAll();
+    if (products.length) {
+      sys += '\n\n== KATALOG PRODUK ==';
+      products.forEach(p => {
+        sys += `\n\nPRODUK: ${p.name}`;
+        if (p.code) sys += ` (Kode: ${p.code})`;
+        if (p.price) sys += `\nHarga: Rp ${p.price}${p.unit ? ' / ' + p.unit : ''}`;
+        if (p.stock) sys += `\nStok: ${p.stock}`;
+        if (p.benefits) sys += `\nManfaat: ${p.benefits}`;
+        if (p.ingredients) sys += `\nKandungan: ${p.ingredients}`;
+        if (p.usage) sys += `\nCara Pakai: ${p.usage}`;
+        if (p.suitable_for) sys += `\nCocok Untuk: ${p.suitable_for}`;
+        if (p.contraindications) sys += `\nPerhatian: ${p.contraindications}`;
+      });
+      sys += '\n\n== AKHIR KATALOG ==';
+    } else if (cfg.product_knowledge) {
+      sys += `\n\n== KATALOG PRODUK ==\n${cfg.product_knowledge}\n== AKHIR KATALOG ==`;
+    } else {
+      sys += '\n\nKatalog produk belum diisi. Informasikan pelanggan bahwa Anda akan segera mengecek.';
+    }
+  } catch {
+    if (cfg.product_knowledge) sys += `\n\n== KATALOG PRODUK ==\n${cfg.product_knowledge}\n== AKHIR KATALOG ==`;
+  }
+
+  // FAQ dari Supabase
+  try {
+    const faqs = await FAQs.getAll();
+    if (faqs.length) {
+      sys += '\n\n== FAQ ==';
+      faqs.forEach(f => { sys += `\n\nQ: ${f.question}\nA: ${f.answer}`; });
+      sys += '\n\n== AKHIR FAQ ==';
+    }
+  } catch {}
+
   return sys;
 }
 
@@ -275,6 +357,7 @@ function renderSidebar(activePage) {
     <a class="s-logo" href="dashboard.html" title="HerbalCare">🌿</a>
     <a class="s-btn ${activePage==='dashboard'?'active':''}" href="dashboard.html" title="Inbox">💬<span class="s-badge" id="unread-badge">0</span></a>
     <a class="s-btn ${activePage==='contacts'?'active':''}" href="contacts.html" title="Kontak">👥</a>
+    <a class="s-btn ${activePage==='knowledge'?'active':''}" href="knowledge.html" title="Knowledge Base">📚</a>
     <a class="s-btn ${activePage==='settings'?'active':''}" href="settings.html" title="Pengaturan">⚙️</a>
     <div class="s-divider"></div>
     <div class="s-avatar" onclick="Auth.logout()" title="Logout">${initials(user?.name||'?')}</div>
