@@ -243,6 +243,86 @@ const FAQs = {
   delete: async (id) => SB.delete('faqs', `?id=eq.${id}`),
 };
 
+/* ── GLOBAL INSIGHTS ── */
+const GlobalInsight = {
+  generate: async () => {
+    const apiKey = Config.getKey('anthropic_key');
+    if (!apiKey) throw new Error('Anthropic API key belum diset di Pengaturan');
+
+    const contacts = await Contacts.getAll();
+    if (!contacts.length) throw new Error('Belum ada kontak/percakapan untuk dipelajari');
+
+    let allChats = '';
+    let contactCount = 0;
+
+    for (const c of contacts) {
+      try {
+        const msgs = await ChatHistory.get(c.id, 12);
+        if (msgs.length < 2) continue;
+        contactCount++;
+        allChats += `\n---\nPelanggan: ${c.name}${c.label ? ` [${c.label}]` : ''}\n`;
+        msgs.forEach(m => {
+          allChats += `${m.role === 'user' ? c.name : 'CS'}: ${m.content}\n`;
+        });
+      } catch {}
+    }
+
+    if (!allChats.trim()) throw new Error('Belum ada percakapan yang cukup untuk dipelajari');
+
+    const prompt = `Kamu adalah analis percakapan customer service berpengalaman. Analisis percakapan CS WhatsApp berikut dan ekstrak pelajaran konkret yang bisa membuat AI CS lebih pintar melayani pelanggan baru.
+
+KUMPULAN PERCAKAPAN:
+${allChats}
+
+Tulis pelajaran dalam format berikut. Singkat, padat, dan langsung actionable:
+
+PERTANYAAN YANG SERING MUNCUL:
+- [pertanyaan] → [cara jawab terbaik]
+
+KEBERATAN UMUM & CARA HANDLE:
+- [keberatan] → [cara handle yang efektif]
+
+POLA KARAKTER PELANGGAN:
+- [tipe pelanggan] → [pendekatan terbaik]
+
+YANG TERBUKTI BERHASIL MEMBUAT PELANGGAN TERTARIK:
+- [taktik spesifik]
+
+YANG HARUS DIHINDARI:
+- [hal yang membuat pelanggan pergi atau tidak nyaman]
+
+Tulis dalam bahasa Indonesia. Fokus pada pola yang berulang dan paling berguna.`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const insights = data.content?.[0]?.text;
+    if (!insights) throw new Error('Gagal generate insights');
+
+    await Config.save({
+      ai_insights: insights,
+      ai_insights_updated: new Date().toISOString(),
+      ai_insights_count: contactCount.toString(),
+    });
+
+    return { insights, contactCount };
+  },
+};
+
 /* ── FILE READER ── */
 const FileReader2 = {
   excel: (file) => new Promise((res, rej) => {
@@ -349,6 +429,7 @@ KONTEN:
   if (infoLines.length) sys += `\n\n== INFO TOKO ==\n${infoLines.join('\n')}`;
   if (cfg.store_policy) sys += `\n\n== KEBIJAKAN TOKO ==\n${cfg.store_policy}`;
   if (cfg.ai_extra) sys += `\n\nInstruksi Tambahan:\n${cfg.ai_extra}`;
+  if (cfg.ai_insights) sys += `\n\n== PELAJARAN DARI PERCAKAPAN SEBELUMNYA ==\nGunakan pelajaran ini untuk melayani pelanggan baru dengan lebih baik:\n${cfg.ai_insights}\n== AKHIR PELAJARAN ==`;
 
   // Produk dari Supabase
   try {
