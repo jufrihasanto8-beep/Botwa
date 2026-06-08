@@ -504,6 +504,11 @@ async function sendMsg() {
     stats.ai++; updateStats();
     renderInbox();
 
+    // Auto-learning setiap 15 pesan AI — jalan di background, tidak ganggu chat
+    if (stats.ai % 15 === 0) {
+      GlobalInsight.generate().catch(() => {});
+    }
+
     if (waOn) {
       const c = await Contacts.find(activeContactId);
       const r = await Fonnte.send(c.phone, reply);
@@ -616,6 +621,14 @@ window.addEventListener('load', async () => {
   if (cid) selectContact(cid);
 
   setInterval(poll, 5000);
+
+  // Auto-learning: jalan di background kalau belum pernah atau sudah > 12 jam
+  const cfg = Config.get();
+  const lastUpdated = cfg.ai_insights_updated;
+  const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  if (!lastUpdated || lastUpdated < twelveHoursAgo) {
+    GlobalInsight.generate().catch(() => {});
+  }
 });
 </script>
 </body>

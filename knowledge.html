@@ -140,6 +140,9 @@
         <div class="kb-nav-item" onclick="showSection('faq', this)">
           <span class="ni">❓</span> FAQ
         </div>
+        <div class="kb-nav-item" onclick="showSection('learning', this)">
+          <span class="ni">🧠</span> AI Learning
+        </div>
       </div>
 
       <!-- CONTENT -->
@@ -238,6 +241,54 @@
             <button class="btn btn-primary btn-sm" onclick="openFAQModal()">+ Tambah FAQ</button>
           </div>
           <div id="faq-list"></div>
+        </div>
+
+        <!-- ── AI LEARNING ── -->
+        <div class="kb-section" id="sec-learning">
+          <div class="kb-section-title">🧠 AI Learning</div>
+          <div class="kb-section-desc">AI belajar dari semua percakapan yang pernah terjadi — hasilnya dipakai untuk melayani semua pelanggan baru dengan lebih baik.</div>
+
+          <div class="info-card">
+            <h3>⚡ Cara Kerja</h3>
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--text-2);line-height:1.6;">
+              <div style="display:flex;gap:10px;align-items:flex-start;">
+                <span style="font-size:18px;">1️⃣</span>
+                <span>Klik <strong style="color:var(--text);">Pelajari Sekarang</strong> — AI baca semua riwayat chat</span>
+              </div>
+              <div style="display:flex;gap:10px;align-items:flex-start;">
+                <span style="font-size:18px;">2️⃣</span>
+                <span>AI ekstrak pola: pertanyaan umum, keberatan, taktik yang berhasil</span>
+              </div>
+              <div style="display:flex;gap:10px;align-items:flex-start;">
+                <span style="font-size:18px;">3️⃣</span>
+                <span>Hasilnya otomatis masuk ke semua percakapan baru — AI langsung lebih pintar</span>
+              </div>
+              <div style="display:flex;gap:10px;align-items:flex-start;">
+                <span style="font-size:18px;">🔄</span>
+                <span>Ulangi setiap minggu atau setelah banyak chat baru masuk</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <h3>📊 Status</h3>
+            <div id="insight-status" style="font-size:13px;color:var(--text-2);margin-bottom:16px;">Belum pernah dijalankan</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-primary" id="learn-btn" onclick="runLearning()">🔄 Perbarui Sekarang</button>
+              <span style="font-size:12px;color:var(--text-3);">Auto-update setiap 12 jam & setiap 15 pesan</span>
+            </div>
+          </div>
+
+          <div class="info-card" id="insight-result-card" style="display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h3 style="margin-bottom:0;">📋 Hasil Pembelajaran</h3>
+              <button class="btn btn-secondary btn-sm" onclick="runLearning()">🔄 Perbarui</button>
+            </div>
+            <div id="insight-content" style="font-size:13px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;background:var(--bg);padding:14px;border-radius:10px;"></div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-3);">
+              ✅ Pelajaran ini otomatis dipakai AI untuk semua percakapan baru
+            </div>
+          </div>
         </div>
 
       </div>
@@ -364,6 +415,7 @@ window.addEventListener('load', async () => {
 
   await renderProducts();
   await renderFAQs();
+  loadInsightStatus();
 });
 
 async function saveTokoInfo() {
@@ -559,6 +611,46 @@ async function deleteFAQ(id) {
     await renderFAQs();
     showToast('🗑 FAQ dihapus');
   } catch(e) { showToast('❌ Gagal: ' + e.message); }
+}
+
+/* ── AI LEARNING ── */
+function loadInsightStatus() {
+  const cfg = Config.get();
+  const statusEl = document.getElementById('insight-status');
+  const resultCard = document.getElementById('insight-result-card');
+  const contentEl = document.getElementById('insight-content');
+
+  if (cfg.ai_insights) {
+    const updated = cfg.ai_insights_updated ? new Date(cfg.ai_insights_updated).toLocaleString('id-ID') : '—';
+    const count = cfg.ai_insights_count || '?';
+    statusEl.innerHTML = `<span style="color:var(--green);font-weight:600;">✅ Aktif</span> &nbsp;·&nbsp; Dipelajari dari <strong>${count} percakapan</strong> &nbsp;·&nbsp; Terakhir diperbarui: ${updated}`;
+    resultCard.style.display = 'block';
+    contentEl.textContent = cfg.ai_insights;
+  } else {
+    statusEl.innerHTML = `<span style="color:var(--text-3);">⏳ Belum pernah dijalankan</span> — Klik tombol di bawah untuk mulai`;
+    resultCard.style.display = 'none';
+  }
+}
+
+async function runLearning() {
+  const btn = document.getElementById('learn-btn');
+  const statusEl = document.getElementById('insight-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Sedang belajar dari semua chat...';
+  statusEl.innerHTML = `<span style="color:var(--text-2);">⏳ AI sedang membaca dan menganalisis semua percakapan...</span>`;
+
+  try {
+    const { insights, contactCount } = await GlobalInsight.generate();
+    await Config.load();
+    loadInsightStatus();
+    showToast(`✅ Selesai! AI sudah belajar dari ${contactCount} percakapan`);
+  } catch(e) {
+    statusEl.innerHTML = `<span style="color:#991b1b;">❌ Gagal: ${e.message}</span>`;
+    showToast('❌ ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🧠 Pelajari dari Semua Chat';
+  }
 }
 
 /* Close modal on overlay click */

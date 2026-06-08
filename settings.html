@@ -351,13 +351,15 @@ async function saveAIConfig() {
   } catch(e) { showToast('❌ Gagal simpan: ' + e.message); }
 }
 
-function savePK() {
+async function savePK() {
   if (!pkText) return showToast('⚠️ Upload katalog terlebih dahulu');
-  const cfg = Config.get();
-  cfg.product_knowledge = pkText;
-  cfg.pk_filename = document.getElementById('pk-filename-badge').textContent.replace('📄 ','');
-  Config.set(cfg);
-  showToast('✅ Product knowledge disimpan');
+  try {
+    await Config.save({
+      product_knowledge: pkText,
+      pk_filename: document.getElementById('pk-filename-badge').textContent.replace('📄 ',''),
+    });
+    showToast('✅ Product knowledge disimpan');
+  } catch(e) { showToast('❌ Gagal simpan: ' + e.message); }
 }
 
 async function testWAConnection() {
