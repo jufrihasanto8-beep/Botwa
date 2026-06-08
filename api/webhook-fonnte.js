@@ -1,19 +1,20 @@
 // Vercel Serverless Function — Terima pesan masuk dari Fonnte → AI balas otomatis
-// Claude API key & Fonnte token dibaca dari config masing-masing user di Supabase
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 /* ── SUPABASE HELPERS ── */
-const sbH = () => ({
-  'Content-Type': 'application/json',
-  'apikey': SUPABASE_SERVICE_KEY,
-  'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-});
+function sbH() {
+  return {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_SERVICE_KEY,
+    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+  };
+}
 
 async function sbGet(table, query = '') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { headers: sbH() });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(`sbGet ${table}: ${await res.text()}`);
   return res.json();
 }
 
@@ -23,27 +24,22 @@ async function sbPost(table, body) {
     headers: { ...sbH(), 'Prefer': 'return=representation' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(`sbPost ${table}: ${await res.text()}`);
   return res.json();
 }
 
 /* ── FIND / CREATE CONTACT ── */
 async function findOrCreateContact(userId, phone, name) {
-  const cleanPhone = phone.replace(/\D/g, '');
+  const cleanPhone = String(phone).replace(/\D/g, '');
   const existing = await sbGet('contacts', `?user_id=eq.${userId}&phone=eq.${cleanPhone}`);
   if (existing.length) return existing[0];
-
-  const rows = await sbPost('contacts', {
-    user_id: userId,
-    name: name || cleanPhone,
-    phone: cleanPhone,
-  });
+  const rows = await sbPost('contacts', { user_id: userId, name: name || cleanPhone, phone: cleanPhone });
   return rows[0];
 }
 
-/* ── CHAT HISTORY ── */
-async function getHistory(contactId, userId, limit = 20) {
-  return sbGet('messages', `?contact_id=eq.${contactId}&user_id=eq.${userId}&order=created_at.asc&limit=${limit}`);
+/* ── MESSAGES ── */
+async function getHistory(contactId, userId) {
+  return sbGet('messages', `?contact_id=eq.${contactId}&user_id=eq.${userId}&order=created_at.asc&limit=20`);
 }
 
 async function saveMessage(contactId, userId, role, content) {
@@ -60,57 +56,42 @@ KEPRIBADIAN:
 Kamu hangat, peduli, dan nyambung ngobrolnya. Seperti teman yang kerja di toko — bukan sales yang lagi pitch produk.
 
 CARA BALAS PESAN:
+- Kalau pelanggan cerita keluhan → empati dulu, JANGAN langsung sebut produk
+- Jangan tulis meta-komentar seperti "nanya dulu biar bisa bantu..."
+- Produk disebut setelah konteks cukup, disampaikan natural
+- Kalau pelanggan tolak → gali kenapa dulu, jangan langsung menyerah
+- Kalau tanya produk/harga langsung → jawab langsung
 
-Kalau pelanggan cerita keluhan/masalah:
-→ Empati dulu dengan tulus, TANPA langsung sebut produk
-→ Boleh tanya satu pertanyaan lanjutan yang terasa natural
-→ JANGAN tulis kenapa kamu nanya (jangan "nanya dulu biar...", dsb)
-→ Produk baru disebut setelah ada konteks yang cukup, dan disampaikan dengan natural
+CONTOH SALAH: "Nanya dulu biar bisa kasih saran yang lebih pas 🙏"
+CONTOH BENAR: "Ih sinusitis emang ngeselin ya... Lagi sering kambuh atau baru parah?"
 
-Kalau pelanggan tanya produk atau harga:
-→ Langsung jawab dengan ramah dan informatif
-
-Kalau pelanggan menolak atau bilang tidak mau:
-→ JANGAN langsung menyerah
-→ Gali dulu kenapa — kemahalan? masih ragu? sudah coba produk lain?
-→ Kalau kemahalan → tawarkan solusi (produk lain, beli 1 dulu, dsb)
-→ Kalau ragu → jawab keraguan mereka
-→ Maksimal 2x follow up sebelum benar-benar lepas
-
-CONTOH YANG SALAH: "Nanya dulu biar bisa kasih saran yang lebih pas 🙏"
-CONTOH YANG BENAR: "Ih sinusitis tuh emang ngeselin banget ya... Lagi sering kambuh atau baru parah belakangan ini?"
-
-FORMAT PESAN:
-- DILARANG pakai markdown: jangan **bold**, jangan ---, jangan > quote
-- Singkat dan natural, 2-4 baris sudah cukup
-- Bahasa casual seperti orang asli chat WA
-- Emoji boleh tapi seperlunya
+FORMAT:
+- DILARANG markdown: jangan **bold**, jangan ---, jangan > quote
+- 2-4 baris, casual, seperti chat WA beneran
+- Emoji seperlunya, jangan tiap kalimat
 
 KONTEN:
-- Rekomendasikan HANYA produk yang ada di katalog
-- Kalau tidak ada yang cocok, jujur bilang tidak ada
+- Hanya rekomendasikan produk yang ada di katalog
 - Jangan sebut nama AI atau Claude
-- Untuk keluhan medis serius tetap sarankan konsul dokter`;
+- Keluhan medis serius → sarankan konsul dokter juga`;
 
-  // Info toko
-  const infoLines = [];
-  if (config.store_hours) infoLines.push(`Jam Operasional: ${config.store_hours}`);
-  if (config.store_wa) infoLines.push(`No. WhatsApp: ${config.store_wa}`);
-  if (config.store_address) infoLines.push(`Alamat: ${config.store_address}`);
-  if (infoLines.length) sys += `\n\n== INFO TOKO ==\n${infoLines.join('\n')}`;
-  if (config.store_policy) sys += `\n\n== KEBIJAKAN TOKO ==\n${config.store_policy}`;
+  const info = [];
+  if (config.store_hours) info.push(`Jam: ${config.store_hours}`);
+  if (config.store_wa) info.push(`WA: ${config.store_wa}`);
+  if (config.store_address) info.push(`Lokasi: ${config.store_address}`);
+  if (info.length) sys += `\n\n== INFO TOKO ==\n${info.join('\n')}`;
+  if (config.store_policy) sys += `\n\n== KEBIJAKAN ==\n${config.store_policy}`;
   if (config.store_order) sys += `\n\n== CARA ORDER ==\n${config.store_order}`;
   if (config.ai_extra) sys += `\n\nInstruksi Tambahan:\n${config.ai_extra}`;
-  if (config.ai_insights) sys += `\n\n== PELAJARAN DARI PERCAKAPAN SEBELUMNYA ==\n${config.ai_insights}\n== AKHIR PELAJARAN ==`;
+  if (config.ai_insights) sys += `\n\n== PELAJARAN DARI CHAT SEBELUMNYA ==\n${config.ai_insights}`;
 
-  // Produk dari Supabase
   try {
     const products = await sbGet('products', `?user_id=eq.${userId}&order=created_at.asc`);
     if (products.length) {
       sys += '\n\n== KATALOG PRODUK ==';
       products.forEach(p => {
         sys += `\n\nPRODUK: ${p.name}`;
-        if (p.code) sys += ` (Kode: ${p.code})`;
+        if (p.code) sys += ` (${p.code})`;
         if (p.price) sys += `\nHarga: Rp ${p.price}${p.unit ? ' / ' + p.unit : ''}`;
         if (p.stock) sys += `\nStok: ${p.stock}`;
         if (p.benefits) sys += `\nManfaat: ${p.benefits}`;
@@ -121,17 +102,15 @@ KONTEN:
       });
       sys += '\n\n== AKHIR KATALOG ==';
     }
-  } catch {}
+  } catch (e) { console.error('Gagal load produk:', e.message); }
 
-  // FAQ dari Supabase
   try {
     const faqs = await sbGet('faqs', `?user_id=eq.${userId}&order=created_at.asc`);
     if (faqs.length) {
       sys += '\n\n== FAQ ==';
       faqs.forEach(f => { sys += `\n\nQ: ${f.question}\nA: ${f.answer}`; });
-      sys += '\n\n== AKHIR FAQ ==';
     }
-  } catch {}
+  } catch (e) { console.error('Gagal load FAQ:', e.message); }
 
   return sys;
 }
@@ -153,11 +132,11 @@ async function callClaude(apiKey, systemPrompt, messages) {
     }),
   });
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
+  if (data.error) throw new Error(`Claude: ${data.error.message}`);
   return data.content?.[0]?.text || '';
 }
 
-/* ── SEND WA via FONNTE ── */
+/* ── SEND WA ── */
 async function sendWA(token, phone, message) {
   const res = await fetch('https://api.fonnte.com/send', {
     method: 'POST',
@@ -168,98 +147,104 @@ async function sendWA(token, phone, message) {
 }
 
 /* ── MAIN HANDLER ── */
-export default async function handler(req, res) {
-  // Fonnte kadang kirim GET untuk verifikasi
-  if (req.method === 'GET') return res.status(200).send('Webhook aktif');
+module.exports = async function handler(req, res) {
+  if (req.method === 'GET') return res.status(200).send('Webhook aktif ✅');
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-    const body = req.body || {};
+    // Fonnte bisa kirim JSON atau form-data — handle keduanya
+    let body = req.body || {};
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { body = Object.fromEntries(new URLSearchParams(body)); }
+    }
 
-    // Parse data dari Fonnte
-    const sender = (body.sender || body.from || '').replace(/\D/g, '');
-    const message = body.message || body.text || '';
-    const senderName = body.name || body.pushname || sender;
-    const device = (body.device || body.phone || '').replace(/\D/g, '');
+    console.log('Webhook received:', JSON.stringify(body));
 
-    // Abaikan kalau bukan pesan teks atau dari bot sendiri
-    if (!sender || !message || sender === device) {
+    // Parse field dari Fonnte
+    const sender  = String(body.sender  || body.from   || '').replace(/\D/g, '');
+    const message = String(body.message || body.text   || '').trim();
+    const name    = String(body.name    || body.pushname || sender);
+    const device  = String(body.device  || body.phone  || '').replace(/\D/g, '');
+
+    // Abaikan kalau tidak ada pesan atau pengirim
+    if (!sender || !message) {
+      console.log('Skip: sender atau message kosong');
       return res.status(200).json({ ok: true });
     }
 
-    // Abaikan pesan dari grup WA
-    if (sender.includes('@g.us') || sender.endsWith('g.us')) {
+    // Abaikan pesan dari bot sendiri
+    if (sender === device) {
+      console.log('Skip: pesan dari device sendiri');
       return res.status(200).json({ ok: true });
     }
 
-    // Cari config user berdasarkan nomor device (cs_number)
+    // Abaikan pesan grup
+    if (sender.includes('-') || sender.endsWith('@g.us')) {
+      console.log('Skip: pesan grup');
+      return res.status(200).json({ ok: true });
+    }
+
+    console.log(`Pesan dari ${name} (${sender}): ${message}`);
+
+    // Cari config user berdasarkan cs_number = device
     let config = null;
     let userId = null;
 
     if (device) {
-      const configs = await sbGet('configs', `?cs_number=eq.${device}`);
-      if (configs.length) {
-        config = configs[0];
-        userId = config.user_id;
-      }
+      const byDevice = await sbGet('configs', `?cs_number=eq.${device}`);
+      if (byDevice.length) { config = byDevice[0]; userId = config.user_id; }
     }
 
-    // Fallback: pakai config pertama yang ada
+    // Fallback: pakai config pertama
     if (!config) {
-      const configs = await sbGet('configs', `?limit=1`);
-      if (configs.length) {
-        config = configs[0];
-        userId = config.user_id;
-      }
+      const all = await sbGet('configs', `?limit=1`);
+      if (all.length) { config = all[0]; userId = config.user_id; }
     }
 
     if (!userId) {
-      console.error('Tidak ada user/config ditemukan');
+      console.error('Tidak ada user/config ditemukan di Supabase');
+      return res.status(200).json({ ok: true });
+    }
+
+    if (!config.anthropic_key) {
+      console.error('Anthropic API key belum diset di Settings');
+      return res.status(200).json({ ok: true });
+    }
+
+    if (!config.fonnte_token) {
+      console.error('Fonnte token belum diset di Settings');
       return res.status(200).json({ ok: true });
     }
 
     // Cari / buat kontak
-    const contact = await findOrCreateContact(userId, sender, senderName);
+    const contact = await findOrCreateContact(userId, sender, name);
 
     // Simpan pesan masuk
     await saveMessage(contact.id, userId, 'user', message);
 
-    // Ambil history chat (tidak termasuk pesan yang baru disimpan)
-    const history = await getHistory(contact.id, userId, 20);
+    // Ambil history + build prompt
+    const history = await getHistory(contact.id, userId);
     const messages = history.map(m => ({
       role: m.role === 'user' ? 'user' : 'assistant',
       content: m.content,
     }));
 
-    // Build system prompt
     const systemPrompt = await buildSystemPrompt(config, userId);
 
-    // Cek API key user — kalau belum diset di Settings, skip
-    if (!config.anthropic_key) {
-      console.error('User belum set Anthropic API key di Settings');
-      return res.status(200).json({ ok: true });
-    }
-    if (!config.fonnte_token) {
-      console.error('User belum set Fonnte token di Settings');
-      return res.status(200).json({ ok: true });
-    }
-
-    // Panggil Claude pakai key milik user
+    // Panggil Claude
     const reply = await callClaude(config.anthropic_key, systemPrompt, messages);
-
     if (!reply) return res.status(200).json({ ok: true });
 
-    // Simpan balasan AI
-    await saveMessage(contact.id, userId, 'assistant', reply);
+    console.log(`Reply untuk ${sender}: ${reply}`);
 
-    // Kirim ke WA pelanggan pakai token Fonnte milik user
+    // Simpan & kirim balasan
+    await saveMessage(contact.id, userId, 'assistant', reply);
     await sendWA(config.fonnte_token, sender, reply);
 
-    return res.status(200).json({ ok: true, reply });
+    return res.status(200).json({ ok: true });
 
   } catch (err) {
     console.error('Webhook error:', err.message);
-    // Selalu return 200 ke Fonnte supaya tidak retry terus
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true }); // Selalu 200 ke Fonnte
   }
-}
+};
