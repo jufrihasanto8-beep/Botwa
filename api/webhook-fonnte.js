@@ -28,6 +28,44 @@ async function sbPost(table, body) {
   return res.json();
 }
 
+async function sbPatch(table, query, body) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
+    method: 'PATCH',
+    headers: { ...sbH(), 'Prefer': 'return=representation' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`sbPatch ${table}: ${await res.text()}`);
+  return res.json();
+}
+
+/* ── AUTO-MANAGE CASES ── */
+async function handleCase(contactId, userId, message, isEscalated, priority) {
+  try {
+    const existing = await sbGet('cases', `?contact_id=eq.${contactId}&user_id=eq.${userId}&status=neq.selesai&order=created_at.desc&limit=1`);
+    if (existing.length) {
+      // Update case jika perlu eskalasi
+      if (isEscalated && existing[0].status !== 'eskalasi') {
+        await sbPatch('cases', `?id=eq.${existing[0].id}`, {
+          status: 'eskalasi',
+          priority: 'high',
+          is_escalated: true,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    } else {
+      // Buat case baru
+      await sbPost('cases', {
+        contact_id: contactId,
+        user_id: userId,
+        title: message.slice(0, 60) || 'Percakapan Baru',
+        status: isEscalated ? 'eskalasi' : 'baru',
+        priority: isEscalated ? 'high' : (priority || 'low'),
+        is_escalated: isEscalated,
+      });
+    }
+  } catch(e) { console.error('Case handler error:', e.message); }
+}
+
 /* ── FIND / CREATE CONTACT ── */
 async function findOrCreateContact(userId, phone, name) {
   const cleanPhone = String(phone).replace(/\D/g, '');
@@ -51,6 +89,10 @@ async function buildSystemPrompt(config, userId) {
   const storeName = config.store_name || 'Toko';
 
   let sys = `Kamu adalah CS ${storeName} yang melayani pelanggan lewat WhatsApp. Kamu harus terdengar seperti manusia sungguhan, bukan bot.
+
+ESKALASI KE MANUSIA:
+Jika customer sangat marah, panik, minta bicara dengan manusia/CS asli, atau masalahnya terlalu kompleks — mulai responsmu dengan [ESCALATE] lalu tetap tulis pesan yang hangat. Contoh: "[ESCALATE] Saya paham situasinya, biar tim kami yang bantu langsung ya kak..."
+
 
 KEPRIBADIAN:
 Kamu hangat, peduli, dan nyambung ngobrolnya. Seperti teman yang kerja di toko — bukan sales yang lagi pitch produk.
@@ -232,10 +274,17 @@ module.exports = async function handler(req, res) {
     const systemPrompt = await buildSystemPrompt(config, userId);
 
     // Panggil Claude
-    const reply = await callClaude(config.anthropic_key, systemPrompt, messages);
-    if (!reply) return res.status(200).json({ ok: true });
+    const rawReply = await callClaude(config.anthropic_key, systemPrompt, messages);
+    if (!rawReply) return res.status(200).json({ ok: true });
 
-    console.log(`Reply untuk ${sender}: ${reply}`);
+    // Deteksi eskalasi dari marker [ESCALATE]
+    const isEscalated = rawReply.startsWith('[ESCALATE]');
+    const reply = rawReply.replace(/^\[ESCALATE\]\s*/, '');
+
+    console.log(`Reply untuk ${sender}${isEscalated?' [ESKALASI]':''}: ${reply}`);
+
+    // Auto-manage case
+    await handleCase(contact.id, userId, message, isEscalated, null);
 
     // Simpan & kirim balasan
     await saveMessage(contact.id, userId, 'assistant', reply);

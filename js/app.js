@@ -226,6 +226,91 @@ const Products = {
   },
 };
 
+/* ── CASES ── */
+const Cases = {
+  getAll: async (filters = {}) => {
+    const uid = Auth.getUser()?.id;
+    let q = `?user_id=eq.${uid}&order=created_at.desc`;
+    if (filters.status && filters.status !== 'semua') q += `&status=eq.${filters.status}`;
+    return SB.get('cases', q);
+  },
+  find: async (id) => {
+    const rows = await SB.get('cases', `?id=eq.${id}`);
+    return rows[0] || null;
+  },
+  getByContact: async (contactId) => {
+    const uid = Auth.getUser()?.id;
+    return SB.get('cases', `?contact_id=eq.${contactId}&user_id=eq.${uid}&status=neq.selesai&order=created_at.desc&limit=1`);
+  },
+  create: async (data) => {
+    const rows = await SB.post('cases', { ...data, user_id: Auth.getUser()?.id });
+    return rows[0];
+  },
+  update: async (id, data) => {
+    const rows = await SB.patch('cases', `?id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
+    return rows[0];
+  },
+};
+
+/* ── ORDERS ── */
+const Orders = {
+  getAll: async (filters = {}) => {
+    const uid = Auth.getUser()?.id;
+    let q = `?user_id=eq.${uid}&order=created_at.desc`;
+    if (filters.status && filters.status !== 'semua') q += `&status=eq.${filters.status}`;
+    return SB.get('orders', q);
+  },
+  find: async (id) => {
+    const rows = await SB.get('orders', `?id=eq.${id}`);
+    return rows[0] || null;
+  },
+  create: async (data) => {
+    const uid = Auth.getUser()?.id;
+    const orderNumber = 'ORD-' + Date.now().toString().slice(-8);
+    const rows = await SB.post('orders', { ...data, user_id: uid, order_number: orderNumber });
+    return rows[0];
+  },
+  update: async (id, data) => {
+    const rows = await SB.patch('orders', `?id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
+    return rows[0];
+  },
+  delete: async (id) => SB.delete('orders', `?id=eq.${id}`),
+};
+
+/* ── BROADCASTS ── */
+const Broadcasts = {
+  getAll: async () => {
+    const uid = Auth.getUser()?.id;
+    return SB.get('broadcasts', `?user_id=eq.${uid}&order=created_at.desc`);
+  },
+  create: async (data) => {
+    const rows = await SB.post('broadcasts', { ...data, user_id: Auth.getUser()?.id });
+    return rows[0];
+  },
+  update: async (id, data) => {
+    const rows = await SB.patch('broadcasts', `?id=eq.${id}`, data);
+    return rows[0];
+  },
+  sendAll: async (broadcastId, contacts, message) => {
+    const token = Config.getKey('fonnte_token');
+    if (!token) throw new Error('Fonnte token belum diset di Pengaturan');
+    let sent = 0;
+    for (const c of contacts) {
+      try {
+        await fetch('https://api.fonnte.com/send', {
+          method: 'POST',
+          headers: { 'Authorization': token },
+          body: new URLSearchParams({ target: c.phone, message, countryCode: '62' }),
+        });
+        sent++;
+        await new Promise(r => setTimeout(r, 1200));
+      } catch {}
+    }
+    await Broadcasts.update(broadcastId, { sent_count: sent, status: 'done' });
+    return sent;
+  },
+};
+
 /* ── FAQS ── */
 const FAQs = {
   getAll: async () => {
@@ -472,13 +557,38 @@ KONTEN:
 
 function renderSidebar(activePage) {
   const user = Auth.getUser();
+  const nav = [
+    { id:'dashboard', href:'dashboard.html', icon:'💬', label:'Inbox',       badge:true },
+    { id:'cases',     href:'cases.html',     icon:'📋', label:'Cases' },
+    { id:'analytics', href:'analytics.html', icon:'📊', label:'Analytics' },
+    { id:'contacts',  href:'contacts.html',  icon:'👥', label:'Kontak' },
+    { id:'orders',    href:'orders.html',    icon:'🛒', label:'Orders' },
+    { id:'broadcast', href:'broadcast.html', icon:'📣', label:'Broadcast' },
+  ];
+  const nav2 = [
+    { id:'knowledge', href:'knowledge.html', icon:'📚', label:'Knowledge Base' },
+    { id:'settings',  href:'settings.html',  icon:'⚙️', label:'Pengaturan' },
+  ];
+  const navItem = (p) => `
+    <a class="s-btn ${activePage===p.id?'active':''}" href="${p.href}">
+      <span class="s-icon">${p.icon}</span>
+      <span class="s-label">${p.label}</span>
+      ${p.badge ? '<span class="s-badge" id="unread-badge" style="display:none">0</span>' : ''}
+    </a>`;
   return `<div id="sidebar">
-    <a class="s-logo" href="dashboard.html" title="HerbalCare">🌿</a>
-    <a class="s-btn ${activePage==='dashboard'?'active':''}" href="dashboard.html" title="Inbox">💬<span class="s-badge" id="unread-badge">0</span></a>
-    <a class="s-btn ${activePage==='contacts'?'active':''}" href="contacts.html" title="Kontak">👥</a>
-    <a class="s-btn ${activePage==='knowledge'?'active':''}" href="knowledge.html" title="Knowledge Base">📚</a>
-    <a class="s-btn ${activePage==='settings'?'active':''}" href="settings.html" title="Pengaturan">⚙️</a>
+    <div class="s-brand">
+      <div class="s-logo">CS</div>
+      <span class="s-brand-name">Adsy CS</span>
+    </div>
+    ${nav.map(navItem).join('')}
     <div class="s-divider"></div>
-    <div class="s-avatar" onclick="Auth.logout()" title="Logout">${initials(user?.name||'?')}</div>
+    ${nav2.map(navItem).join('')}
+    <div class="s-user">
+      <div class="s-avatar">${initials(user?.name||'?')}</div>
+      <div class="s-user-info">
+        <div class="s-user-name">${user?.name||'Admin'}</div>
+        <button class="s-logout" onclick="Auth.logout()">Logout</button>
+      </div>
+    </div>
   </div>`;
 }

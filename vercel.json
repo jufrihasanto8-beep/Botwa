@@ -3,8 +3,12 @@
     { "source": "/", "destination": "/login.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/cases", "destination": "/cases.html" },
+    { "source": "/analytics", "destination": "/analytics.html" },
     { "source": "/contacts", "destination": "/contacts.html" },
-    { "source": "/settings", "destination": "/settings.html" },
-    { "source": "/knowledge", "destination": "/knowledge.html" }
+    { "source": "/orders", "destination": "/orders.html" },
+    { "source": "/broadcast", "destination": "/broadcast.html" },
+    { "source": "/knowledge", "destination": "/knowledge.html" },
+    { "source": "/settings", "destination": "/settings.html" }
   ]
 }

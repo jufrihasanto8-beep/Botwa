@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HerbalCare CS</title>
+<title>Adsy CS — Inbox</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #1a1d23; font-size: 14px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; background: #f1f5f9; color: #0f172a; font-size: 14px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; -webkit-font-smoothing:antialiased; }
 
 /* ── TOP NAVBAR ── */
 #topbar { display: none; }
@@ -22,29 +22,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* ── LEFT SIDEBAR (secondary nav) ── */
 #left-nav {
-  width: 220px; background: #fff; border-right: 1px solid #e8eaed;
-  display: flex; flex-direction: column; padding: 0 8px 8px; gap: 2px; flex-shrink: 0;
+  width: 220px; background: #1e293b; border-right: none;
+  display: flex; flex-direction: column; padding: 0; gap: 0; flex-shrink: 0;
 }
 .nav-logo {
-  display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px;
-  color: #16a679; padding: 14px 10px 12px; margin-bottom: 4px;
-  border-bottom: 1px solid #f3f4f6; font-size: 16px;
+  display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px;
+  color: #f1f5f9; padding: 16px 14px 14px; letter-spacing: -.3px;
+  border-bottom: 1px solid rgba(255,255,255,.07); margin-bottom: 6px;
 }
-.nav-logo span { font-size: 22px; }
+.nav-logo .logo-badge {
+  width: 32px; height: 32px; background: #3b82f6; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: #fff; letter-spacing: -.5px; flex-shrink: 0;
+}
 .nav-item {
-  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
-  border-radius: 8px; font-size: 13px; font-weight: 500; color: #6b7280;
-  cursor: pointer; text-decoration: none; transition: all .15s;
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: 1px 8px;
+  border-radius: 8px; font-size: 13px; font-weight: 500; color: #94a3b8;
+  cursor: pointer; text-decoration: none; transition: all .12s;
 }
-.nav-item:hover { background: #f3f4f6; color: #1a1d23; text-decoration: none; }
-.nav-item.active { background: #e6f7f2; color: #0e7a58; }
-.nav-item .ni { font-size: 16px; }
+.nav-item:hover { background: rgba(255,255,255,.06); color: #e2e8f0; text-decoration: none; }
+.nav-item.active { background: rgba(59,130,246,.15); color: #93c5fd; }
+.nav-item .ni { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
 .nav-badge {
   margin-left: auto; min-width: 18px; height: 18px; background: #ef4444;
-  border-radius: 9px; font-size: 10px; color: #fff; font-weight: 600;
+  border-radius: 9px; font-size: 10px; color: #fff; font-weight: 700;
   display: flex; align-items: center; justify-content: center; padding: 0 4px;
 }
-.nav-section { font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; padding: 8px 10px 4px; margin-top: 8px; }
+.nav-section { font-size: 10px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: .5px; padding: 10px 14px 4px; margin-top: 6px; }
 
 /* ── PAGE CONTENT ── */
 #page-content { flex: 1; display: flex; overflow: hidden; min-width: 0; }
@@ -62,76 +66,78 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 #chat-page { display: flex; flex: 1; overflow: hidden; }
 
 /* INBOX */
-#inbox { width: 280px; background: #fff; border-right: 1px solid #e8eaed; display: flex; flex-direction: column; flex-shrink: 0; }
-#inbox-top { padding: 12px 12px 8px; border-bottom: 1px solid #e8eaed; }
-#inbox-top h2 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
-.search-bar { display: flex; align-items: center; gap: 8px; background: #f5f7fa; border: 1px solid #e8eaed; border-radius: 8px; padding: 6px 10px; }
-.search-bar input { border: none; background: none; font-size: 13px; flex: 1; color: #1a1d23; outline: none; }
-.tab-row { display: flex; gap: 2px; padding: 6px 8px 0; }
-.tab { font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer; color: #6b7280; font-weight: 500; border: none; background: none; transition: all .15s; }
-.tab.active { background: #e6f7f2; color: #0e7a58; }
+#inbox { width: 280px; background: #fff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; }
+#inbox-top { padding: 14px 12px 10px; border-bottom: 1px solid #e2e8f0; }
+#inbox-top h2 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #0f172a; }
+.search-bar { display: flex; align-items: center; gap: 8px; background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 7px 10px; transition: border-color .15s; }
+.search-bar:focus-within { border-color: #3b82f6; }
+.search-bar input { border: none; background: none; font-size: 13px; flex: 1; color: #0f172a; outline: none; }
+.tab-row { display: flex; gap: 4px; padding: 8px 10px 0; }
+.tab { font-size: 12px; padding: 5px 12px; border-radius: 20px; cursor: pointer; color: #64748b; font-weight: 500; border: 1px solid transparent; background: none; transition: all .12s; }
+.tab.active { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
+.tab:hover:not(.active) { background: #f1f5f9; color: #0f172a; }
 #conv-list { flex: 1; overflow-y: auto; }
-.conv-item { display: flex; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: background .1s; align-items: flex-start; }
-.conv-item:hover { background: #f9fafb; }
-.conv-item.active { background: #e6f7f2; }
+.conv-item { display: flex; gap: 10px; padding: 11px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background .1s; align-items: flex-start; }
+.conv-item:hover { background: #f8fafc; }
+.conv-item.active { background: #eff6ff; border-left: 2px solid #3b82f6; }
 .conv-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; }
 .conv-info { flex: 1; min-width: 0; }
-.conv-name { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; }
-.conv-name .ctime { font-weight: 400; font-size: 11px; color: #9ca3af; }
-.conv-preview { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.conv-name { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; color: #0f172a; }
+.conv-name .ctime { font-weight: 400; font-size: 11px; color: #94a3b8; }
+.conv-preview { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 .conv-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 3px; }
 .ch-wa { background: #dcfce7; color: #15803d; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
-.unread-dot { width: 7px; height: 7px; background: #16a679; border-radius: 50%; }
-.empty-inbox { text-align: center; padding: 40px 20px; color: #9ca3af; }
+.unread-dot { width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; }
+.empty-inbox { text-align: center; padding: 40px 16px; color: #94a3b8; }
 
 /* CHAT PANEL */
 #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-#chat-header { background: #fff; border-bottom: 1px solid #e8eaed; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+#chat-header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 11px 16px; display: flex; align-items: center; gap: 12px; }
 .ch-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
-.ch-name { font-weight: 600; font-size: 14px; }
-.ch-sub { font-size: 11px; color: #6b7280; display: flex; align-items: center; gap: 4px; }
+.ch-name { font-weight: 700; font-size: 14px; color: #0f172a; }
+.ch-sub { font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 4px; }
 .online-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; }
 .ch-acts { display: flex; gap: 6px; margin-left: auto; }
-.action-btn { width: 32px; height: 32px; border-radius: 8px; background: #f5f7fa; border: 1px solid #e8eaed; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #6b7280; transition: all .15s; }
-.action-btn:hover { background: #e6f7f2; color: #16a679; }
+.action-btn { width: 32px; height: 32px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #64748b; transition: all .12s; }
+.action-btn:hover { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
 
-#messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #f9fafb; }
-.day-divider { text-align: center; font-size: 11px; color: #9ca3af; display: flex; align-items: center; gap: 8px; }
-.day-divider::before,.day-divider::after { content: ''; flex: 1; height: 1px; background: #e8eaed; }
+#messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #f8fafc; }
+.day-divider { text-align: center; font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 8px; }
+.day-divider::before,.day-divider::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
 .msg-row { display: flex; gap: 8px; align-items: flex-end; }
 .msg-row.from-customer { justify-content: flex-start; }
 .msg-row.from-bot,.msg-row.from-agent { justify-content: flex-end; }
 .msg-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; flex-shrink: 0; font-weight: 700; }
-.bubble { max-width: 68%; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.55; }
-.from-customer .bubble { background: #fff; border: 1px solid #e8eaed; border-bottom-left-radius: 4px; }
-.from-bot .bubble,.from-agent .bubble { background: #16a679; color: #fff; border-bottom-right-radius: 4px; }
-.msg-meta { font-size: 10px; color: #9ca3af; margin-top: 2px; }
+.bubble { max-width: 68%; padding: 9px 13px; border-radius: 16px; font-size: 13px; line-height: 1.6; }
+.from-customer .bubble { background: #fff; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.from-bot .bubble,.from-agent .bubble { background: #3b82f6; color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 1px 4px rgba(59,130,246,.3); }
+.msg-meta { font-size: 10px; color: #94a3b8; margin-top: 3px; }
 .from-bot .msg-meta,.from-agent .msg-meta { text-align: right; }
-.bot-label { font-size: 10px; color: #16a679; font-weight: 500; margin-bottom: 2px; text-align: right; }
+.bot-label { font-size: 10px; color: #3b82f6; font-weight: 600; margin-bottom: 2px; text-align: right; }
 .wa-sent { font-size: 10px; color: #15803d; margin-top: 2px; text-align: right; }
 .wa-fail { font-size: 10px; color: #ef4444; margin-top: 2px; text-align: right; }
-.no-chat { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #9ca3af; }
+.no-chat { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #94a3b8; }
 
-#input-box { background: #fff; border-top: 1px solid #e8eaed; padding: 10px 14px; }
-.input-tools { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-.tool-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid #e8eaed; background: #f5f7fa; font-size: 11px; color: #6b7280; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .15s; }
-.tool-btn:hover,.tool-btn.on { background: #e6f7f2; color: #0e7a58; border-color: #b2e8d8; }
+#input-box { background: #fff; border-top: 1px solid #e2e8f0; padding: 12px 14px; }
+.input-tools { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.tool-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 12px; color: #64748b; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .12s; font-weight: 500; }
+.tool-btn:hover,.tool-btn.on { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
 .input-row { display: flex; gap: 8px; align-items: flex-end; }
-#msg-input { flex: 1; resize: none; border: 1.5px solid #e8eaed; border-radius: 10px; padding: 9px 12px; font-size: 13px; font-family: inherit; line-height: 1.4; background: #f5f7fa; color: #1a1d23; min-height: 40px; max-height: 100px; transition: border-color .2s; }
-#msg-input:focus { outline: none; border-color: #16a679; background: #fff; }
-#send-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: #16a679; color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background .15s; flex-shrink: 0; }
-#send-btn:hover { background: #0e7a58; }
-#send-btn:disabled { background: #e8eaed; cursor: not-allowed; }
+#msg-input { flex: 1; resize: none; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 9px 14px; font-size: 13px; font-family: inherit; line-height: 1.5; background: #f8fafc; color: #0f172a; min-height: 42px; max-height: 100px; transition: border-color .15s; }
+#msg-input:focus { outline: none; border-color: #3b82f6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,.08); }
+#send-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #3b82f6; color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; box-shadow: 0 2px 8px rgba(59,130,246,.3); }
+#send-btn:hover { background: #2563eb; transform: scale(1.05); }
+#send-btn:disabled { background: #e2e8f0; cursor: not-allowed; box-shadow: none; transform: none; }
 
 /* RIGHT DETAIL */
-#right-detail { width: 240px; background: #fff; border-left: 1px solid #e8eaed; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
-.rd-section { padding: 12px 14px; border-bottom: 1px solid #e8eaed; }
-.rd-title { font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
-.rd-contact-av { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; margin: 0 auto 8px; }
+#right-detail { width: 240px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.rd-section { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
+.rd-title { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+.rd-contact-av { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; margin: 0 auto 10px; }
 .stat-row { display: flex; gap: 8px; }
-.stat-card { flex: 1; background: #f5f7fa; border-radius: 8px; padding: 8px 10px; }
-.stat-num { font-size: 18px; font-weight: 700; color: #16a679; }
-.stat-label { font-size: 10px; color: #6b7280; margin-top: 1px; }
+.stat-card { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+.stat-num { font-size: 20px; font-weight: 700; color: #3b82f6; }
+.stat-label { font-size: 10px; color: #64748b; margin-top: 2px; }
 .wa-badge { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; }
 .wa-badge.connected { background: #dcfce7; color: #15803d; }
 .wa-badge.disconnected { background: #fee2e2; color: #991b1b; }
@@ -168,37 +174,38 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <!-- LEFT NAV -->
   <div id="left-nav">
     <div class="nav-logo">
-      <span>🌿</span> HerbalCare
+      <div class="logo-badge">CS</div>
+      Adsy CS
     </div>
     <div class="nav-item active" onclick="showPage('chat',this)" data-page="chat">
-      <span class="ni">💬</span> Chat
+      <span class="ni">💬</span> Inbox
       <span class="nav-badge" id="unread-badge">0</span>
     </div>
-    <div class="nav-item" onclick="showPage('fanpage',this)" data-page="fanpage">
-      <span class="ni">📘</span> Fanpage
-    </div>
-    <div class="nav-item" onclick="showPage('analytics',this)" data-page="analytics">
+    <a class="nav-item" href="cases.html">
+      <span class="ni">📋</span> Cases
+    </a>
+    <a class="nav-item" href="analytics.html">
       <span class="ni">📊</span> Analytics
-    </div>
-    <div class="nav-item" onclick="showPage('conversations',this)" data-page="conversations">
-      <span class="ni">🗂</span> Conversations
-    </div>
-    <div class="nav-item" onclick="showPage('broadcast',this)" data-page="broadcast">
-      <span class="ni">📢</span> Broadcast
-    </div>
-    <a class="nav-item" href="aiagents.html" data-page="aiagents">
+    </a>
+    <a class="nav-item" href="orders.html">
+      <span class="ni">🛒</span> Orders
+    </a>
+    <a class="nav-item" href="broadcast.html">
+      <span class="ni">📣</span> Broadcast
+    </a>
+    <a class="nav-item" href="aiagents.html">
       <span class="ni">🤖</span> AI Agents
     </a>
     <div class="nav-section">Lainnya</div>
     <a class="nav-item" href="contacts.html"><span class="ni">👥</span> Kontak</a>
     <a class="nav-item" href="knowledge.html"><span class="ni">📚</span> Knowledge Base</a>
     <a class="nav-item" href="settings.html"><span class="ni">⚙️</span> Pengaturan</a>
-    <div style="margin-top:auto;padding:12px 10px;border-top:1px solid #e8eaed;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="tb-avatar" id="tb-av2" style="width:28px;height:28px;font-size:11px;">A</div>
+    <div style="margin-top:auto;padding:12px 14px;border-top:1px solid rgba(255,255,255,.07);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div id="tb-av2" style="width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0;">A</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:600;color:#1a1d23;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="tb-name2">Admin</div>
-          <button style="font-size:11px;color:#9ca3af;border:none;background:none;cursor:pointer;padding:0;" onclick="Auth.logout()">Logout</button>
+          <div style="font-size:12px;font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="tb-name2">Admin</div>
+          <button style="font-size:11px;color:#64748b;border:none;background:none;cursor:pointer;padding:0;" onclick="Auth.logout()">Logout</button>
         </div>
       </div>
     </div>
@@ -289,32 +296,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
 
-    <!-- OTHER PAGES (coming soon) -->
-    <div id="fanpage-page" class="coming-soon" style="display:none;">
-      <div class="cs-icon">📘</div>
-      <h2>Fanpage</h2>
-      <p>Segera hadir — integrasi Facebook & Instagram</p>
-    </div>
-    <div id="analytics-page" class="coming-soon" style="display:none;">
-      <div class="cs-icon">📊</div>
-      <h2>Analytics</h2>
-      <p>Segera hadir — laporan dan statistik lengkap</p>
-    </div>
-    <div id="conversations-page" class="coming-soon" style="display:none;">
-      <div class="cs-icon">🗂</div>
-      <h2>Conversations</h2>
-      <p>Segera hadir — manajemen percakapan lanjutan</p>
-    </div>
-    <div id="broadcast-page" class="coming-soon" style="display:none;">
-      <div class="cs-icon">📢</div>
-      <h2>Broadcast</h2>
-      <p>Segera hadir — kirim pesan massal ke kontak</p>
-    </div>
-    <div id="aiagents-page" class="coming-soon" style="display:none;">
-      <div class="cs-icon">🤖</div>
-      <h2>AI Agents</h2>
-      <p>Segera hadir — konfigurasi dan monitor AI agent</p>
-    </div>
 
   </div>
 </div>

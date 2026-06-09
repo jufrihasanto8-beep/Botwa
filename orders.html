@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orders · Adsy CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.s-tab { padding:6px 14px; border-radius:20px; border:1px solid var(--border); background:var(--white); font-size:12px; font-weight:500; color:var(--text-2); cursor:pointer; transition:all .15s; }
+.s-tab.active { background:var(--green); color:#fff; border-color:var(--green); }
+.orders-table { width:100%; border-collapse:collapse; }
+.orders-table th, .orders-table td { padding:11px 14px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; }
+.orders-table th { font-size:11px; font-weight:600; color:var(--text-2); background:var(--bg); text-transform:uppercase; }
+.orders-table tr:last-child td { border-bottom:none; }
+.orders-table tr:hover td { background:#fafafa; }
+.st-pending   { background:#fef3c7; color:#92400e; }
+.st-confirmed { background:#dbeafe; color:#1e40af; }
+.st-processing{ background:#e0e7ff; color:#4338ca; }
+.st-shipped   { background:#fed7aa; color:#9a3412; }
+.st-delivered { background:#dcfce7; color:#166534; }
+.st-cancelled { background:#f3f4f6; color:#6b7280; }
+.pay-paid    { background:#dcfce7; color:#166534; }
+.pay-unpaid  { background:#fee2e2; color:#991b1b; }
+.stat-cards { display:flex; gap:14px; padding:20px 24px 0; flex-wrap:wrap; }
+.stat-c { flex:1; min-width:110px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; }
+.stat-c .num { font-size:26px; font-weight:700; }
+.stat-c .lbl { font-size:12px; color:var(--text-2); margin-top:4px; }
+.filter-bar { display:flex; align-items:center; gap:8px; padding:14px 24px; background:var(--white); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+
+    <div class="page-header">
+      <div>
+        <h1>🛒 Orders</h1>
+        <p>Manajemen pesanan dari percakapan customer</p>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openAdd()">+ Tambah Order</button>
+    </div>
+
+    <div class="stat-cards" id="stat-cards"></div>
+
+    <div class="filter-bar" style="margin-top:16px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="s-tab active" onclick="setFilter('semua',this)">Semua</button>
+        <button class="s-tab" onclick="setFilter('pending',this)">Pending</button>
+        <button class="s-tab" onclick="setFilter('confirmed',this)">Confirmed</button>
+        <button class="s-tab" onclick="setFilter('processing',this)">Processing</button>
+        <button class="s-tab" onclick="setFilter('shipped',this)">Shipped</button>
+        <button class="s-tab" onclick="setFilter('delivered',this)">Delivered</button>
+        <button class="s-tab" onclick="setFilter('cancelled',this)">Cancelled</button>
+      </div>
+      <input type="text" id="search-input" placeholder="🔍 Cari order / kontak..." oninput="renderOrders()"
+        style="margin-left:auto;padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:200px;">
+    </div>
+
+    <div style="padding:0 24px 40px;">
+      <div class="card" style="margin-top:16px;overflow:hidden;">
+        <div class="table-wrap">
+          <table class="orders-table">
+            <thead>
+              <tr>
+                <th>No. Order</th>
+                <th>Kontak</th>
+                <th>Item / Produk</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Bayar</th>
+                <th>Resi</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="orders-tbody"></tbody>
+          </table>
+        </div>
+        <div id="orders-empty" style="display:none;text-align:center;padding:60px;color:var(--text-2);">
+          <div style="font-size:40px;margin-bottom:12px;">🛒</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">Belum ada order</div>
+          <div style="font-size:13px;">Klik "+ Tambah Order" untuk mencatat pesanan pertama</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="order-modal">
+  <div class="modal" style="width:520px;">
+    <h2 id="modal-title">Tambah Order</h2>
+    <input type="hidden" id="order-id">
+    <div class="form-group">
+      <label>Kontak / Customer *</label>
+      <select id="ord-contact" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg);"></select>
+    </div>
+    <div class="form-group">
+      <label>Item / Produk *</label>
+      <textarea id="ord-items" rows="2" placeholder="Nama produk, jumlah, varian..."></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group">
+        <label>Total (Rp)</label>
+        <input type="number" id="ord-total" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label>Metode Bayar</label>
+        <select id="ord-payment">
+          <option value="transfer">Transfer Bank</option>
+          <option value="cod">COD</option>
+          <option value="ewallet">E-Wallet</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Alamat Pengiriman</label>
+      <textarea id="ord-address" rows="2" placeholder="Alamat lengkap..."></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group">
+        <label>Status Order</label>
+        <select id="ord-status">
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="processing">Processing</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status Bayar</label>
+        <select id="ord-paystatus">
+          <option value="unpaid">Belum Bayar</option>
+          <option value="paid">Sudah Bayar</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group">
+        <label>Kurir</label>
+        <input type="text" id="ord-courier" placeholder="JNE, Sicepat, Gojek...">
+      </div>
+      <div class="form-group">
+        <label>No. Resi</label>
+        <input type="text" id="ord-resi" placeholder="000000000000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Catatan</label>
+      <input type="text" id="ord-notes" placeholder="Catatan internal...">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveOrder()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('orders');
+
+let currentFilter = 'semua';
+let allOrders = [];
+let contactMap = {};
+
+async function init() {
+  await Config.load();
+  const contacts = await Contacts.getAll();
+  contacts.forEach(c => { contactMap[c.id] = c; });
+
+  const sel = document.getElementById('ord-contact');
+  sel.innerHTML = `<option value="">— Pilih Kontak —</option>` +
+    contacts.map(c => `<option value="${c.id}">${c.name} (+${c.phone})</option>`).join('');
+
+  await loadOrders();
+}
+
+async function loadOrders() {
+  allOrders = await Orders.getAll();
+
+  const cnt = { semua: allOrders.length };
+  ['pending','confirmed','processing','shipped','delivered','cancelled'].forEach(s => {
+    cnt[s] = allOrders.filter(o => o.status === s).length;
+  });
+  const totalRevenue = allOrders.filter(o=>o.payment_status==='paid').reduce((sum,o)=>sum+(o.total||0),0);
+
+  document.getElementById('stat-cards').innerHTML = `
+    <div class="stat-c"><div class="num">${cnt.semua}</div><div class="lbl">Total Orders</div></div>
+    <div class="stat-c"><div class="num" style="color:#92400e">${cnt.pending}</div><div class="lbl">Pending</div></div>
+    <div class="stat-c"><div class="num" style="color:#9a3412">${cnt.shipped}</div><div class="lbl">Shipped</div></div>
+    <div class="stat-c"><div class="num" style="color:#166534">${cnt.delivered}</div><div class="lbl">Delivered</div></div>
+    <div class="stat-c"><div class="num" style="color:#16a679;font-size:20px;">Rp ${totalRevenue.toLocaleString('id')}</div><div class="lbl">Revenue (paid)</div></div>
+  `;
+  renderOrders();
+}
+
+function renderOrders() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  let list = allOrders;
+  if (currentFilter !== 'semua') list = list.filter(o => o.status === currentFilter);
+  if (search) list = list.filter(o => {
+    const c = contactMap[o.contact_id];
+    return (o.order_number||'').toLowerCase().includes(search) ||
+      (c?.name||'').toLowerCase().includes(search) ||
+      (o.items||'').toLowerCase().includes(search);
+  });
+
+  const tbody = document.getElementById('orders-tbody');
+  const empty = document.getElementById('orders-empty');
+  if (!list.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  const stLabel = { pending:'Pending', confirmed:'Confirmed', processing:'Processing', shipped:'Shipped', delivered:'Delivered', cancelled:'Cancelled' };
+
+  tbody.innerHTML = list.map(o => {
+    const c = contactMap[o.contact_id] || {};
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px;color:var(--text-2);">${o.order_number||'—'}</td>
+      <td>
+        <div style="font-weight:500;">${c.name||'—'}</div>
+        <div style="font-size:11px;color:var(--text-2);">${c.phone?'+'+c.phone:''}</div>
+      </td>
+      <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${o.items||'—'}</td>
+      <td style="font-weight:600;">Rp ${(o.total||0).toLocaleString('id')}</td>
+      <td><span class="badge st-${o.status}">${stLabel[o.status]||o.status}</span></td>
+      <td><span class="badge ${o.payment_status==='paid'?'pay-paid':'pay-unpaid'}">${o.payment_status==='paid'?'✅ Lunas':'⏳ Belum'}</span></td>
+      <td style="font-size:12px;font-family:monospace;">${o.resi||'—'}</td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-secondary" onclick="editOrder('${o.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.s-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderOrders();
+}
+
+function openAdd() {
+  document.getElementById('order-id').value='';
+  document.getElementById('modal-title').textContent='Tambah Order';
+  ['ord-items','ord-address','ord-courier','ord-resi','ord-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ord-total').value='';
+  document.getElementById('ord-contact').value='';
+  document.getElementById('ord-status').value='pending';
+  document.getElementById('ord-paystatus').value='unpaid';
+  document.getElementById('ord-payment').value='transfer';
+  document.getElementById('order-modal').classList.add('open');
+}
+
+async function editOrder(id) {
+  const o = allOrders.find(x=>x.id===id);
+  if (!o) return;
+  document.getElementById('order-id').value=o.id;
+  document.getElementById('modal-title').textContent='Edit Order';
+  document.getElementById('ord-contact').value=o.contact_id||'';
+  document.getElementById('ord-items').value=o.items||'';
+  document.getElementById('ord-total').value=o.total||'';
+  document.getElementById('ord-payment').value=o.payment_method||'transfer';
+  document.getElementById('ord-address').value=o.shipping_address||'';
+  document.getElementById('ord-status').value=o.status||'pending';
+  document.getElementById('ord-paystatus').value=o.payment_status||'unpaid';
+  document.getElementById('ord-courier').value=o.courier||'';
+  document.getElementById('ord-resi').value=o.resi||'';
+  document.getElementById('ord-notes').value=o.notes||'';
+  document.getElementById('order-modal').classList.add('open');
+}
+
+async function saveOrder() {
+  const id = document.getElementById('order-id').value;
+  const data = {
+    contact_id: document.getElementById('ord-contact').value||null,
+    items: document.getElementById('ord-items').value.trim(),
+    total: parseInt(document.getElementById('ord-total').value)||0,
+    payment_method: document.getElementById('ord-payment').value,
+    shipping_address: document.getElementById('ord-address').value.trim(),
+    status: document.getElementById('ord-status').value,
+    payment_status: document.getElementById('ord-paystatus').value,
+    courier: document.getElementById('ord-courier').value.trim(),
+    resi: document.getElementById('ord-resi').value.trim(),
+    notes: document.getElementById('ord-notes').value.trim(),
+  };
+  if (!data.items) return showToast('⚠️ Item/produk wajib diisi');
+  try {
+    if (id) { await Orders.update(id, data); showToast('✅ Order diperbarui'); }
+    else { await Orders.create(data); showToast('✅ Order ditambahkan'); }
+    closeModal(); await loadOrders();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function deleteOrder(id) {
+  if (!confirm('Hapus order ini?')) return;
+  await Orders.delete(id);
+  showToast('🗑 Order dihapus');
+  await loadOrders();
+}
+
+function closeModal() { document.getElementById('order-modal').classList.remove('open'); }
+
+document.getElementById('order-modal').addEventListener('click', function(e) {
+  if (e.target===this) closeModal();
+});
+
+init();
+</script>
+</body>
+</html>

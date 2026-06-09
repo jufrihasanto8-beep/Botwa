@@ -3,27 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login - HerbalCare CS</title>
+<title>Login - Adsy CS</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
-body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0e2a22,#1a3d2e,#0e2a22);}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);}
 .login-wrap{width:100%;max-width:420px;padding:16px;}
-.login-card{background:var(--white);border-radius:20px;padding:36px 32px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.login-card{background:var(--white);border-radius:20px;padding:36px 32px;box-shadow:0 24px 80px rgba(0,0,0,.35);}
 .logo-area{text-align:center;margin-bottom:28px;}
-.logo-icon{width:56px;height:56px;background:var(--green);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;}
-.logo-area h1{font-size:22px;font-weight:700;}
+.logo-icon{width:52px;height:52px;background:var(--primary);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;letter-spacing:-1px;margin:0 auto 14px;box-shadow:0 8px 20px rgba(59,130,246,.35);}
+.logo-area h1{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px;}
 .logo-area p{font-size:13px;color:var(--text-2);margin-top:4px;}
-.tab-switch{display:flex;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:24px;}
+.tab-switch{display:flex;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:24px;border:1px solid var(--border);}
 .tab-switch button{flex:1;padding:8px;border:none;border-radius:8px;background:none;color:var(--text-2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;}
-.tab-switch button.active{background:var(--white);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.1);}
+.tab-switch button.active{background:var(--white);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.08);font-weight:600;}
 .form-section{display:none;}.form-section.active{display:block;}
 .error-msg{background:#fee2e2;color:#991b1b;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;display:none;}
 .success-msg{background:#dcfce7;color:#166534;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;display:none;}
 .divider-text{text-align:center;font-size:12px;color:var(--text-3);margin:16px 0;position:relative;}
 .divider-text::before,.divider-text::after{content:'';position:absolute;top:50%;width:40%;height:1px;background:var(--border);}
 .divider-text::before{left:0;}.divider-text::after{right:0;}
-.demo-btn{width:100%;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text-2);cursor:pointer;transition:all .15s;}
-.demo-btn:hover{background:var(--green-light);color:var(--green);border-color:var(--green-mid);}
+.demo-btn{width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text-2);cursor:pointer;transition:all .15s;font-weight:500;}
+.demo-btn:hover{background:var(--primary-light);color:var(--primary);border-color:var(--primary-mid);}
 </style>
 </head>
 <body>
@@ -31,9 +31,9 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;bac
 <div class="login-wrap">
   <div class="login-card">
     <div class="logo-area">
-      <div class="logo-icon">&#127807;</div>
-      <h1>HerbalCare CS</h1>
-      <p>Dashboard Customer Service berbasis AI</p>
+      <div class="logo-icon" style="background:#16a679;font-size:22px;font-weight:800;letter-spacing:-1px;">CS</div>
+      <h1>Adsy CS</h1>
+      <p>CS Automation Dashboard berbasis AI</p>
     </div>
     <div class="tab-switch">
       <button class="active" onclick="switchTab('login')">Masuk</button>
@@ -112,10 +112,10 @@ async function loginDemo(){
   const btn=document.getElementById('demo-btn');
   btn.textContent='Memuat...';btn.disabled=true;
   try{
-    try{await Auth.login('demo@herbalcare.id','demo123');}
+    try{await Auth.login('demo@adsy.id','demo123');}
     catch{
-      await Auth.register('Admin Demo','demo@herbalcare.id','demo123','HerbalCare Demo');
-      await Auth.login('demo@herbalcare.id','demo123');
+      await Auth.register('Admin Demo','demo@adsy.id','demo123','Adsy Demo');
+      await Auth.login('demo@adsy.id','demo123');
     }
     window.location.href='dashboard.html';
   }catch(e){

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analytics · Adsy CS</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; padding:24px; }
+.stat-box { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; }
+.stat-box .num { font-size:32px; font-weight:700; color:var(--text); }
+.stat-box .lbl { font-size:12px; color:var(--text-2); margin-top:4px; }
+.stat-box .change { font-size:11px; margin-top:6px; }
+.change.up { color:#16a34a; } .change.neutral { color:var(--text-2); }
+.charts-row { display:grid; grid-template-columns:2fr 1fr; gap:16px; padding:0 24px 24px; }
+.chart-card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; }
+.chart-card h3 { font-size:14px; font-weight:600; margin-bottom:16px; }
+.insights-section { padding:0 24px 40px; }
+.insights-card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); }
+.insights-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.insights-header h3 { font-size:14px; font-weight:600; }
+.insights-body { padding:20px; font-size:13px; color:var(--text-2); line-height:1.8; white-space:pre-wrap; min-height:80px; }
+.top-table th, .top-table td { padding:10px 14px; font-size:13px; border-bottom:1px solid var(--border); }
+.top-table th { font-size:11px; font-weight:600; color:var(--text-2); background:var(--bg); }
+.top-table tr:last-child td { border-bottom:none; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+
+    <div class="page-header">
+      <div>
+        <h1>📊 Analytics</h1>
+        <p>Statistik dan insight percakapan customer</p>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="refresh()">↻ Refresh</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-grid" id="stat-grid">
+      <div class="stat-box"><div class="num">—</div><div class="lbl">Loading...</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Pesan 7 Hari Terakhir</h3>
+        <canvas id="msg-chart" height="100"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Cases by Status</h3>
+        <canvas id="case-chart" height="200"></canvas>
+        <div id="case-legend" style="margin-top:12px;font-size:12px;"></div>
+      </div>
+    </div>
+
+    <!-- Top Contacts -->
+    <div style="padding:0 24px 24px;">
+      <div class="card">
+        <div class="card-header">Top Kontak (pesan terbanyak)</div>
+        <div class="table-wrap">
+          <table class="top-table" style="width:100%;border-collapse:collapse;">
+            <thead><tr><th>#</th><th>Nama</th><th>No. WA</th><th>Total Pesan</th><th>Aksi</th></tr></thead>
+            <tbody id="top-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Insights -->
+    <div class="insights-section">
+      <div class="insights-card">
+        <div class="insights-header">
+          <h3>🧠 AI Insights</h3>
+          <button class="btn btn-secondary btn-sm" id="insights-btn" onclick="generateInsights()">Generate Insights</button>
+        </div>
+        <div class="insights-body" id="insights-body">
+          Klik "Generate Insights" untuk menganalisis percakapan dan mendapatkan rekomendasi otomatis dari AI.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('analytics');
+
+let msgChart = null, caseChart = null;
+
+async function refresh() { await init(); showToast('Data diperbarui'); }
+
+async function init() {
+  await Config.load();
+
+  const [contacts, allCases] = await Promise.all([
+    Contacts.getAll(),
+    Cases.getAll().catch(() => []),
+  ]);
+
+  // Fetch recent messages for stats
+  const uid = Auth.getUser()?.id;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+  const allMsgs = await SB.get('messages', `?user_id=eq.${uid}&order=created_at.desc&limit=1000`);
+
+  const todayMsgs = allMsgs.filter(m => new Date(m.created_at) >= today);
+  const aiMsgs = allMsgs.filter(m => m.role === 'assistant');
+  const aiToday = aiMsgs.filter(m => new Date(m.created_at) >= today);
+  const aiRate = allMsgs.length ? Math.round((aiMsgs.length / allMsgs.length) * 100) : 0;
+
+  const openCases = allCases.filter(c => c.status !== 'selesai').length;
+  const escalated = allCases.filter(c => c.status === 'eskalasi').length;
+
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-box">
+      <div class="num">${allMsgs.length.toLocaleString('id')}</div>
+      <div class="lbl">Total Pesan</div>
+      <div class="change up">📬 ${todayMsgs.length} hari ini</div>
+    </div>
+    <div class="stat-box">
+      <div class="num">${contacts.length}</div>
+      <div class="lbl">Total Kontak</div>
+      <div class="change neutral">Aktif di platform</div>
+    </div>
+    <div class="stat-box">
+      <div class="num">${aiRate}%</div>
+      <div class="lbl">AI Reply Rate</div>
+      <div class="change up">🤖 ${aiToday.length} balasan hari ini</div>
+    </div>
+    <div class="stat-box">
+      <div class="num">${openCases}</div>
+      <div class="lbl">Cases Terbuka</div>
+      <div class="change ${escalated>0?'up':'neutral'}">${escalated > 0 ? '🚨 '+escalated+' eskalasi' : 'Semua aman'}</div>
+    </div>
+  `;
+
+  // Build 7-day chart data
+  const days = [];
+  const dayCounts = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i*24*60*60*1000);
+    const label = d.toLocaleDateString('id-ID', { weekday:'short', day:'numeric' });
+    days.push(label);
+    const start = new Date(d); start.setHours(0,0,0,0);
+    const end = new Date(d); end.setHours(23,59,59,999);
+    dayCounts.push(allMsgs.filter(m => {
+      const t = new Date(m.created_at);
+      return t >= start && t <= end;
+    }).length);
+  }
+
+  if (msgChart) msgChart.destroy();
+  msgChart = new Chart(document.getElementById('msg-chart'), {
+    type: 'line',
+    data: {
+      labels: days,
+      datasets: [{
+        label: 'Pesan',
+        data: dayCounts,
+        borderColor: '#16a679',
+        backgroundColor: 'rgba(22,166,121,.1)',
+        borderWidth: 2,
+        tension: .4,
+        fill: true,
+        pointBackgroundColor: '#16a679',
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1 } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Cases donut
+  const caseStats = {
+    baru: allCases.filter(c=>c.status==='baru').length,
+    diproses: allCases.filter(c=>c.status==='diproses').length,
+    eskalasi: allCases.filter(c=>c.status==='eskalasi').length,
+    selesai: allCases.filter(c=>c.status==='selesai').length,
+  };
+  if (caseChart) caseChart.destroy();
+  caseChart = new Chart(document.getElementById('case-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Baru','Diproses','Eskalasi','Selesai'],
+      datasets: [{
+        data: [caseStats.baru, caseStats.diproses, caseStats.eskalasi, caseStats.selesai],
+        backgroundColor: ['#3b82f6','#f59e0b','#ef4444','#10b981'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      cutout: '65%',
+    }
+  });
+  document.getElementById('case-legend').innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      ${['#3b82f6|Baru|'+caseStats.baru,'#f59e0b|Diproses|'+caseStats.diproses,'#ef4444|Eskalasi|'+caseStats.eskalasi,'#10b981|Selesai|'+caseStats.selesai].map(s=>{
+        const [c,l,n] = s.split('|');
+        return `<div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:50%;background:${c}"></div><span>${l} (${n})</span></div>`;
+      }).join('')}
+    </div>`;
+
+  // Top contacts
+  const contactMsgCount = {};
+  allMsgs.filter(m=>m.role==='user').forEach(m => {
+    contactMsgCount[m.contact_id] = (contactMsgCount[m.contact_id]||0)+1;
+  });
+  const topContacts = contacts
+    .map(c => ({ ...c, msgCount: contactMsgCount[c.id]||0 }))
+    .filter(c => c.msgCount > 0)
+    .sort((a,b) => b.msgCount - a.msgCount)
+    .slice(0, 10);
+
+  document.getElementById('top-tbody').innerHTML = topContacts.length
+    ? topContacts.map((c,i) => `<tr>
+        <td style="color:var(--text-2);font-weight:600;">${i+1}</td>
+        <td><strong>${c.name}</strong></td>
+        <td style="color:var(--text-2);">+${c.phone}</td>
+        <td><span class="badge badge-green">${c.msgCount} pesan</span></td>
+        <td><a href="dashboard.html?contact=${c.id}" class="btn btn-sm btn-secondary">💬 Chat</a></td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--text-2);padding:32px;">Belum ada data percakapan</td></tr>`;
+
+  // Load existing insights
+  const cfg = Config.get();
+  if (cfg.ai_insights) {
+    document.getElementById('insights-body').textContent = cfg.ai_insights;
+    const d = cfg.ai_insights_updated ? new Date(cfg.ai_insights_updated).toLocaleDateString('id-ID') : '';
+    if (d) document.getElementById('insights-btn').textContent = `↻ Update (terakhir ${d})`;
+  }
+}
+
+async function generateInsights() {
+  const btn = document.getElementById('insights-btn');
+  const body = document.getElementById('insights-body');
+  btn.disabled = true; btn.textContent = 'Menganalisis...';
+  body.textContent = 'AI sedang menganalisis percakapan... ini mungkin butuh beberapa detik.';
+  try {
+    const r = await GlobalInsight.generate();
+    body.textContent = r.insights;
+    btn.textContent = '↻ Update Insights';
+    showToast(`✅ Insights diperbarui dari ${r.contactCount} percakapan`);
+  } catch(e) {
+    body.textContent = 'Gagal generate insights: ' + e.message;
+    showToast('❌ ' + e.message);
+  } finally { btn.disabled = false; }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Broadcast · Adsy CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.bc-layout { display:grid; grid-template-columns:420px 1fr; gap:0; height:calc(100vh - 57px); overflow:hidden; }
+.bc-compose { border-right:1px solid var(--border); background:var(--white); display:flex; flex-direction:column; overflow-y:auto; }
+.bc-history { overflow-y:auto; background:var(--bg); padding:20px; }
+.compose-header { padding:20px; border-bottom:1px solid var(--border); }
+.compose-header h2 { font-size:15px; font-weight:600; }
+.compose-body { flex:1; padding:20px; display:flex; flex-direction:column; gap:16px; }
+.char-count { font-size:11px; color:var(--text-2); text-align:right; margin-top:4px; }
+.target-tag { display:inline-flex; align-items:center; gap:4px; background:var(--green-light); color:var(--green-dark); padding:4px 10px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; }
+.target-tag:hover { background:var(--green-mid); }
+.bc-card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px; margin-bottom:12px; }
+.bc-card .bc-title { font-weight:600; font-size:13px; margin-bottom:4px; }
+.bc-card .bc-meta { font-size:11px; color:var(--text-2); display:flex; gap:10px; flex-wrap:wrap; }
+.bc-card .bc-msg { font-size:12px; color:var(--text-2); margin-top:8px; padding:10px; background:var(--bg); border-radius:8px; white-space:pre-wrap; max-height:80px; overflow:hidden; }
+.progress-bar { height:4px; background:var(--border); border-radius:2px; margin-top:8px; overflow:hidden; }
+.progress-fill { height:100%; background:var(--green); border-radius:2px; transition:width .3s; }
+.send-btn { margin:20px; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content" style="overflow:hidden;display:flex;flex-direction:column;">
+
+    <div class="page-header">
+      <div>
+        <h1>📣 Broadcast</h1>
+        <p>Kirim pesan ke banyak kontak sekaligus</p>
+      </div>
+    </div>
+
+    <div class="bc-layout">
+      <!-- COMPOSE -->
+      <div class="bc-compose">
+        <div class="compose-header">
+          <h2>✍️ Tulis Pesan Broadcast</h2>
+        </div>
+        <div class="compose-body">
+          <div class="form-group" style="margin:0;">
+            <label>Judul / Label Internal</label>
+            <input type="text" id="bc-title" placeholder="Promo Lebaran, Stok Baru, dll.">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Pesan *</label>
+            <textarea id="bc-message" rows="8" placeholder="Halo Kak 👋&#10;&#10;Ada promo spesial hari ini!..." oninput="countChars()"></textarea>
+            <div class="char-count"><span id="char-count">0</span> karakter</div>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Target Penerima</label>
+            <select id="bc-target" onchange="updatePreview()">
+              <option value="">Semua Kontak</option>
+            </select>
+            <div class="hint" id="recipient-count" style="margin-top:6px;font-weight:500;color:var(--green);">Menghitung penerima...</div>
+          </div>
+          <div style="background:#fef3c7;border-radius:8px;padding:12px 14px;font-size:12px;color:#92400e;">
+            ⚠️ Broadcast akan dikirim 1 per 1,2 detik agar tidak diblokir WhatsApp. Pastikan nomor Fonnte kamu terhubung.
+          </div>
+        </div>
+        <div class="send-btn">
+          <button class="btn btn-primary btn-block" id="send-btn" onclick="sendBroadcast()">
+            📣 Kirim Broadcast
+          </button>
+          <div id="send-progress" style="display:none;margin-top:12px;">
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:6px;" id="progress-label">Mengirim...</div>
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="bc-history">
+        <div style="font-size:13px;font-weight:600;margin-bottom:16px;color:var(--text-2);">📂 Riwayat Broadcast</div>
+        <div id="bc-history-list">
+          <div style="text-align:center;padding:40px;color:var(--text-2);">
+            <div style="font-size:32px;margin-bottom:8px;">📣</div>
+            <div>Belum ada riwayat broadcast</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('broadcast');
+
+let allContacts = [];
+let isSending = false;
+
+async function init() {
+  await Config.load();
+  allContacts = await Contacts.getAll();
+
+  // Populate label filter
+  const labels = new Set();
+  allContacts.forEach(c => (c.label||'').split(',').forEach(l => { if(l.trim()) labels.add(l.trim()); }));
+  const sel = document.getElementById('bc-target');
+  sel.innerHTML = `<option value="">Semua Kontak (${allContacts.length})</option>` +
+    [...labels].map(l => {
+      const count = allContacts.filter(c=>(c.label||'').includes(l)).length;
+      return `<option value="${l}">${l} (${count} kontak)</option>`;
+    }).join('');
+
+  updatePreview();
+  await loadHistory();
+}
+
+function getTargetContacts() {
+  const label = document.getElementById('bc-target').value;
+  if (!label) return allContacts;
+  return allContacts.filter(c => (c.label||'').includes(label));
+}
+
+function updatePreview() {
+  const targets = getTargetContacts();
+  const est = Math.ceil(targets.length * 1.2);
+  document.getElementById('recipient-count').textContent =
+    `${targets.length} kontak akan menerima pesan ini (estimasi ${est} detik)`;
+}
+
+function countChars() {
+  const len = document.getElementById('bc-message').value.length;
+  document.getElementById('char-count').textContent = len;
+}
+
+async function sendBroadcast() {
+  if (isSending) return;
+  const title = document.getElementById('bc-title').value.trim() || 'Broadcast';
+  const message = document.getElementById('bc-message').value.trim();
+  const targetLabel = document.getElementById('bc-target').value;
+  if (!message) return showToast('⚠️ Pesan tidak boleh kosong');
+
+  const targets = getTargetContacts();
+  if (!targets.length) return showToast('⚠️ Tidak ada kontak di target ini');
+
+  if (!confirm(`Kirim broadcast ke ${targets.length} kontak?\n\nPesan:\n${message.slice(0,100)}...`)) return;
+
+  const token = Config.getKey('fonnte_token');
+  if (!token) return showToast('❌ Set Fonnte token di Pengaturan dulu');
+
+  isSending = true;
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true; btn.textContent = 'Mengirim...';
+  document.getElementById('send-progress').style.display = 'block';
+
+  // Create broadcast record
+  const bc = await Broadcasts.create({
+    title, message,
+    target_label: targetLabel || null,
+    total_target: targets.length,
+    status: 'sending',
+  });
+
+  let sent = 0;
+  for (const c of targets) {
+    document.getElementById('progress-label').textContent = `Mengirim ke ${c.name}... (${sent+1}/${targets.length})`;
+    document.getElementById('progress-fill').style.width = ((sent/targets.length)*100) + '%';
+    try {
+      await fetch('https://api.fonnte.com/send', {
+        method: 'POST',
+        headers: { 'Authorization': token },
+        body: new URLSearchParams({ target: c.phone, message, countryCode: '62' }),
+      });
+      sent++;
+    } catch {}
+    await new Promise(r => setTimeout(r, 1200));
+  }
+
+  await Broadcasts.update(bc.id, { sent_count: sent, status: 'done' });
+
+  document.getElementById('progress-fill').style.width = '100%';
+  document.getElementById('progress-label').textContent = `✅ Selesai! Terkirim ke ${sent} dari ${targets.length} kontak`;
+  showToast(`✅ Broadcast selesai — ${sent}/${targets.length} terkirim`);
+
+  isSending = false;
+  btn.disabled = false; btn.textContent = '📣 Kirim Broadcast';
+  setTimeout(() => { document.getElementById('send-progress').style.display='none'; }, 4000);
+
+  await loadHistory();
+}
+
+async function loadHistory() {
+  const list = await Broadcasts.getAll();
+  const container = document.getElementById('bc-history-list');
+  if (!list.length) {
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-2);"><div style="font-size:32px;margin-bottom:8px;">📣</div><div>Belum ada riwayat broadcast</div></div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(b => {
+    const date = new Date(b.created_at).toLocaleDateString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const rate = b.total_target > 0 ? Math.round((b.sent_count/b.total_target)*100) : 0;
+    return `<div class="bc-card">
+      <div class="bc-title">${b.title || 'Broadcast'}</div>
+      <div class="bc-meta">
+        <span>📅 ${date}</span>
+        <span>👥 ${b.sent_count}/${b.total_target} terkirim</span>
+        ${b.target_label ? `<span>🏷 ${b.target_label}</span>` : '<span>Semua kontak</span>'}
+        <span class="badge ${b.status==='done'?'badge-green':'badge-amber'}">${b.status}</span>
+      </div>
+      <div class="progress-bar" style="margin-top:8px;"><div class="progress-fill" style="width:${rate}%"></div></div>
+      <div class="bc-msg">${(b.message||'').replace(/</g,'&lt;')}</div>
+    </div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>

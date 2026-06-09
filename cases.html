@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cases · Adsy CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.s-tab { padding:6px 16px; border-radius:20px; border:1px solid var(--border); background:var(--white); font-size:12px; font-weight:500; color:var(--text-2); cursor:pointer; transition:all .15s; }
+.s-tab.active { background:var(--green); color:#fff; border-color:var(--green); }
+.cases-table { width:100%; border-collapse:collapse; }
+.cases-table th, .cases-table td { padding:12px 16px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; }
+.cases-table th { font-size:11px; font-weight:600; color:var(--text-2); background:var(--bg); text-transform:uppercase; letter-spacing:.3px; }
+.cases-table tr:last-child td { border-bottom:none; }
+.cases-table tr:hover td { background:#fafafa; }
+.s-baru    { background:#dbeafe; color:#1e40af; }
+.s-diproses{ background:#fef3c7; color:#92400e; }
+.s-eskalasi{ background:#fee2e2; color:#991b1b; }
+.s-selesai { background:#dcfce7; color:#166534; }
+.p-low     { background:#f3f4f6; color:#4b5563; }
+.p-medium  { background:#fef3c7; color:#92400e; }
+.p-high    { background:#fed7aa; color:#9a3412; }
+.p-urgent  { background:#fee2e2; color:#991b1b; font-weight:700; }
+.stat-cards { display:flex; gap:14px; padding:20px 24px 0; flex-wrap:wrap; }
+.stat-c { flex:1; min-width:110px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; }
+.stat-c .num { font-size:26px; font-weight:700; }
+.stat-c .lbl { font-size:12px; color:var(--text-2); margin-top:4px; }
+.filter-bar { display:flex; align-items:center; gap:10px; padding:16px 24px; background:var(--white); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+
+    <div class="page-header">
+      <div>
+        <h1>📋 Cases</h1>
+        <p>Kelola semua case percakapan customer</p>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openAddCase()">+ Tambah Case</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-cards" id="stats-row">
+      <div class="stat-c"><div class="num">—</div><div class="lbl">Total Cases</div></div>
+    </div>
+
+    <!-- Filter -->
+    <div class="filter-bar" style="margin-top:16px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="s-tab active" onclick="setStatus('semua',this)">Semua</button>
+        <button class="s-tab" onclick="setStatus('baru',this)">🔵 Baru</button>
+        <button class="s-tab" onclick="setStatus('diproses',this)">🟡 Diproses</button>
+        <button class="s-tab" onclick="setStatus('eskalasi',this)">🚨 Eskalasi</button>
+        <button class="s-tab" onclick="setStatus('selesai',this)">✅ Selesai</button>
+      </div>
+      <input type="text" id="search-input" placeholder="🔍 Cari case atau kontak..." oninput="renderCases()"
+        style="margin-left:auto;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:220px;">
+    </div>
+
+    <!-- Table -->
+    <div style="padding:0 24px 40px;">
+      <div class="card" style="margin-top:16px;overflow:hidden;">
+        <div class="table-wrap">
+          <table class="cases-table">
+            <thead>
+              <tr>
+                <th>Kontak</th>
+                <th>Judul Case</th>
+                <th>Status</th>
+                <th>Prioritas</th>
+                <th>Dibuat</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="cases-tbody"></tbody>
+          </table>
+        </div>
+        <div id="cases-empty" style="display:none;text-align:center;padding:60px;color:var(--text-2);">
+          <div style="font-size:40px;margin-bottom:12px;">📋</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">Belum ada case</div>
+          <div style="font-size:13px;">Cases akan muncul otomatis saat ada percakapan masuk</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="case-modal">
+  <div class="modal">
+    <h2 id="modal-title">Tambah Case</h2>
+    <input type="hidden" id="case-id">
+    <div class="form-group">
+      <label>Kontak *</label>
+      <select id="case-contact" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg);"></select>
+    </div>
+    <div class="form-group">
+      <label>Judul / Ringkasan *</label>
+      <input type="text" id="case-title" placeholder="Contoh: Komplain pengiriman lambat">
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="case-status">
+        <option value="baru">🔵 Baru</option>
+        <option value="diproses">🟡 Diproses</option>
+        <option value="eskalasi">🚨 Eskalasi</option>
+        <option value="selesai">✅ Selesai</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Prioritas</label>
+      <select id="case-priority">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="urgent">🔴 Urgent</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Catatan</label>
+      <textarea id="case-notes" rows="3" placeholder="Catatan internal tentang case ini..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveCase()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('cases');
+
+let currentStatus = 'semua';
+let allCases = [];
+let contactMap = {};
+
+async function init() {
+  await Config.load();
+  const contacts = await Contacts.getAll();
+  contacts.forEach(c => { contactMap[c.id] = c; });
+
+  const sel = document.getElementById('case-contact');
+  sel.innerHTML = contacts.map(c => `<option value="${c.id}">${c.name} (+${c.phone})</option>`).join('');
+
+  await loadCases();
+}
+
+async function loadCases() {
+  allCases = await Cases.getAll();
+
+  const cnt = { semua: allCases.length, baru:0, diproses:0, eskalasi:0, selesai:0 };
+  allCases.forEach(c => { if (cnt[c.status] !== undefined) cnt[c.status]++; });
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-c"><div class="num">${cnt.semua}</div><div class="lbl">Total Cases</div></div>
+    <div class="stat-c"><div class="num" style="color:#1e40af">${cnt.baru}</div><div class="lbl">Baru</div></div>
+    <div class="stat-c"><div class="num" style="color:#92400e">${cnt.diproses}</div><div class="lbl">Diproses</div></div>
+    <div class="stat-c"><div class="num" style="color:#991b1b">${cnt.eskalasi}</div><div class="lbl">🚨 Eskalasi</div></div>
+    <div class="stat-c"><div class="num" style="color:#166534">${cnt.selesai}</div><div class="lbl">Selesai</div></div>
+  `;
+  renderCases();
+}
+
+function renderCases() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  let list = allCases;
+  if (currentStatus !== 'semua') list = list.filter(c => c.status === currentStatus);
+  if (search) list = list.filter(c => {
+    const contact = contactMap[c.contact_id];
+    return (c.title||'').toLowerCase().includes(search) ||
+      (contact?.name||'').toLowerCase().includes(search) ||
+      (contact?.phone||'').includes(search);
+  });
+
+  const tbody = document.getElementById('cases-tbody');
+  const empty = document.getElementById('cases-empty');
+  if (!list.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display = 'none';
+
+  const statusLabel = { baru:'🔵 Baru', diproses:'🟡 Diproses', eskalasi:'🚨 Eskalasi', selesai:'✅ Selesai' };
+  const priorityLabel = { low:'Low', medium:'Medium', high:'High', urgent:'🔴 Urgent' };
+
+  tbody.innerHTML = list.map(c => {
+    const contact = contactMap[c.contact_id] || {};
+    return `<tr>
+      <td>
+        <div style="font-weight:500;">${contact.name || 'Unknown'}</div>
+        <div style="font-size:11px;color:var(--text-2);">${contact.phone ? '+'+contact.phone : ''}</div>
+      </td>
+      <td style="max-width:200px;">
+        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.title || 'Case Baru'}</div>
+        ${c.notes ? `<div style="font-size:11px;color:var(--text-2);margin-top:2px;">${c.notes.slice(0,40)}...</div>` : ''}
+      </td>
+      <td><span class="badge s-${c.status}">${statusLabel[c.status]||c.status}</span></td>
+      <td><span class="badge p-${c.priority}">${priorityLabel[c.priority]||c.priority}</span></td>
+      <td style="color:var(--text-2);font-size:12px;white-space:nowrap;">${timeAgo(c.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-secondary" onclick="editCase('${c.id}')">Edit</button>
+          <a href="dashboard.html?contact=${c.contact_id}" class="btn btn-sm btn-secondary">💬 Chat</a>
+          ${c.status !== 'selesai' ? `<button class="btn btn-sm" style="background:#dcfce7;color:#166534;border:none;" onclick="resolveCase('${c.id}')">Selesai</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function timeAgo(ts) {
+  if (!ts) return '-';
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff/60000), h = Math.floor(diff/3600000), d = Math.floor(diff/86400000);
+  if (m < 1) return 'Baru saja';
+  if (m < 60) return `${m} mnt lalu`;
+  if (h < 24) return `${h} jam lalu`;
+  return `${d} hari lalu`;
+}
+
+function setStatus(status, btn) {
+  currentStatus = status;
+  document.querySelectorAll('.s-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderCases();
+}
+
+function openAddCase() {
+  document.getElementById('case-id').value = '';
+  document.getElementById('modal-title').textContent = 'Tambah Case';
+  document.getElementById('case-title').value = '';
+  document.getElementById('case-status').value = 'baru';
+  document.getElementById('case-priority').value = 'low';
+  document.getElementById('case-notes').value = '';
+  document.getElementById('case-modal').classList.add('open');
+}
+
+function editCase(id) {
+  const c = allCases.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('case-id').value = c.id;
+  document.getElementById('modal-title').textContent = 'Edit Case';
+  document.getElementById('case-contact').value = c.contact_id || '';
+  document.getElementById('case-title').value = c.title || '';
+  document.getElementById('case-status').value = c.status || 'baru';
+  document.getElementById('case-priority').value = c.priority || 'low';
+  document.getElementById('case-notes').value = c.notes || '';
+  document.getElementById('case-modal').classList.add('open');
+}
+
+async function resolveCase(id) {
+  await Cases.update(id, { status:'selesai', resolved_at: new Date().toISOString() });
+  showToast('✅ Case ditandai selesai');
+  await loadCases();
+}
+
+async function saveCase() {
+  const id = document.getElementById('case-id').value;
+  const status = document.getElementById('case-status').value;
+  const data = {
+    contact_id: document.getElementById('case-contact').value,
+    title: document.getElementById('case-title').value.trim() || 'Case Baru',
+    status,
+    priority: document.getElementById('case-priority').value,
+    notes: document.getElementById('case-notes').value.trim(),
+    is_escalated: status === 'eskalasi',
+    ...(status === 'selesai' ? { resolved_at: new Date().toISOString() } : {}),
+  };
+  try {
+    if (id) { await Cases.update(id, data); showToast('✅ Case diperbarui'); }
+    else { await Cases.create(data); showToast('✅ Case ditambahkan'); }
+    closeModal();
+    await loadCases();
+  } catch(e) { showToast('❌ Error: ' + e.message); }
+}
+
+function closeModal() { document.getElementById('case-modal').classList.remove('open'); }
+
+document.getElementById('case-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+init();
+</script>
+</body>
+</html>
