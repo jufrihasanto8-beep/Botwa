@@ -10,5 +10,15 @@
     { "source": "/broadcast", "destination": "/broadcast.html" },
     { "source": "/knowledge", "destination": "/knowledge.html" },
     { "source": "/settings", "destination": "/settings.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/followup",
+      "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/rekap",
+      "schedule": "0 14 * * *"
+    }
   ]
 }
