@@ -112,6 +112,8 @@
         <a href="#" onclick="showSection('wa',this)">📱 WhatsApp</a>
         <a href="#" onclick="showSection('pk',this)">🌿 Product Knowledge</a>
         <a href="#" onclick="showSection('ai',this)">🤖 AI Agent</a>
+        <a href="#" onclick="showSection('followup',this)">🔁 Follow-up Otomatis</a>
+        <a href="#" onclick="showSection('rekap',this)">📊 Rekap Harian</a>
       </div>
 
       <!-- Body -->
@@ -245,6 +247,71 @@
           </div>
         </div>
 
+        <!-- FOLLOW-UP OTOMATIS -->
+        <div class="settings-section" id="sec-followup">
+          <div class="section-title">🔁 Follow-up Otomatis</div>
+          <div class="section-desc">Kirim pesan follow-up otomatis ke leads yang sudah lama tidak dibalas. Vercel Cron akan mengecek setiap 2 jam.</div>
+
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+              <input type="checkbox" id="fu-enabled" style="width:16px;height:16px;accent-color:var(--primary);">
+              Aktifkan follow-up otomatis
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label>Kirim follow-up setelah berapa jam tidak ada balasan?</label>
+            <select id="fu-delay">
+              <option value="1">1 jam</option>
+              <option value="2">2 jam</option>
+              <option value="3" selected>3 jam</option>
+              <option value="6">6 jam</option>
+              <option value="12">12 jam</option>
+              <option value="24">24 jam (1 hari)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Pesan Follow-up</label>
+            <textarea id="fu-message" rows="4" placeholder="Halo kak, masih ada yang bisa kami bantu? 😊"></textarea>
+            <div class="hint">Pesan ini akan dikirim ke customer yang belum dibalas melewati batas waktu di atas.</div>
+          </div>
+
+          <div style="background:#eff6ff;border-radius:8px;padding:12px 14px;font-size:12px;color:#1e40af;margin-bottom:16px;">
+            💡 Follow-up hanya dikirim jika pesan terakhir dari customer (bukan dari AI). Satu follow-up per sesi percakapan.
+          </div>
+
+          <div class="save-bar">
+            <button class="btn btn-secondary" id="test-fu-btn" onclick="testFollowup()">🧪 Test Jalankan Sekarang</button>
+            <button class="btn btn-primary" onclick="saveFollowup()">Simpan</button>
+          </div>
+        </div>
+
+        <!-- REKAP HARIAN -->
+        <div class="settings-section" id="sec-rekap">
+          <div class="section-title">📊 Rekap Harian Otomatis</div>
+          <div class="section-desc">Laporan ringkasan harian akan dikirim otomatis ke nomor WA yang ditentukan setiap jam 21:00 WIB.</div>
+
+          <div class="form-group">
+            <label>Nomor WA Tujuan Rekap</label>
+            <input type="text" id="rekap-wa" placeholder="628123456789" />
+            <div class="hint">Format: 628xxx (tanpa + atau spasi). Bisa nomor pribadi, grup, atau nomor lain.</div>
+          </div>
+
+          <div style="background:#f0fdf4;border-radius:8px;padding:14px;font-size:13px;color:#166534;margin-bottom:16px;line-height:1.8;">
+            <div style="font-weight:600;margin-bottom:6px;">📋 Isi rekap yang dikirim:</div>
+            • Total pesan masuk & dibalas AI hari ini<br>
+            • Jumlah cases (baru, selesai, eskalasi)<br>
+            • Total order & revenue hari ini<br>
+            • Kontak baru
+          </div>
+
+          <div class="save-bar">
+            <button class="btn btn-secondary" id="test-rekap-btn" onclick="testRekap()">🧪 Test Kirim Sekarang</button>
+            <button class="btn btn-primary" onclick="saveRekap()">Simpan</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -298,6 +365,14 @@ window.addEventListener('load', async () => {
   // PK
   pkText = cfg.product_knowledge || '';
   if (pkText) showPKLoaded(cfg.pk_filename || 'katalog.txt', pkText);
+
+  // Follow-up
+  document.getElementById('fu-enabled').checked = cfg.followup_enabled === true || cfg.followup_enabled === 'true';
+  document.getElementById('fu-delay').value = cfg.followup_delay || '3';
+  document.getElementById('fu-message').value = cfg.followup_message || 'Halo kak, masih ada yang bisa kami bantu? 😊 Jangan ragu kalau ada pertanyaan ya!';
+
+  // Rekap
+  document.getElementById('rekap-wa').value = cfg.rekap_wa || '';
 });
 
 function saveAccount() {
@@ -423,6 +498,44 @@ async function clearPK() {
 function togglePreview() {
   const box = document.getElementById('pk-preview-box');
   box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveFollowup() {
+  try {
+    await Config.save({
+      followup_enabled: document.getElementById('fu-enabled').checked,
+      followup_delay:   document.getElementById('fu-delay').value || '3',
+      followup_message: document.getElementById('fu-message').value.trim(),
+    });
+    showToast('✅ Pengaturan follow-up disimpan');
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function saveRekap() {
+  try {
+    await Config.save({ rekap_wa: document.getElementById('rekap-wa').value.trim() });
+    showToast('✅ Pengaturan rekap disimpan');
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function testRekap() {
+  const btn = document.getElementById('test-rekap-btn');
+  btn.disabled = true; btn.textContent = 'Mengirim...';
+  try {
+    const r = await fetch('/api/rekap'); const data = await r.json();
+    showToast(data.ok ? '✅ Rekap test terkirim!' : '❌ ' + (data.error||'Error'));
+  } catch(e) { showToast('❌ ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '🧪 Test Kirim Sekarang'; }
+}
+
+async function testFollowup() {
+  const btn = document.getElementById('test-fu-btn');
+  btn.disabled = true; btn.textContent = 'Mengecek...';
+  try {
+    const r = await fetch('/api/followup'); const data = await r.json();
+    showToast(data.ok ? `✅ Follow-up: ${data.sent} terkirim` : '❌ ' + (data.error||'Error'));
+  } catch(e) { showToast('❌ ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '🧪 Test Jalankan Sekarang'; }
 }
 </script>
 </body>
