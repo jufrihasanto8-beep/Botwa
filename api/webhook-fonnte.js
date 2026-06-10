@@ -157,7 +157,7 @@ KONTEN:
   return sys;
 }
 
-/* ── CALL CLAUDE ── */
+/* ── CALL CLAUDE (text) ── */
 async function callClaude(apiKey, systemPrompt, messages) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -175,6 +175,40 @@ async function callClaude(apiKey, systemPrompt, messages) {
   });
   const data = await res.json();
   if (data.error) throw new Error(`Claude: ${data.error.message}`);
+  return data.content?.[0]?.text || '';
+}
+
+/* ── ANALYZE IMAGE with Claude Vision ── */
+async function analyzeImage(apiKey, imageUrl, caption, systemPrompt) {
+  const userContent = [
+    {
+      type: 'image',
+      source: { type: 'url', url: imageUrl },
+    },
+    {
+      type: 'text',
+      text: caption
+        ? `Customer mengirim gambar dengan caption: "${caption}". Analisis gambar ini dan balas dengan natural sesuai konteks toko.`
+        : 'Customer mengirim gambar ini. Analisis gambar dan balas dengan natural sesuai konteks toko.',
+    },
+  ];
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 600,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userContent }],
+    }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(`Claude Vision: ${data.error.message}`);
   return data.content?.[0]?.text || '';
 }
 
@@ -203,13 +237,16 @@ module.exports = async function handler(req, res) {
     console.log('Webhook received:', JSON.stringify(body));
 
     // Parse field dari Fonnte
-    const sender  = String(body.sender  || body.from   || '').replace(/\D/g, '');
-    const message = String(body.message || body.text   || '').trim();
-    const name    = String(body.name    || body.pushname || sender);
-    const device  = String(body.device  || body.phone  || '').replace(/\D/g, '');
+    const sender      = String(body.sender  || body.from     || '').replace(/\D/g, '');
+    const message     = String(body.message || body.text     || '').trim();
+    const name        = String(body.name    || body.pushname || sender);
+    const device      = String(body.device  || body.phone    || '').replace(/\D/g, '');
+    const messageType = String(body.message_type || body.type || 'text').toLowerCase();
+    const mediaUrl    = body.url || body.file || body.media_url || null;
+    const isImage     = mediaUrl && (messageType.includes('image') || messageType.includes('photo') || messageType.includes('sticker'));
 
-    // Abaikan kalau tidak ada pesan atau pengirim
-    if (!sender || !message) {
+    // Abaikan kalau tidak ada pesan DAN bukan gambar
+    if (!sender || (!message && !isImage)) {
       console.log('Skip: sender atau message kosong');
       return res.status(200).json({ ok: true });
     }
@@ -261,20 +298,31 @@ module.exports = async function handler(req, res) {
     // Cari / buat kontak
     const contact = await findOrCreateContact(userId, sender, name);
 
-    // Simpan pesan masuk
-    await saveMessage(contact.id, userId, 'user', message);
+    // Simpan pesan masuk (label gambar jika media)
+    const savedMessage = isImage
+      ? `[Gambar]${message ? ' ' + message : ''}`
+      : message;
+    await saveMessage(contact.id, userId, 'user', savedMessage);
 
-    // Ambil history + build prompt
-    const history = await getHistory(contact.id, userId);
-    const messages = history.map(m => ({
-      role: m.role === 'user' ? 'user' : 'assistant',
-      content: m.content,
-    }));
-
+    // Build system prompt
     const systemPrompt = await buildSystemPrompt(config, userId);
 
-    // Panggil Claude
-    const rawReply = await callClaude(config.anthropic_key, systemPrompt, messages);
+    let rawReply = '';
+
+    if (isImage) {
+      // ── Gambar: pakai Claude Vision ──
+      console.log(`Gambar masuk dari ${sender}: ${mediaUrl}`);
+      rawReply = await analyzeImage(config.anthropic_key, mediaUrl, message, systemPrompt);
+    } else {
+      // ── Teks biasa: pakai Claude + history ──
+      const history = await getHistory(contact.id, userId);
+      const messages = history.map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content,
+      }));
+      rawReply = await callClaude(config.anthropic_key, systemPrompt, messages);
+    }
+
     if (!rawReply) return res.status(200).json({ ok: true });
 
     // Deteksi eskalasi dari marker [ESCALATE]
