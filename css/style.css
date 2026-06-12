@@ -190,6 +190,14 @@ tr:hover td { background: #fafbfc; }
   overflow: hidden;
 }
 
+#sidebar .s-nav-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+#sidebar .s-nav-wrap::-webkit-scrollbar { display: none; }
+
 /* Brand */
 .s-brand {
   display: flex; align-items: center; gap: 10px;
