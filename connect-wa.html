@@ -78,8 +78,14 @@
 <script>
 const SB_URL = window.SUPABASE_URL;
 const SB_KEY = window.SUPABASE_ANON_KEY;
-const BAILEYS_URL    = 'http://13.140.178.4:3000'; // ganti dengan IP VPS
+const BAILEYS_PROXY  = '/api/baileys-proxy';        // proxy HTTPS via Vercel
 const BAILEYS_SECRET = 'adsy_secret_2026_random';   // ganti dengan secret kamu
+
+// Helper: fetch ke Baileys lewat proxy
+async function baileysFetch(path, opts = {}) {
+  const url = `${BAILEYS_PROXY}?path=${encodeURIComponent(path)}`;
+  return fetch(url, opts);
+}
 
 let userId = null;
 let pollInterval = null;
@@ -98,13 +104,13 @@ async function renderWACards() {
   // Cek status session user ini
   let status = { status: 'not_found', waNumber: null };
   try {
-    const res = await fetch(`${BAILEYS_URL}/session/status/${userId}`);
+    const res = await baileysFetch(`/session/status/${userId}`);
     status = await res.json();
   } catch(e) {
     grid.innerHTML = `<div style="grid-column:1/-1;" class="empty-state">
       <div class="icon">⚠️</div>
       <p>Tidak bisa terhubung ke Baileys server</p>
-      <p style="font-size:12px;margin-top:8px">${BAILEYS_URL}</p>
+      <p style="font-size:12px;margin-top:8px">Pastikan VPS aktif</p>
     </div>`;
     return;
   }
@@ -164,7 +170,7 @@ async function openAddWA() {
 
   // Start session
   try {
-    await fetch(`${BAILEYS_URL}/session/start`, {
+    await baileysFetch(`/session/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: userId }),
@@ -205,7 +211,7 @@ async function loadQR() {
   if (!container) return;
 
   try {
-    const res = await fetch(`${BAILEYS_URL}/session/status/${userId}`);
+    const res = await baileysFetch(`/session/status/${userId}`);
     const status = await res.json();
 
     if (status.status === 'connected') {
@@ -214,11 +220,13 @@ async function loadQR() {
     }
 
     if (status.status === 'qr_ready') {
-      // Load QR image via iframe
-      container.innerHTML = `
-        <iframe src="${BAILEYS_URL}/qr/${userId}"
-          style="width:100%;height:360px;border:none;border-radius:12px;"
-          title="QR WhatsApp"></iframe>`;
+      // Load QR image via proxy (bukan iframe langsung ke HTTP)
+      const qrRes = await baileysFetch(`/qr-data/${userId}`);
+      const qrData = await qrRes.json();
+      container.innerHTML = qrData.qrDataUrl
+        ? `<img src="${qrData.qrDataUrl}" style="width:260px;border-radius:12px;border:1px solid var(--border)">
+           <p style="font-size:12px;color:var(--text-2);margin-top:8px">QR berlaku ~60 detik</p>`
+        : `<div style="font-size:40px">⏳</div><p style="color:var(--text-2);margin-top:8px;font-size:13px">Memuat QR...</p>`;
     } else {
       container.innerHTML = `
         <div style="font-size:40px">⏳</div>
@@ -248,7 +256,7 @@ function showQRError(msg) {
 
 async function getStatus() {
   try {
-    const res = await fetch(`${BAILEYS_URL}/session/status/${userId}`);
+    const res = await baileysFetch(`/session/status/${userId}`);
     return await res.json();
   } catch(e) { return null; }
 }
@@ -256,7 +264,7 @@ async function getStatus() {
 async function disconnectWA() {
   if (!confirm('Disconnect nomor WhatsApp ini?')) return;
   try {
-    await fetch(`${BAILEYS_URL}/session/stop`, {
+    await baileysFetch(`/session/stop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: userId }),
@@ -269,7 +277,7 @@ async function disconnectWA() {
 }
 
 function openQRPage() {
-  window.open(`${BAILEYS_URL}/qr/${userId}`, '_blank', 'width=420,height=520');
+  openAddWA();
 }
 
 function toast(msg, type='success') {
