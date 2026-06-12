@@ -236,10 +236,11 @@ function relativeTime(ts) {
   return 'Baru saja';
 }
 
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('shipping');
+
 async function init() {
-  await Auth.requireLogin();
   userId = Auth.getUser()?.id;
-  document.getElementById('sidebar-container').innerHTML = renderSidebar('shipping');
   await Promise.all([loadShipments(), loadGrades()]);
 }
 

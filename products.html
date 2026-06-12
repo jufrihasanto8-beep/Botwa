@@ -213,10 +213,11 @@ function toast(msg, type='success') {
 
 function rp(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
 
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('products');
+
 async function init() {
-  await Auth.requireLogin();
   currentUserId = Auth.getUser()?.id;
-  document.getElementById('sidebar-container').innerHTML = renderSidebar('products');
   await loadProducts();
 }
 

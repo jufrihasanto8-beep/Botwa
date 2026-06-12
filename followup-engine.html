@@ -201,10 +201,11 @@ function toast(msg,type='success'){const el=document.getElementById('toast');el.
 function relativeTime(ts){if(!ts)return'-';const d=Math.floor((Date.now()-new Date(ts).getTime())/86400000);const h=Math.floor((Date.now()-new Date(ts).getTime())/3600000);if(d>0)return`${d} hari lalu`;if(h>0)return`${h} jam lalu`;return'Baru saja';}
 function dateStr(ts){if(!ts)return'-';return new Date(ts).toLocaleDateString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});}
 
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('followup-engine');
+
 async function init() {
-  await Auth.requireLogin();
   userId = Auth.getUser()?.id;
-  document.getElementById('sidebar-container').innerHTML = renderSidebar('followup-engine');
   await Promise.all([loadLeads(), loadFollowups(), loadCampaigns(), loadProducts()]);
   renderJadwal();
 }
