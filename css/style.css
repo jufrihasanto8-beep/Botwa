@@ -53,6 +53,22 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── Page transition ── */
+body { animation: fadeIn .18s ease; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.main-content { animation: fadeIn .18s ease; }
+
+/* Klik link → fade out sebelum pindah */
+body.page-leaving {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .12s ease, transform .12s ease;
+  pointer-events: none;
+}
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 input, textarea, button, select { font-family: inherit; font-size: 14px; }
