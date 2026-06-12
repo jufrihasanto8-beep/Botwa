@@ -1,18 +1,65 @@
 /* ── HerbalCare · Supabase + Shared Utilities ── */
 
-/* ── Page transition ── */
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('a[href]').forEach(link => {
-    const href = link.getAttribute('href');
-    // Hanya internal link .html, skip anchor/external/javascript
-    if (!href || href.startsWith('#') || href.startsWith('http') || href.startsWith('javascript')) return;
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.body.classList.add('page-leaving');
-      setTimeout(() => { window.location.href = href; }, 120);
-    });
-  });
-});
+/* ── SPA Router: swap .main-content tanpa reload sidebar ── */
+const Router = {
+  async go(href) {
+    const mainEl = document.querySelector('.main-content');
+    // Fallback ke full reload kalau tidak ada main-content (misal dashboard)
+    if (!mainEl) { window.location.href = href; return; }
+
+    // Fade out konten
+    mainEl.style.transition = 'opacity .1s ease';
+    mainEl.style.opacity = '0';
+
+    try {
+      const res  = await fetch(href);
+      const text = await res.text();
+      const doc  = new DOMParser().parseFromString(text, 'text/html');
+      const newMain = doc.querySelector('.main-content');
+
+      // Kalau halaman tujuan tidak pakai .main-content, full reload
+      if (!newMain) { window.location.href = href; return; }
+
+      // Ambil scripts sebelum dihapus dari DOM
+      const scripts = [...newMain.querySelectorAll('script')].map(s => s.textContent);
+      newMain.querySelectorAll('script').forEach(s => s.remove());
+
+      // Swap konten
+      mainEl.innerHTML = newMain.innerHTML;
+      requestAnimationFrame(() => { mainEl.style.opacity = '1'; });
+
+      // Update title & URL
+      const t = doc.querySelector('title');
+      if (t) document.title = t.textContent;
+      history.pushState({}, '', href);
+
+      // Update active state sidebar
+      document.querySelectorAll('.s-btn').forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === href);
+      });
+
+      // Jalankan scripts halaman baru (skip baris sidebar/auth yang sudah ada)
+      scripts.forEach(code => {
+        const filtered = code.split('\n').filter(line =>
+          !line.includes('Auth.guard()') &&
+          !line.includes('Auth.requireLogin()') &&
+          !line.includes('sidebar-container') &&
+          !line.includes('renderSidebar(')
+        ).join('\n');
+        try {
+          const el = document.createElement('script');
+          el.textContent = filtered;
+          document.body.appendChild(el);
+          document.body.removeChild(el);
+        } catch(e) { console.error('Script inject error:', e); }
+      });
+
+    } catch(e) {
+      console.error('Router error:', e);
+      window.location.href = href;
+    }
+  }
+};
 
 /* ── SUPABASE CONFIG ── Ganti dengan URL & Key project Anda */
 const SUPABASE_URL = window.SUPABASE_URL || 'https://YOUR_PROJECT.supabase.co';
@@ -587,7 +634,8 @@ function renderSidebar(activePage) {
     { id:'settings',        href:'settings.html',         icon:'⚙️', label:'Pengaturan' },
   ];
   const navItem = (p) => `
-    <a class="s-btn ${activePage===p.id?'active':''}" href="${p.href}">
+    <a class="s-btn ${activePage===p.id?'active':''}" href="${p.href}"
+       onclick="event.preventDefault();Router.go('${p.href}')">
       <span class="s-icon">${p.icon}</span>
       <span class="s-label">${p.label}</span>
       ${p.badge ? '<span class="s-badge" id="unread-badge" style="display:none">0</span>' : ''}
