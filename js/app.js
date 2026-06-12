@@ -24,6 +24,15 @@ const Router = {
       const scripts = [...newMain.querySelectorAll('script')].map(s => s.textContent);
       newMain.querySelectorAll('script').forEach(s => s.remove());
 
+      // Inject style dari halaman baru (hapus style halaman sebelumnya dulu)
+      document.querySelectorAll('style[data-page-style]').forEach(s => s.remove());
+      doc.querySelectorAll('head style').forEach(s => {
+        const el = document.createElement('style');
+        el.setAttribute('data-page-style', '1');
+        el.textContent = s.textContent;
+        document.head.appendChild(el);
+      });
+
       // Swap konten
       mainEl.innerHTML = newMain.innerHTML;
       requestAnimationFrame(() => { mainEl.style.opacity = '1'; });
