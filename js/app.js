@@ -640,6 +640,7 @@ function renderSidebar(activePage) {
     { id:'shipping',        href:'shipping.html',         icon:'📦', label:'Pengiriman' },
     { id:'followup-engine', href:'followup-engine.html',  icon:'🔔', label:'Follow-up' },
     { id:'knowledge',       href:'knowledge.html',        icon:'📚', label:'Knowledge Base' },
+    { id:'connect-wa',      href:'connect-wa.html',       icon:'📱', label:'Hubungkan WA' },
     { id:'settings',        href:'settings.html',         icon:'⚙️', label:'Pengaturan' },
   ];
   const navItem = (p) => `
