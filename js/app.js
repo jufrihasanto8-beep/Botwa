@@ -566,8 +566,11 @@ function renderSidebar(activePage) {
     { id:'broadcast', href:'broadcast.html', icon:'📣', label:'Broadcast' },
   ];
   const nav2 = [
-    { id:'knowledge', href:'knowledge.html', icon:'📚', label:'Knowledge Base' },
-    { id:'settings',  href:'settings.html',  icon:'⚙️', label:'Pengaturan' },
+    { id:'products',        href:'products.html',        icon:'🏷️', label:'Produk' },
+    { id:'shipping',        href:'shipping.html',         icon:'📦', label:'Pengiriman' },
+    { id:'followup-engine', href:'followup-engine.html',  icon:'🔔', label:'Follow-up' },
+    { id:'knowledge',       href:'knowledge.html',        icon:'📚', label:'Knowledge Base' },
+    { id:'settings',        href:'settings.html',         icon:'⚙️', label:'Pengaturan' },
   ];
   const navItem = (p) => `
     <a class="s-btn ${activePage===p.id?'active':''}" href="${p.href}">
