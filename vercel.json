@@ -12,7 +12,8 @@
     { "source": "/settings", "destination": "/settings.html" },
     { "source": "/products", "destination": "/products.html" },
     { "source": "/shipping", "destination": "/shipping.html" },
-    { "source": "/followup-engine", "destination": "/followup-engine.html" }
+    { "source": "/followup-engine", "destination": "/followup-engine.html" },
+    { "source": "/connect-wa", "destination": "/connect-wa.html" }
   ],
   "crons": []
 }
