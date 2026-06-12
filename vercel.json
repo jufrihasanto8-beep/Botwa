@@ -14,18 +14,5 @@
     { "source": "/shipping", "destination": "/shipping.html" },
     { "source": "/followup-engine", "destination": "/followup-engine.html" }
   ],
-  "crons": [
-    {
-      "path": "/api/followup",
-      "schedule": "0 */2 * * *"
-    },
-    {
-      "path": "/api/rekap",
-      "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/tracking",
-      "schedule": "0 8 * * *"
-    }
-  ]
+  "crons": []
 }
