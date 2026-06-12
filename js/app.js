@@ -1,5 +1,19 @@
 /* ── HerbalCare · Supabase + Shared Utilities ── */
 
+/* ── Page transition ── */
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('a[href]').forEach(link => {
+    const href = link.getAttribute('href');
+    // Hanya internal link .html, skip anchor/external/javascript
+    if (!href || href.startsWith('#') || href.startsWith('http') || href.startsWith('javascript')) return;
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.body.classList.add('page-leaving');
+      setTimeout(() => { window.location.href = href; }, 120);
+    });
+  });
+});
+
 /* ── SUPABASE CONFIG ── Ganti dengan URL & Key project Anda */
 const SUPABASE_URL = window.SUPABASE_URL || 'https://YOUR_PROJECT.supabase.co';
 const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'YOUR_ANON_KEY';
