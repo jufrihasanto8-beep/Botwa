@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hubungkan WhatsApp · Adsy CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.wa-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; padding:24px; }
+.wa-card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+.wa-card-head { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.wa-card-body { padding:20px; }
+.wa-status { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; }
+.dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.dot-connected   { background:#22c55e; box-shadow:0 0 0 3px #dcfce7; }
+.dot-disconnected{ background:#94a3b8; }
+.dot-qr_ready    { background:#f59e0b; box-shadow:0 0 0 3px #fef3c7; animation:pulse 1s infinite; }
+.dot-connecting  { background:#3b82f6; box-shadow:0 0 0 3px #dbeafe; animation:pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+.qr-wrap { text-align:center; padding:16px 0; }
+.qr-wrap img { border-radius:12px; border:1px solid var(--border); }
+.qr-wrap p { font-size:12px; color:var(--text-2); margin-top:8px; }
+
+.empty-state { text-align:center; padding:60px 24px; color:var(--text-2); }
+.empty-state .icon { font-size:48px; margin-bottom:16px; }
+
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:var(--white); border-radius:var(--radius-lg); width:100%; max-width:440px; overflow:hidden; }
+.modal-head { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.modal-body { padding:24px; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>📱 Hubungkan WhatsApp</h1>
+        <p>Kelola nomor WA yang terhubung ke AI CS</p>
+      </div>
+      <button class="btn btn-primary" onclick="openAddWA()">+ Hubungkan Nomor</button>
+    </div>
+
+    <div class="wa-grid" id="wa-grid">
+      <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-2)">Memuat...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal tambah nomor -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 style="font-size:16px;font-weight:600;">Hubungkan Nomor WhatsApp</h3>
+      <button class="btn btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-content">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:20px;">
+          Scan QR code berikut menggunakan WhatsApp yang ingin dihubungkan.<br>
+          Buka WhatsApp → <strong>Perangkat Tertaut</strong> → Tautkan Perangkat
+        </p>
+        <div id="qr-container" style="text-align:center;padding:20px;">
+          <div style="font-size:40px">⏳</div>
+          <p style="color:var(--text-2);margin-top:8px;font-size:13px">Memuat QR code...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+const SB_URL = window.SUPABASE_URL;
+const SB_KEY = window.SUPABASE_ANON_KEY;
+const BAILEYS_URL    = 'http://13.140.178.4:3000'; // ganti dengan IP VPS
+const BAILEYS_SECRET = 'adsy_secret_2026_random';   // ganti dengan secret kamu
+
+let userId = null;
+let pollInterval = null;
+
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('connect-wa');
+
+async function init() {
+  userId = Auth.getUser()?.id;
+  await renderWACards();
+}
+
+async function renderWACards() {
+  const grid = document.getElementById('wa-grid');
+
+  // Cek status session user ini
+  let status = { status: 'not_found', waNumber: null };
+  try {
+    const res = await fetch(`${BAILEYS_URL}/session/status/${userId}`);
+    status = await res.json();
+  } catch(e) {
+    grid.innerHTML = `<div style="grid-column:1/-1;" class="empty-state">
+      <div class="icon">⚠️</div>
+      <p>Tidak bisa terhubung ke Baileys server</p>
+      <p style="font-size:12px;margin-top:8px">${BAILEYS_URL}</p>
+    </div>`;
+    return;
+  }
+
+  if (status.status === 'not_found' || status.status === 'logged_out') {
+    grid.innerHTML = `<div style="grid-column:1/-1;" class="empty-state">
+      <div class="icon">📱</div>
+      <p style="font-size:15px;font-weight:600;color:var(--text)">Belum ada nomor terhubung</p>
+      <p style="margin-top:8px">Klik <strong>+ Hubungkan Nomor</strong> untuk mulai</p>
+    </div>`;
+    return;
+  }
+
+  const dotClass = `dot-${status.status}`;
+  const statusLabel = {
+    connected: '✅ Terhubung',
+    connecting: '🔄 Menghubungkan...',
+    qr_ready: '📷 Scan QR',
+    reconnecting: '🔄 Reconnecting...',
+    logged_out: '❌ Logout',
+  }[status.status] || status.status;
+
+  grid.innerHTML = `<div class="wa-card">
+    <div class="wa-card-head">
+      <div>
+        <div style="font-weight:600;font-size:15px">${status.waNumber ? '+' + status.waNumber : 'WhatsApp'}</div>
+        <div class="wa-status" style="margin-top:4px">
+          <span class="dot ${dotClass}"></span>
+          <span>${statusLabel}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        ${status.status === 'connected' ? `
+          <button class="btn btn-sm" onclick="openQRPage()">🔗 Ganti Nomor</button>
+          <button class="btn btn-sm" style="color:var(--danger)" onclick="disconnectWA()">Disconnect</button>
+        ` : `
+          <button class="btn btn-sm btn-primary" onclick="openAddWA()">Scan QR</button>
+        `}
+      </div>
+    </div>
+    <div class="wa-card-body">
+      ${status.status === 'connected' ? `
+        <div style="display:flex;gap:20px;font-size:13px;">
+          <div><span style="color:var(--text-2)">Nomor aktif</span><br><strong>+${status.waNumber}</strong></div>
+          <div><span style="color:var(--text-2)">Status AI</span><br><strong style="color:#22c55e">ON</strong></div>
+        </div>
+      ` : `
+        <p style="font-size:13px;color:var(--text-2)">Nomor belum terhubung. Scan QR untuk mengaktifkan AI CS.</p>
+      `}
+    </div>
+  </div>`;
+}
+
+/* ── Modal QR ── */
+async function openAddWA() {
+  document.getElementById('add-modal').classList.add('open');
+
+  // Start session
+  try {
+    await fetch(`${BAILEYS_URL}/session/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: userId }),
+    });
+  } catch(e) {
+    showQRError('Tidak bisa terhubung ke server');
+    return;
+  }
+
+  // Poll QR
+  pollQR();
+}
+
+function closeModal() {
+  document.getElementById('add-modal').classList.remove('open');
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  renderWACards();
+}
+
+function pollQR() {
+  if (pollInterval) clearInterval(pollInterval);
+  loadQR(); // langsung load
+  pollInterval = setInterval(async () => {
+    const status = await getStatus();
+    if (status?.status === 'connected') {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      showConnected(status.waNumber);
+      renderWACards();
+    } else {
+      await loadQR();
+    }
+  }, 5000);
+}
+
+async function loadQR() {
+  const container = document.getElementById('qr-container');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${BAILEYS_URL}/session/status/${userId}`);
+    const status = await res.json();
+
+    if (status.status === 'connected') {
+      showConnected(status.waNumber);
+      return;
+    }
+
+    if (status.status === 'qr_ready') {
+      // Load QR image via iframe
+      container.innerHTML = `
+        <iframe src="${BAILEYS_URL}/qr/${userId}"
+          style="width:100%;height:360px;border:none;border-radius:12px;"
+          title="QR WhatsApp"></iframe>`;
+    } else {
+      container.innerHTML = `
+        <div style="font-size:40px">⏳</div>
+        <p style="color:var(--text-2);margin-top:8px;font-size:13px">${status.status === 'connecting' ? 'Menghubungkan...' : 'Menunggu QR...'}</p>`;
+    }
+  } catch(e) {
+    showQRError('Gagal load QR: ' + e.message);
+  }
+}
+
+function showConnected(waNumber) {
+  const container = document.getElementById('qr-container');
+  if (!container) return;
+  container.innerHTML = `
+    <div style="font-size:56px">✅</div>
+    <p style="font-size:15px;font-weight:600;color:#166534;margin-top:12px">+${waNumber}</p>
+    <p style="color:var(--text-2);font-size:13px;margin-top:4px">WhatsApp berhasil terhubung!</p>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="closeModal()">Selesai</button>`;
+}
+
+function showQRError(msg) {
+  const container = document.getElementById('qr-container');
+  if (container) container.innerHTML = `
+    <div style="font-size:40px">⚠️</div>
+    <p style="color:var(--danger);font-size:13px;margin-top:8px">${msg}</p>`;
+}
+
+async function getStatus() {
+  try {
+    const res = await fetch(`${BAILEYS_URL}/session/status/${userId}`);
+    return await res.json();
+  } catch(e) { return null; }
+}
+
+async function disconnectWA() {
+  if (!confirm('Disconnect nomor WhatsApp ini?')) return;
+  try {
+    await fetch(`${BAILEYS_URL}/session/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: userId }),
+    });
+    toast('WhatsApp berhasil disconnect');
+    await renderWACards();
+  } catch(e) {
+    toast('Gagal disconnect: ' + e.message, 'error');
+  }
+}
+
+function openQRPage() {
+  window.open(`${BAILEYS_URL}/qr/${userId}`, '_blank', 'width=420,height=520');
+}
+
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast toast-${type} show`;
+  setTimeout(() => el.className = 'toast', 3000);
+}
+
+init();
+</script>
+</body>
+</html>
