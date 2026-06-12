@@ -583,9 +583,11 @@ function renderSidebar(activePage) {
       <div class="s-logo">CS</div>
       <span class="s-brand-name">Adsy CS</span>
     </div>
-    ${nav.map(navItem).join('')}
-    <div class="s-divider"></div>
-    ${nav2.map(navItem).join('')}
+    <div class="s-nav-wrap">
+      ${nav.map(navItem).join('')}
+      <div class="s-divider"></div>
+      ${nav2.map(navItem).join('')}
+    </div>
     <div class="s-user">
       <div class="s-avatar">${initials(user?.name||'?')}</div>
       <div class="s-user-info">
