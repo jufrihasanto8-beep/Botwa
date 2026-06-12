@@ -9,7 +9,10 @@
     { "source": "/orders", "destination": "/orders.html" },
     { "source": "/broadcast", "destination": "/broadcast.html" },
     { "source": "/knowledge", "destination": "/knowledge.html" },
-    { "source": "/settings", "destination": "/settings.html" }
+    { "source": "/settings", "destination": "/settings.html" },
+    { "source": "/products", "destination": "/products.html" },
+    { "source": "/shipping", "destination": "/shipping.html" },
+    { "source": "/followup-engine", "destination": "/followup-engine.html" }
   ],
   "crons": [
     {
@@ -19,6 +22,10 @@
     {
       "path": "/api/rekap",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/tracking",
+      "schedule": "0 8 * * *"
     }
   ]
 }

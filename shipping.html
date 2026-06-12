@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pengiriman · Adsy CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.ship-tabs { display:flex; gap:4px; padding:0 24px; border-bottom:1px solid var(--border); background:var(--white); }
+.ship-tab { padding:12px 16px; font-size:13px; font-weight:500; color:var(--text-2); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; }
+.ship-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+.ship-section { display:none; padding:24px; }
+.ship-section.active { display:block; }
+.resi-table { width:100%; border-collapse:collapse; }
+.resi-table th, .resi-table td { padding:11px 14px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; }
+.resi-table th { font-size:11px; font-weight:600; color:var(--text-2); background:var(--bg); text-transform:uppercase; }
+.resi-table tr:hover td { background:#fafafa; }
+.status-badge { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:500; }
+.st-dikirim  { background:#dbeafe; color:#1e40af; }
+.st-selesai  { background:#dcfce7; color:#166534; }
+.st-pending  { background:#fef3c7; color:#92400e; }
+.st-batal    { background:#fee2e2; color:#991b1b; }
+.flag-risiko { background:#fee2e2; color:#991b1b; }
+.upload-area { border:2px dashed var(--border); border-radius:var(--radius-lg); padding:40px; text-align:center; cursor:pointer; transition:border-color .15s; }
+.upload-area:hover { border-color:var(--primary); }
+.grade-table { width:100%; border-collapse:collapse; }
+.grade-table th, .grade-table td { padding:10px 14px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; }
+.grade-table th { font-size:11px; font-weight:600; color:var(--text-2); background:var(--bg); text-transform:uppercase; }
+.grade-A { background:#dcfce7; color:#166534; }
+.grade-B { background:#dbeafe; color:#1e40af; }
+.grade-C { background:#fef3c7; color:#92400e; }
+.grade-D { background:#fed7aa; color:#9a3412; }
+.grade-E { background:#fee2e2; color:#991b1b; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>📦 Pengiriman</h1>
+        <p>Upload resi, tracking otomatis, dan grade ekspedisi</p>
+      </div>
+    </div>
+
+    <div class="ship-tabs">
+      <button class="ship-tab active" onclick="showSection('upload',this)">📤 Upload Resi</button>
+      <button class="ship-tab" onclick="showSection('tracking',this)">🚚 Status Pengiriman</button>
+      <button class="ship-tab" onclick="showSection('risiko',this)">⚠️ Pantau Risiko</button>
+      <button class="ship-tab" onclick="showSection('grade',this)">⭐ Grade Ekspedisi</button>
+    </div>
+
+    <!-- Upload Resi -->
+    <div class="ship-section active" id="sec-upload">
+      <div class="card" style="max-width:600px;">
+        <div class="card-body" style="padding:24px;">
+          <h3 style="margin-bottom:16px;">Upload Resi</h3>
+
+          <!-- Single -->
+          <div style="margin-bottom:24px;">
+            <h4 style="font-size:13px;font-weight:600;margin-bottom:12px;">Single Resi</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group" style="margin:0">
+                <label>No. WhatsApp Customer</label>
+                <input type="text" id="single-wa" placeholder="628xxxxxxxxxx">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label>No. Resi</label>
+                <input type="text" id="single-resi" placeholder="JNE1234567890">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;align-items:end;">
+              <div class="form-group" style="margin:0">
+                <label>Ekspedisi</label>
+                <select id="single-ekspedisi">
+                  <option value="JNE">JNE</option>
+                  <option value="J&T">J&T Express</option>
+                  <option value="SICEPAT">SiCepat</option>
+                  <option value="ANTERAJA">Anteraja</option>
+                  <option value="NINJA">Ninja Xpress</option>
+                  <option value="LION">Lion Parcel</option>
+                  <option value="POS">Pos Indonesia</option>
+                  <option value="TIKI">TIKI</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="uploadSingle()">Upload</button>
+            </div>
+          </div>
+
+          <hr style="border-color:var(--border);margin-bottom:20px;">
+
+          <!-- Bulk -->
+          <h4 style="font-size:13px;font-weight:600;margin-bottom:12px;">Upload Massal (CSV/Paste)</h4>
+          <p style="font-size:12px;color:var(--text-2);margin-bottom:10px;">Format: <code>wa_number,resi,ekspedisi</code> (satu per baris)</p>
+          <textarea id="bulk-paste" rows="6" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:monospace;" placeholder="628111222333,JNE1234567890,JNE
+628444555666,SICEPAT987654,SICEPAT"></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+            <button class="btn" onclick="document.getElementById('bulk-file').click()">📎 Upload CSV</button>
+            <input type="file" id="bulk-file" accept=".csv" style="display:none" onchange="parseCsvFile(event)">
+            <button class="btn btn-primary" onclick="uploadBulk()">Proses Semua</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hasil upload -->
+      <div id="upload-result" style="margin-top:16px;max-width:600px;"></div>
+    </div>
+
+    <!-- Status Tracking -->
+    <div class="ship-section" id="sec-tracking">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <input type="text" id="search-resi" placeholder="🔍 Cari resi / nama customer..."
+          oninput="renderTracking()" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:280px;">
+        <div style="display:flex;gap:6px;">
+          <button class="s-tab active" onclick="setTrackFilter('semua',this)">Semua</button>
+          <button class="s-tab" onclick="setTrackFilter('dikirim',this)">Dikirim</button>
+          <button class="s-tab" onclick="setTrackFilter('selesai',this)">Sampai</button>
+        </div>
+      </div>
+      <div class="card" style="overflow:hidden;">
+        <table class="resi-table">
+          <thead><tr>
+            <th>Customer</th><th>Resi</th><th>Ekspedisi</th>
+            <th>Status Tracking</th><th>Terakhir Update</th><th>Aksi</th>
+          </tr></thead>
+          <tbody id="tracking-tbody"></tbody>
+        </table>
+        <div id="tracking-empty" style="display:none;text-align:center;padding:40px;color:var(--text-2);">Tidak ada data pengiriman</div>
+      </div>
+    </div>
+
+    <!-- Pantau Risiko -->
+    <div class="ship-section" id="sec-risiko">
+      <div style="background:#fff5f5;border:1px solid #fecaca;border-radius:var(--radius-lg);padding:16px;margin-bottom:20px;font-size:13px;color:#991b1b;">
+        ⚠️ Daftar order yang perlu dipantau lebih ketat (grade kurir rendah atau resi tidak bergerak > 3 hari)
+      </div>
+      <div class="card" style="overflow:hidden;">
+        <table class="resi-table">
+          <thead><tr>
+            <th>Customer</th><th>Resi</th><th>Alasan Flag</th>
+            <th>Hari Tidak Gerak</th><th>Status</th>
+          </tr></thead>
+          <tbody id="risiko-tbody"></tbody>
+        </table>
+        <div id="risiko-empty" style="display:none;text-align:center;padding:40px;color:var(--text-2);">✅ Tidak ada order berisiko</div>
+      </div>
+    </div>
+
+    <!-- Grade Ekspedisi -->
+    <div class="ship-section" id="sec-grade">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <p style="font-size:13px;color:var(--text-2);">Grade A/B = kurir diutamakan. Grade D/E = akan di-flag sebagai risiko.</p>
+        <button class="btn btn-primary btn-sm" onclick="openAddGrade()">+ Tambah Grade</button>
+      </div>
+      <div class="card" style="overflow:hidden;">
+        <table class="grade-table">
+          <thead><tr>
+            <th>Daerah</th><th>Ekspedisi</th><th>Grade</th><th>Digunakan</th><th>Aksi</th>
+          </tr></thead>
+          <tbody id="grade-tbody"></tbody>
+        </table>
+        <div id="grade-empty" style="display:none;text-align:center;padding:40px;color:var(--text-2);">Belum ada data grade ekspedisi</div>
+      </div>
+
+      <!-- Form tambah grade inline -->
+      <div id="grade-form" style="display:none;margin-top:16px;" class="card">
+        <div style="padding:20px;">
+          <h4 style="margin-bottom:16px;font-size:14px;font-weight:600;">Tambah Grade Ekspedisi</h4>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+            <div class="form-group" style="margin:0">
+              <label>Daerah/Kota</label>
+              <input type="text" id="g-daerah" placeholder="Jakarta Selatan">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label>Ekspedisi</label>
+              <select id="g-ekspedisi">
+                <option>JNE</option><option>J&T</option><option>SICEPAT</option>
+                <option>ANTERAJA</option><option>NINJA</option><option>LION</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label>Grade</label>
+              <select id="g-grade">
+                <option value="A">A — Terpercaya</option>
+                <option value="B">B — Baik</option>
+                <option value="C" selected>C — Standar</option>
+                <option value="D">D — Kurang baik</option>
+                <option value="E">E — Berisiko</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;display:flex;align-items:flex-end;">
+              <button class="btn btn-primary" style="width:100%" onclick="saveGrade()">Simpan</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+const SB_URL = window.SUPABASE_URL;
+const SB_KEY = window.SUPABASE_ANON_KEY;
+let userId = null;
+let allShipments = [], allGrades = [];
+let trackFilter = 'semua';
+
+const sbH = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
+async function sbGet(t,q='') { const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{headers:sbH}); return r.json(); }
+async function sbPost(t,b) { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)}); return r.json(); }
+async function sbPatch(t,q,b) { const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'PATCH',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)}); return r.json(); }
+async function sbDelete(t,q) { await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'DELETE',headers:sbH}); }
+
+function toast(msg,type='success') {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`toast toast-${type} show`;
+  setTimeout(()=>el.className='toast',3000);
+}
+function normalizeWA(n) {
+  n=String(n).replace(/\D/g,'');
+  if(n.startsWith('0')) n='62'+n.slice(1);
+  if(!n.startsWith('62')) n='62'+n;
+  return n;
+}
+function relativeTime(ts) {
+  if(!ts) return '-';
+  const diff = Date.now()-new Date(ts).getTime();
+  const h=Math.floor(diff/3600000), d=Math.floor(diff/86400000);
+  if(d>0) return `${d} hari lalu`;
+  if(h>0) return `${h} jam lalu`;
+  return 'Baru saja';
+}
+
+async function init() {
+  await Auth.requireLogin();
+  userId = Auth.getUser()?.id;
+  document.getElementById('sidebar-container').innerHTML = renderSidebar('shipping');
+  await Promise.all([loadShipments(), loadGrades()]);
+}
+
+async function loadShipments() {
+  allShipments = await sbGet('shipments',
+    `?select=*,orders_new(id,status,flag_risiko,alasan_flag,customers(wa_number,nama))&order=created_at.desc`
+  );
+  renderTracking();
+  renderRisiko();
+}
+
+async function loadGrades() {
+  allGrades = await sbGet('couriers_grade', `?user_id=eq.${userId}&order=daerah.asc`);
+  renderGrades();
+}
+
+function showSection(name, btn) {
+  document.querySelectorAll('.ship-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.ship-section').forEach(s=>s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sec-'+name).classList.add('active');
+}
+
+/* ── Tracking ── */
+function setTrackFilter(f,btn) {
+  trackFilter=f;
+  document.querySelectorAll('.ship-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTracking();
+}
+function renderTracking() {
+  const q = (document.getElementById('search-resi')?.value||'').toLowerCase();
+  let data = allShipments.filter(s => {
+    if (trackFilter === 'dikirim') return !s.sampai;
+    if (trackFilter === 'selesai') return s.sampai;
+    return true;
+  }).filter(s => {
+    if (!q) return true;
+    const nama = s.orders_new?.customers?.nama || '';
+    const wa   = s.orders_new?.customers?.wa_number || '';
+    return s.resi?.toLowerCase().includes(q) || nama.toLowerCase().includes(q) || wa.includes(q);
+  });
+
+  const tbody = document.getElementById('tracking-tbody');
+  const empty = document.getElementById('tracking-empty');
+  if (!data.length) { tbody.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+  tbody.innerHTML = data.map(s => {
+    const cust = s.orders_new?.customers;
+    const badge = s.sampai
+      ? `<span class="status-badge st-selesai">Sampai</span>`
+      : `<span class="status-badge st-dikirim">Dikirim</span>`;
+    return `<tr>
+      <td>${cust?.nama||'-'}<br><small style="color:var(--text-2)">${cust?.wa_number||''}</small></td>
+      <td><code>${s.resi||'-'}</code></td>
+      <td>${s.ekspedisi||'-'}</td>
+      <td>${s.status_tracking||'Menunggu update'}</td>
+      <td>${relativeTime(s.last_status_update)}</td>
+      <td><button class="btn btn-sm" onclick="cekManual('${s.resi}','${s.ekspedisi}')">🔄 Cek</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRisiko() {
+  const data = allShipments.filter(s => s.orders_new?.flag_risiko || isStuck(s));
+  const tbody = document.getElementById('risiko-tbody');
+  const empty = document.getElementById('risiko-empty');
+  if (!data.length) { tbody.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+  tbody.innerHTML = data.map(s => {
+    const cust = s.orders_new?.customers;
+    const days = s.last_status_update
+      ? Math.floor((Date.now()-new Date(s.last_status_update).getTime())/86400000)
+      : '-';
+    return `<tr>
+      <td>${cust?.nama||'-'}</td>
+      <td><code>${s.resi||'-'}</code></td>
+      <td>${s.orders_new?.alasan_flag||'Resi tidak bergerak'}</td>
+      <td>${days} hari</td>
+      <td><span class="status-badge flag-risiko">Pantau</span></td>
+    </tr>`;
+  }).join('');
+}
+function isStuck(s) {
+  if (!s.last_status_update || s.sampai) return false;
+  return (Date.now()-new Date(s.last_status_update).getTime()) > 3*86400000;
+}
+
+async function cekManual(resi, ekspedisi) {
+  toast(`Cek resi ${resi}...`);
+  // Trigger tracking via API
+  try {
+    const r = await fetch('/api/tracking', { method:'POST', headers:{'Content-Type':'application/json'} });
+    toast('Tracking diperbarui!');
+    await loadShipments();
+  } catch (e) { toast('Gagal cek resi', 'error'); }
+}
+
+/* ── Upload Resi ── */
+async function uploadSingle() {
+  const wa    = normalizeWA(document.getElementById('single-wa').value);
+  const resi  = document.getElementById('single-resi').value.trim();
+  const eksp  = document.getElementById('single-ekspedisi').value;
+  if (!wa || !resi) { toast('WA dan resi wajib diisi', 'error'); return; }
+  await prosesResi(wa, resi, eksp);
+}
+
+async function prosesResi(wa, resi, ekspedisi) {
+  try {
+    // Cari customer
+    const customers = await sbGet('customers', `?wa_number=eq.${wa}&user_id=eq.${userId}&limit=1`);
+    if (!customers.length) { showUploadResult([{ wa, resi, ok:false, alasan:'Nomor tidak ditemukan' }]); return; }
+    const custId = customers[0].id;
+
+    // Cari order pending/siap_kirim terbaru
+    const orders = await sbGet('orders_new',
+      `?customer_id=eq.${custId}&status=in.(siap_kirim,pending)&order=created_at.desc&limit=1`
+    );
+    if (!orders.length) { showUploadResult([{ wa, resi, ok:false, alasan:'Tidak ada order yang menunggu resi' }]); return; }
+    const orderId = orders[0].id;
+
+    // Simpan shipment
+    await sbPost('shipments', { order_id: orderId, resi, ekspedisi, sampai: false });
+    await sbPatch('orders_new', `?id=eq.${orderId}`, { status: 'dikirim' });
+
+    showUploadResult([{ wa, resi, ok:true, nama: customers[0].nama }]);
+    await loadShipments();
+  } catch (e) {
+    showUploadResult([{ wa, resi, ok:false, alasan: e.message }]);
+  }
+}
+
+function showUploadResult(results) {
+  const el = document.getElementById('upload-result');
+  el.innerHTML = `<div class="card"><div style="padding:16px;">
+    <h4 style="margin-bottom:12px;font-size:13px;font-weight:600;">Hasil Upload</h4>
+    ${results.map(r => `<div style="padding:8px;border-radius:6px;margin-bottom:6px;font-size:13px;background:${r.ok?'#dcfce7':'#fee2e2'};color:${r.ok?'#166534':'#991b1b'};">
+      ${r.ok?'✅':'❌'} ${r.wa} — ${r.resi} ${r.ok?`(${r.nama})`:('| '+r.alasan)}
+    </div>`).join('')}
+  </div></div>`;
+}
+
+async function uploadBulk() {
+  const text = document.getElementById('bulk-paste').value.trim();
+  if (!text) { toast('Paste data dulu ya', 'error'); return; }
+  const lines = text.split('\n').filter(l => l.trim());
+  const results = [];
+  for (const line of lines) {
+    const parts = line.split(',').map(s=>s.trim());
+    if (parts.length < 2) { results.push({ wa: line, resi: '-', ok:false, alasan:'Format salah' }); continue; }
+    const [wa, resi, eksp='JNE'] = parts;
+    await prosesResi(normalizeWA(wa), resi, eksp);
+  }
+}
+
+function parseCsvFile(e) {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    document.getElementById('bulk-paste').value = ev.target.result;
+  };
+  reader.readAsText(file);
+}
+
+/* ── Grade ── */
+function renderGrades() {
+  const tbody = document.getElementById('grade-tbody');
+  const empty = document.getElementById('grade-empty');
+  if (!allGrades.length) { tbody.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+  tbody.innerHTML = allGrades.map(g => `<tr>
+    <td>${g.daerah}</td>
+    <td>${g.ekspedisi}</td>
+    <td><span class="status-badge grade-${g.grade}">${g.grade}</span></td>
+    <td>${g.boleh_dipakai ? '✅' : '❌'}</td>
+    <td>
+      <button class="btn btn-sm" onclick="toggleGrade('${g.id}',${g.boleh_dipakai})">${g.boleh_dipakai?'Nonaktifkan':'Aktifkan'}</button>
+      <button class="btn btn-sm" style="color:var(--danger)" onclick="hapusGrade('${g.id}')">🗑️</button>
+    </td>
+  </tr>`).join('');
+}
+function openAddGrade() {
+  const f = document.getElementById('grade-form');
+  f.style.display = f.style.display === 'none' ? '' : 'none';
+}
+async function saveGrade() {
+  const daerah    = document.getElementById('g-daerah').value.trim();
+  const ekspedisi = document.getElementById('g-ekspedisi').value;
+  const grade     = document.getElementById('g-grade').value;
+  if (!daerah) { toast('Daerah wajib diisi','error'); return; }
+  await sbPost('couriers_grade', { user_id: userId, daerah, ekspedisi, grade, boleh_dipakai: true });
+  toast('Grade disimpan!');
+  document.getElementById('grade-form').style.display='none';
+  document.getElementById('g-daerah').value='';
+  await loadGrades();
+}
+async function toggleGrade(id, current) {
+  await sbPatch('couriers_grade',`?id=eq.${id}`,{boleh_dipakai:!current});
+  await loadGrades();
+}
+async function hapusGrade(id) {
+  if (!confirm('Hapus grade ini?')) return;
+  await sbDelete('couriers_grade',`?id=eq.${id}`);
+  await loadGrades();
+}
+
+init();
+</script>
+</body>
+</html>

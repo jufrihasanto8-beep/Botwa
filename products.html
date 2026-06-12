@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Produk · Adsy CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.prod-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; padding:24px; }
+.prod-card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; transition:box-shadow .15s; }
+.prod-card:hover { box-shadow:var(--shadow-md); }
+.prod-card-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.prod-nama { font-weight:600; font-size:15px; }
+.prod-harga { font-weight:700; color:var(--primary); font-size:15px; }
+.prod-body { padding:16px; }
+.prod-tag { display:inline-block; background:var(--primary-light); color:var(--primary-dark); font-size:11px; padding:2px 8px; border-radius:20px; margin:2px; }
+.prod-meta { font-size:12px; color:var(--text-2); margin-bottom:8px; }
+.prod-meta span { font-weight:500; color:var(--text); }
+.prod-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+.badge-aktif   { background:#dcfce7; color:#166534; font-size:11px; padding:3px 8px; border-radius:20px; font-weight:500; }
+.badge-nonaktif{ background:#f3f4f6; color:#6b7280; font-size:11px; padding:3px 8px; border-radius:20px; font-weight:500; }
+
+/* Modal */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:var(--white); border-radius:var(--radius-lg); width:100%; max-width:680px; max-height:90vh; overflow-y:auto; }
+.modal-head { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.modal-head h3 { font-size:16px; font-weight:600; }
+.modal-body { padding:24px; }
+.modal-foot { padding:16px 24px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
+.tab-row { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid var(--border); }
+.tab-btn { padding:8px 16px; font-size:13px; font-weight:500; color:var(--text-2); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; }
+.tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+.tab-pane { display:none; }
+.tab-pane.active { display:block; }
+.tags-input { display:flex; flex-wrap:wrap; gap:6px; padding:8px; border:1.5px solid var(--border); border-radius:var(--radius); min-height:42px; cursor:text; }
+.tags-input input { border:none; outline:none; flex:1; min-width:120px; font-size:13px; padding:2px 4px; }
+.tag-item { background:var(--primary-light); color:var(--primary-dark); padding:3px 10px; border-radius:20px; font-size:12px; display:flex; align-items:center; gap:4px; }
+.tag-item .rm { cursor:pointer; opacity:.6; }
+.tag-item .rm:hover { opacity:1; }
+.promo-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>🏷️ Produk</h1>
+        <p>Kelola produk, template AI, dan mapping iklan CTWA</p>
+      </div>
+      <button class="btn btn-primary" onclick="openAdd()">+ Tambah Produk</button>
+    </div>
+
+    <!-- Filter -->
+    <div style="padding:0 24px;display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="s-tab active" onclick="setFilter('semua',this)">Semua</button>
+      <button class="s-tab" onclick="setFilter('aktif',this)">Aktif</button>
+      <button class="s-tab" onclick="setFilter('nonaktif',this)">Nonaktif</button>
+    </div>
+
+    <div class="prod-grid" id="prod-grid">
+      <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-2);">Memuat produk...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Tambah/Edit Produk -->
+<div class="modal-overlay" id="prod-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title">Tambah Produk</h3>
+      <button class="btn btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tab-row">
+        <button class="tab-btn active" onclick="switchTab('info',this)">Info Dasar</button>
+        <button class="tab-btn" onclick="switchTab('ai',this)">AI & Konsultasi</button>
+        <button class="tab-btn" onclick="switchTab('ongkir',this)">Ongkir & Promo</button>
+        <button class="tab-btn" onclick="switchTab('mapping',this)">CTWA Mapping</button>
+      </div>
+
+      <!-- Tab: Info Dasar -->
+      <div class="tab-pane active" id="tab-info">
+        <div class="form-group">
+          <label>Nama Produk *</label>
+          <input type="text" id="f-nama" placeholder="contoh: Herbal Sinus Pro">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label>Harga (Rp) *</label>
+            <input type="number" id="f-harga" placeholder="150000">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="f-aktif">
+              <option value="true">Aktif</option>
+              <option value="false">Nonaktif</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Cara Pakai</label>
+          <textarea id="f-cara-pakai" rows="3" placeholder="2x sehari 1 kapsul, diminum setelah makan..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Product Knowledge (info lengkap untuk AI)</label>
+          <textarea id="f-knowledge" rows="5" placeholder="Kandungan, manfaat, testimoni, dll..."></textarea>
+        </div>
+      </div>
+
+      <!-- Tab: AI & Konsultasi -->
+      <div class="tab-pane" id="tab-ai">
+        <div class="form-group">
+          <label>Keluhan yang Cocok <small style="color:var(--text-2)">(tekan Enter untuk tambah)</small></label>
+          <div class="tags-input" id="tags-keluhan" onclick="this.querySelector('input').focus()">
+            <input type="text" placeholder="contoh: sinusitis..." onkeydown="addTag(event,'keluhan')">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Pertanyaan Diagnosa <small style="color:var(--text-2)">(tekan Enter untuk tambah)</small></label>
+          <div class="tags-input" id="tags-diagnosa" onclick="this.querySelector('input').focus()">
+            <input type="text" placeholder="contoh: Sudah berapa lama?" onkeydown="addTag(event,'diagnosa')">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label>Nama Persona CS</label>
+            <input type="text" id="f-persona-nama" placeholder="Sari" value="Sari">
+          </div>
+          <div class="form-group">
+            <label>Gaya Persona</label>
+            <input type="text" id="f-persona-gaya" placeholder="hangat, sabar, konsultatif">
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Ongkir & Promo -->
+      <div class="tab-pane" id="tab-ongkir">
+        <div class="form-group">
+          <label>Tipe Promo Ongkir</label>
+          <select id="f-promo-tipe" onchange="togglePromoNilai()">
+            <option value="none">Tidak ada promo</option>
+            <option value="gratis_penuh">Gratis Ongkir Penuh</option>
+            <option value="potong">Potongan Ongkir (Rp X)</option>
+            <option value="gratis_sd">Gratis s/d Rp X</option>
+          </select>
+        </div>
+        <div class="form-group" id="promo-nilai-wrap" style="display:none;">
+          <label>Nilai Promo (Rp)</label>
+          <input type="number" id="f-promo-nilai" placeholder="10000">
+        </div>
+        <div style="background:var(--bg);padding:16px;border-radius:var(--radius);font-size:13px;color:var(--text-2);margin-top:8px;">
+          <strong>Preview:</strong> <span id="promo-preview">Tidak ada promo ongkir</span>
+        </div>
+      </div>
+
+      <!-- Tab: CTWA Mapping -->
+      <div class="tab-pane" id="tab-mapping">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;">
+          Hubungkan iklan CTWA (Click to WhatsApp) ke produk ini. Saat customer klik iklan, AI langsung tahu produk mana yang ditanyakan.
+        </p>
+        <div id="mapping-list"></div>
+        <button class="btn btn-sm" onclick="addMappingRow()" style="margin-top:8px;">+ Tambah Mapping</button>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveProduk()">Simpan Produk</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+const SB_URL = window.SUPABASE_URL;
+const SB_KEY = window.SUPABASE_ANON_KEY;
+let currentUserId = null;
+let editId = null;
+let allProducts = [];
+let filterState = 'semua';
+let tagsData = { keluhan: [], diagnosa: [] };
+let mappingRows = [];
+
+const sbH = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
+
+async function sbGet(t, q='') {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, { headers: sbH });
+  return r.json();
+}
+async function sbPost(t, b) {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}`, { method:'POST', headers:{...sbH,'Prefer':'return=representation'}, body:JSON.stringify(b) });
+  return r.json();
+}
+async function sbPatch(t, q, b) {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, { method:'PATCH', headers:{...sbH,'Prefer':'return=representation'}, body:JSON.stringify(b) });
+  return r.json();
+}
+async function sbDelete(t, q) {
+  await fetch(`${SB_URL}/rest/v1/${t}${q}`, { method:'DELETE', headers: sbH });
+}
+
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast toast-${type} show`;
+  setTimeout(() => el.className = 'toast', 3000);
+}
+
+function rp(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
+
+async function init() {
+  await Auth.requireLogin();
+  currentUserId = Auth.getUser()?.id;
+  document.getElementById('sidebar-container').innerHTML = renderSidebar('products');
+  await loadProducts();
+}
+
+async function loadProducts() {
+  allProducts = await sbGet('products', `?user_id=eq.${currentUserId}&order=created_at.desc`);
+  renderGrid();
+}
+
+function setFilter(f, btn) {
+  filterState = f;
+  document.querySelectorAll('.s-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderGrid();
+}
+
+function renderGrid() {
+  let data = allProducts;
+  if (filterState === 'aktif')    data = data.filter(p => p.aktif);
+  if (filterState === 'nonaktif') data = data.filter(p => !p.aktif);
+
+  const grid = document.getElementById('prod-grid');
+  if (!data.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-2);">
+      Belum ada produk. <a href="#" onclick="openAdd()">Tambah sekarang</a>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = data.map(p => {
+    const keluhan = Array.isArray(p.keluhan_cocok) ? p.keluhan_cocok : [];
+    const promo = formatPromo(p.promo_ongkir);
+    return `<div class="prod-card">
+      <div class="prod-card-header">
+        <div>
+          <div class="prod-nama">${p.nama}</div>
+          <div class="prod-harga">${rp(p.harga)}</div>
+        </div>
+        <span class="${p.aktif ? 'badge-aktif' : 'badge-nonaktif'}">${p.aktif ? 'Aktif' : 'Nonaktif'}</span>
+      </div>
+      <div class="prod-body">
+        ${keluhan.length ? `<div style="margin-bottom:10px;">${keluhan.slice(0,4).map(k=>`<span class="prod-tag">${k}</span>`).join('')}${keluhan.length>4?`<span class="prod-tag">+${keluhan.length-4}</span>`:''}</div>` : ''}
+        <div class="prod-meta">Ongkir: <span>${promo}</span></div>
+        <div class="prod-meta">Persona CS: <span>${p.persona_cs_nama || 'Sari'}</span></div>
+        ${p.cara_pakai ? `<div class="prod-meta" style="margin-top:8px;font-size:12px;">${p.cara_pakai.slice(0,80)}...</div>` : ''}
+      </div>
+      <div class="prod-footer">
+        <button class="btn btn-sm" onclick="toggleAktif('${p.id}',${p.aktif})">${p.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>
+        <button class="btn btn-sm" onclick="openEdit('${p.id}')">✏️ Edit</button>
+        <button class="btn btn-sm" style="color:var(--danger)" onclick="hapusProduk('${p.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function formatPromo(promo) {
+  if (!promo || promo.tipe === 'none') return 'Tidak ada promo';
+  if (promo.tipe === 'gratis_penuh') return '✅ Gratis Ongkir';
+  if (promo.tipe === 'potong') return `Potongan ${rp(promo.nilai)}`;
+  if (promo.tipe === 'gratis_sd') return `Gratis s/d ${rp(promo.nilai)}`;
+  return '-';
+}
+
+/* ── Modal ── */
+function openAdd() {
+  editId = null;
+  tagsData = { keluhan: [], diagnosa: [] };
+  mappingRows = [];
+  document.getElementById('modal-title').textContent = 'Tambah Produk';
+  document.getElementById('f-nama').value = '';
+  document.getElementById('f-harga').value = '';
+  document.getElementById('f-aktif').value = 'true';
+  document.getElementById('f-cara-pakai').value = '';
+  document.getElementById('f-knowledge').value = '';
+  document.getElementById('f-persona-nama').value = 'Sari';
+  document.getElementById('f-persona-gaya').value = 'hangat, sabar, konsultatif';
+  document.getElementById('f-promo-tipe').value = 'none';
+  document.getElementById('f-promo-nilai').value = '';
+  renderTags('keluhan'); renderTags('diagnosa');
+  renderMappingList();
+  togglePromoNilai();
+  switchTab('info', document.querySelector('.tab-btn'));
+  document.getElementById('prod-modal').classList.add('open');
+}
+
+async function openEdit(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  editId = id;
+  tagsData.keluhan  = Array.isArray(p.keluhan_cocok)        ? [...p.keluhan_cocok] : [];
+  tagsData.diagnosa = Array.isArray(p.pertanyaan_diagnosa)  ? [...p.pertanyaan_diagnosa] : [];
+  document.getElementById('modal-title').textContent = 'Edit Produk';
+  document.getElementById('f-nama').value = p.nama || '';
+  document.getElementById('f-harga').value = p.harga || '';
+  document.getElementById('f-aktif').value = String(p.aktif);
+  document.getElementById('f-cara-pakai').value = p.cara_pakai || '';
+  document.getElementById('f-knowledge').value = p.product_knowledge || '';
+  document.getElementById('f-persona-nama').value = p.persona_cs_nama || 'Sari';
+  document.getElementById('f-persona-gaya').value = p.persona_cs_gaya || 'hangat, sabar, konsultatif';
+  const promo = p.promo_ongkir || {};
+  document.getElementById('f-promo-tipe').value = promo.tipe || 'none';
+  document.getElementById('f-promo-nilai').value = promo.nilai || '';
+
+  // Load mappings
+  const maps = await sbGet('ad_mapping', `?product_id=eq.${id}`);
+  mappingRows = maps.map(m => ({ id: m.id, sumber: m.sumber, identifier: m.identifier }));
+
+  renderTags('keluhan'); renderTags('diagnosa');
+  renderMappingList();
+  togglePromoNilai();
+  switchTab('info', document.querySelector('.tab-btn'));
+  document.getElementById('prod-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('prod-modal').classList.remove('open');
+}
+
+/* ── Tags ── */
+function addTag(e, type) {
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  e.preventDefault();
+  const val = e.target.value.trim();
+  if (!val) return;
+  tagsData[type].push(val);
+  e.target.value = '';
+  renderTags(type);
+}
+function removeTag(type, idx) {
+  tagsData[type].splice(idx, 1);
+  renderTags(type);
+}
+function renderTags(type) {
+  const container = document.getElementById(`tags-${type}`);
+  const input = container.querySelector('input');
+  container.innerHTML = '';
+  tagsData[type].forEach((t, i) => {
+    container.insertAdjacentHTML('beforeend',
+      `<span class="tag-item">${t}<span class="rm" onclick="removeTag('${type}',${i})">✕</span></span>`);
+  });
+  container.appendChild(input);
+}
+
+/* ── Promo toggle ── */
+function togglePromoNilai() {
+  const tipe = document.getElementById('f-promo-tipe').value;
+  const show = ['potong','gratis_sd'].includes(tipe);
+  document.getElementById('promo-nilai-wrap').style.display = show ? '' : 'none';
+  updatePromoPreview();
+}
+function updatePromoPreview() {
+  const tipe  = document.getElementById('f-promo-tipe').value;
+  const nilai = parseInt(document.getElementById('f-promo-nilai').value) || 0;
+  let text = 'Tidak ada promo ongkir';
+  if (tipe === 'gratis_penuh') text = '✅ Gratis Ongkir Penuh';
+  if (tipe === 'potong')    text = `Potongan ongkir Rp ${nilai.toLocaleString('id-ID')}`;
+  if (tipe === 'gratis_sd') text = `Gratis ongkir s/d Rp ${nilai.toLocaleString('id-ID')}`;
+  document.getElementById('promo-preview').textContent = text;
+}
+
+/* ── CTWA Mapping rows ── */
+function addMappingRow() {
+  mappingRows.push({ id: null, sumber: 'ctwa', identifier: '' });
+  renderMappingList();
+}
+function removeMappingRow(idx) {
+  mappingRows.splice(idx, 1);
+  renderMappingList();
+}
+function renderMappingList() {
+  const el = document.getElementById('mapping-list');
+  if (!mappingRows.length) {
+    el.innerHTML = `<p style="color:var(--text-2);font-size:13px;">Belum ada mapping.</p>`;
+    return;
+  }
+  el.innerHTML = mappingRows.map((m, i) => `
+    <div style="display:grid;grid-template-columns:120px 1fr 32px;gap:8px;margin-bottom:8px;align-items:center;">
+      <select onchange="mappingRows[${i}].sumber=this.value" style="padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
+        <option value="ctwa" ${m.sumber==='ctwa'?'selected':''}>CTWA</option>
+        <option value="form" ${m.sumber==='form'?'selected':''}>Form</option>
+        <option value="inbound" ${m.sumber==='inbound'?'selected':''}>Keyword</option>
+      </select>
+      <input type="text" value="${m.identifier}" oninput="mappingRows[${i}].identifier=this.value"
+        placeholder="ad_id / headline / keyword..." style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
+      <button onclick="removeMappingRow(${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px;">✕</button>
+    </div>`).join('');
+}
+
+/* ── Save ── */
+async function saveProduk() {
+  const nama = document.getElementById('f-nama').value.trim();
+  const harga = parseInt(document.getElementById('f-harga').value);
+  if (!nama || !harga) { toast('Nama dan harga wajib diisi', 'error'); return; }
+
+  const payload = {
+    user_id: currentUserId,
+    nama,
+    harga,
+    aktif: document.getElementById('f-aktif').value === 'true',
+    cara_pakai: document.getElementById('f-cara-pakai').value.trim(),
+    product_knowledge: document.getElementById('f-knowledge').value.trim(),
+    keluhan_cocok: tagsData.keluhan,
+    pertanyaan_diagnosa: tagsData.diagnosa,
+    persona_cs_nama: document.getElementById('f-persona-nama').value.trim() || 'Sari',
+    persona_cs_gaya: document.getElementById('f-persona-gaya').value.trim(),
+    promo_ongkir: {
+      tipe: document.getElementById('f-promo-tipe').value,
+      nilai: parseInt(document.getElementById('f-promo-nilai').value) || 0,
+    },
+  };
+
+  try {
+    let productId = editId;
+    if (editId) {
+      await sbPatch('products', `?id=eq.${editId}`, payload);
+    } else {
+      const rows = await sbPost('products', payload);
+      productId = rows[0]?.id;
+    }
+
+    // Simpan mapping
+    if (productId) {
+      // Hapus mapping lama
+      await sbDelete('ad_mapping', `?product_id=eq.${productId}`);
+      // Insert mapping baru
+      for (const m of mappingRows) {
+        if (m.identifier.trim()) {
+          await sbPost('ad_mapping', {
+            user_id: currentUserId,
+            product_id: productId,
+            sumber: m.sumber,
+            identifier: m.identifier.trim(),
+          });
+        }
+      }
+    }
+
+    toast(editId ? 'Produk diupdate!' : 'Produk ditambahkan!');
+    closeModal();
+    await loadProducts();
+  } catch (e) {
+    toast('Gagal simpan: ' + e.message, 'error');
+  }
+}
+
+async function toggleAktif(id, current) {
+  await sbPatch('products', `?id=eq.${id}`, { aktif: !current });
+  toast(`Produk ${!current ? 'diaktifkan' : 'dinonaktifkan'}`);
+  await loadProducts();
+}
+
+async function hapusProduk(id) {
+  if (!confirm('Hapus produk ini? Data mapping juga akan dihapus.')) return;
+  await sbDelete('products', `?id=eq.${id}`);
+  toast('Produk dihapus');
+  await loadProducts();
+}
+
+/* ── Tabs ── */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('tab-' + name)?.classList.add('active');
+}
+
+document.getElementById('f-promo-tipe').addEventListener('change', updatePromoPreview);
+document.getElementById('f-promo-nilai').addEventListener('input', updatePromoPreview);
+
+init();
+</script>
+</body>
+</html>

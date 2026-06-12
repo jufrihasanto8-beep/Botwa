@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Follow-up Engine · Adsy CS</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.fu-tabs { display:flex; gap:4px; padding:0 24px; border-bottom:1px solid var(--border); background:var(--white); }
+.fu-tab  { padding:12px 16px; font-size:13px; font-weight:500; color:var(--text-2); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; }
+.fu-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+.fu-section { display:none; padding:24px; }
+.fu-section.active { display:block; }
+
+.leads-table { width:100%; border-collapse:collapse; }
+.leads-table th, .leads-table td { padding:11px 14px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; }
+.leads-table th { font-size:11px; font-weight:600; color:var(--text-2); background:var(--bg); text-transform:uppercase; }
+.leads-table tr:hover td { background:#fafafa; }
+
+.sched-row { display:grid; grid-template-columns:80px 1fr 1fr auto; gap:10px; align-items:center; margin-bottom:10px; }
+.campaign-card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; margin-bottom:12px; }
+.campaign-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.badge-aktif   { background:#dcfce7; color:#166534; font-size:11px; padding:3px 8px; border-radius:20px; }
+.badge-nonaktif{ background:#f3f4f6; color:#6b7280; font-size:11px; padding:3px 8px; border-radius:20px; }
+
+.stat-row { display:flex; gap:14px; margin-bottom:24px; flex-wrap:wrap; }
+.stat-mini { flex:1; min-width:110px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; }
+.stat-mini .num { font-size:22px; font-weight:700; color:var(--primary); }
+.stat-mini .lbl { font-size:12px; color:var(--text-2); margin-top:2px; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>🔔 Follow-up Engine</h1>
+        <p>Jadwal follow-up personal, kampanye momen, dan leads pending</p>
+      </div>
+    </div>
+
+    <div class="fu-tabs">
+      <button class="fu-tab active" onclick="showSection('leads',this)">👥 Leads Pending</button>
+      <button class="fu-tab" onclick="showSection('jadwal',this)">📅 Jadwal Follow-up</button>
+      <button class="fu-tab" onclick="showSection('campaign',this)">🎯 Kampanye Momen</button>
+      <button class="fu-tab" onclick="showSection('monitor',this)">📊 Monitor</button>
+    </div>
+
+    <!-- Leads Pending -->
+    <div class="fu-section active" id="sec-leads">
+      <div class="stat-row" id="leads-stats"></div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="search-leads" placeholder="🔍 Cari nama / WA..." oninput="renderLeads()"
+          style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:250px;">
+        <select id="filter-produk" onchange="renderLeads()"
+          style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+          <option value="">Semua Produk</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="sendMomenBulk()" style="margin-left:auto;">📤 Kirim Promo Momen ke Semua</button>
+      </div>
+      <div class="card" style="overflow:hidden;">
+        <table class="leads-table">
+          <thead><tr>
+            <th>Customer</th><th>Produk</th><th>Terakhir Chat</th>
+            <th>Alasan Mandek</th><th>Follow-up Berikutnya</th><th>Aksi</th>
+          </tr></thead>
+          <tbody id="leads-tbody"></tbody>
+        </table>
+        <div id="leads-empty" style="display:none;text-align:center;padding:40px;color:var(--text-2);">🎉 Semua leads sudah ditangani!</div>
+      </div>
+    </div>
+
+    <!-- Jadwal Follow-up Personal -->
+    <div class="fu-section" id="sec-jadwal">
+      <div class="card" style="padding:24px;max-width:700px;margin-bottom:20px;">
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:4px;">Tabel Ritme Follow-up Personal</h3>
+        <p style="font-size:12px;color:var(--text-2);margin-bottom:20px;">Konfigurasi kapan dan promo apa yang dikirim ke chat yang mandek.</p>
+
+        <div id="jadwal-rows"></div>
+        <button class="btn btn-sm" onclick="addJadwalRow()" style="margin-top:8px;">+ Tambah Tahap</button>
+
+        <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
+          <button class="btn btn-primary" onclick="saveJadwal()">Simpan Jadwal</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:24px;max-width:700px;">
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Preview Jadwal</h3>
+        <div id="jadwal-preview"></div>
+      </div>
+    </div>
+
+    <!-- Kampanye Momen -->
+    <div class="fu-section" id="sec-campaign">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <p style="font-size:13px;color:var(--text-2);">Trigger otomatis ke leads pending saat momen tertentu (payday, tanggal kembar, dll)</p>
+        <button class="btn btn-primary btn-sm" onclick="openAddCampaign()">+ Kampanye Baru</button>
+      </div>
+      <div id="campaign-list"></div>
+
+      <!-- Form Kampanye -->
+      <div id="campaign-form" style="display:none;" class="card">
+        <div style="padding:24px;">
+          <h4 style="font-size:14px;font-weight:600;margin-bottom:16px;" id="camp-form-title">Kampanye Baru</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label>Nama Kampanye</label>
+              <input type="text" id="c-nama" placeholder="Payday Sale Juni">
+            </div>
+            <div class="form-group">
+              <label>Tipe Trigger</label>
+              <select id="c-tipe" onchange="toggleCampRule()">
+                <option value="payday">Payday (akhir bulan)</option>
+                <option value="tanggal_kembar">Tanggal Kembar (1.1, 2.2, ...)</option>
+                <option value="tgl_spesifik">Tanggal Spesifik</option>
+              </select>
+            </div>
+          </div>
+          <div id="camp-rule-wrap" style="display:none;" class="form-group">
+            <label>Tanggal Spesifik</label>
+            <input type="date" id="c-tanggal">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label>Tipe Promo</label>
+              <select id="c-promo-tipe">
+                <option value="diskon_persen">Diskon %</option>
+                <option value="diskon_nominal">Diskon Rp</option>
+                <option value="gratis_ongkir">Gratis Ongkir</option>
+                <option value="info_saja">Info saja (tanpa diskon)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Nilai Promo</label>
+              <input type="text" id="c-promo-nilai" placeholder="10 (untuk 10%) atau 20000">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Deskripsi Promo (untuk AI)</label>
+            <input type="text" id="c-promo-desc" placeholder="Flash sale akhir bulan, stok terbatas!">
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+            <button class="btn" onclick="closeCampaignForm()">Batal</button>
+            <button class="btn btn-primary" onclick="saveCampaign()">Simpan Kampanye</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monitor -->
+    <div class="fu-section" id="sec-monitor">
+      <div class="stat-row" id="monitor-stats"></div>
+      <div class="card" style="overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="font-size:14px;font-weight:600;">Riwayat Follow-up</h3>
+          <div style="display:flex;gap:6px;">
+            <button class="s-tab active" onclick="setMonitorFilter('semua',this)">Semua</button>
+            <button class="s-tab" onclick="setMonitorFilter('pending',this)">Terjadwal</button>
+            <button class="s-tab" onclick="setMonitorFilter('sent',this)">Terkirim</button>
+            <button class="s-tab" onclick="setMonitorFilter('stop',this)">Stop</button>
+          </div>
+        </div>
+        <table class="leads-table">
+          <thead><tr>
+            <th>Customer</th><th>Tipe</th><th>Tahap</th>
+            <th>Dijadwalkan</th><th>Status</th>
+          </tr></thead>
+          <tbody id="monitor-tbody"></tbody>
+        </table>
+        <div id="monitor-empty" style="display:none;text-align:center;padding:40px;color:var(--text-2);">Belum ada riwayat follow-up</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+const SB_URL = window.SUPABASE_URL;
+const SB_KEY = window.SUPABASE_ANON_KEY;
+let userId = null;
+let allLeads = [], allFollowups = [], allCampaigns = [], allProducts = [];
+let monitorFilter = 'semua';
+let jadwalRows = [
+  { hari: 1,  promo: 'Harga normal, tanyakan apakah masih berminat' },
+  { hari: 3,  promo: 'Promo COD, gratis ongkir untuk kota tertentu' },
+  { hari: 5,  promo: 'Penawaran terakhir, stok terbatas' },
+];
+let editCampId = null;
+
+const sbH = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
+async function sbGet(t,q='') { const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{headers:sbH}); return r.json(); }
+async function sbPost(t,b) { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)}); return r.json(); }
+async function sbPatch(t,q,b) { const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'PATCH',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)}); return r.json(); }
+async function sbDelete(t,q) { await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'DELETE',headers:sbH}); }
+
+function toast(msg,type='success'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast toast-${type} show`;setTimeout(()=>el.className='toast',3000);}
+function relativeTime(ts){if(!ts)return'-';const d=Math.floor((Date.now()-new Date(ts).getTime())/86400000);const h=Math.floor((Date.now()-new Date(ts).getTime())/3600000);if(d>0)return`${d} hari lalu`;if(h>0)return`${h} jam lalu`;return'Baru saja';}
+function dateStr(ts){if(!ts)return'-';return new Date(ts).toLocaleDateString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});}
+
+async function init() {
+  await Auth.requireLogin();
+  userId = Auth.getUser()?.id;
+  document.getElementById('sidebar-container').innerHTML = renderSidebar('followup-engine');
+  await Promise.all([loadLeads(), loadFollowups(), loadCampaigns(), loadProducts()]);
+  renderJadwal();
+}
+
+async function loadLeads() {
+  // Conversations aktif yang bukan selesai = leads pending
+  allLeads = await sbGet('conversations',
+    `?user_id=eq.${userId}&status=in.(baru,diproses)&order=last_msg_at.desc&select=*,customers(wa_number,nama),products(nama)`
+  );
+  renderLeads();
+  renderLeadsStats();
+}
+
+async function loadFollowups() {
+  allFollowups = await sbGet('followups',
+    `?select=*,conversations(customer_id,customers(wa_number,nama))&order=scheduled_at.desc&limit=100`
+  );
+  renderMonitor();
+  renderMonitorStats();
+}
+
+async function loadCampaigns() {
+  allCampaigns = await sbGet('campaigns', `?user_id=eq.${userId}&order=created_at.desc`);
+  renderCampaigns();
+}
+
+async function loadProducts() {
+  allProducts = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true`);
+  const sel = document.getElementById('filter-produk');
+  allProducts.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.nama;
+    sel.appendChild(opt);
+  });
+}
+
+function showSection(name, btn) {
+  document.querySelectorAll('.fu-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.fu-section').forEach(s=>s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sec-'+name).classList.add('active');
+}
+
+/* ── Leads ── */
+function renderLeadsStats() {
+  const total = allLeads.length;
+  const baru  = allLeads.filter(l=>l.status==='baru').length;
+  const diproses = allLeads.filter(l=>l.status==='diproses').length;
+  document.getElementById('leads-stats').innerHTML = `
+    <div class="stat-mini"><div class="num">${total}</div><div class="lbl">Total Leads Pending</div></div>
+    <div class="stat-mini"><div class="num">${baru}</div><div class="lbl">Belum Ditangani</div></div>
+    <div class="stat-mini"><div class="num">${diproses}</div><div class="lbl">Sedang Diproses</div></div>`;
+}
+
+function renderLeads() {
+  const q    = (document.getElementById('search-leads')?.value||'').toLowerCase();
+  const prod = document.getElementById('filter-produk')?.value||'';
+  let data = allLeads.filter(l => {
+    const nama = l.customers?.nama||'';
+    const wa   = l.customers?.wa_number||'';
+    const match = !q || nama.toLowerCase().includes(q) || wa.includes(q);
+    const prodMatch = !prod || l.product_id === prod;
+    return match && prodMatch;
+  });
+
+  const tbody = document.getElementById('leads-tbody');
+  const empty = document.getElementById('leads-empty');
+  if (!data.length) { tbody.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+
+  tbody.innerHTML = data.map(l => {
+    const cust = l.customers;
+    const prod = l.products;
+    const hariMandek = l.last_msg_at
+      ? Math.floor((Date.now()-new Date(l.last_msg_at).getTime())/86400000)
+      : '?';
+    const alasanMandek = detectAlasanMandek(l, hariMandek);
+    const nextFU = getNextFollowup(l.id);
+    return `<tr>
+      <td><strong>${cust?.nama||'?'}</strong><br><small style="color:var(--text-2)">${cust?.wa_number||''}</small></td>
+      <td>${prod?.nama||'-'}</td>
+      <td>${relativeTime(l.last_msg_at)}</td>
+      <td><span style="font-size:12px">${alasanMandek}</span></td>
+      <td>${nextFU ? dateStr(nextFU.scheduled_at) : '<span style="color:var(--text-3)">-</span>'}</td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn btn-sm" onclick="jadwalkanFU('${l.id}','${cust?.wa_number||''}')">📅 Follow-up</button>
+        <button class="btn btn-sm" style="color:var(--danger)" onclick="stopFU('${l.id}')">🛑 Stop</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function detectAlasanMandek(conv, hari) {
+  const state = conv.state || {};
+  if (state.tahap === 'harga') return '💰 Mandek di harga';
+  if (state.tahap === 'alamat') return '📍 Mandek di alamat';
+  if (state.tahap === 'transfer') return '💳 Menunggu transfer';
+  if (hari > 5) return '🕐 Chat lama tidak aktif';
+  return '💬 Masih konsultasi';
+}
+
+function getNextFollowup(convId) {
+  return allFollowups.find(f => f.conversation_id === convId && f.status === 'pending');
+}
+
+async function jadwalkanFU(convId, waNumber) {
+  // Buat jadwal follow-up berdasarkan jadwalRows
+  for (const j of jadwalRows) {
+    const scheduledAt = new Date(Date.now() + j.hari * 86400000).toISOString();
+    await sbPost('followups', {
+      conversation_id: convId,
+      tipe: 'personal',
+      tahap: `h${j.hari}`,
+      scheduled_at: scheduledAt,
+      status: 'pending',
+      promo_applied: { deskripsi: j.promo },
+    });
+  }
+  toast('Follow-up dijadwalkan!');
+  await loadFollowups();
+  renderLeads();
+}
+
+async function stopFU(convId) {
+  await sbPatch('followups', `?conversation_id=eq.${convId}&status=eq.pending`, { status: 'stop' });
+  toast('Follow-up dihentikan');
+  await loadFollowups();
+}
+
+async function sendMomenBulk() {
+  const campaigns = allCampaigns.filter(c => c.aktif);
+  if (!campaigns.length) { toast('Belum ada kampanye aktif','error'); return; }
+  toast(`Mengirim promo momen ke ${allLeads.length} leads...`);
+  // Trigger API followup
+  try {
+    await fetch('/api/followup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({tipe:'momen'}) });
+    toast('Promo momen dikirim!');
+  } catch(e) { toast('Gagal: '+e.message,'error'); }
+}
+
+/* ── Jadwal ── */
+function addJadwalRow() {
+  jadwalRows.push({ hari: jadwalRows.length + 1, promo: '' });
+  renderJadwal();
+}
+function removeJadwalRow(idx) {
+  jadwalRows.splice(idx, 1);
+  renderJadwal();
+}
+function renderJadwal() {
+  const el = document.getElementById('jadwal-rows');
+  el.innerHTML = jadwalRows.map((j, i) => `
+    <div class="sched-row">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:12px;color:var(--text-2)">H+</span>
+        <input type="number" value="${j.hari}" min="1" oninput="jadwalRows[${i}].hari=+this.value;updateJadwalPreview()"
+          style="width:50px;padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
+      </div>
+      <input type="text" value="${j.promo}" placeholder="Deskripsi promo / pesan..."
+        oninput="jadwalRows[${i}].promo=this.value;updateJadwalPreview()"
+        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
+      <select oninput="jadwalRows[${i}].tipe_promo=this.value"
+        style="padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
+        <option value="info">Info saja</option>
+        <option value="gratis_ongkir">Gratis ongkir</option>
+        <option value="diskon">Diskon harga</option>
+      </select>
+      <button onclick="removeJadwalRow(${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;">✕</button>
+    </div>`).join('');
+  updateJadwalPreview();
+}
+function updateJadwalPreview() {
+  const el = document.getElementById('jadwal-preview');
+  el.innerHTML = jadwalRows.map(j =>
+    `<div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <span style="background:var(--primary-light);color:var(--primary-dark);padding:3px 10px;border-radius:20px;font-size:12px;white-space:nowrap;">H+${j.hari}</span>
+      <span>${j.promo || '-'}</span>
+    </div>`
+  ).join('');
+}
+async function saveJadwal() {
+  // Simpan ke localStorage untuk sekarang (bisa ke Supabase configs nanti)
+  localStorage.setItem('fu_jadwal', JSON.stringify(jadwalRows));
+  toast('Jadwal disimpan!');
+}
+
+/* ── Campaign ── */
+function renderCampaigns() {
+  const el = document.getElementById('campaign-list');
+  if (!allCampaigns.length) {
+    el.innerHTML = `<p style="color:var(--text-2);font-size:13px;">Belum ada kampanye. Tambah kampanye momen di atas.</p>`;
+    return;
+  }
+  el.innerHTML = allCampaigns.map(c => `
+    <div class="campaign-card">
+      <div class="campaign-head">
+        <div>
+          <strong style="font-size:14px;">${c.nama}</strong>
+          <span style="margin-left:8px;font-size:12px;color:var(--text-2)">${formatCampTipe(c.tipe)}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="${c.aktif?'badge-aktif':'badge-nonaktif'}">${c.aktif?'Aktif':'Nonaktif'}</span>
+          <button class="btn btn-sm" onclick="toggleCampaign('${c.id}',${c.aktif})">${c.aktif?'Nonaktifkan':'Aktifkan'}</button>
+          <button class="btn btn-sm" style="color:var(--danger)" onclick="hapusCampaign('${c.id}')">🗑️</button>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text-2);">
+        Promo: <strong style="color:var(--text)">${c.promo?.deskripsi||'-'}</strong>
+      </div>
+    </div>`).join('');
+}
+function formatCampTipe(t) {
+  if(t==='payday') return '📅 Payday (akhir bulan)';
+  if(t==='tanggal_kembar') return '🔢 Tanggal kembar';
+  if(t==='tgl_spesifik') return '📌 Tanggal spesifik';
+  return t;
+}
+function openAddCampaign() {
+  editCampId = null;
+  document.getElementById('camp-form-title').textContent = 'Kampanye Baru';
+  document.getElementById('c-nama').value='';
+  document.getElementById('c-tipe').value='payday';
+  document.getElementById('c-promo-tipe').value='diskon_persen';
+  document.getElementById('c-promo-nilai').value='';
+  document.getElementById('c-promo-desc').value='';
+  toggleCampRule();
+  document.getElementById('campaign-form').style.display='';
+}
+function closeCampaignForm() { document.getElementById('campaign-form').style.display='none'; }
+function toggleCampRule() {
+  const show = document.getElementById('c-tipe').value === 'tgl_spesifik';
+  document.getElementById('camp-rule-wrap').style.display = show ? '' : 'none';
+}
+async function saveCampaign() {
+  const nama = document.getElementById('c-nama').value.trim();
+  if (!nama) { toast('Nama kampanye wajib diisi','error'); return; }
+  const payload = {
+    user_id: userId,
+    nama,
+    tipe: document.getElementById('c-tipe').value,
+    rule: document.getElementById('c-tanggal').value ? { tanggal: document.getElementById('c-tanggal').value } : {},
+    promo: {
+      tipe: document.getElementById('c-promo-tipe').value,
+      nilai: document.getElementById('c-promo-nilai').value,
+      deskripsi: document.getElementById('c-promo-desc').value,
+    },
+    target: 'leads_pending',
+    aktif: true,
+  };
+  await sbPost('campaigns', payload);
+  toast('Kampanye disimpan!');
+  closeCampaignForm();
+  await loadCampaigns();
+}
+async function toggleCampaign(id, current) {
+  await sbPatch('campaigns', `?id=eq.${id}`, { aktif: !current });
+  await loadCampaigns();
+}
+async function hapusCampaign(id) {
+  if(!confirm('Hapus kampanye ini?')) return;
+  await sbDelete('campaigns', `?id=eq.${id}`);
+  await loadCampaigns();
+}
+
+/* ── Monitor ── */
+function setMonitorFilter(f, btn) {
+  monitorFilter = f;
+  document.querySelectorAll('.s-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMonitor();
+}
+function renderMonitorStats() {
+  const pending = allFollowups.filter(f=>f.status==='pending').length;
+  const sent    = allFollowups.filter(f=>f.status==='sent').length;
+  const stop    = allFollowups.filter(f=>f.status==='stop').length;
+  document.getElementById('monitor-stats').innerHTML = `
+    <div class="stat-mini"><div class="num" style="color:var(--warning)">${pending}</div><div class="lbl">Terjadwal</div></div>
+    <div class="stat-mini"><div class="num" style="color:var(--success)">${sent}</div><div class="lbl">Terkirim</div></div>
+    <div class="stat-mini"><div class="num" style="color:var(--text-2)">${stop}</div><div class="lbl">Dihentikan</div></div>`;
+}
+function renderMonitor() {
+  let data = monitorFilter === 'semua' ? allFollowups : allFollowups.filter(f=>f.status===monitorFilter);
+  const tbody = document.getElementById('monitor-tbody');
+  const empty = document.getElementById('monitor-empty');
+  if (!data.length) { tbody.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+  const stMap = { pending:'🕐 Terjadwal', sent:'✅ Terkirim', stop:'🛑 Stop' };
+  tbody.innerHTML = data.map(f => {
+    const cust = f.conversations?.customers;
+    return `<tr>
+      <td>${cust?.nama||'?'}<br><small style="color:var(--text-2)">${cust?.wa_number||''}</small></td>
+      <td>${f.tipe==='personal'?'👤 Personal':'🎯 Momen'}</td>
+      <td>${f.tahap||'-'}</td>
+      <td>${dateStr(f.scheduled_at)}</td>
+      <td>${stMap[f.status]||f.status}</td>
+    </tr>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
