@@ -617,14 +617,17 @@ module.exports = async function handler(req, res) {
     // ── Transcribe voice note jika ada (Groq Whisper) ─────────
     if (messageType === 'audio' && mediaUrl) {
       const transkripsi = await transcribeAudio(mediaUrl);
-      if (transkripsi) {
+      // Cek apakah hasil transkripsi bermakna (bukan noise)
+      const isNoise = !transkripsi || transkripsi.trim().length < 3
+        || /^[^a-zA-Z0-9\u00C0-\u024F\u4E00-\u9FFF\u0600-\u06FF]*$/.test(transkripsi)
+        || (transkripsi.match(/(.)\1{2,}/g) || []).length > 3; // banyak huruf berulang = noise
+
+      if (transkripsi && !isNoise) {
         console.log(`VN transcribed: ${transkripsi.slice(0, 80)}`);
-        // Ganti message dengan hasil transkripsi
-        Object.assign(body, { message: `[Voice Note] ${transkripsi}` });
-        // Update variable message
-        message = `[Voice Note] ${transkripsi}`;
+        message = `[SISTEM: Customer kirim voice note, isi: "${transkripsi}". Balas sesuai isi voice note tersebut, jangan bilang tidak bisa dengar VN.]`;
       } else {
-        message = '[Voice Note — tidak bisa ditranskrip]';
+        console.log(`VN noise/gagal: ${transkripsi}`);
+        message = `[SISTEM: Customer kirim voice note tapi isinya tidak jelas/noise. Minta customer kirim ulang VN-nya atau ketik pesannya.]`;
       }
     }
 
