@@ -293,6 +293,7 @@ async function callClaude(systemPrompt, messages) {
     }),
   });
   const data = await res.json();
+  console.log(`Claude API: status=${res.status} stop_reason=${data.stop_reason} error=${JSON.stringify(data.error)} content_len=${data.content?.length} text_len=${data.content?.[0]?.text?.length}`);
   if (data.error) throw new Error(`Claude: ${data.error.message}`);
   return data.content?.[0]?.text || '';
 }
