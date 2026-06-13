@@ -589,8 +589,50 @@ module.exports = async function handler(req, res) {
       await sbPatch('conversations', `?id=eq.${conversation.id}`, { product_id: product.id });
     }
 
+    // ── Analisa gambar jika ada (Claude Vision) ────────────────
+    let imageAnalysis = null;
+    if (messageType === 'image' && mediaUrl && mediaUrl.startsWith('data:image')) {
+      try {
+        const visionRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 300,
+            messages: [{
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: { type: 'base64', media_type: 'image/jpeg', data: mediaUrl.replace('data:image/jpeg;base64,', '') },
+                },
+                {
+                  type: 'text',
+                  text: 'Analisa gambar ini. Apakah ini bukti transfer/pembayaran bank yang valid? Jawab dalam format JSON: {"is_bukti_tf": true/false, "keterangan": "penjelasan singkat", "bank": "nama bank jika ada", "nominal": "nominal jika terbaca", "tanggal": "tanggal jika ada"}',
+                },
+              ],
+            }],
+          }),
+        });
+        const visionData = await visionRes.json();
+        const raw = visionData.content?.[0]?.text || '';
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) imageAnalysis = JSON.parse(jsonMatch[0]);
+        console.log('Image analysis:', JSON.stringify(imageAnalysis));
+      } catch(e) {
+        console.error('Vision error:', e.message);
+      }
+    }
+
     // ── Simpan pesan masuk ─────────────────────────────────────
-    await saveMessage(conversation.id, 'customer', message || `[${messageType}]`);
+    const msgText = message || (imageAnalysis
+      ? `[Gambar terkirim — ${imageAnalysis.is_bukti_tf ? `Bukti TF ${imageAnalysis.bank || ''} ${imageAnalysis.nominal || ''}`.trim() : 'Bukan bukti transfer'}]`
+      : `[${messageType}]`);
+    await saveMessage(conversation.id, 'customer', msgText);
 
     // ── Cek apakah sudah eskalasi → AI diam, CS manusia yang balas ──
     if (conversation.status === 'eskalasi') {
@@ -606,6 +648,14 @@ module.exports = async function handler(req, res) {
 
     // ── Ambil 10 pesan terakhir ────────────────────────────────
     const history = await getContextMessages(conversation.id);
+
+    // ── Inject hasil analisa gambar ke history ─────────────────
+    if (imageAnalysis) {
+      const notif = imageAnalysis.is_bukti_tf
+        ? `[SISTEM] Customer baru kirim bukti transfer. Hasil verifikasi: VALID ✅ | Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'} | Tanggal: ${imageAnalysis.tanggal || '?'}. Balas dengan konfirmasi penerimaan bukti TF dan info selanjutnya (misal kapan dikirim).`
+        : `[SISTEM] Customer baru kirim gambar tapi BUKAN bukti transfer. Keterangan: ${imageAnalysis.keterangan}. Minta dengan sopan untuk kirim bukti transfer yang benar.`;
+      history.push({ role: 'user', content: notif });
+    }
 
     // ── WEBHOOK-LEVEL: Auto-trigger ongkir jika customer konfirmasi wilayah ──
     // Cek apakah AI sebelumnya sedang tanya konfirmasi wilayah ("Sumba NTT ya kak?")
