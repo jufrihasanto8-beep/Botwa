@@ -807,9 +807,9 @@ Kakak enaknya COD atau transfer? 🙏`;
       });
     }
 
-    // ── Update state jika order confirmed → tandai di state, CS tutup manual ──
+    // ── Update state jika order confirmed → auto closing ─────
     if (orderConfirmed) {
-      await updateConvState(conversation.id, { order_confirmed: true });
+      await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
     }
 
     // ── Simpan & kirim balasan ─────────────────────────────────
