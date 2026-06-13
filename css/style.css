@@ -182,6 +182,15 @@ tr:hover td { background: #fafbfc; }
 
 .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
+/* ── Filter tabs ── */
+.s-tab {
+  padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+  border: 1.5px solid var(--border); background: var(--white); color: var(--text-2);
+  cursor: pointer; transition: all .15s;
+}
+.s-tab:hover { border-color: var(--primary); color: var(--primary); }
+.s-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
 /* ════════════════════════════════════════
    SIDEBAR — 220px, icon + label
 ════════════════════════════════════════ */
