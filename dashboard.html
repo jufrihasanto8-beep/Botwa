@@ -945,8 +945,9 @@ async function renderChat() {
   document.getElementById('ae-num').textContent  = activeCustomer?.wa_number ? '+'+activeCustomer.wa_number : '—';
 
   const msgs = await sbGet('conv_messages',
-    `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=100`);
+    `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=200`);
   lastMsgCount = msgs.length;
+  lastMsgTimestamp = msgs.length ? msgs[msgs.length - 1].created_at : null;
 
   area.innerHTML = '<div class="day-divider">Hari ini</div>';
   msgs.forEach(m => appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, false, m.created_at, m.role));
