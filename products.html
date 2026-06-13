@@ -3,10 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Produk · Adsy CS</title>
+<title>Katalog & SOP · Adsy CS</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
-/* ── Sidebar override ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:#0d1117;color:#e2e8f0;font-size:13px}
+
+/* ── Sidebar ── */
 .app-layout{padding-left:0!important;display:flex!important;height:100vh!important;overflow:hidden!important}
 #sidebar{position:relative!important;left:auto!important;top:auto!important;z-index:auto!important;width:220px!important;min-width:220px!important;background:#1e293b!important;height:100vh!important;display:flex!important;flex-direction:column!important;flex-shrink:0!important;overflow:hidden!important;border-right:1px solid rgba(255,255,255,.07)!important}
 .sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
@@ -23,40 +26,107 @@
 .sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
 .sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
-/* ── Page styles ── */
-.prod-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; padding:24px; }
-.prod-card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; transition:box-shadow .15s; }
-.prod-card:hover { box-shadow:var(--shadow-md); }
-.prod-card-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
-.prod-nama { font-weight:600; font-size:15px; }
-.prod-harga { font-weight:700; color:var(--primary); font-size:15px; }
-.prod-body { padding:16px; }
-.prod-tag { display:inline-block; background:var(--primary-light); color:var(--primary-dark); font-size:11px; padding:2px 8px; border-radius:20px; margin:2px; }
-.prod-meta { font-size:12px; color:var(--text-2); margin-bottom:8px; }
-.prod-meta span { font-weight:500; color:var(--text); }
-.prod-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
-.badge-aktif   { background:#dcfce7; color:#166534; font-size:11px; padding:3px 8px; border-radius:20px; font-weight:500; }
-.badge-nonaktif{ background:#f3f4f6; color:#6b7280; font-size:11px; padding:3px 8px; border-radius:20px; font-weight:500; }
 
-/* Modal */
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center; padding:20px; }
-.modal-overlay.open { display:flex; }
-.modal-box { background:var(--white); border-radius:var(--radius-lg); width:100%; max-width:680px; max-height:90vh; overflow-y:auto; }
-.modal-head { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
-.modal-head h3 { font-size:16px; font-weight:600; }
-.modal-body { padding:24px; }
-.modal-foot { padding:16px 24px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
-.tab-row { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid var(--border); }
-.tab-btn { padding:8px 16px; font-size:13px; font-weight:500; color:var(--text-2); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; }
-.tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
-.tab-pane { display:none; }
-.tab-pane.active { display:block; }
-.tags-input { display:flex; flex-wrap:wrap; gap:6px; padding:8px; border:1.5px solid var(--border); border-radius:var(--radius); min-height:42px; cursor:text; }
-.tags-input input { border:none; outline:none; flex:1; min-width:120px; font-size:13px; padding:2px 4px; }
-.tag-item { background:var(--primary-light); color:var(--primary-dark); padding:3px 10px; border-radius:20px; font-size:12px; display:flex; align-items:center; gap:4px; }
-.tag-item .rm { cursor:pointer; opacity:.6; }
-.tag-item .rm:hover { opacity:1; }
-.promo-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+/* ── Layout ── */
+.main-content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.page-header{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.page-header h1{font-size:18px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+.page-header p{font-size:12px;color:#64748b;margin-top:2px}
+.kb-layout{display:flex;flex:1;overflow:hidden}
+.kb-nav{width:190px;background:#161b22;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;padding:10px 8px;gap:2px;flex-shrink:0}
+.kb-nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:all .12s;text-decoration:none;user-select:none}
+.kb-nav-item:hover{background:rgba(255,255,255,.05);color:#e2e8f0}
+.kb-nav-item.active{background:rgba(59,130,246,.12);color:#93c5fd}
+.kb-nav-item .ni{font-size:15px}
+.kb-content{flex:1;overflow-y:auto;background:#0d1117}
+.kb-content::-webkit-scrollbar{width:4px}
+.kb-content::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px}
+.kb-section{display:none;padding:24px}
+.kb-section.active{display:block}
+
+/* ── Produk ── */
+.section-action{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.section-title{font-size:16px;font-weight:700;color:#f1f5f9}
+.section-desc{font-size:12px;color:#64748b;margin-top:2px}
+.filter-tabs{display:flex;gap:6px;margin-bottom:16px}
+.s-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid rgba(255,255,255,.08);background:none;color:#64748b;cursor:pointer;transition:all .12s}
+.s-tab:hover{border-color:#3b82f6;color:#93c5fd}
+.s-tab.active{background:rgba(59,130,246,.12);color:#93c5fd;border-color:rgba(59,130,246,.3)}
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.prod-card{background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:10px;overflow:hidden;transition:border-color .15s}
+.prod-card:hover{border-color:rgba(59,130,246,.25)}
+.prod-card-header{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between}
+.prod-nama{font-weight:600;font-size:14px;color:#f1f5f9}
+.prod-harga{font-weight:700;color:#3b82f6;font-size:14px;margin-top:2px}
+.prod-body{padding:12px 16px}
+.prod-tag{display:inline-block;background:rgba(59,130,246,.12);color:#93c5fd;font-size:10px;padding:2px 8px;border-radius:20px;margin:2px}
+.prod-meta{font-size:11px;color:#64748b;margin-bottom:6px}
+.prod-meta span{font-weight:500;color:#94a3b8}
+.prod-footer{padding:10px 16px;border-top:1px solid rgba(255,255,255,.05);display:flex;gap:6px;justify-content:flex-end}
+.badge-aktif{background:rgba(34,197,94,.12);color:#86efac;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600}
+.badge-nonaktif{background:rgba(100,116,139,.12);color:#64748b;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600}
+
+/* ── SOP ── */
+.sop-list{display:flex;flex-direction:column;gap:8px}
+.sop-item{background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .15s}
+.sop-item:hover{border-color:rgba(59,130,246,.2)}
+.sop-num{width:26px;height:26px;border-radius:7px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.sop-body{flex:1;min-width:0}
+.sop-title-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.sop-title{font-weight:600;font-size:13px;color:#e2e8f0}
+.sop-cat{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
+.sop-content{font-size:12px;color:#94a3b8;line-height:1.6;white-space:pre-line}
+.sop-actions{display:flex;gap:4px;flex-shrink:0}
+.cat-h1{background:rgba(251,146,60,.15);color:#fdba74}
+.cat-h3{background:rgba(250,204,21,.15);color:#fde047}
+.cat-h7{background:rgba(34,197,94,.15);color:#86efac}
+.cat-tidak_respon{background:rgba(239,68,68,.15);color:#fca5a5}
+.cat-umum{background:rgba(99,102,241,.15);color:#a5b4fc}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn:hover{background:rgba(255,255,255,.07);color:#e2e8f0}
+.btn-sm{padding:4px 9px!important;font-size:11px!important}
+.btn-primary{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary:hover{box-shadow:0 4px 12px rgba(59,130,246,.35)}
+.btn-secondary{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-secondary:hover{background:rgba(255,255,255,.07);color:#e2e8f0}
+.btn-danger{display:inline-flex;align-items:center;padding:6px 10px;border-radius:7px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;font-size:12px;cursor:pointer;transition:all .15s}
+.btn-danger:hover{background:rgba(239,68,68,.18)}
+
+/* ── Forms ── */
+.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.form-group label{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px}
+.form-group input,.form-group textarea,.form-group select{background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 12px;font-size:13px;color:#e2e8f0;font-family:inherit;outline:none;transition:border-color .15s;resize:vertical}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{border-color:rgba(59,130,246,.4)}
+.form-group input::placeholder,.form-group textarea::placeholder{color:#374151}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── Modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal-box{background:#1e293b;border:1px solid rgba(255,255,255,.08);border-radius:12px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.5)}
+.modal-box-sm{max-width:480px}
+.modal-head{padding:18px 22px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between}
+.modal-head h3{font-size:15px;font-weight:700;color:#f1f5f9}
+.modal-body{padding:22px}
+.modal-foot{padding:14px 22px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:flex-end;gap:8px}
+.tab-row{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.tab-btn{padding:8px 14px;font-size:12px;font-weight:500;color:#64748b;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .12s}
+.tab-btn.active{color:#93c5fd;border-bottom-color:#3b82f6}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+.tags-input{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid rgba(255,255,255,.08);border-radius:8px;min-height:42px;cursor:text;background:#0d1117;transition:border-color .15s}
+.tags-input:focus-within{border-color:rgba(59,130,246,.4)}
+.tags-input input{border:none;outline:none;flex:1;min-width:120px;font-size:13px;padding:2px 4px;background:none;color:#e2e8f0}
+.tags-input input::placeholder{color:#374151}
+.tag-item{background:rgba(59,130,246,.15);color:#93c5fd;padding:3px 10px;border-radius:20px;font-size:12px;display:flex;align-items:center;gap:4px}
+.tag-item .rm{cursor:pointer;opacity:.6}
+.tag-item .rm:hover{opacity:1}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#toast.show{opacity:1}
 </style>
 </head>
 <body>
@@ -73,8 +143,7 @@
     <a class="sb-item" href="analytics.html"><span class="si">📊</span> Ringkasan</a>
     <a class="sb-item" href="dashboard.html"><span class="si">💬</span> Percakapan</a>
     <a class="sb-item" href="orders.html"><span class="si">✅</span> Closing</a>
-    <a class="sb-item" href="knowledge.html"><span class="si">📋</span> Katalog & SOP</a>
-    <a class="sb-item active" href="products.html"><span class="si">🎁</span> Skema Promo</a>
+    <a class="sb-item active" href="products.html"><span class="si">📋</span> Katalog & SOP</a>
     <div class="sb-divider"></div>
     <div class="sb-section">Akun</div>
     <a class="sb-item" href="settings.html"><span class="si">⚙️</span> Pengaturan</a>
@@ -89,29 +158,79 @@
   </div>
 </div>
 
-  <div class="main-content">
-    <div class="page-header">
-      <div>
-        <h1>🏷️ Produk</h1>
-        <p>Kelola produk, template AI, dan mapping iklan CTWA</p>
-      </div>
-      <button class="btn btn-primary" onclick="openAdd()">+ Tambah Produk</button>
-    </div>
-
-    <!-- Filter -->
-    <div style="padding:0 24px;display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-      <button class="s-tab active" onclick="setFilter('semua',this)">Semua</button>
-      <button class="s-tab" onclick="setFilter('aktif',this)">Aktif</button>
-      <button class="s-tab" onclick="setFilter('nonaktif',this)">Nonaktif</button>
-    </div>
-
-    <div class="prod-grid" id="prod-grid">
-      <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-2);">Memuat produk...</div>
+<div class="main-content">
+  <div class="page-header">
+    <div>
+      <h1>📋 Katalog & SOP</h1>
+      <p>Kelola produk dan SOP follow up customer</p>
     </div>
   </div>
-</div>
 
-<!-- Modal Tambah/Edit Produk -->
+  <div class="kb-layout">
+    <!-- Left Nav -->
+    <div class="kb-nav">
+      <div class="kb-nav-item active" id="nav-produk" onclick="showSection('produk',this)">
+        <span class="ni">📦</span> Katalog Produk
+      </div>
+      <div class="kb-nav-item" id="nav-sop" onclick="showSection('sop',this)">
+        <span class="ni">📋</span> SOP Follow Up
+      </div>
+    </div>
+
+    <div class="kb-content">
+
+      <!-- ── Section: Katalog Produk ── -->
+      <div class="kb-section active" id="sec-produk">
+        <div class="section-action">
+          <div>
+            <div class="section-title">Katalog Produk</div>
+            <div class="section-desc">Produk yang dijual beserta konfigurasi AI</div>
+          </div>
+          <button class="btn-primary" onclick="openAdd()">+ Tambah Produk</button>
+        </div>
+
+        <div class="filter-tabs">
+          <button class="s-tab active" onclick="setFilter('semua',this)">Semua</button>
+          <button class="s-tab" onclick="setFilter('aktif',this)">Aktif</button>
+          <button class="s-tab" onclick="setFilter('nonaktif',this)">Nonaktif</button>
+        </div>
+
+        <div class="prod-grid" id="prod-grid">
+          <div style="grid-column:1/-1;text-align:center;padding:60px;color:#64748b;">Memuat produk...</div>
+        </div>
+      </div>
+
+      <!-- ── Section: SOP Follow Up ── -->
+      <div class="kb-section" id="sec-sop">
+        <div class="section-action">
+          <div>
+            <div class="section-title">SOP Follow Up</div>
+            <div class="section-desc">Panduan follow up customer berdasarkan waktu & kondisi</div>
+          </div>
+          <button class="btn-primary" onclick="openSOPModal()">+ Tambah SOP</button>
+        </div>
+
+        <div class="filter-tabs" id="sop-filter-tabs">
+          <button class="s-tab active" onclick="setSOPFilter('semua',this)">Semua</button>
+          <button class="s-tab" onclick="setSOPFilter('h1',this)">H+1</button>
+          <button class="s-tab" onclick="setSOPFilter('h3',this)">H+3</button>
+          <button class="s-tab" onclick="setSOPFilter('h7',this)">H+7</button>
+          <button class="s-tab" onclick="setSOPFilter('tidak_respon',this)">Tidak Respon</button>
+          <button class="s-tab" onclick="setSOPFilter('umum',this)">Umum</button>
+        </div>
+
+        <div class="sop-list" id="sop-list">
+          <div style="text-align:center;padding:60px;color:#64748b;">Memuat SOP...</div>
+        </div>
+      </div>
+
+    </div><!-- kb-content -->
+  </div><!-- kb-layout -->
+</div><!-- main-content -->
+
+</div><!-- app-layout -->
+
+<!-- ── Modal Tambah/Edit Produk ── -->
 <div class="modal-overlay" id="prod-modal">
   <div class="modal-box">
     <div class="modal-head">
@@ -158,13 +277,13 @@
       <!-- Tab: AI & Konsultasi -->
       <div class="tab-pane" id="tab-ai">
         <div class="form-group">
-          <label>Keluhan yang Cocok <small style="color:var(--text-2)">(tekan Enter untuk tambah)</small></label>
+          <label>Keluhan yang Cocok <small style="color:#64748b">(tekan Enter untuk tambah)</small></label>
           <div class="tags-input" id="tags-keluhan" onclick="this.querySelector('input').focus()">
             <input type="text" placeholder="contoh: sinusitis..." onkeydown="addTag(event,'keluhan')">
           </div>
         </div>
         <div class="form-group">
-          <label>Pertanyaan Diagnosa <small style="color:var(--text-2)">(tekan Enter untuk tambah)</small></label>
+          <label>Pertanyaan Diagnosa <small style="color:#64748b">(tekan Enter untuk tambah)</small></label>
           <div class="tags-input" id="tags-diagnosa" onclick="this.querySelector('input').focus()">
             <input type="text" placeholder="contoh: Sudah berapa lama?" onkeydown="addTag(event,'diagnosa')">
           </div>
@@ -196,14 +315,14 @@
           <label>Nilai Promo (Rp)</label>
           <input type="number" id="f-promo-nilai" placeholder="10000">
         </div>
-        <div style="background:var(--bg);padding:16px;border-radius:var(--radius);font-size:13px;color:var(--text-2);margin-top:8px;">
-          <strong>Preview:</strong> <span id="promo-preview">Tidak ada promo ongkir</span>
+        <div style="background:#0d1117;padding:16px;border-radius:8px;font-size:13px;color:#64748b;margin-top:8px;">
+          <strong style="color:#94a3b8">Preview:</strong> <span id="promo-preview">Tidak ada promo ongkir</span>
         </div>
       </div>
 
       <!-- Tab: CTWA Mapping -->
       <div class="tab-pane" id="tab-mapping">
-        <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;">
+        <p style="font-size:13px;color:#64748b;margin-bottom:16px;">
           Hubungkan iklan CTWA (Click to WhatsApp) ke produk ini. Saat customer klik iklan, AI langsung tahu produk mana yang ditanyakan.
         </p>
         <div id="mapping-list"></div>
@@ -212,8 +331,42 @@
 
     </div>
     <div class="modal-foot">
-      <button class="btn" onclick="closeModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveProduk()">Simpan Produk</button>
+      <button class="btn-secondary" onclick="closeModal()">Batal</button>
+      <button class="btn-primary" onclick="saveProduk()">Simpan Produk</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal Tambah/Edit SOP ── -->
+<div class="modal-overlay" id="sop-modal">
+  <div class="modal-box modal-box-sm">
+    <div class="modal-head">
+      <h3 id="sop-modal-title">Tambah SOP</h3>
+      <button class="btn btn-sm" onclick="closeSOPModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Judul SOP *</label>
+        <input type="text" id="sop-f-title" placeholder="contoh: Follow up order belum tiba H+3">
+      </div>
+      <div class="form-group">
+        <label>Kategori</label>
+        <select id="sop-f-cat">
+          <option value="h1">Follow Up H+1</option>
+          <option value="h3">Follow Up H+3</option>
+          <option value="h7">Follow Up H+7</option>
+          <option value="tidak_respon">Tidak Respon</option>
+          <option value="umum">Umum</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Isi / Skrip SOP *</label>
+        <textarea id="sop-f-content" rows="7" placeholder="Tulis skrip follow up di sini...&#10;&#10;Contoh:&#10;Halo kak [nama], gimana kabarnya? Mau tanya nih, orderannya sudah sampai belum? 😊"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeSOPModal()">Batal</button>
+      <button class="btn-primary" onclick="saveSOP()">Simpan SOP</button>
     </div>
   </div>
 </div>
@@ -229,6 +382,10 @@ let allProducts = [];
 let filterState = 'semua';
 let tagsData = { keluhan: [], diagnosa: [] };
 let mappingRows = [];
+
+let allSOPs = [];
+let sopFilter = 'semua';
+let sopEditId = null;
 
 const sbH = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
 
@@ -262,14 +419,32 @@ function toast(msg, type='success') {
 
 function rp(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
 
+/* ── Section switching ── */
+function showSection(name, el) {
+  document.querySelectorAll('.kb-nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.kb-section').forEach(s => s.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('sec-' + name)?.classList.add('active');
+}
+
 Auth.guard();
-(function(){const u=Auth.getUser();if(u){document.getElementById('sb-av').textContent=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();document.getElementById('sb-name').textContent=u.name||'Admin';document.getElementById('sb-store').textContent=u.store||'Adsy CS';}})();
+(function(){
+  const u = Auth.getUser();
+  if (u) {
+    document.getElementById('sb-av').textContent = (u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    document.getElementById('sb-name').textContent = u.name || 'Admin';
+    document.getElementById('sb-store').textContent = u.store || 'Adsy CS';
+  }
+})();
 
 async function init() {
   currentUserId = Auth.getUser()?.id;
-  await loadProducts();
+  await Promise.all([loadProducts(), loadSOPs()]);
 }
 
+/* ══════════════════════════════════════
+   KATALOG PRODUK
+══════════════════════════════════════ */
 async function loadProducts() {
   allProducts = await sbGet('products', `?user_id=eq.${currentUserId}&order=created_at.desc`);
   renderGrid();
@@ -277,7 +452,7 @@ async function loadProducts() {
 
 function setFilter(f, btn) {
   filterState = f;
-  document.querySelectorAll('.s-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#sec-produk .s-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderGrid();
 }
@@ -289,8 +464,8 @@ function renderGrid() {
 
   const grid = document.getElementById('prod-grid');
   if (!data.length) {
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-2);">
-      Belum ada produk. <a href="#" onclick="openAdd()">Tambah sekarang</a>
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:#64748b;">
+      Belum ada produk. <a href="#" onclick="openAdd()" style="color:#93c5fd">Tambah sekarang</a>
     </div>`;
     return;
   }
@@ -315,7 +490,7 @@ function renderGrid() {
       <div class="prod-footer">
         <button class="btn btn-sm" onclick="toggleAktif('${p.id}',${p.aktif})">${p.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>
         <button class="btn btn-sm" onclick="openEdit('${p.id}')">✏️ Edit</button>
-        <button class="btn btn-sm" style="color:var(--danger)" onclick="hapusProduk('${p.id}')">🗑️</button>
+        <button class="btn-danger btn-sm" onclick="hapusProduk('${p.id}')">🗑️</button>
       </div>
     </div>`;
   }).join('');
@@ -329,7 +504,7 @@ function formatPromo(promo) {
   return '-';
 }
 
-/* ── Modal ── */
+/* ── Modal Produk ── */
 function openAdd() {
   editId = null;
   tagsData = { keluhan: [], diagnosa: [] };
@@ -368,11 +543,8 @@ async function openEdit(id) {
   const promo = p.promo_ongkir || {};
   document.getElementById('f-promo-tipe').value = promo.tipe || 'none';
   document.getElementById('f-promo-nilai').value = promo.nilai || '';
-
-  // Load mappings
   const maps = await sbGet('ad_mapping', `?product_id=eq.${id}`);
   mappingRows = maps.map(m => ({ id: m.id, sumber: m.sumber, identifier: m.identifier }));
-
   renderTags('keluhan'); renderTags('diagnosa');
   renderMappingList();
   togglePromoNilai();
@@ -438,23 +610,24 @@ function removeMappingRow(idx) {
 function renderMappingList() {
   const el = document.getElementById('mapping-list');
   if (!mappingRows.length) {
-    el.innerHTML = `<p style="color:var(--text-2);font-size:13px;">Belum ada mapping.</p>`;
+    el.innerHTML = `<p style="color:#64748b;font-size:13px;">Belum ada mapping.</p>`;
     return;
   }
   el.innerHTML = mappingRows.map((m, i) => `
     <div style="display:grid;grid-template-columns:120px 1fr 32px;gap:8px;margin-bottom:8px;align-items:center;">
-      <select onchange="mappingRows[${i}].sumber=this.value" style="padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
+      <select onchange="mappingRows[${i}].sumber=this.value" style="padding:7px 8px;border:1px solid rgba(255,255,255,.08);background:#0d1117;color:#e2e8f0;border-radius:6px;font-size:13px;">
         <option value="ctwa" ${m.sumber==='ctwa'?'selected':''}>CTWA</option>
         <option value="form" ${m.sumber==='form'?'selected':''}>Form</option>
         <option value="inbound" ${m.sumber==='inbound'?'selected':''}>Keyword</option>
       </select>
       <input type="text" value="${m.identifier}" oninput="mappingRows[${i}].identifier=this.value"
-        placeholder="ad_id / headline / keyword..." style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
-      <button onclick="removeMappingRow(${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px;">✕</button>
+        placeholder="ad_id / headline / keyword..."
+        style="padding:7px 10px;border:1px solid rgba(255,255,255,.08);background:#0d1117;color:#e2e8f0;border-radius:6px;font-size:13px;outline:none;">
+      <button onclick="removeMappingRow(${i})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;">✕</button>
     </div>`).join('');
 }
 
-/* ── Save ── */
+/* ── Save Produk ── */
 async function saveProduk() {
   const nama = document.getElementById('f-nama').value.trim();
   const harga = parseInt(document.getElementById('f-harga').value);
@@ -485,12 +658,8 @@ async function saveProduk() {
       const rows = await sbPost('products', payload);
       productId = rows[0]?.id;
     }
-
-    // Simpan mapping
     if (productId) {
-      // Hapus mapping lama
       await sbDelete('ad_mapping', `?product_id=eq.${productId}`);
-      // Insert mapping baru
       for (const m of mappingRows) {
         if (m.identifier.trim()) {
           await sbPost('ad_mapping', {
@@ -502,7 +671,6 @@ async function saveProduk() {
         }
       }
     }
-
     toast(editId ? 'Produk diupdate!' : 'Produk ditambahkan!');
     closeModal();
     await loadProducts();
@@ -534,6 +702,125 @@ function switchTab(name, btn) {
 
 document.getElementById('f-promo-tipe').addEventListener('change', updatePromoPreview);
 document.getElementById('f-promo-nilai').addEventListener('input', updatePromoPreview);
+
+/* ══════════════════════════════════════
+   SOP FOLLOW UP
+══════════════════════════════════════ */
+const SOP_CAT_LABEL = {
+  h1: 'H+1', h3: 'H+3', h7: 'H+7', tidak_respon: 'Tidak Respon', umum: 'Umum'
+};
+const SOP_CAT_NUM_BG = {
+  h1: 'rgba(251,146,60,.2)', h3: 'rgba(250,204,21,.2)', h7: 'rgba(34,197,94,.2)',
+  tidak_respon: 'rgba(239,68,68,.2)', umum: 'rgba(99,102,241,.2)'
+};
+const SOP_CAT_NUM_COLOR = {
+  h1: '#fdba74', h3: '#fde047', h7: '#86efac', tidak_respon: '#fca5a5', umum: '#a5b4fc'
+};
+
+async function loadSOPs() {
+  allSOPs = await sbGet('sops', `?user_id=eq.${currentUserId}&order=created_at.asc`);
+  renderSOPs();
+}
+
+function setSOPFilter(f, btn) {
+  sopFilter = f;
+  document.querySelectorAll('#sop-filter-tabs .s-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSOPs();
+}
+
+function renderSOPs() {
+  let data = allSOPs;
+  if (sopFilter !== 'semua') data = data.filter(s => s.category === sopFilter);
+
+  const list = document.getElementById('sop-list');
+  if (!data.length) {
+    list.innerHTML = `<div style="text-align:center;padding:60px;color:#64748b;">
+      Belum ada SOP. <a href="#" onclick="openSOPModal()" style="color:#93c5fd">Tambah sekarang</a>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = data.map((s, i) => {
+    const cat = s.category || 'umum';
+    const numBg = SOP_CAT_NUM_BG[cat] || SOP_CAT_NUM_BG.umum;
+    const numColor = SOP_CAT_NUM_COLOR[cat] || SOP_CAT_NUM_COLOR.umum;
+    return `<div class="sop-item">
+      <div class="sop-num" style="background:${numBg};color:${numColor}">${i+1}</div>
+      <div class="sop-body">
+        <div class="sop-title-row">
+          <span class="sop-title">${s.title}</span>
+          <span class="sop-cat cat-${cat}">${SOP_CAT_LABEL[cat] || cat}</span>
+        </div>
+        <div class="sop-content">${s.content}</div>
+      </div>
+      <div class="sop-actions">
+        <button class="btn btn-sm" onclick="editSOP('${s.id}')">✏️</button>
+        <button class="btn-danger btn-sm" onclick="deleteSOP('${s.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openSOPModal(id) {
+  sopEditId = id || null;
+  document.getElementById('sop-modal-title').textContent = id ? 'Edit SOP' : 'Tambah SOP';
+  if (!id) {
+    document.getElementById('sop-f-title').value = '';
+    document.getElementById('sop-f-cat').value = 'h1';
+    document.getElementById('sop-f-content').value = '';
+  }
+  document.getElementById('sop-modal').classList.add('open');
+}
+
+function editSOP(id) {
+  const s = allSOPs.find(x => x.id === id);
+  if (!s) return;
+  sopEditId = id;
+  document.getElementById('sop-modal-title').textContent = 'Edit SOP';
+  document.getElementById('sop-f-title').value = s.title || '';
+  document.getElementById('sop-f-cat').value = s.category || 'umum';
+  document.getElementById('sop-f-content').value = s.content || '';
+  document.getElementById('sop-modal').classList.add('open');
+}
+
+function closeSOPModal() {
+  document.getElementById('sop-modal').classList.remove('open');
+}
+
+async function saveSOP() {
+  const title = document.getElementById('sop-f-title').value.trim();
+  const content = document.getElementById('sop-f-content').value.trim();
+  if (!title || !content) { toast('Judul dan isi SOP wajib diisi', 'error'); return; }
+
+  const payload = {
+    user_id: currentUserId,
+    title,
+    content,
+    category: document.getElementById('sop-f-cat').value,
+  };
+
+  try {
+    if (sopEditId) {
+      await sbPatch('sops', `?id=eq.${sopEditId}`, payload);
+      toast('SOP diupdate!');
+    } else {
+      await sbPost('sops', payload);
+      toast('SOP ditambahkan!');
+    }
+    closeSOPModal();
+    await loadSOPs();
+  } catch (e) {
+    toast('Gagal simpan: ' + e.message, 'error');
+  }
+}
+
+async function deleteSOP(id) {
+  if (!confirm('Hapus SOP ini?')) return;
+  await sbDelete('sops', `?id=eq.${id}`);
+  toast('SOP dihapus');
+  await loadSOPs();
+}
 
 init();
 </script>
