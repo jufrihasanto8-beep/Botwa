@@ -384,6 +384,12 @@ module.exports = async function handler(req, res) {
     // ── Simpan pesan masuk ─────────────────────────────────────
     await saveMessage(conversation.id, 'customer', message || `[${messageType}]`);
 
+    // ── Cek apakah sudah eskalasi → AI diam, CS manusia yang balas ──
+    if (conversation.status === 'eskalasi') {
+      console.log(`Conversation ${conversation.id} status eskalasi — AI skip, tunggu CS manusia`);
+      return res.status(200).json({ ok: true, skipped: 'eskalasi' });
+    }
+
     // ── Build system prompt ────────────────────────────────────
     const systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber);
 
