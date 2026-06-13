@@ -190,6 +190,7 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
     <div class="settings-nav">
       <a href="#" class="active" onclick="showSection('account',this)">👤 Akun</a>
       <a href="#" onclick="showSection('wa',this)">📱 Connect WhatsApp</a>
+      <a href="#" onclick="showSection('rekening',this)">💳 Rekening Transfer</a>
       <a href="#" onclick="showSection('kurir',this)">🚚 Ekspedisi</a>
     </div>
 
@@ -250,6 +251,23 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
       </div>
 
       <!-- ── EKSPEDISI WHITELIST ── -->
+      <!-- ── REKENING TRANSFER ── -->
+      <div class="settings-section" id="sec-rekening">
+        <div class="section-title">Rekening Transfer</div>
+        <div class="section-desc">Info rekening yang akan dikirim otomatis ke customer saat mereka pilih bayar lewat Transfer Bank.</div>
+        <div class="form-group">
+          <label>Info Rekening</label>
+          <textarea id="rek-info" rows="5" placeholder="Contoh:
+BCA 1234567890 a.n. Budi Santoso
+BRI 0987654321 a.n. Budi Santoso
+
+Bisa isi lebih dari satu rekening."></textarea>
+        </div>
+        <div class="save-bar">
+          <button class="btn-primary" onclick="saveRekening()">Simpan Rekening</button>
+        </div>
+      </div>
+
       <div class="settings-section" id="sec-kurir">
         <div class="section-title">Ekspedisi yang Dipakai</div>
         <div class="section-desc">Pilih ekspedisi mana yang boleh dipakai saat sistem memilih kurir otomatis. Ekspedisi yang dimatikan tidak akan dipilih meski tersedia di Mengantar API.</div>
@@ -491,7 +509,32 @@ window.showSection = function(name, el) {
   origShowSection(name, el);
   if (name === 'wa') loadWAStatus();
   if (name === 'kurir') loadKurir();
+  if (name === 'rekening') loadRekening();
 };
+
+/* ── REKENING TRANSFER ── */
+async function loadRekening() {
+  const userId = Auth.getUser()?.id;
+  const { data, error } = await supabase
+    .from('users')
+    .select('rekening')
+    .eq('id', userId)
+    .single();
+  if (!error && data?.rekening) {
+    document.getElementById('rek-info').value = data.rekening;
+  }
+}
+
+async function saveRekening() {
+  const userId = Auth.getUser()?.id;
+  const rekening = document.getElementById('rek-info').value.trim();
+  const { error } = await supabase
+    .from('users')
+    .update({ rekening })
+    .eq('id', userId);
+  if (error) { toast('❌ Gagal simpan: ' + error.message); return; }
+  toast('✅ Info rekening disimpan');
+}
 
 /* ── EKSPEDISI WHITELIST ── */
 const KURIR_DEFAULT = ['JNE','J&T Express','SiCepat','Anteraja','ID Express','Ninja Xpress','Lion Parcel','SAP Express'];
