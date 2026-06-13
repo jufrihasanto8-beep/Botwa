@@ -357,28 +357,13 @@ body.light .fu-msg-lbl{color:#94a3b8}
               <div class="fu-dot h1" style="margin-top:4px"></div>
               <div class="fu-stage-info">
                 <div class="fu-stage-label">H+1 — Besok</div>
-                <div class="fu-stage-desc">Pesan manual dikirim keesokan harinya jika tidak ada balasan.</div>
+                <div class="fu-stage-desc">Kirim SOP H+1 keesokan harinya jika tidak ada balasan. Isi pesan & foto diatur lewat tombol <strong>+ Tambah SOP</strong> di bawah.</div>
                 <div class="fu-fields">
                   <div class="fu-field">
                     <label>Kirim setelah</label>
                     <input type="number" id="fu-h1-delay" value="24" min="12" max="48">
                     <div class="unit">jam tidak balas</div>
                   </div>
-                </div>
-                <div class="fu-msg-area">
-                  <div class="fu-msg-lbl">Pesan Follow Up H+1</div>
-                  <textarea id="fu-h1-msg" placeholder="Halo kak, kemarin sempat tanya soal... Ada yang bisa aku bantu lagi? 😊"></textarea>
-                  <div class="fu-photo-row">
-                    <input type="file" id="fu-h1-file" accept="image/*" style="display:none" onchange="handlePhotoUpload('h1',this)">
-                    <div id="fu-h1-photo" class="fu-photo-empty" onclick="document.getElementById('fu-h1-file').click()" title="Klik untuk upload foto">📷</div>
-                    <div>
-                      <div style="font-size:12px;color:#e2e8f0;font-weight:500" id="fu-h1-photo-name">Belum ada foto</div>
-                      <div style="font-size:11px;color:#64748b;margin-top:2px">Foto dikirim bersamaan dengan pesan</div>
-                      <button class="btn btn-sm" style="margin-top:6px" onclick="document.getElementById('fu-h1-file').click()">📷 Upload Foto</button>
-                      <button class="btn btn-sm" id="fu-h1-remove" style="display:none;margin-top:6px" onclick="removePhoto('h1')">✕ Hapus</button>
-                    </div>
-                  </div>
-                  <input type="hidden" id="fu-h1-img-url">
                 </div>
               </div>
               <div class="fu-toggle">
@@ -392,28 +377,13 @@ body.light .fu-msg-lbl{color:#94a3b8}
               <div class="fu-dot h3" style="margin-top:4px"></div>
               <div class="fu-stage-info">
                 <div class="fu-stage-label">H+3 — 3 Hari Kemudian</div>
-                <div class="fu-stage-desc">Pesan manual dikirim jika setelah H+1 masih tidak ada balasan.</div>
+                <div class="fu-stage-desc">Kirim SOP H+3 jika setelah H+1 masih tidak ada balasan. Isi pesan & foto diatur lewat tombol <strong>+ Tambah SOP</strong> di bawah.</div>
                 <div class="fu-fields">
                   <div class="fu-field">
                     <label>Kirim setelah</label>
                     <input type="number" id="fu-h3-delay" value="72" min="24" max="120">
                     <div class="unit">jam sejak H+1</div>
                   </div>
-                </div>
-                <div class="fu-msg-area">
-                  <div class="fu-msg-lbl">Pesan Follow Up H+3</div>
-                  <textarea id="fu-h3-msg" placeholder="Halo kak, mau share info menarik nih... 🌿"></textarea>
-                  <div class="fu-photo-row">
-                    <input type="file" id="fu-h3-file" accept="image/*" style="display:none" onchange="handlePhotoUpload('h3',this)">
-                    <div id="fu-h3-photo" class="fu-photo-empty" onclick="document.getElementById('fu-h3-file').click()" title="Klik untuk upload foto">📷</div>
-                    <div>
-                      <div style="font-size:12px;color:#e2e8f0;font-weight:500" id="fu-h3-photo-name">Belum ada foto</div>
-                      <div style="font-size:11px;color:#64748b;margin-top:2px">Foto dikirim bersamaan dengan pesan</div>
-                      <button class="btn btn-sm" style="margin-top:6px" onclick="document.getElementById('fu-h3-file').click()">📷 Upload Foto</button>
-                      <button class="btn btn-sm" id="fu-h3-remove" style="display:none;margin-top:6px" onclick="removePhoto('h3')">✕ Hapus</button>
-                    </div>
-                  </div>
-                  <input type="hidden" id="fu-h3-img-url">
                 </div>
               </div>
               <div class="fu-toggle">
@@ -427,28 +397,13 @@ body.light .fu-msg-lbl{color:#94a3b8}
               <div class="fu-dot h7" style="margin-top:4px"></div>
               <div class="fu-stage-info">
                 <div class="fu-stage-label">H+7 — 7 Hari Kemudian</div>
-                <div class="fu-stage-desc">Follow up terakhir. Dikirim jika setelah H+3 masih tidak ada balasan.</div>
+                <div class="fu-stage-desc">Follow up terakhir. Isi pesan & foto diatur lewat tombol <strong>+ Tambah SOP</strong> di bawah.</div>
                 <div class="fu-fields">
                   <div class="fu-field">
                     <label>Kirim setelah</label>
                     <input type="number" id="fu-h7-delay" value="168" min="72" max="240">
                     <div class="unit">jam sejak H+3</div>
                   </div>
-                </div>
-                <div class="fu-msg-area">
-                  <div class="fu-msg-lbl">Pesan Follow Up H+7</div>
-                  <textarea id="fu-h7-msg" placeholder="Halo kak, maaf ganggu ya. Aku mau info terakhir soal... 🙏"></textarea>
-                  <div class="fu-photo-row">
-                    <input type="file" id="fu-h7-file" accept="image/*" style="display:none" onchange="handlePhotoUpload('h7',this)">
-                    <div id="fu-h7-photo" class="fu-photo-empty" onclick="document.getElementById('fu-h7-file').click()" title="Klik untuk upload foto">📷</div>
-                    <div>
-                      <div style="font-size:12px;color:#e2e8f0;font-weight:500" id="fu-h7-photo-name">Belum ada foto</div>
-                      <div style="font-size:11px;color:#64748b;margin-top:2px">Foto dikirim bersamaan dengan pesan</div>
-                      <button class="btn btn-sm" style="margin-top:6px" onclick="document.getElementById('fu-h7-file').click()">📷 Upload Foto</button>
-                      <button class="btn btn-sm" id="fu-h7-remove" style="display:none;margin-top:6px" onclick="removePhoto('h7')">✕ Hapus</button>
-                    </div>
-                  </div>
-                  <input type="hidden" id="fu-h7-img-url">
                 </div>
               </div>
               <div class="fu-toggle">
@@ -606,7 +561,7 @@ body.light .fu-msg-lbl{color:#94a3b8}
       </div>
       <div class="form-group">
         <label>Kategori</label>
-        <select id="sop-f-cat">
+        <select id="sop-f-cat" onchange="onSOPCatChange()">
           <option value="h1">Follow Up H+1</option>
           <option value="h3">Follow Up H+3</option>
           <option value="h7">Follow Up H+7</option>
@@ -616,7 +571,25 @@ body.light .fu-msg-lbl{color:#94a3b8}
       </div>
       <div class="form-group">
         <label>Isi / Skrip SOP *</label>
-        <textarea id="sop-f-content" rows="7" placeholder="Tulis skrip follow up di sini...&#10;&#10;Contoh:&#10;Halo kak [nama], gimana kabarnya? Mau tanya nih, orderannya sudah sampai belum? 😊"></textarea>
+        <textarea id="sop-f-content" rows="6" placeholder="Tulis skrip follow up di sini...&#10;&#10;Contoh:&#10;Halo kak [nama], gimana kabarnya? Mau tanya nih, orderannya sudah sampai belum? 😊"></textarea>
+      </div>
+
+      <!-- Foto — hanya muncul untuk H+1, H+3, H+7 -->
+      <div id="sop-photo-group" class="form-group" style="display:none">
+        <label>Foto Pendukung <span style="font-weight:400;text-transform:none;font-size:11px">(opsional — dikirim bersama pesan)</span></label>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+          <input type="file" id="sop-f-file" accept="image/*" style="display:none" onchange="handleSOPPhoto(this)">
+          <div id="sop-photo-thumb" class="fu-photo-empty" style="width:60px;height:60px;flex-shrink:0" onclick="document.getElementById('sop-f-file').click()" title="Klik upload foto">📷</div>
+          <div>
+            <div style="font-size:13px;font-weight:500;color:#e2e8f0" id="sop-photo-name">Belum ada foto</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px">Max 5MB · JPG/PNG/WEBP</div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <button class="btn btn-sm" onclick="document.getElementById('sop-f-file').click()">📷 Upload Foto</button>
+              <button class="btn btn-sm btn-danger" id="sop-remove-photo" style="display:none" onclick="removeSOPPhoto()">✕ Hapus</button>
+            </div>
+          </div>
+        </div>
+        <input type="hidden" id="sop-f-img-url">
       </div>
     </div>
     <div class="modal-foot">
@@ -1175,6 +1148,7 @@ function renderSOPs() {
           <span class="sop-cat cat-${cat}">${SOP_CAT_LABEL[cat] || cat}</span>
         </div>
         <div class="sop-content">${s.content}</div>
+        ${s.image_url ? `<div style="margin-top:8px"><img src="${s.image_url}" style="height:64px;border-radius:7px;border:1px solid rgba(255,255,255,.08);object-fit:cover;cursor:pointer" onclick="window.open('${s.image_url}','_blank')" title="Lihat foto"></div>` : ''}
       </div>
       <div class="sop-actions">
         <button class="btn btn-sm" onclick="editSOP('${s.id}')">✏️</button>
@@ -1184,6 +1158,54 @@ function renderSOPs() {
   }).join('');
 }
 
+function onSOPCatChange() {
+  const cat = document.getElementById('sop-f-cat').value;
+  document.getElementById('sop-photo-group').style.display =
+    ['h1','h3','h7'].includes(cat) ? 'block' : 'none';
+}
+
+async function handleSOPPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('❌ Foto maksimal 5MB'); input.value=''; return; }
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const path = `${currentUserId}/sop_${Date.now()}.${ext}`;
+  toast('⏳ Mengupload foto...');
+  try {
+    const res = await fetch(`${SB_URL}/storage/v1/object/followup-media/${path}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': file.type },
+      body: file,
+    });
+    if (!res.ok) throw new Error('Upload gagal');
+    const url = `${SB_URL}/storage/v1/object/public/followup-media/${path}`;
+    document.getElementById('sop-f-img-url').value = url;
+    document.getElementById('sop-photo-name').textContent = file.name;
+    const thumb = document.getElementById('sop-photo-thumb');
+    thumb.innerHTML = `<img src="${url}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;cursor:pointer" onclick="document.getElementById('sop-f-file').click()">`;
+    thumb.classList.remove('fu-photo-empty');
+    document.getElementById('sop-remove-photo').style.display = 'inline-flex';
+    toast('✅ Foto berhasil diupload');
+  } catch(e) { toast('❌ ' + e.message); input.value = ''; }
+}
+
+function removeSOPPhoto() {
+  document.getElementById('sop-f-img-url').value = '';
+  document.getElementById('sop-f-file').value = '';
+  document.getElementById('sop-photo-name').textContent = 'Belum ada foto';
+  const thumb = document.getElementById('sop-photo-thumb');
+  thumb.innerHTML = '📷';
+  thumb.className = 'fu-photo-empty';
+  thumb.style.cssText = 'width:60px;height:60px;flex-shrink:0';
+  thumb.onclick = () => document.getElementById('sop-f-file').click();
+  document.getElementById('sop-remove-photo').style.display = 'none';
+}
+
+function _resetSOPPhotoUI() {
+  removeSOPPhoto();
+  onSOPCatChange();
+}
+
 function openSOPModal(id) {
   sopEditId = id || null;
   document.getElementById('sop-modal-title').textContent = id ? 'Edit SOP' : 'Tambah SOP';
@@ -1191,6 +1213,7 @@ function openSOPModal(id) {
     document.getElementById('sop-f-title').value = '';
     document.getElementById('sop-f-cat').value = 'h1';
     document.getElementById('sop-f-content').value = '';
+    _resetSOPPhotoUI();
   }
   document.getElementById('sop-modal').classList.add('open');
 }
@@ -1200,9 +1223,19 @@ function editSOP(id) {
   if (!s) return;
   sopEditId = id;
   document.getElementById('sop-modal-title').textContent = 'Edit SOP';
-  document.getElementById('sop-f-title').value = s.title || '';
-  document.getElementById('sop-f-cat').value = s.category || 'umum';
-  document.getElementById('sop-f-content').value = s.content || '';
+  document.getElementById('sop-f-title').value   = s.title    || '';
+  document.getElementById('sop-f-cat').value     = s.category || 'umum';
+  document.getElementById('sop-f-content').value = s.content  || '';
+  _resetSOPPhotoUI();
+  // restore existing photo
+  if (s.image_url) {
+    document.getElementById('sop-f-img-url').value = s.image_url;
+    document.getElementById('sop-photo-name').textContent = 'Foto tersimpan';
+    const thumb = document.getElementById('sop-photo-thumb');
+    thumb.innerHTML = `<img src="${s.image_url}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;cursor:pointer" onclick="document.getElementById('sop-f-file').click()">`;
+    thumb.classList.remove('fu-photo-empty');
+    document.getElementById('sop-remove-photo').style.display = 'inline-flex';
+  }
   document.getElementById('sop-modal').classList.add('open');
 }
 
@@ -1211,15 +1244,16 @@ function closeSOPModal() {
 }
 
 async function saveSOP() {
-  const title = document.getElementById('sop-f-title').value.trim();
+  const title   = document.getElementById('sop-f-title').value.trim();
   const content = document.getElementById('sop-f-content').value.trim();
   if (!title || !content) { toast('Judul dan isi SOP wajib diisi', 'error'); return; }
 
   const payload = {
-    user_id: currentUserId,
+    user_id:   currentUserId,
     title,
     content,
-    category: document.getElementById('sop-f-cat').value,
+    category:  document.getElementById('sop-f-cat').value,
+    image_url: document.getElementById('sop-f-img-url').value || null,
   };
 
   try {
