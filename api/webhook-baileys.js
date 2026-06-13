@@ -310,28 +310,21 @@ async function hitungOngkir(wilayah, product) {
     let rates = ratesData?.data || [];
     if (!rates.length) return null;
 
-    // Step 4: Filter whitelist & grade dari tabel couriers_grade
-    // (jika tabel belum ada / kosong, pakai semua kurir)
-    const gradeRows = await sbGet('couriers_grade',
-      `?daerah=ilike.%25${encodeURIComponent(areaNama)}%25&boleh_dipakai=eq.true`
+    // Step 4: Filter whitelist dari tabel courier_whitelist
+    // (jika tabel kosong, pakai semua kurir)
+    const whitelist = await sbGet('courier_whitelist',
+      `?user_id=eq.${product?.user_id || ''}&aktif=eq.true`
     ).catch(() => []);
 
-    if (gradeRows.length) {
-      const gradeMap = {};
-      for (const g of gradeRows) gradeMap[g.ekspedisi.toLowerCase()] = g.grade;
-
-      // Step 5: Pilih kurir terbaik — grade A dulu, lalu termurah
-      rates = rates.filter(r => gradeMap[r.courier_name?.toLowerCase()]);
-      rates.sort((a, b) => {
-        const ga = gradeMap[a.courier_name?.toLowerCase()] || 'E';
-        const gb = gradeMap[b.courier_name?.toLowerCase()] || 'E';
-        if (ga !== gb) return ga.localeCompare(gb); // A < B < C ...
-        return (a.price || 0) - (b.price || 0);
-      });
-    } else {
-      // Fallback: urutkan dari termurah
-      rates.sort((a, b) => (a.price || 0) - (b.price || 0));
+    if (whitelist.length) {
+      const allowed = new Set(whitelist.map(w => w.nama.toLowerCase()));
+      const filtered = rates.filter(r => allowed.has(r.courier_name?.toLowerCase()));
+      // Kalau ada yang masuk whitelist, pakai itu. Kalau tidak ada match, fallback semua
+      if (filtered.length) rates = filtered;
     }
+
+    // Step 5: Pilih termurah dari yang lolos filter
+    rates.sort((a, b) => (a.price || 0) - (b.price || 0));
 
     if (!rates.length) return null;
 
@@ -415,7 +408,7 @@ module.exports = async function handler(req, res) {
     console.log(`Secret check: body="${body.secret}" env="${WEBHOOK_SECRET}"`);
     if (body.secret !== WEBHOOK_SECRET) {
       console.warn('Secret tidak valid — tidak cocok');
-      return;
+      return res.status(200).json({ ok: false, reason: 'invalid_secret' });
     }
 
     const reply_jid   = body.reply_jid || normalizeWA(body.wa_number || ''); // untuk kirim WA (LID atau normal)
@@ -427,13 +420,19 @@ module.exports = async function handler(req, res) {
     const referral    = body.referral || null; // dari CTWA
 
     console.log(`wa_number="${wa_number}" reply_jid="${reply_jid}" message="${message}" type="${messageType}"`);
-    if (!reply_jid || (!message && messageType === 'text')) { console.warn('wa_number atau message kosong'); return; }
+    if (!reply_jid || (!message && messageType === 'text')) {
+      console.warn('wa_number atau message kosong');
+      return res.status(200).json({ ok: false, reason: 'empty_message' });
+    }
 
     console.log(`Pesan dari ${pushName} (${wa_number}): ${message.slice(0, 80)}`);
 
     // ── Ambil userId dari session_id (= user UUID dari dashboard) ──
     const userId = body.session_id;
-    if (!userId) { console.warn('session_id kosong'); return; }
+    if (!userId) {
+      console.warn('session_id kosong');
+      return res.status(200).json({ ok: false, reason: 'no_session_id' });
+    }
 
     // ── Routing: cari produk dari referral/isi chat ────────────
     const { product, sumber } = await resolveProduct(userId, referral, message);
@@ -463,7 +462,7 @@ module.exports = async function handler(req, res) {
     // ── Ambil history & panggil Claude ────────────────────────
     const history = await getContextMessages(conversation.id);
     let rawReply  = await callClaude(systemPrompt, history);
-    if (!rawReply) return;
+    if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
 
     // ── Deteksi marker khusus ──────────────────────────────────
     const isEscalated      = rawReply.includes('[ESCALATE]');
