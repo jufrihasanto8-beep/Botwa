@@ -104,9 +104,45 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 #toast.show{opacity:1}
+
+/* ── Icon button ── */
+.icon-btn{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:#64748b;transition:all .15s}
+.icon-btn:hover{border-color:#3b82f6;color:#3b82f6}
+
+/* ══ LIGHT THEME OVERRIDES ══ */
+body.light{background:#f1f5f9;color:#0f172a}
+body.light .page-header{background:#fff;border-color:#e2e8f0}
+body.light .page-header h1{color:#0f172a}
+body.light .page-header p{color:#64748b}
+body.light .icon-btn{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
+body.light .stat-cards{background:#f1f5f9}
+body.light .stat-c{background:#fff;border-color:#e2e8f0}
+body.light .stat-c .num{color:#0f172a}
+body.light .stat-c .lbl{color:#64748b}
+body.light .filter-bar{background:#fff;border-color:#e2e8f0}
+body.light .s-tab{border-color:#e2e8f0;color:#64748b}
+body.light .s-tab:hover{border-color:#3b82f6;color:#2563eb}
+body.light .s-tab.active{background:rgba(59,130,246,.1);color:#2563eb;border-color:rgba(59,130,246,.3)}
+body.light .search-input{background:#f1f5f9;border-color:#e2e8f0;color:#0f172a}
+body.light .search-input::placeholder{color:#94a3b8}
+body.light .orders-table th{background:#f8fafc;border-color:#e2e8f0;color:#64748b}
+body.light .orders-table td{border-color:#f1f5f9}
+body.light .orders-table tr:hover td{background:#f8fafc}
+body.light .btn{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
+body.light .btn:hover{background:#e2e8f0;color:#0f172a}
+body.light .btn-secondary{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
+body.light .form-group label{color:#64748b}
+body.light .form-group input,body.light .form-group textarea,body.light .form-group select{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+body.light .form-group input::placeholder,body.light .form-group textarea::placeholder{color:#94a3b8}
+body.light .modal-box{background:#fff;border-color:#e2e8f0}
+body.light .modal-head{background:#fff;border-color:#e2e8f0}
+body.light .modal-head h3{color:#0f172a}
+body.light .modal-foot{background:#fff;border-color:#e2e8f0}
+body.light .empty{color:#64748b}
 </style>
 </head>
 <body>
+<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
 <div id="toast"></div>
 <div class="app-layout">
 
@@ -142,7 +178,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
       <h1>✅ Closing</h1>
       <p>Manajemen pesanan dari percakapan customer</p>
     </div>
-    <button class="btn-primary" onclick="openAdd()">+ Tambah Order</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
+      <button class="btn-primary" onclick="openAdd()">+ Tambah Order</button>
+    </div>
   </div>
 
   <div class="stat-cards" id="stat-cards"></div>
@@ -265,6 +304,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
+<script src="js/theme.js"></script>
 <script>
 Auth.guard();
 (function(){
