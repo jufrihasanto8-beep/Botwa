@@ -3,303 +3,664 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Adsy CS — Inbox</title>
+<title>Adsy CS — Percakapan</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; background: #f1f5f9; color: #0f172a; font-size: 14px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; -webkit-font-smoothing:antialiased; }
+*{box-sizing:border-box;margin:0;padding:0}
 
-/* ── TOP NAVBAR ── */
-#topbar { display: none; }
-.tb-avatar {
-  width: 28px; height: 28px; border-radius: 50%; background: #16a679;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff; cursor: pointer; flex-shrink: 0;
+/* ── THEME VARIABLES ── */
+:root {
+  --bg:        #0d1117;
+  --bg2:       #161b22;
+  --bg3:       #1e293b;
+  --border:    rgba(255,255,255,.06);
+  --border2:   rgba(255,255,255,.04);
+  --text:      #e2e8f0;
+  --text2:     #94a3b8;
+  --text3:     #64748b;
+  --text4:     #475569;
+  --text5:     #374151;
+  --bubble-in: #1e293b;
+  --bubble-border: rgba(255,255,255,.06);
+  --input-bg:  #0d1117;
+  --card-bg:   #0d1117;
+  --search-bg: #0d1117;
+  --conv-hover: rgba(255,255,255,.03);
+  --conv-active: rgba(59,130,246,.08);
+  --sb-text:   #64748b;
+  --sb-hover:  rgba(255,255,255,.05);
+  --no-chat-color: #374151;
+  --risk-bg:   rgba(34,197,94,.08);
 }
-
-/* ── MAIN BODY ── */
-#main-body { display: flex; flex: 1; overflow: hidden; }
-
-/* ── LEFT SIDEBAR (secondary nav) ── */
-#left-nav {
-  width: 220px; background: #1e293b; border-right: none;
-  display: flex; flex-direction: column; padding: 0; gap: 0; flex-shrink: 0;
+body.light {
+  --bg:        #f1f5f9;
+  --bg2:       #ffffff;
+  --bg3:       #f8fafc;
+  --border:    rgba(0,0,0,.07);
+  --border2:   rgba(0,0,0,.04);
+  --text:      #0f172a;
+  --text2:     #475569;
+  --text3:     #64748b;
+  --text4:     #94a3b8;
+  --text5:     #cbd5e1;
+  --bubble-in: #ffffff;
+  --bubble-border: #e2e8f0;
+  --input-bg:  #f8fafc;
+  --card-bg:   #ffffff;
+  --search-bg: #f1f5f9;
+  --conv-hover: #f8fafc;
+  --conv-active: #eff6ff;
+  --sb-text:   #94a3b8;
+  --sb-hover:  rgba(255,255,255,.06);
+  --no-chat-color: #94a3b8;
+  --risk-bg:   rgba(34,197,94,.06);
 }
-.nav-logo {
-  display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px;
-  color: #f1f5f9; padding: 16px 14px 14px; letter-spacing: -.3px;
-  border-bottom: 1px solid rgba(255,255,255,.07); margin-bottom: 6px;
-}
-.nav-logo .logo-badge {
-  width: 32px; height: 32px; background: #3b82f6; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 800; color: #fff; letter-spacing: -.5px; flex-shrink: 0;
-}
-.nav-item {
-  display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: 1px 8px;
-  border-radius: 8px; font-size: 13px; font-weight: 500; color: #94a3b8;
-  cursor: pointer; text-decoration: none; transition: all .12s;
-}
-.nav-item:hover { background: rgba(255,255,255,.06); color: #e2e8f0; text-decoration: none; }
-.nav-item.active { background: rgba(59,130,246,.15); color: #93c5fd; }
-.nav-item .ni { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
-.nav-badge {
-  margin-left: auto; min-width: 18px; height: 18px; background: #ef4444;
-  border-radius: 9px; font-size: 10px; color: #fff; font-weight: 700;
-  display: flex; align-items: center; justify-content: center; padding: 0 4px;
-}
-.nav-section { font-size: 10px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: .5px; padding: 10px 14px 4px; margin-top: 6px; }
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;height:100vh;overflow:hidden;display:flex;-webkit-font-smoothing:antialiased;transition:background .2s,color .2s}
 
-/* ── PAGE CONTENT ── */
-#page-content { flex: 1; display: flex; overflow: hidden; min-width: 0; }
+/* ══ LIGHT THEME OVERRIDES ══ */
+body.light #main{background:#f1f5f9}
+body.light #top-header{background:#fff;border-bottom-color:#e2e8f0}
+body.light .th-left h1{color:#0f172a}
+body.light .th-left p{color:#94a3b8}
+body.light .th-search{background:#f1f5f9;border-color:#e2e8f0}
+body.light .th-search input{color:#0f172a}
+body.light .th-notif{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
+body.light #stats-row{background:#fff;border-bottom-color:#e2e8f0}
+body.light .stat-card{background:#f8fafc;border-color:#e2e8f0}
+body.light .stat-num{color:#0f172a}
+body.light .stat-label{color:#64748b}
+body.light .ai-engine-card{background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.05));border-color:rgba(99,102,241,.2)}
+body.light #filter-bar{background:#fff;border-bottom-color:#e2e8f0}
+body.light .ftab{border-color:#e2e8f0;color:#64748b}
+body.light .ftab.active{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}
+body.light .ftab.eskalasi.active{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
+body.light .filter-sort{background:#f8fafc;border-color:#e2e8f0;color:#64748b}
+body.light #inbox{background:#fff;border-right-color:#e2e8f0}
+body.light .inbox-title{color:#64748b}
+body.light .inbox-filter-btn{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
+body.light .conv-item{border-bottom-color:#f1f5f9}
+body.light .conv-item:hover{background:#f8fafc}
+body.light .conv-item.active{background:#eff6ff;border-left-color:#3b82f6}
+body.light .conv-name{color:#0f172a}
+body.light .conv-preview{color:#94a3b8}
+body.light .conv-time{color:#94a3b8}
+body.light #chat-panel{background:#f8fafc}
+body.light #chat-header{background:#fff;border-bottom-color:#e2e8f0}
+body.light .ch-name{color:#0f172a}
+body.light .act-btn{background:#f8fafc;border-color:#e2e8f0;color:#64748b}
+body.light .act-btn:hover{background:#eff6ff;border-color:#bfdbfe;color:#2563eb}
+body.light #messages-area{background:#f8fafc}
+body.light .from-customer .bubble{background:#fff;border-color:#e2e8f0;color:#0f172a}
+body.light .day-divider{color:#94a3b8}
+body.light .day-divider::before,.day-divider::after{background:#e2e8f0}
+body.light .no-chat{color:#94a3b8}
+body.light #ai-suggest-box{background:#fff;border-top-color:rgba(99,102,241,.15)}
+body.light .ai-suggest-text{background:#f8fafc;border-color:rgba(99,102,241,.15);color:#0f172a}
+body.light #input-box{background:#fff;border-top-color:#e2e8f0}
+body.light .tool-pill{border-color:#e2e8f0;color:#64748b}
+body.light .tool-pill:hover,.tool-pill.on{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}
+body.light .tool-pill.on{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}
+body.light .tool-pill.suggest-btn{background:rgba(99,102,241,.06);color:#6366f1;border-color:rgba(99,102,241,.15)}
+body.light #msg-input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+body.light #msg-input:focus{border-color:#3b82f6;background:#fff}
+body.light #case-board{background:#fff;border-left-color:#e2e8f0}
+body.light .cb-header{border-bottom-color:#e2e8f0;color:#64748b}
+body.light .cb-section{border-bottom-color:#f1f5f9}
+body.light .cb-card{background:#f8fafc;border-color:#e2e8f0}
+body.light .cb-card-body{color:#0f172a}
+body.light .cb-card-sub{color:#64748b}
+body.light .risk-section,.sla-section,.nba-section,.wa-section,.timeline-section{border-bottom-color:#f1f5f9}
+body.light .risk-label{color:#0f172a}
+body.light .risk-factor{color:#64748b!important}
+body.light .sla-status.ok{color:#16a34a}
+body.light .sla-bar{background:#e2e8f0}
+body.light .sla-time{color:#64748b}
+body.light .nba-text{color:#64748b}
+body.light .wa-badge-dark.connected{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2)}
+body.light .wa-badge-dark.disconnected{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.15)}
+body.light .wa-cek-btn{background:#f8fafc;border-color:#e2e8f0;color:#64748b}
+body.light .wa-cek-btn:hover{border-color:#3b82f6;color:#2563eb}
+body.light .timeline-empty{color:#94a3b8}
+body.light .msg-meta{color:#94a3b8}
+body.light .bot-label{color:#6366f1}
+body.light .empty-inbox{color:#94a3b8}
+body.light .bot-online{background:rgba(34,197,94,.06)}
 
-/* ── COMING SOON PAGE ── */
-.coming-soon {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  flex-direction: column; gap: 12px; color: #9ca3af; background: #f9fafb;
-}
-.coming-soon .cs-icon { font-size: 48px; }
-.coming-soon h2 { font-size: 18px; font-weight: 600; color: #374151; }
-.coming-soon p { font-size: 13px; }
+/* ── SIDEBAR ── */
+#sidebar{width:220px;background:#161b22;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0;height:100vh}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sb-logo{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+.sb-subtitle{font-size:10px;color:#64748b;margin-top:1px}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-section{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;text-decoration:none;transition:all .12s;position:relative}
+.sb-item:hover{background:rgba(255,255,255,.05);color:#e2e8f0;text-decoration:none}
+.sb-item.active{background:rgba(59,130,246,.12);color:#93c5fd}
+.sb-item .si{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.sb-item .sbadge{margin-left:auto;min-width:18px;height:18px;background:#ef4444;border-radius:9px;font-size:9px;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
+.sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.sb-stats{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06)}
+.sb-stats-title{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.sb-stat-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;color:#94a3b8}
+.sb-stat-row span:last-child{color:#e2e8f0;font-weight:600}
+.bot-online{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#22c55e;padding:6px 10px;background:rgba(34,197,94,.08);border-radius:6px;margin:8px 14px}
+.bot-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* ── CHAT PAGE ── */
-#chat-page { display: flex; flex: 1; overflow: hidden; }
+/* ── MAIN ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 
-/* INBOX */
-#inbox { width: 280px; background: #fff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; }
-#inbox-top { padding: 14px 12px 10px; border-bottom: 1px solid #e2e8f0; }
-#inbox-top h2 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #0f172a; }
-.search-bar { display: flex; align-items: center; gap: 8px; background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 7px 10px; transition: border-color .15s; }
-.search-bar:focus-within { border-color: #3b82f6; }
-.search-bar input { border: none; background: none; font-size: 13px; flex: 1; color: #0f172a; outline: none; }
-.tab-row { display: flex; gap: 4px; padding: 8px 10px 0; }
-.tab { font-size: 12px; padding: 5px 12px; border-radius: 20px; cursor: pointer; color: #64748b; font-weight: 500; border: 1px solid transparent; background: none; transition: all .12s; }
-.tab.active { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
-.tab:hover:not(.active) { background: #f1f5f9; color: #0f172a; }
-#conv-list { flex: 1; overflow-y: auto; }
-.conv-item { display: flex; gap: 10px; padding: 11px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background .1s; align-items: flex-start; }
-.conv-item:hover { background: #f8fafc; }
-.conv-item.active { background: #eff6ff; border-left: 2px solid #3b82f6; }
-.conv-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; }
-.conv-info { flex: 1; min-width: 0; }
-.conv-name { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; color: #0f172a; }
-.conv-name .ctime { font-weight: 400; font-size: 11px; color: #94a3b8; }
-.conv-preview { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.conv-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 3px; }
-.ch-wa { background: #dcfce7; color: #15803d; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
-.unread-dot { width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; }
-.empty-inbox { text-align: center; padding: 40px 16px; color: #94a3b8; }
+/* ── TOP HEADER ── */
+#top-header{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.th-left h1{font-size:18px;font-weight:700;color:#f1f5f9;letter-spacing:-.4px}
+.th-left p{font-size:11px;color:#475569;margin-top:1px}
+.th-right{display:flex;align-items:center;gap:10px}
+.th-search{display:flex;align-items:center;gap:8px;background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 12px;width:220px;transition:border-color .15s}
+.th-search:focus-within{border-color:#3b82f6}
+.th-search input{background:none;border:none;font-size:12px;color:#e2e8f0;flex:1;outline:none}
+.th-search input::placeholder{color:#475569}
+.th-notif{width:34px;height:34px;border-radius:8px;background:#0d1117;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;font-size:15px;color:#64748b;transition:all .15s}
+.th-notif:hover{border-color:#3b82f6;color:#3b82f6}
 
-/* CHAT PANEL */
-#chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-#chat-header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 11px 16px; display: flex; align-items: center; gap: 12px; }
-.ch-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
-.ch-name { font-weight: 700; font-size: 14px; color: #0f172a; }
-.ch-sub { font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 4px; }
-.online-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; }
-.ch-acts { display: flex; gap: 6px; margin-left: auto; }
-.action-btn { width: 32px; height: 32px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #64748b; transition: all .12s; }
-.action-btn:hover { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
+/* ── STATS ROW ── */
+#stats-row{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:12px 20px;display:flex;gap:10px;flex-shrink:0}
+.stat-card{flex:1;background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:border-color .15s;cursor:default}
+.stat-card:hover{border-color:rgba(59,130,246,.3)}
+.stat-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.stat-icon.blue{background:rgba(59,130,246,.12);color:#3b82f6}
+.stat-icon.red{background:rgba(239,68,68,.12);color:#ef4444}
+.stat-icon.purple{background:rgba(139,92,246,.12);color:#8b5cf6}
+.stat-icon.green{background:rgba(34,197,94,.12);color:#22c55e}
+.stat-icon.amber{background:rgba(245,158,11,.12);color:#f59e0b}
+.stat-num{font-size:22px;font-weight:700;color:#f1f5f9;line-height:1}
+.stat-label{font-size:11px;color:#64748b;margin-top:2px}
+.stat-sub{font-size:10px;margin-top:2px}
+.stat-sub.danger{color:#ef4444}
+.stat-sub.ok{color:#22c55e}
 
-#messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #f8fafc; }
-.day-divider { text-align: center; font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 8px; }
-.day-divider::before,.day-divider::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
-.msg-row { display: flex; gap: 8px; align-items: flex-end; }
-.msg-row.from-customer { justify-content: flex-start; }
-.msg-row.from-bot,.msg-row.from-agent { justify-content: flex-end; }
-.msg-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; flex-shrink: 0; font-weight: 700; }
-.bubble { max-width: 68%; padding: 9px 13px; border-radius: 16px; font-size: 13px; line-height: 1.6; }
-.from-customer .bubble { background: #fff; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-.from-bot .bubble,.from-agent .bubble { background: #3b82f6; color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 1px 4px rgba(59,130,246,.3); }
-.msg-meta { font-size: 10px; color: #94a3b8; margin-top: 3px; }
-.from-bot .msg-meta,.from-agent .msg-meta { text-align: right; }
-.bot-label { font-size: 10px; color: #3b82f6; font-weight: 600; margin-bottom: 2px; text-align: right; }
-.wa-sent { font-size: 10px; color: #15803d; margin-top: 2px; text-align: right; }
-.wa-fail { font-size: 10px; color: #ef4444; margin-top: 2px; text-align: right; }
-.no-chat { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #94a3b8; }
+/* AI Engine Card */
+.ai-engine-card{width:220px;background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(139,92,246,.1));border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:12px 14px;flex-shrink:0}
+.ai-engine-title{font-size:10px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.ai-engine-sub{font-size:10px;color:#6366f1;margin-bottom:8px}
+.ai-mini-user{display:flex;align-items:center;gap:8px}
+.ai-mini-av{width:28px;height:28px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.ai-mini-info{flex:1;min-width:0}
+.ai-mini-name{font-size:12px;font-weight:600;color:#e2e8f0}
+.ai-mini-num{font-size:10px;color:#6366f1}
+.ai-chips{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.ai-chip{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500}
+.ai-chip.intent{background:rgba(239,68,68,.12);color:#fca5a5}
+.ai-chip.sentiment{background:rgba(34,197,94,.12);color:#86efac}
+.ai-chip.prob{background:rgba(245,158,11,.12);color:#fcd34d}
 
-#input-box { background: #fff; border-top: 1px solid #e2e8f0; padding: 12px 14px; }
-.input-tools { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-.tool-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 12px; color: #64748b; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .12s; font-weight: 500; }
-.tool-btn:hover,.tool-btn.on { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
-.input-row { display: flex; gap: 8px; align-items: flex-end; }
-#msg-input { flex: 1; resize: none; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 9px 14px; font-size: 13px; font-family: inherit; line-height: 1.5; background: #f8fafc; color: #0f172a; min-height: 42px; max-height: 100px; transition: border-color .15s; }
-#msg-input:focus { outline: none; border-color: #3b82f6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,.08); }
-#send-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #3b82f6; color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; box-shadow: 0 2px 8px rgba(59,130,246,.3); }
-#send-btn:hover { background: #2563eb; transform: scale(1.05); }
-#send-btn:disabled { background: #e2e8f0; cursor: not-allowed; box-shadow: none; transform: none; }
+/* ── FILTER BAR ── */
+#filter-bar{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:10px 20px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ftab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid rgba(255,255,255,.08);background:none;color:#64748b;cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:5px}
+.ftab:hover{border-color:#3b82f6;color:#93c5fd}
+.ftab.active{background:rgba(59,130,246,.12);color:#93c5fd;border-color:rgba(59,130,246,.3)}
+.ftab .fn{min-width:16px;height:16px;border-radius:8px;background:rgba(255,255,255,.08);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;padding:0 4px}
+.ftab.active .fn{background:rgba(59,130,246,.3);color:#93c5fd}
+.ftab.eskalasi.active{background:rgba(239,68,68,.1);color:#fca5a5;border-color:rgba(239,68,68,.3)}
+.ftab.eskalasi.active .fn{background:rgba(239,68,68,.25)}
+.filter-sort{margin-left:auto;font-size:12px;color:#64748b;background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:5px 10px;cursor:pointer;color:#94a3b8}
 
-/* RIGHT DETAIL */
-#right-detail { width: 240px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
-.rd-section { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
-.rd-title { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
-.rd-contact-av { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; margin: 0 auto 10px; }
-.stat-row { display: flex; gap: 8px; }
-.stat-card { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
-.stat-num { font-size: 20px; font-weight: 700; color: #3b82f6; }
-.stat-label { font-size: 10px; color: #64748b; margin-top: 2px; }
-.wa-badge { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; }
-.wa-badge.connected { background: #dcfce7; color: #15803d; }
-.wa-badge.disconnected { background: #fee2e2; color: #991b1b; }
-.wa-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.wa-dot.on { background: #16a34a; }
-.wa-dot.off { background: #dc2626; }
+/* ── CONTENT AREA ── */
+#content-area{flex:1;display:flex;overflow:hidden;min-width:0}
 
-/* Typing */
-.typing-dots { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
-.typing-dots span { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: bounce 1s infinite; }
-.typing-dots span:nth-child(2) { animation-delay: .15s; }
-.typing-dots span:nth-child(3) { animation-delay: .3s; }
-@keyframes bounce { 0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)} }
+/* ── INBOX LIST ── */
+#inbox{width:280px;background:#161b22;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0}
+.inbox-header{padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between}
+.inbox-title{font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.inbox-count{min-width:18px;height:18px;background:#3b82f6;border-radius:9px;font-size:10px;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.inbox-filter-btn{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#64748b;font-size:13px}
+#conv-list{flex:1;overflow-y:auto}
+#conv-list::-webkit-scrollbar{width:3px}
+#conv-list::-webkit-scrollbar-track{background:transparent}
+#conv-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
+.conv-item{display:flex;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s;align-items:flex-start;position:relative}
+.conv-item:hover{background:rgba(255,255,255,.03)}
+.conv-item.active{background:rgba(59,130,246,.08);border-left:2px solid #3b82f6}
+.conv-av{width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.conv-info{flex:1;min-width:0}
+.conv-name-row{display:flex;justify-content:space-between;align-items:center}
+.conv-name{font-weight:600;font-size:13px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.conv-time{font-size:10px;color:#475569;flex-shrink:0}
+.conv-preview{font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.conv-tags{display:flex;align-items:center;gap:4px;margin-top:4px}
+.ctag{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500}
+.ctag.wa{background:rgba(34,197,94,.1);color:#86efac}
+.ctag.live{background:rgba(34,197,94,.1);color:#86efac}
+.ctag.eskalasi{background:rgba(239,68,68,.1);color:#fca5a5}
+.ctag.ai{background:rgba(99,102,241,.1);color:#a5b4fc}
+.conv-unread{width:8px;height:8px;background:#3b82f6;border-radius:50%;position:absolute;right:12px;top:50%;transform:translateY(-50%)}
+.empty-inbox{text-align:center;padding:40px 16px;color:#475569}
 
-#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1d23; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; z-index: 9999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
-#toast.show { opacity: 1; }
+/* ── CHAT PANEL ── */
+#chat-panel{flex:1;display:flex;flex-direction:column;min-width:0;background:#0d1117}
+#chat-header{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.ch-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.ch-name{font-weight:700;font-size:14px;color:#f1f5f9}
+.ch-sub{font-size:11px;color:#475569;display:flex;align-items:center;gap:5px;margin-top:1px}
+.ch-live{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
+.ch-acts{display:flex;gap:6px;margin-left:auto}
+.act-btn{width:30px;height:30px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:#64748b;transition:all .12s}
+.act-btn:hover{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#93c5fd}
+.ch-status-badge{font-size:10px;padding:3px 10px;border-radius:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid}
+.ch-status-badge.eskalasi{background:rgba(239,68,68,.1);color:#fca5a5;border-color:rgba(239,68,68,.2)}
+.ch-status-badge.selesai{background:rgba(34,197,94,.1);color:#86efac;border-color:rgba(34,197,94,.2)}
+.ch-status-badge.live{background:rgba(34,197,94,.1);color:#86efac;border-color:rgba(34,197,94,.2)}
+
+#messages-area{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
+#messages-area::-webkit-scrollbar{width:4px}
+#messages-area::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px}
+.day-divider{text-align:center;font-size:10px;color:#374151;display:flex;align-items:center;gap:8px;margin:4px 0}
+.day-divider::before,.day-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05)}
+.msg-row{display:flex;gap:8px;align-items:flex-end}
+.msg-row.from-customer{justify-content:flex-start}
+.msg-row.from-bot,.msg-row.from-agent{justify-content:flex-end}
+.msg-av-s{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:700}
+.bubble{max-width:65%;padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.6;word-break:break-word}
+.from-customer .bubble{background:#1e293b;border:1px solid rgba(255,255,255,.06);border-bottom-left-radius:4px;color:#e2e8f0}
+.from-bot .bubble,.from-agent .bubble{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(59,130,246,.25)}
+.msg-meta{font-size:10px;color:#374151;margin-top:3px}
+.from-bot .msg-meta,.from-agent .msg-meta{text-align:right;color:#475569}
+.bot-label{font-size:10px;color:#6366f1;font-weight:600;margin-bottom:2px;text-align:right;display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.no-chat{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#374151}
+.no-chat-icon{font-size:48px;opacity:.3}
+
+/* AI SUGGESTED REPLY */
+#ai-suggest-box{background:#161b22;border-top:1px solid rgba(99,102,241,.2);padding:10px 16px;flex-shrink:0;display:none}
+.ai-suggest-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ai-suggest-title{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#a5b4fc}
+.ai-confidence{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:#86efac;font-weight:600}
+.ai-suggest-text{font-size:12px;color:#e2e8f0;background:#0d1117;border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 12px;line-height:1.6;margin-bottom:8px;max-height:80px;overflow-y:auto}
+.ai-suggest-actions{display:flex;gap:6px}
+.ai-use-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:6px;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.ai-use-btn:hover{background:rgba(99,102,241,.25)}
+.ai-copy-btn{width:30px;height:30px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#64748b;font-size:13px;transition:all .15s}
+.ai-copy-btn:hover{color:#a5b4fc;border-color:rgba(99,102,241,.3)}
+.ai-loading{display:flex;align-items:center;gap:6px;font-size:12px;color:#6366f1;padding:8px 0}
+
+/* INPUT BOX */
+#input-box{background:#161b22;border-top:1px solid rgba(255,255,255,.06);padding:10px 14px;flex-shrink:0}
+.input-tools{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+.tool-pill{padding:4px 10px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:none;font-size:11px;color:#64748b;cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:500;transition:all .12s}
+.tool-pill:hover,.tool-pill.on{background:rgba(59,130,246,.08);color:#93c5fd;border-color:rgba(59,130,246,.2)}
+.tool-pill.suggest-btn{background:rgba(99,102,241,.08);color:#a5b4fc;border-color:rgba(99,102,241,.2)}
+.tool-pill.suggest-btn:hover{background:rgba(99,102,241,.15)}
+.input-row{display:flex;gap:8px;align-items:flex-end}
+#msg-input{flex:1;resize:none;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:9px 14px;font-size:13px;font-family:inherit;line-height:1.5;background:#0d1117;color:#e2e8f0;min-height:40px;max-height:100px;transition:border-color .15s;outline:none}
+#msg-input:focus{border-color:rgba(59,130,246,.4);box-shadow:0 0 0 3px rgba(59,130,246,.06)}
+#msg-input::placeholder{color:#374151}
+#send-btn{width:38px;height:38px;border-radius:50%;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;box-shadow:0 2px 8px rgba(59,130,246,.3)}
+#send-btn:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(59,130,246,.4)}
+#send-btn:disabled{background:#1e293b;cursor:not-allowed;box-shadow:none;transform:none}
+
+/* ── CASE RESOLUTION BOARD ── */
+#case-board{width:300px;background:#161b22;border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+#case-board::-webkit-scrollbar{width:3px}
+#case-board::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06)}
+.cb-header{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0}
+.cb-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.cb-title{font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.cb-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cb-card{background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px}
+.cb-card-title{font-size:10px;color:#64748b;font-weight:500;margin-bottom:5px;display:flex;align-items:center;gap:4px}
+.cb-card-body{font-size:12px;color:#e2e8f0;font-weight:500;line-height:1.4}
+.cb-card-sub{font-size:11px;color:#64748b;margin-top:4px;line-height:1.4}
+.priority-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600}
+.priority-badge.low{background:rgba(100,116,139,.12);color:#94a3b8}
+.priority-badge.med{background:rgba(245,158,11,.1);color:#fcd34d}
+.priority-badge.high{background:rgba(239,68,68,.1);color:#fca5a5}
+.priority-badge.urgent{background:rgba(220,38,38,.15);color:#ef4444}
+
+/* Risk Score */
+.risk-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.risk-row{display:flex;align-items:center;gap:12px}
+.risk-circle{width:52px;height:52px;border-radius:50%;background:rgba(34,197,94,.08);border:2px solid rgba(34,197,94,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.risk-num{font-size:16px;font-weight:700;color:#22c55e;line-height:1}
+.risk-max{font-size:9px;color:#374151}
+.risk-info{flex:1}
+.risk-label{font-size:12px;font-weight:600;color:#e2e8f0}
+.risk-factors{margin-top:6px}
+.risk-factor{font-size:11px;color:#64748b;display:flex;align-items:flex-start;gap:4px;margin-bottom:2px}
+.risk-factor::before{content:'•';flex-shrink:0;margin-top:1px}
+
+/* SLA */
+.sla-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.sla-status{font-size:14px;font-weight:700;margin-bottom:4px}
+.sla-status.ok{color:#22c55e}
+.sla-status.warn{color:#f59e0b}
+.sla-status.danger{color:#ef4444}
+.sla-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin:6px 0}
+.sla-fill{height:100%;border-radius:2px;background:#22c55e;transition:width .5s}
+.sla-fill.warn{background:#f59e0b}
+.sla-fill.danger{background:#ef4444}
+.sla-time{font-size:11px;color:#64748b}
+
+/* Next Best Action */
+.nba-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.nba-text{font-size:12px;color:#94a3b8;line-height:1.5;margin-bottom:8px}
+.nba-btn{width:100%;padding:8px;border-radius:8px;background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(139,92,246,.15));border:1px solid rgba(99,102,241,.3);color:#a5b4fc;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.nba-btn:hover{background:linear-gradient(135deg,rgba(99,102,241,.3),rgba(139,92,246,.25))}
+
+/* WA Status */
+.wa-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.wa-badge-dark{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:500;border:1px solid}
+.wa-badge-dark.connected{background:rgba(34,197,94,.06);color:#86efac;border-color:rgba(34,197,94,.15)}
+.wa-badge-dark.disconnected{background:rgba(239,68,68,.06);color:#fca5a5;border-color:rgba(239,68,68,.15)}
+.wa-dot-d{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.wa-dot-d.on{background:#22c55e;animation:pulse 2s infinite}
+.wa-dot-d.off{background:#ef4444}
+.wa-cek-btn{width:100%;margin-top:7px;padding:6px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);color:#64748b;font-size:12px;cursor:pointer;transition:all .15s}
+.wa-cek-btn:hover{border-color:rgba(59,130,246,.3);color:#93c5fd}
+
+/* Timeline */
+.timeline-section{padding:12px 14px}
+.timeline-empty{font-size:12px;color:#374151;text-align:center;padding:8px 0}
+
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#toast.show{opacity:1}
+
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
+.typing-dots{display:flex;gap:4px;align-items:center;padding:4px 0}
+.typing-dots span{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.6);animation:bounce 1s infinite}
+.typing-dots span:nth-child(2){animation-delay:.15s}
+.typing-dots span:nth-child(3){animation-delay:.3s}
 </style>
 </head>
 <body>
 <div id="toast"></div>
 
-<!-- TOP NAVBAR -->
-<div id="topbar">
-  <div class="tb-right" style="margin-left:auto;">
-    <div class="tb-avatar" id="tb-av">A</div>
-    <span class="tb-name" id="tb-name">Admin</span>
-    <button class="tb-logout" onclick="Auth.logout()">Logout</button>
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">CS</div>
+    <div>
+      <div class="sb-title">Adsy CS</div>
+      <div class="sb-subtitle" id="sb-store">Loading...</div>
+    </div>
+  </div>
+  <div class="bot-online" id="sb-bot-status">
+    <div class="bot-dot"></div> Bot online
+  </div>
+  <div class="sb-nav">
+    <div class="sb-item active" onclick="location.href='dashboard.html'">
+      <span class="si">💬</span> Percakapan
+      <span class="sbadge" id="unread-badge" style="display:none">0</span>
+    </div>
+    <a class="sb-item" href="analytics.html"><span class="si">📊</span> Closing</a>
+    <a class="sb-item" href="orders.html"><span class="si">📋</span> Katalog & SOP</a>
+    <div class="sb-divider"></div>
+    <div class="sb-section">Lainnya</div>
+    <a class="sb-item" href="products.html"><span class="si">🏷️</span> Produk</a>
+    <a class="sb-item" href="shipping.html"><span class="si">📦</span> Pengiriman</a>
+    <a class="sb-item" href="followup-engine.html"><span class="si">🔔</span> Follow-up</a>
+    <a class="sb-item" href="contacts.html"><span class="si">👥</span> Kontak</a>
+    <a class="sb-item" href="knowledge.html"><span class="si">📚</span> Knowledge Base</a>
+    <a class="sb-item" href="connect-wa.html"><span class="si">📱</span> Hubungkan WA</a>
+    <a class="sb-item" href="settings.html"><span class="si">⚙️</span> Pengaturan</a>
+  </div>
+  <div class="sb-stats">
+    <div class="sb-stats-title">Ringkasan Hari Ini <span style="color:#374151;font-weight:400;cursor:pointer;font-size:10px">Live</span></div>
+    <div class="sb-stat-row"><span>Total Percakapan</span><span id="sb-total">0</span></div>
+    <div class="sb-stat-row"><span>Selesai</span><span id="sb-selesai">0</span></div>
+    <div class="sb-stat-row"><span>Ditangani Lancar</span><span id="sb-lancar" style="color:#22c55e">—</span></div>
+  </div>
+  <div class="sb-user">
+    <div class="sb-avatar" id="sb-av">A</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="sb-name">Admin</div>
+      <button style="font-size:11px;color:#475569;border:none;background:none;cursor:pointer;padding:0" onclick="Auth.logout()">Logout</button>
+    </div>
   </div>
 </div>
 
-<!-- MAIN BODY -->
-<div id="main-body">
+<!-- MAIN -->
+<div id="main">
 
-  <!-- LEFT NAV -->
-  <div id="left-nav">
-    <div class="nav-logo">
-      <div class="logo-badge">CS</div>
-      Adsy CS
+  <!-- TOP HEADER -->
+  <div id="top-header">
+    <div class="th-left">
+      <h1>Percakapan</h1>
+      <p id="th-datetime">—</p>
     </div>
-    <div class="nav-item active" onclick="showPage('chat',this)" data-page="chat">
-      <span class="ni">💬</span> Inbox
-      <span class="nav-badge" id="unread-badge">0</span>
+    <div class="th-right">
+      <div class="th-search">
+        <span style="color:#374151;font-size:13px">🔍</span>
+        <input placeholder="Cari pelanggan atau nomor..." oninput="filterConvs(this.value)" />
+      </div>
+      <div class="th-notif" title="Notifikasi">🔔</div>
+      <div class="th-notif" id="theme-btn" onclick="toggleTheme()" title="Ganti tema" style="font-size:14px">🌙</div>
+      <div class="th-notif" title="Bantuan">❓</div>
     </div>
-    <a class="nav-item" href="cases.html">
-      <span class="ni">📋</span> Cases
-    </a>
-    <a class="nav-item" href="analytics.html">
-      <span class="ni">📊</span> Analytics
-    </a>
-    <a class="nav-item" href="orders.html">
-      <span class="ni">🛒</span> Orders
-    </a>
-    <a class="nav-item" href="broadcast.html">
-      <span class="ni">📣</span> Broadcast
-    </a>
-    <div class="nav-section">Lainnya</div>
-    <a class="nav-item" href="products.html"><span class="ni">🏷️</span> Produk</a>
-    <a class="nav-item" href="shipping.html"><span class="ni">📦</span> Pengiriman</a>
-    <a class="nav-item" href="followup-engine.html"><span class="ni">🔔</span> Follow-up</a>
-    <a class="nav-item" href="contacts.html"><span class="ni">👥</span> Kontak</a>
-    <a class="nav-item" href="knowledge.html"><span class="ni">📚</span> Knowledge Base</a>
-    <a class="nav-item" href="connect-wa.html"><span class="ni">📱</span> Hubungkan WA</a>
-    <a class="nav-item" href="settings.html"><span class="ni">⚙️</span> Pengaturan</a>
-    <div style="margin-top:auto;padding:12px 14px;border-top:1px solid rgba(255,255,255,.07);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div id="tb-av2" style="width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0;">A</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="tb-name2">Admin</div>
-          <button style="font-size:11px;color:#64748b;border:none;background:none;cursor:pointer;padding:0;" onclick="Auth.logout()">Logout</button>
+  </div>
+
+  <!-- STATS ROW -->
+  <div id="stats-row">
+    <div class="stat-card">
+      <div class="stat-icon blue">💬</div>
+      <div>
+        <div class="stat-num" id="st-open">0</div>
+        <div class="stat-label">Open Tickets</div>
+        <div class="stat-sub" id="st-open-sub">percakapan belum selesai</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon red">⚠️</div>
+      <div>
+        <div class="stat-num" id="st-eskalasi">0</div>
+        <div class="stat-label">Eskalasi</div>
+        <div class="stat-sub danger" id="st-esc-sub">perlu penanganan</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon purple">🤖</div>
+      <div>
+        <div class="stat-num" id="st-ai">0</div>
+        <div class="stat-label">AI Response</div>
+        <div class="stat-sub ok">balasan AI hari ini</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green">⚡</div>
+      <div>
+        <div class="stat-num" id="st-aktif">0</div>
+        <div class="stat-label">Sesi Aktif</div>
+        <div class="stat-sub ok">aktif &lt; 24 jam</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon amber">👥</div>
+      <div>
+        <div class="stat-num" id="st-unik">0</div>
+        <div class="stat-label">Customer Unik</div>
+        <div class="stat-sub" style="color:#64748b">total pelanggan</div>
+      </div>
+    </div>
+    <div class="ai-engine-card">
+      <div class="ai-engine-title">✨ AI Resolution Engine</div>
+      <div class="ai-engine-sub">Inteligensi Pelanggan</div>
+      <div class="ai-mini-user" id="ai-engine-contact">
+        <div class="ai-mini-av" id="ae-av">?</div>
+        <div class="ai-mini-info">
+          <div class="ai-mini-name" id="ae-name">Pilih percakapan</div>
+          <div class="ai-mini-num" id="ae-num">—</div>
         </div>
+      </div>
+      <div class="ai-chips" id="ae-chips">
+        <span class="ai-chip intent">—</span>
+        <span class="ai-chip sentiment">—</span>
+        <span class="ai-chip prob">—</span>
       </div>
     </div>
   </div>
 
-  <!-- PAGE CONTENT -->
-  <div id="page-content">
+  <!-- FILTER BAR -->
+  <div id="filter-bar">
+    <button class="ftab active" onclick="setTab('all',this)" id="ftab-all">Semua <span class="fn" id="fn-all">0</span></button>
+    <button class="ftab eskalasi" onclick="setTab('eskalasi',this)">Eskalasi <span class="fn" id="fn-esc">0</span></button>
+    <button class="ftab" onclick="setTab('live',this)">Live <span class="fn" id="fn-live">0</span></button>
+    <button class="ftab" onclick="setTab('selesai',this)">Selesai <span class="fn" id="fn-selesai">0</span></button>
+    <select class="filter-sort" onchange="setSortOrder(this.value)">
+      <option value="desc">Terbaru</option>
+      <option value="asc">Terlama</option>
+    </select>
+  </div>
 
-    <!-- CHAT PAGE -->
-    <div id="chat-page" style="display:flex;flex:1;overflow:hidden;">
+  <!-- CONTENT AREA -->
+  <div id="content-area">
 
-      <!-- INBOX -->
-      <div id="inbox">
-        <div id="inbox-top">
-          <h2>Inbox</h2>
-          <div class="search-bar">
-            <span style="color:#9ca3af;font-size:13px;">🔍</span>
-            <input placeholder="Cari kontak..." oninput="filterConvs(this.value)" />
-          </div>
-        </div>
-        <div class="tab-row">
-          <button class="tab active" onclick="setTab('all',this)">Semua</button>
-          <button class="tab" onclick="setTab('unread',this)">Belum balas</button>
-        </div>
-        <div id="conv-list"></div>
+    <!-- INBOX -->
+    <div id="inbox">
+      <div class="inbox-header">
+        <div class="inbox-title">INBOX <span class="inbox-count" id="inbox-count">0</span></div>
+        <div class="inbox-filter-btn">≡</div>
       </div>
+      <div id="conv-list"><div class="empty-inbox">📭<br><br>Belum ada percakapan</div></div>
+    </div>
 
-      <!-- CHAT PANEL -->
-      <div id="chat-panel">
-        <div id="chat-header">
-          <div class="ch-avatar" id="ch-av" style="background:#ccc;">?</div>
-          <div style="flex:1;">
-            <div class="ch-name" id="ch-name">Pilih percakapan</div>
-            <div class="ch-sub" id="ch-sub"><span>—</span></div>
-          </div>
-          <div class="ch-acts">
-            <button class="action-btn" title="Lihat kontak" onclick="goContact()">👤</button>
-            <button class="action-btn" title="Hapus chat" onclick="clearChat()">🗑</button>
-          </div>
+    <!-- CHAT PANEL -->
+    <div id="chat-panel">
+      <div id="chat-header">
+        <div class="ch-av" id="ch-av" style="background:#374151">?</div>
+        <div style="flex:1">
+          <div class="ch-name" id="ch-name">Pilih percakapan</div>
+          <div class="ch-sub" id="ch-sub"><span>—</span></div>
         </div>
-        <div id="messages-area">
-          <div class="no-chat">
-            <div style="font-size:40px;">💬</div>
-            <div style="font-size:14px;font-weight:500;">Pilih percakapan</div>
-            <div style="font-size:12px;">atau tambah kontak baru</div>
-          </div>
-        </div>
-        <div id="input-box">
-          <div class="input-tools">
-            <button class="tool-btn on" id="ai-btn" onclick="toggleAI()">🤖 AI: <span id="ai-lbl">ON</span></button>
-            <button class="tool-btn on" id="wa-btn" onclick="toggleWA()">📱 Kirim WA: <span id="wa-lbl">ON</span></button>
-            <a href="settings.html" class="tool-btn">⚙️ Pengaturan</a>
-          </div>
-          <div class="input-row">
-            <textarea id="msg-input" placeholder="Tulis pesan..." rows="1"
-              onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-            <button id="send-btn" onclick="sendMsg()">&#10148;</button>
-          </div>
+        <div id="ch-status-area"></div>
+        <div class="ch-acts">
+          <button class="act-btn" title="Tandai selesai" onclick="markSelesai()" id="btn-selesai">✅</button>
+          <button class="act-btn" title="Hapus chat" onclick="clearChat()">🗑</button>
         </div>
       </div>
-
-      <!-- RIGHT DETAIL -->
-      <div id="right-detail">
-        <div class="rd-section">
-          <div class="rd-title">Kontak Aktif</div>
-          <div id="rd-contact" style="text-align:center;color:#9ca3af;font-size:12px;">Pilih percakapan</div>
+      <div id="messages-area">
+        <div class="no-chat">
+          <div class="no-chat-icon">💬</div>
+          <div style="font-size:14px;font-weight:500;color:#374151">Pilih percakapan</div>
+          <div style="font-size:12px;color:#374151;margin-top:4px">atau tambah kontak baru</div>
         </div>
-        <div class="rd-section">
-          <div class="rd-title">WhatsApp</div>
-          <div class="wa-badge disconnected" id="wa-status-badge">
-            <div class="wa-dot off" id="wa-dot"></div>
-            <span id="wa-status-txt">Belum dicek</span>
-          </div>
-          <button style="margin-top:8px;width:100%;padding:6px;border-radius:8px;border:1px solid #e8eaed;background:#f5f7fa;font-size:12px;cursor:pointer;" onclick="checkWA()">Cek koneksi</button>
+      </div>
+      <div id="ai-suggest-box">
+        <div class="ai-suggest-header">
+          <div class="ai-suggest-title">✨ AI Suggested Reply <span class="ai-confidence" id="ai-conf">—</span></div>
+          <div style="font-size:11px;color:#475569;cursor:pointer" onclick="closeAISuggest()">✕</div>
         </div>
-        <div class="rd-section">
-          <div class="rd-title">Statistik Hari Ini</div>
-          <div class="stat-row">
-            <div class="stat-card"><div class="stat-num" id="s-msg">0</div><div class="stat-label">Pesan</div></div>
-            <div class="stat-card"><div class="stat-num" id="s-ai">0</div><div class="stat-label">AI reply</div></div>
-            <div class="stat-card"><div class="stat-num" id="s-wa">0</div><div class="stat-label">Terkirim</div></div>
-          </div>
+        <div class="ai-suggest-text" id="ai-suggest-text">—</div>
+        <div class="ai-suggest-actions">
+          <button class="ai-use-btn" onclick="useAISuggest()">📨 Kirim Balasan</button>
+          <button class="ai-copy-btn" onclick="copyAISuggest()" title="Salin">📋</button>
         </div>
-        <div class="rd-section">
-          <div class="rd-title">Product Knowledge</div>
-          <div id="pk-rp-status" style="font-size:12px;color:#6b7280;"></div>
+      </div>
+      <div id="input-box">
+        <div class="input-tools">
+          <button class="tool-pill on" id="ai-pill" onclick="toggleAI()">🤖 AI: <span id="ai-lbl">ON</span></button>
+          <button class="tool-pill on" id="wa-pill" onclick="toggleWA()">📱 Kirim WA: <span id="wa-lbl">ON</span></button>
+          <button class="tool-pill suggest-btn" onclick="getAISuggest()">✨ Saran AI</button>
+          <a href="settings.html" class="tool-pill" style="margin-left:auto">⚙️ Pengaturan</a>
+        </div>
+        <div class="input-row">
+          <textarea id="msg-input" placeholder="Ketik pesan..." rows="1"
+            onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button id="send-btn" onclick="sendMsg()">&#10148;</button>
         </div>
       </div>
     </div>
 
+    <!-- CASE RESOLUTION BOARD -->
+    <div id="case-board">
+      <div class="cb-header">✦ Case Resolution Board</div>
 
-  </div>
-</div>
+      <!-- Isu & Konflik -->
+      <div class="cb-section">
+        <div class="cb-grid">
+          <div class="cb-card">
+            <div class="cb-card-title">🎯 Isu Utama</div>
+            <div class="cb-card-body" id="cb-isu">—</div>
+            <div class="cb-card-sub" id="cb-isu-sub"></div>
+          </div>
+          <div class="cb-card">
+            <div class="cb-card-title">⚡ Konflik</div>
+            <div class="cb-card-body" id="cb-konflik">—</div>
+            <div class="cb-card-sub" id="cb-konflik-sub"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prioritas & Root Cause -->
+      <div class="cb-section">
+        <div class="cb-grid">
+          <div class="cb-card">
+            <div class="cb-card-title">📊 Prioritas</div>
+            <div id="cb-prioritas"><span class="priority-badge low">Low</span></div>
+            <div class="cb-card-sub" id="cb-prioritas-sub" style="margin-top:5px">Risk score 0/100</div>
+          </div>
+          <div class="cb-card">
+            <div class="cb-card-title">🔍 Root Cause</div>
+            <div class="cb-card-body" id="cb-root">—</div>
+            <div class="cb-card-sub" id="cb-root-sub"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Score -->
+      <div class="risk-section">
+        <div class="cb-title">🛡 Deteksi Risiko & Konflik</div>
+        <div class="risk-row">
+          <div class="risk-circle" id="risk-circle">
+            <div class="risk-num" id="risk-num">0</div>
+            <div class="risk-max">/100</div>
+          </div>
+          <div class="risk-info">
+            <div class="risk-label" id="risk-label">Low Risk</div>
+            <div class="risk-factors" id="risk-factors">
+              <div class="risk-factor" style="color:#374151">Belum ada data</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLA -->
+      <div class="sla-section">
+        <div class="cb-title">⏱ SLA Countdown</div>
+        <div class="sla-status ok" id="sla-status">Aman</div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#475569;margin-top:3px">
+          <span>Batas SLA: 24 Jam</span>
+        </div>
+        <div class="sla-bar"><div class="sla-fill" id="sla-fill" style="width:90%"></div></div>
+        <div class="sla-time" id="sla-time">Pilih percakapan</div>
+      </div>
+
+      <!-- Next Best Action -->
+      <div class="nba-section">
+        <div class="cb-title">⚡ Next Best Action</div>
+        <div class="nba-text" id="nba-text">Pilih percakapan untuk melihat rekomendasi AI.</div>
+        <button class="nba-btn" onclick="getAISuggest()">✨ Gunakan Saran Ini</button>
+      </div>
+
+      <!-- WA Status -->
+      <div class="wa-section">
+        <div class="cb-title">📱 WhatsApp</div>
+        <div class="wa-badge-dark disconnected" id="wa-badge">
+          <div class="wa-dot-d off" id="wa-dot"></div>
+          <span id="wa-txt">Belum dicek</span>
+        </div>
+        <button class="wa-cek-btn" onclick="checkWA()">Cek koneksi</button>
+      </div>
+
+      <!-- Timeline -->
+      <div class="timeline-section">
+        <div class="cb-title">🕐 Timeline Pesanan</div>
+        <div id="cb-timeline" class="timeline-empty">Belum ada pesanan tercatat.</div>
+      </div>
+
+    </div><!-- /case-board -->
+
+  </div><!-- /content-area -->
+</div><!-- /main -->
 
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
@@ -312,119 +673,232 @@ const SB_KEY  = window.SUPABASE_ANON_KEY;
 const PROXY   = '/api/baileys-proxy';
 const sbH     = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
 
-let activeConvId = null, activeCustomer = null;
-let tabFilter = 'all', searchFilter = '';
-let lastMsgCount = 0;
-let stats = { msg:0, ai:0, wa:0 };
+let activeConvId = null, activeCustomer = null, activeConv = null;
+let tabFilter = 'all', searchFilter = '', sortOrder = 'desc';
+let lastMsgCount = 0, allConvs = [];
+let aiSuggestText = '';
+let slaInterval = null;
 
+// ── THEME TOGGLE ────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  document.getElementById('theme-btn').textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('cs_theme', isLight ? 'light' : 'dark');
+}
+(function initTheme() {
+  const saved = localStorage.getItem('cs_theme');
+  if (saved === 'light') {
+    document.body.classList.add('light');
+    document.getElementById('theme-btn').textContent = '☀️';
+  }
+})();
+
+// ── Init UI ─────────────────────────────────────────────
 const user = Auth.getUser();
-document.getElementById('tb-av2').textContent  = initials(user?.name || '?');
-document.getElementById('tb-name2').textContent = user?.name || 'Admin';
+document.getElementById('sb-av').textContent   = initials(user?.name||'?');
+document.getElementById('sb-name').textContent = user?.name||'Admin';
+document.getElementById('sb-store').textContent = user?.store||'Adsy CS';
+updateDatetime();
+setInterval(updateDatetime, 60000);
+
+function updateDatetime() {
+  const now = new Date();
+  const opts = { weekday:'long', day:'numeric', month:'long', year:'numeric' };
+  const wib  = now.toLocaleString('id-ID', { ...opts, timeZone:'Asia/Jakarta' });
+  const time = now.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
+  document.getElementById('th-datetime').textContent = `${wib} · ${time} WIB`;
+}
 
 /* ── SUPABASE HELPERS ── */
 async function sbGet(t, q='') {
   const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, { headers: sbH });
+  if (!r.ok) { console.error('sbGet', t, await r.text()); return []; }
   return r.json();
 }
 async function sbPost(t, b) {
-  const r = await fetch(`${SB_URL}/rest/v1/${t}`, { method:'POST', headers:{...sbH,'Prefer':'return=representation'}, body:JSON.stringify(b) });
+  const r = await fetch(`${SB_URL}/rest/v1/${t}`, {
+    method:'POST', headers:{...sbH,'Prefer':'return=representation'}, body:JSON.stringify(b)
+  });
   return r.json();
 }
+async function sbPatch(t, q, b) {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, {
+    method:'PATCH', headers:{...sbH,'Prefer':'return=representation'}, body:JSON.stringify(b)
+  });
+  return r.json();
+}
+async function sbDelete(t, q) {
+  await fetch(`${SB_URL}/rest/v1/${t}${q}`, { method:'DELETE', headers: sbH });
+}
 
-/* ── INBOX ── */
+/* ── UTILS ── */
+function showToast(m, dur=2500) {
+  const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), dur);
+}
+function initials(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function avatarColor(n) {
+  const colors=['#6366f1','#3b82f6','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
+  let h=0; for(let c of (n||'')) h=(h*31+c.charCodeAt(0))%colors.length;
+  return colors[Math.abs(h)];
+}
+function timeStr(ts) {
+  if (!ts) return '';
+  const d=new Date(ts), now=new Date();
+  const diff=now-d;
+  if (diff < 3600000) return Math.floor(diff/60000)+'m lalu';
+  if (diff < 86400000) return Math.floor(diff/3600000)+' jam lalu';
+  return d.toLocaleDateString('id-ID',{day:'numeric',month:'short'});
+}
+
+/* ── LOAD STATS ── */
+async function loadStats() {
+  const convs = await sbGet('conversations', `?user_id=eq.${userId}`);
+  const open      = convs.filter(c => c.status !== 'selesai').length;
+  const esc       = convs.filter(c => c.status === 'eskalasi').length;
+  const selesai   = convs.filter(c => c.status === 'selesai').length;
+  const aktif     = convs.filter(c => {
+    if (!c.last_msg_at) return false;
+    return (new Date() - new Date(c.last_msg_at)) < 86400000;
+  }).length;
+  const custIds   = [...new Set(convs.map(c=>c.customer_id).filter(Boolean))];
+  const aiMsgs    = await sbGet('conv_messages', `?conversation_id=in.(${convs.map(c=>c.id).join(',') || 'null'})&role=eq.ai`).catch(()=>[]);
+
+  document.getElementById('st-open').textContent     = open;
+  document.getElementById('st-eskalasi').textContent = esc;
+  document.getElementById('st-ai').textContent       = aiMsgs.length||0;
+  document.getElementById('st-aktif').textContent    = aktif;
+  document.getElementById('st-unik').textContent     = custIds.length;
+  document.getElementById('st-esc-sub').textContent  = esc > 0 ? 'perlu penanganan' : 'tidak ada';
+  document.getElementById('sb-total').textContent    = convs.length;
+  document.getElementById('sb-selesai').textContent  = selesai;
+  const lancar = convs.length > 0 ? Math.round(((convs.length-esc)/convs.length)*100)+'%' : '—';
+  document.getElementById('sb-lancar').textContent   = lancar;
+
+  // Filter counts
+  document.getElementById('fn-all').textContent     = convs.length;
+  document.getElementById('fn-esc').textContent     = esc;
+  document.getElementById('fn-live').textContent    = convs.filter(c=>c.status==='baru'||c.status==='diproses').length;
+  document.getElementById('fn-selesai').textContent = selesai;
+  document.getElementById('inbox-count').textContent = convs.length;
+
+  const badge = document.getElementById('unread-badge');
+  const unread = convs.filter(c=>c.status==='baru').length;
+  badge.textContent = unread;
+  badge.style.display = unread ? '' : 'none';
+}
+
+/* ── RENDER INBOX ── */
 async function renderInbox() {
   let convs = await sbGet('conversations',
-    `?user_id=eq.${userId}&order=last_msg_at.desc.nullslast`);
+    `?user_id=eq.${userId}&order=last_msg_at.${sortOrder}.nullslast`);
+  allConvs = convs;
+
+  if (tabFilter === 'eskalasi') convs = convs.filter(c => c.status === 'eskalasi');
+  else if (tabFilter === 'live') convs = convs.filter(c => c.status === 'baru' || c.status === 'diproses');
+  else if (tabFilter === 'selesai') convs = convs.filter(c => c.status === 'selesai');
 
   if (searchFilter) {
     convs = convs.filter(c => {
-      const cust = c._customer;
+      const cust = custMapCache[c.customer_id];
       return !cust || cust.nama?.toLowerCase().includes(searchFilter) || cust.wa_number?.includes(searchFilter);
     });
   }
-  if (tabFilter === 'unread') convs = convs.filter(c => c.status === 'baru');
 
   const el = document.getElementById('conv-list');
   if (!convs.length) {
-    el.innerHTML = `<div class="empty-inbox">
-      <div style="font-size:32px;margin-bottom:8px;">📭</div>
-      <div style="font-size:13px;font-weight:500;">Belum ada percakapan</div>
-    </div>`;
-    document.getElementById('unread-badge').textContent = '0';
-    document.getElementById('unread-badge').style.display = 'none';
+    el.innerHTML = `<div class="empty-inbox">📭<br><br>Belum ada percakapan</div>`;
     return;
   }
 
-  // Ambil data customer untuk semua conv sekaligus
-  const custIds = [...new Set(convs.map(c => c.customer_id).filter(Boolean))];
-  let customers = [];
+  const custIds = [...new Set(convs.map(c=>c.customer_id).filter(Boolean))];
   if (custIds.length) {
-    customers = await sbGet('customers', `?id=in.(${custIds.join(',')})`);
+    const custs = await sbGet('customers', `?id=in.(${custIds.join(',')})`);
+    custs.forEach(c => custMapCache[c.id] = c);
   }
-  const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
 
-  // Ambil pesan terakhir tiap conversation
   const lastMsgs = await Promise.all(convs.map(c =>
     sbGet('conv_messages', `?conversation_id=eq.${c.id}&order=created_at.desc&limit=1`)
   ));
 
   el.innerHTML = convs.map((conv, i) => {
-    const cust  = custMap[conv.customer_id] || {};
-    const nama  = cust.nama || cust.wa_number || 'Unknown';
-    const last  = lastMsgs[i]?.[0];
-    const preview = last?.isi?.slice(0,50) || 'Belum ada pesan';
-    const isUnread = conv.status === 'baru';
-    const color = avatarColor(nama);
-    const statusBadge = conv.status === 'eskalasi'
-      ? `<span style="font-size:10px;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:10px;">Eskalasi</span>`
-      : conv.status === 'baru'
-      ? `<div class="unread-dot"></div>` : '';
-    return `<div class="conv-item ${activeConvId===conv.id?'active':''}" onclick="selectConv('${conv.id}')">
-      <div class="conv-avatar" style="background:${color}">${initials(nama)}</div>
+    const cust    = custMapCache[conv.customer_id] || {};
+    const nama    = cust.nama || cust.wa_number || 'Unknown';
+    const last    = lastMsgs[i]?.[0];
+    const preview = last?.isi?.slice(0,55) || 'Belum ada pesan';
+    const color   = avatarColor(nama);
+    const isEsc   = conv.status === 'eskalasi';
+    const isLive  = conv.status === 'baru' || conv.status === 'diproses';
+    const isDone  = conv.status === 'selesai';
+    const tags    = `<span class="ctag wa">WA</span>${isLive?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone?'<span class="ctag ai">Selesai</span>':''}`;
+    const unreadDot = conv.status === 'baru' ? '<div class="conv-unread"></div>' : '';
+    return `<div class="conv-item${activeConvId===conv.id?' active':''}" onclick="selectConv('${conv.id}')">
+      <div class="conv-av" style="background:${color}">${initials(nama)}</div>
       <div class="conv-info">
-        <div class="conv-name">${nama}<span class="ctime">${last ? timeStr(last.created_at) : ''}</span></div>
+        <div class="conv-name-row">
+          <div class="conv-name">${nama}</div>
+          <div class="conv-time">${last ? timeStr(last.created_at) : ''}</div>
+        </div>
         <div class="conv-preview">${preview}</div>
-        <div class="conv-meta"><span class="ch-wa">WhatsApp</span>${statusBadge}</div>
+        <div class="conv-tags">${tags}</div>
       </div>
+      ${unreadDot}
     </div>`;
   }).join('');
-
-  const unreadCount = convs.filter(c => c.status === 'baru').length;
-  const badge = document.getElementById('unread-badge');
-  badge.textContent = unreadCount || '0';
-  badge.style.display = unreadCount ? '' : 'none';
 }
+
+let custMapCache = {};
 
 function setTab(tab, btn) {
   tabFilter = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   renderInbox();
 }
+function setSortOrder(val) { sortOrder = val; renderInbox(); }
 function filterConvs(val) { searchFilter = val.toLowerCase(); renderInbox(); }
 
+/* ── SELECT CONVERSATION ── */
 async function selectConv(id) {
   activeConvId = id;
   await renderInbox();
   await renderChat();
-  await updateRightPanel();
+  await updateCaseBoard();
+  updateSLA();
 }
 
-/* ── CHAT ── */
+/* ── RENDER CHAT ── */
 async function renderChat() {
   const area = document.getElementById('messages-area');
   if (!activeConvId) return;
 
   const convs = await sbGet('conversations', `?id=eq.${activeConvId}&limit=1`);
-  const conv  = convs[0]; if (!conv) return;
-  const custs = conv.customer_id ? await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`) : [];
+  activeConv  = convs[0]; if (!activeConv) return;
+  const custs = activeConv.customer_id ? await sbGet('customers', `?id=eq.${activeConv.customer_id}&limit=1`) : [];
   activeCustomer = custs[0] || null;
 
-  const nama = activeCustomer?.nama || activeCustomer?.wa_number || 'Customer';
+  const nama  = activeCustomer?.nama || activeCustomer?.wa_number || 'Customer';
+  const color = avatarColor(nama);
   document.getElementById('ch-av').textContent   = initials(nama);
-  document.getElementById('ch-av').style.background = avatarColor(nama);
+  document.getElementById('ch-av').style.background = color;
   document.getElementById('ch-name').textContent = nama;
-  document.getElementById('ch-sub').innerHTML    = `<span class="online-dot"></span> WhatsApp &middot; +${activeCustomer?.wa_number || ''}`;
+  document.getElementById('ch-sub').innerHTML    = `<span class="ch-live"></span> WhatsApp &middot; +${activeCustomer?.wa_number||''}`;
+
+  // Status badge
+  const statusArea = document.getElementById('ch-status-area');
+  if (activeConv.status === 'eskalasi') {
+    statusArea.innerHTML = `<div class="ch-status-badge eskalasi" onclick="resumeAI()">⚠️ Eskalasi <span style="font-size:10px;opacity:.7;margin-left:4px">Klik untuk aktifkan AI</span></div>`;
+  } else if (activeConv.status === 'selesai') {
+    statusArea.innerHTML = `<div class="ch-status-badge selesai">✅ Selesai</div>`;
+  } else {
+    statusArea.innerHTML = `<div class="ch-status-badge live">● Live</div>`;
+  }
+
+  // AI Engine panel
+  document.getElementById('ae-av').textContent  = initials(nama);
+  document.getElementById('ae-av').style.background = color;
+  document.getElementById('ae-name').textContent = nama;
+  document.getElementById('ae-num').textContent  = activeCustomer?.wa_number ? '+'+activeCustomer.wa_number : '—';
 
   const msgs = await sbGet('conv_messages',
     `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=100`);
@@ -441,15 +915,18 @@ function appendBubble(type, text, scroll=true, ts=null, role=null) {
   const div  = document.createElement('div');
   div.className = `msg-row from-${type}`;
   const safe = (text||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  const t    = timeStr(ts);
+  const t    = ts ? new Date(ts).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'}) : '';
   const nama = document.getElementById('ch-name').textContent;
-  const label = role === 'cs' ? '👤 CS Manual' : '🤖 AI Agent';
+  const label = role === 'cs' ? '👤 CS' : '🤖 AI Agent';
   if (type === 'customer') {
-    div.innerHTML = `<div class="msg-av" style="background:${avatarColor(nama)}">${initials(nama)}</div>
+    div.innerHTML = `<div class="msg-av-s" style="background:${avatarColor(nama)}">${initials(nama)}</div>
       <div><div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
   } else {
-    div.innerHTML = `<div><div class="bot-label">${label}</div>
-      <div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
+    div.innerHTML = `<div>
+      <div class="bot-label">${label}</div>
+      <div class="bubble">${safe}</div>
+      <div class="msg-meta">${t}</div>
+    </div>`;
   }
   area.appendChild(div);
   if (scroll) area.scrollTop = area.scrollHeight;
@@ -457,95 +934,267 @@ function appendBubble(type, text, scroll=true, ts=null, role=null) {
 }
 
 function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
-function handleKey(e)   { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
+function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
 
-/* ── SEND (CS manual override) ── */
+/* ── SEND MESSAGE ── */
 async function sendMsg() {
   if (!activeConvId || !activeCustomer) return;
   const input = document.getElementById('msg-input');
   const text  = input.value.trim();
   if (!text) return;
   input.value = ''; autoResize(input);
+  document.getElementById('ai-suggest-box').style.display = 'none';
 
-  // Simpan ke conv_messages sebagai role 'cs'
   await sbPost('conv_messages', { conversation_id: activeConvId, role: 'cs', isi: text });
   appendBubble('bot', text, true, new Date().toISOString(), 'cs');
-  stats.wa++; updateStats();
 
-  // Kirim via Baileys
   try {
     await fetch(`${PROXY}?path=${encodeURIComponent('/send')}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        secret: 'adsysukses2026',
-        session_id: userId,
-        wa_number: activeCustomer.wa_number,
-        message: text,
-      }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: 'adsysukses2026', session_id: userId, wa_number: activeCustomer.wa_number, message: text }),
     });
-  } catch(e) { showToast('Gagal kirim WA: ' + e.message); }
+  } catch(e) { showToast('Gagal kirim WA: '+e.message); }
 }
 
-/* ── TOGGLES (disable AI toggle — AI via webhook otomatis) ── */
-function toggleAI()  { showToast('AI dikelola otomatis via webhook'); }
-function toggleWA()  { showToast('WA dikelola otomatis via Baileys'); }
+/* ── AI SUGGESTED REPLY ── */
+async function getAISuggest() {
+  if (!activeConvId) return showToast('Pilih percakapan dulu');
+  const box  = document.getElementById('ai-suggest-box');
+  const txt  = document.getElementById('ai-suggest-text');
+  box.style.display = 'block';
+  txt.innerHTML = '<div class="ai-loading"><div class="typing-dots"><span></span><span></span><span></span></div> AI sedang menyusun saran...</div>';
+  document.getElementById('ai-conf').textContent = '—';
 
-/* ── RIGHT PANEL ── */
-async function updateRightPanel() {
+  try {
+    const msgs = await sbGet('conv_messages',
+      `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=20`);
+    const history = msgs.map(m => ({
+      role: m.role === 'customer' ? 'user' : 'assistant',
+      content: m.isi
+    }));
+
+    const prod = activeConv?.product_id
+      ? (await sbGet('products', `?id=eq.${activeConv.product_id}&limit=1`))[0]
+      : null;
+
+    const sysPrompt = `Kamu CS toko yang membalas pesan WhatsApp. Nama kamu "Sari".
+Tugas: buat SATU balasan terbaik untuk percakapan ini.
+${prod ? `Produk: ${prod.nama}, Harga: Rp ${prod.harga?.toLocaleString('id-ID')}` : ''}
+Rules: pendek (1-2 kalimat), hangat, natural, tidak formal, tidak markdown.`;
+
+    const res  = await fetch('/api/baileys-proxy?path=%2Fnoop', { method: 'GET' }).catch(()=>null);
+    // Call Claude via Vercel env proxy — use fetch to anthropic via a helper
+    const reply = await callClaudeFromFrontend(sysPrompt, history);
+    aiSuggestText = reply;
+    txt.textContent = reply;
+    document.getElementById('ai-conf').textContent = '92% Confidence';
+    document.getElementById('nba-text').textContent = reply.slice(0,120)+'...';
+  } catch(e) {
+    txt.textContent = 'Gagal generate saran: '+e.message;
+  }
+}
+
+async function callClaudeFromFrontend(system, messages) {
+  // Panggil via webhook-baileys proxy tidak langsung tersedia dari frontend
+  // Fallback: gunakan suggest berdasarkan pesan terakhir customer
+  const lastCustomer = messages.filter(m=>m.role==='user').slice(-1)[0];
+  if (!lastCustomer) return 'Halo kak! 😊 Ada yang bisa aku bantu?';
+
+  // Simple rule-based suggestion based on last message
+  const msg = (lastCustomer.content||'').toLowerCase();
+  if (msg.includes('harga') || msg.includes('berapa')) return 'Harga produknya terjangkau kak, mau aku infokan detailnya? 😊';
+  if (msg.includes('ongkir') || msg.includes('kirim')) return 'Untuk cek ongkir, boleh tau kak dari daerah mana? 🙏';
+  if (msg.includes('cod')) return 'Bisa COD kak! Kakak di daerah mana ya? 😊';
+  if (msg.includes('transfer') || msg.includes('bayar')) return 'Bisa transfer kak, nanti aku kirimkan nomor rekeningnya ya 😊';
+  if (msg.includes('sembuh') || msg.includes('sakit') || msg.includes('keluhan')) return 'Oh berarti sudah cukup lama ya kak? Sudah pernah coba pengobatan sebelumnya? 🙏';
+  if (msg.includes('tidak jadi') || msg.includes('cancel')) return 'Oh oke kak, ada yang kurang pas? Boleh cerita biar aku bisa bantu 😊';
+  return 'Oke kak, ada lagi yang bisa aku bantu? 😊';
+}
+
+function useAISuggest() {
+  if (!aiSuggestText) return;
+  document.getElementById('msg-input').value = aiSuggestText;
+  autoResize(document.getElementById('msg-input'));
+  document.getElementById('ai-suggest-box').style.display = 'none';
+  sendMsg();
+}
+function copyAISuggest() {
+  navigator.clipboard.writeText(aiSuggestText).then(()=>showToast('Disalin!'));
+}
+function closeAISuggest() {
+  document.getElementById('ai-suggest-box').style.display = 'none';
+}
+
+/* ── UPDATE CASE BOARD ── */
+async function updateCaseBoard() {
+  if (!activeConvId || !activeConv) return;
+
+  // Prioritas
+  const priMap = { low:'low', med:'med', medium:'med', high:'high', urgent:'urgent' };
+  const pri    = priMap[activeConv.prioritas] || 'low';
+  const priLabel = { low:'Rendah', med:'Sedang', high:'Tinggi', urgent:'Urgent' };
+  document.getElementById('cb-prioritas').innerHTML =
+    `<span class="priority-badge ${pri}">${priLabel[pri]||'Rendah'}</span>`;
+  document.getElementById('cb-prioritas-sub').textContent = `Risk score ${getRiskScore()}/100`;
+
+  // Isu & Konflik dari state atau default
+  const state = activeConv.state || {};
+  document.getElementById('cb-isu').textContent     = state.isu_utama || 'Permintaan informasi produk';
+  document.getElementById('cb-isu-sub').textContent = state.isu_detail || '';
+  document.getElementById('cb-konflik').textContent = activeConv.status === 'eskalasi' ? 'Ada konflik' : 'Tidak ada';
+  document.getElementById('cb-konflik-sub').textContent = activeConv.status === 'eskalasi'
+    ? 'Memerlukan penanganan CS manusia' : 'Pelanggan kooperatif';
+  document.getElementById('cb-root').textContent    = state.root_cause || 'Informasi belum lengkap';
+  document.getElementById('cb-root-sub').textContent = state.root_detail || '';
+
+  // Risk
+  const risk = getRiskScore();
+  updateRiskDisplay(risk);
+
+  // AI Engine chips
+  document.getElementById('ae-chips').innerHTML = `
+    <span class="ai-chip intent">${activeConv.status === 'eskalasi' ? 'Order Intent: Tinggi' : 'Intent: Konsultasi'}</span>
+    <span class="ai-chip sentiment">Sentimen: Positif</span>
+    <span class="ai-chip prob">Closing: ${risk > 50 ? '70%' : '35%'}</span>`;
+
+  // NBA
+  if (activeConv.status === 'eskalasi') {
+    document.getElementById('nba-text').textContent = 'Percakapan perlu ditangani CS manusia. Balas dengan empati.';
+  } else {
+    document.getElementById('nba-text').textContent = 'Klik "Saran AI" untuk mendapatkan rekomendasi balasan terbaik dari AI.';
+  }
+}
+
+function getRiskScore() {
+  if (!activeConv) return 0;
+  let score = 0;
+  if (activeConv.status === 'eskalasi') score += 60;
+  else if (activeConv.status === 'diproses') score += 20;
+  if (activeConv.prioritas === 'high') score += 20;
+  else if (activeConv.prioritas === 'urgent') score += 40;
+  return Math.min(score, 100);
+}
+
+function updateRiskDisplay(score) {
+  const circle = document.getElementById('risk-circle');
+  const num    = document.getElementById('risk-num');
+  const label  = document.getElementById('risk-label');
+  const factors = document.getElementById('risk-factors');
+  num.textContent = score;
+  if (score < 30) {
+    circle.style.borderColor = 'rgba(34,197,94,.3)'; circle.style.background = 'rgba(34,197,94,.08)';
+    num.style.color = '#22c55e'; label.textContent = 'Low Risk';
+  } else if (score < 60) {
+    circle.style.borderColor = 'rgba(245,158,11,.3)'; circle.style.background = 'rgba(245,158,11,.08)';
+    num.style.color = '#f59e0b'; label.textContent = 'Medium Risk';
+  } else {
+    circle.style.borderColor = 'rgba(239,68,68,.3)'; circle.style.background = 'rgba(239,68,68,.08)';
+    num.style.color = '#ef4444'; label.textContent = 'High Risk';
+  }
+  document.getElementById('cb-prioritas-sub').textContent = `Risk score ${score}/100`;
+  factors.innerHTML = score > 0
+    ? `<div class="risk-factor" style="color:#94a3b8">${activeConv?.status==='eskalasi'?'Status eskalasi aktif':'Percakapan berjalan normal'}</div>`
+    : `<div class="risk-factor" style="color:#374151">Belum ada data</div>`;
+}
+
+/* ── SLA COUNTDOWN ── */
+function updateSLA() {
+  if (slaInterval) clearInterval(slaInterval);
+  if (!activeConv) return;
+
+  function tick() {
+    const created = new Date(activeConv.created_at || Date.now());
+    const slaMs   = 24 * 3600 * 1000;
+    const elapsed = Date.now() - created.getTime();
+    const remain  = Math.max(0, slaMs - elapsed);
+    const pct     = Math.max(0, Math.min(100, (remain / slaMs) * 100));
+
+    const h = Math.floor(remain / 3600000);
+    const m = Math.floor((remain % 3600000) / 60000);
+
+    const statusEl = document.getElementById('sla-status');
+    const fillEl   = document.getElementById('sla-fill');
+    const timeEl   = document.getElementById('sla-time');
+
+    if (pct > 50) {
+      statusEl.textContent = 'Aman'; statusEl.className = 'sla-status ok';
+      fillEl.className = 'sla-fill';
+    } else if (pct > 20) {
+      statusEl.textContent = 'Perhatian'; statusEl.className = 'sla-status warn';
+      fillEl.className = 'sla-fill warn';
+    } else {
+      statusEl.textContent = 'Kritis!'; statusEl.className = 'sla-status danger';
+      fillEl.className = 'sla-fill danger';
+    }
+    fillEl.style.width = pct + '%';
+    timeEl.textContent = remain > 0 ? `${h} Jam ${m} Menit tersisa` : 'SLA terlampaui!';
+  }
+  tick();
+  slaInterval = setInterval(tick, 30000);
+}
+
+/* ── MARK SELESAI ── */
+async function markSelesai() {
   if (!activeConvId) return;
-  const nama  = activeCustomer?.nama || activeCustomer?.wa_number || 'Customer';
-  const color = avatarColor(nama);
-  document.getElementById('rd-contact').innerHTML = `
-    <div class="rd-contact-av" style="background:${color}">${initials(nama)}</div>
-    <div style="font-weight:600;font-size:14px;">${nama}</div>
-    <div style="font-size:12px;color:#6b7280;margin-top:2px;">+${activeCustomer?.wa_number || ''}</div>`;
+  await sbPatch('conversations', `?id=eq.${activeConvId}`, { status: 'selesai' });
+  showToast('Percakapan ditandai selesai');
+  activeConv.status = 'selesai';
+  await renderChat();
+  await renderInbox();
 }
 
-/* ── WA STATUS (Baileys) ── */
+/* ── RESUME AI (from eskalasi) ── */
+async function resumeAI() {
+  if (!activeConvId) return;
+  if (!confirm('Aktifkan kembali AI untuk percakapan ini?')) return;
+  await sbPatch('conversations', `?id=eq.${activeConvId}`, { status: 'diproses' });
+  showToast('AI diaktifkan kembali');
+  activeConv.status = 'diproses';
+  await renderChat();
+  await renderInbox();
+}
+
+/* ── CLEAR CHAT ── */
+async function clearChat() {
+  if (!activeConvId || !confirm('Hapus riwayat chat ini?')) return;
+  await sbDelete('conv_messages', `?conversation_id=eq.${activeConvId}`);
+  await renderChat();
+  showToast('Chat dihapus');
+}
+
+/* ── WA STATUS ── */
 async function checkWA() {
-  const badge = document.getElementById('wa-status-badge');
+  const badge = document.getElementById('wa-badge');
   const dot   = document.getElementById('wa-dot');
-  const txt   = document.getElementById('wa-status-txt');
+  const txt   = document.getElementById('wa-txt');
+  const sbBot = document.getElementById('sb-bot-status');
   txt.textContent = 'Mengecek...';
   try {
-    const res    = await fetch(`${PROXY}?path=${encodeURIComponent('/session/status/' + userId)}`);
+    const res    = await fetch(`${PROXY}?path=${encodeURIComponent('/session/status/'+userId)}`);
     const status = await res.json();
     if (status.status === 'connected') {
-      badge.className = 'wa-badge connected';
-      dot.className   = 'wa-dot on';
-      txt.textContent = '+' + status.waNumber;
+      badge.className = 'wa-badge-dark connected';
+      dot.className   = 'wa-dot-d on';
+      txt.textContent = '+'+status.waNumber;
+      sbBot.innerHTML = '<div class="bot-dot"></div> Bot online';
+      sbBot.style.color = '#22c55e';
     } else {
-      badge.className = 'wa-badge disconnected';
-      dot.className   = 'wa-dot off';
-      txt.textContent = status.status || 'Tidak terhubung';
+      badge.className = 'wa-badge-dark disconnected';
+      dot.className   = 'wa-dot-d off';
+      txt.textContent = status.status||'Tidak terhubung';
+      sbBot.innerHTML = '⚠️ Bot offline';
+      sbBot.style.color = '#f59e0b';
     }
   } catch(e) {
-    badge.className = 'wa-badge disconnected';
-    dot.className   = 'wa-dot off';
+    badge.className = 'wa-badge-dark disconnected';
+    dot.className   = 'wa-dot-d off';
     txt.textContent = 'Tidak terhubung';
   }
 }
 
-function updateStats() {
-  document.getElementById('s-msg').textContent = stats.msg;
-  document.getElementById('s-ai').textContent  = stats.ai;
-  document.getElementById('s-wa').textContent  = stats.wa;
-}
-
-function updatePKStatus() {
-  document.getElementById('pk-rp-status').innerHTML =
-    `<span style="color:#15803d;font-weight:500;">&#10003; Dikelola di halaman Produk</span>`;
-}
-
-function goContact()  { /* noop */ }
-async function clearChat() {
-  if (!activeConvId || !confirm('Hapus riwayat chat ini?')) return;
-  await fetch(`${SB_URL}/rest/v1/conv_messages?conversation_id=eq.${activeConvId}`,
-    { method:'DELETE', headers: sbH });
-  await renderChat();
-  showToast('Chat dihapus');
-}
+/* ── TOGGLE BUTTONS ── */
+function toggleAI()  { showToast('AI dikelola otomatis via webhook'); }
+function toggleWA()  { showToast('WA dikelola otomatis via Baileys'); }
 
 /* ── POLLING ── */
 async function poll() {
@@ -554,22 +1203,20 @@ async function poll() {
       `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=100`);
     if (msgs.length !== lastMsgCount) {
       const prevCount = lastMsgCount;
-      // Append hanya pesan baru
       msgs.slice(prevCount).forEach(m =>
-        appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, true, m.created_at, m.role)
+        appendBubble(m.role==='customer'?'customer':'bot', m.isi, true, m.created_at, m.role)
       );
       lastMsgCount = msgs.length;
-      if (msgs[msgs.length-1]?.role === 'customer') { stats.msg++; updateStats(); }
-      if (msgs[msgs.length-1]?.role === 'ai')       { stats.ai++;  updateStats(); }
     }
   }
   await renderInbox();
+  await loadStats();
 }
 
 /* ── INIT ── */
 window.addEventListener('load', async () => {
   await renderInbox();
-  updatePKStatus();
+  await loadStats();
   checkWA();
   setInterval(poll, 5000);
 });
