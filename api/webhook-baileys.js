@@ -295,7 +295,6 @@ async function callClaude(systemPrompt, messages) {
     }),
   });
   const data = await res.json();
-  console.log(`Claude API: status=${res.status} stop_reason=${data.stop_reason} error=${JSON.stringify(data.error)} content_len=${data.content?.length} text_len=${data.content?.[0]?.text?.length}`);
   if (data.error) throw new Error(`Claude: ${data.error.message}`);
   return data.content?.[0]?.text || '';
 }
@@ -460,11 +459,8 @@ module.exports = async function handler(req, res) {
     console.log(`Produk: ${product?.nama || 'tidak diketahui'} (${sumber})`);
 
     // ── Find/create customer & conversation ───────────────────
-    console.log(`[1] findOrCreateCustomer: userId=${userId} wa_number=${wa_number}`);
     const customer = await findOrCreateCustomer(userId, wa_number, pushName);
-    console.log(`[2] customer: id=${customer?.id}`);
     const conversation = await findOrCreateConversation(userId, customer.id, sumber, product?.id);
-    console.log(`[3] conversation: id=${conversation?.id} status=${conversation?.status}`);
 
     // Update produk ke conversation jika baru ketemu
     if (product?.id && !conversation.product_id) {
@@ -472,9 +468,7 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Simpan pesan masuk ─────────────────────────────────────
-    console.log(`[4] saveMessage...`);
     await saveMessage(conversation.id, 'customer', message || `[${messageType}]`);
-    console.log(`[5] saveMessage OK`);
 
     // ── Cek apakah sudah eskalasi → AI diam, CS manusia yang balas ──
     if (conversation.status === 'eskalasi') {
@@ -486,11 +480,8 @@ module.exports = async function handler(req, res) {
     const systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber);
 
     // ── Ambil history & panggil Claude ────────────────────────
-    console.log(`[6] getContextMessages...`);
     const history = await getContextMessages(conversation.id);
-    console.log(`[7] callClaude... history=${history.length} msgs`);
     let rawReply  = await callClaude(systemPrompt, history);
-    console.log(`[8] Claude reply: ${rawReply?.slice(0,60)}`);
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
 
     // ── Deteksi marker khusus ──────────────────────────────────
@@ -547,11 +538,7 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
       .replace(/\[CEK_ONGKIR:[^\]]+\]/, '')
       .trim();
 
-    console.log(`[9] rawReply="${rawReply?.slice(0,100)}" reply="${reply?.slice(0,100)}"`);
-    if (!reply) {
-      console.warn('[9] reply kosong setelah bersihkan marker — skip kirim');
-      return res.status(200).json({ ok: true, skipped: 'empty_reply' });
-    }
+    if (!reply) return res.status(200).json({ ok: true, skipped: 'empty_reply' });
 
     console.log(`Reply untuk ${wa_number}${isEscalated?' [ESKALASI]':''}${orderConfirmed?' [ORDER]':''}: ${reply.slice(0, 80)}`);
 
@@ -569,10 +556,8 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
     }
 
     // ── Simpan & kirim balasan ─────────────────────────────────
-    console.log(`[10] sendWA → reply_jid=${reply_jid}`);
     await saveMessage(conversation.id, 'ai', reply);
     await sendWA(userId, reply_jid, reply);
-    console.log(`[11] sendWA OK`);
 
     res.status(200).json({ ok: true });
 
