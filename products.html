@@ -153,6 +153,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .fu-save-hint{font-size:11px;color:#475569;flex:1}
 .fu-chevron{font-size:12px;color:#475569;transition:transform .2s}
 .fu-chevron.open{transform:rotate(180deg)}
+.fu-msg-area{margin-top:12px;border-top:1px solid rgba(255,255,255,.05);padding-top:12px}
+.fu-msg-area textarea{width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:9px 12px;font-size:12px;color:#e2e8f0;font-family:inherit;outline:none;resize:vertical;min-height:72px;transition:border-color .15s;margin-top:6px}
+.fu-msg-area textarea:focus{border-color:rgba(59,130,246,.4)}
+.fu-msg-area textarea::placeholder{color:#374151}
+.fu-msg-lbl{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.3px}
+.fu-photo-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.fu-photo-thumb{width:54px;height:54px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.08);cursor:pointer}
+.fu-photo-empty{width:54px;height:54px;border-radius:8px;background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:border-color .15s}
+.fu-photo-empty:hover{border-color:rgba(59,130,246,.4)}
 
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
@@ -212,6 +221,10 @@ body.light .fu-field label{color:#94a3b8}
 body.light .fu-field input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
 body.light .fu-save-bar{border-color:#e2e8f0}
 body.light .fu-save-hint{color:#94a3b8}
+body.light .fu-msg-area{border-color:#f1f5f9}
+body.light .fu-msg-area textarea{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+body.light .fu-photo-empty{background:#f1f5f9;border-color:#e2e8f0}
+body.light .fu-msg-lbl{color:#94a3b8}
 </style>
 </head>
 <body>
@@ -344,13 +357,28 @@ body.light .fu-save-hint{color:#94a3b8}
               <div class="fu-dot h1" style="margin-top:4px"></div>
               <div class="fu-stage-info">
                 <div class="fu-stage-label">H+1 — Besok</div>
-                <div class="fu-stage-desc">Kirim SOP H+1 setelah X jam sejak pesan terakhir di hari H. Konten diambil dari SOP H+1 di bawah.</div>
+                <div class="fu-stage-desc">Pesan manual dikirim keesokan harinya jika tidak ada balasan.</div>
                 <div class="fu-fields">
                   <div class="fu-field">
                     <label>Kirim setelah</label>
                     <input type="number" id="fu-h1-delay" value="24" min="12" max="48">
                     <div class="unit">jam tidak balas</div>
                   </div>
+                </div>
+                <div class="fu-msg-area">
+                  <div class="fu-msg-lbl">Pesan Follow Up H+1</div>
+                  <textarea id="fu-h1-msg" placeholder="Halo kak, kemarin sempat tanya soal... Ada yang bisa aku bantu lagi? 😊"></textarea>
+                  <div class="fu-photo-row">
+                    <input type="file" id="fu-h1-file" accept="image/*" style="display:none" onchange="handlePhotoUpload('h1',this)">
+                    <div id="fu-h1-photo" class="fu-photo-empty" onclick="document.getElementById('fu-h1-file').click()" title="Klik untuk upload foto">📷</div>
+                    <div>
+                      <div style="font-size:12px;color:#e2e8f0;font-weight:500" id="fu-h1-photo-name">Belum ada foto</div>
+                      <div style="font-size:11px;color:#64748b;margin-top:2px">Foto dikirim bersamaan dengan pesan</div>
+                      <button class="btn btn-sm" style="margin-top:6px" onclick="document.getElementById('fu-h1-file').click()">📷 Upload Foto</button>
+                      <button class="btn btn-sm" id="fu-h1-remove" style="display:none;margin-top:6px" onclick="removePhoto('h1')">✕ Hapus</button>
+                    </div>
+                  </div>
+                  <input type="hidden" id="fu-h1-img-url">
                 </div>
               </div>
               <div class="fu-toggle">
@@ -364,13 +392,28 @@ body.light .fu-save-hint{color:#94a3b8}
               <div class="fu-dot h3" style="margin-top:4px"></div>
               <div class="fu-stage-info">
                 <div class="fu-stage-label">H+3 — 3 Hari Kemudian</div>
-                <div class="fu-stage-desc">Kirim SOP H+3 jika setelah H+1 masih tidak ada balasan dalam X jam.</div>
+                <div class="fu-stage-desc">Pesan manual dikirim jika setelah H+1 masih tidak ada balasan.</div>
                 <div class="fu-fields">
                   <div class="fu-field">
                     <label>Kirim setelah</label>
                     <input type="number" id="fu-h3-delay" value="72" min="24" max="120">
                     <div class="unit">jam sejak H+1</div>
                   </div>
+                </div>
+                <div class="fu-msg-area">
+                  <div class="fu-msg-lbl">Pesan Follow Up H+3</div>
+                  <textarea id="fu-h3-msg" placeholder="Halo kak, mau share info menarik nih... 🌿"></textarea>
+                  <div class="fu-photo-row">
+                    <input type="file" id="fu-h3-file" accept="image/*" style="display:none" onchange="handlePhotoUpload('h3',this)">
+                    <div id="fu-h3-photo" class="fu-photo-empty" onclick="document.getElementById('fu-h3-file').click()" title="Klik untuk upload foto">📷</div>
+                    <div>
+                      <div style="font-size:12px;color:#e2e8f0;font-weight:500" id="fu-h3-photo-name">Belum ada foto</div>
+                      <div style="font-size:11px;color:#64748b;margin-top:2px">Foto dikirim bersamaan dengan pesan</div>
+                      <button class="btn btn-sm" style="margin-top:6px" onclick="document.getElementById('fu-h3-file').click()">📷 Upload Foto</button>
+                      <button class="btn btn-sm" id="fu-h3-remove" style="display:none;margin-top:6px" onclick="removePhoto('h3')">✕ Hapus</button>
+                    </div>
+                  </div>
+                  <input type="hidden" id="fu-h3-img-url">
                 </div>
               </div>
               <div class="fu-toggle">
@@ -384,13 +427,28 @@ body.light .fu-save-hint{color:#94a3b8}
               <div class="fu-dot h7" style="margin-top:4px"></div>
               <div class="fu-stage-info">
                 <div class="fu-stage-label">H+7 — 7 Hari Kemudian</div>
-                <div class="fu-stage-desc">Follow up terakhir. Kirim SOP H+7 jika setelah H+3 masih tidak ada balasan dalam X jam.</div>
+                <div class="fu-stage-desc">Follow up terakhir. Dikirim jika setelah H+3 masih tidak ada balasan.</div>
                 <div class="fu-fields">
                   <div class="fu-field">
                     <label>Kirim setelah</label>
                     <input type="number" id="fu-h7-delay" value="168" min="72" max="240">
                     <div class="unit">jam sejak H+3</div>
                   </div>
+                </div>
+                <div class="fu-msg-area">
+                  <div class="fu-msg-lbl">Pesan Follow Up H+7</div>
+                  <textarea id="fu-h7-msg" placeholder="Halo kak, maaf ganggu ya. Aku mau info terakhir soal... 🙏"></textarea>
+                  <div class="fu-photo-row">
+                    <input type="file" id="fu-h7-file" accept="image/*" style="display:none" onchange="handlePhotoUpload('h7',this)">
+                    <div id="fu-h7-photo" class="fu-photo-empty" onclick="document.getElementById('fu-h7-file').click()" title="Klik untuk upload foto">📷</div>
+                    <div>
+                      <div style="font-size:12px;color:#e2e8f0;font-weight:500" id="fu-h7-photo-name">Belum ada foto</div>
+                      <div style="font-size:11px;color:#64748b;margin-top:2px">Foto dikirim bersamaan dengan pesan</div>
+                      <button class="btn btn-sm" style="margin-top:6px" onclick="document.getElementById('fu-h7-file').click()">📷 Upload Foto</button>
+                      <button class="btn btn-sm" id="fu-h7-remove" style="display:none;margin-top:6px" onclick="removePhoto('h7')">✕ Hapus</button>
+                    </div>
+                  </div>
+                  <input type="hidden" id="fu-h7-img-url">
                 </div>
               </div>
               <div class="fu-toggle">
@@ -675,6 +733,55 @@ function syncFULabels() {
   document.getElementById(`fu-${k}-enabled`)?.addEventListener('change', syncFULabels);
 });
 
+/* ── Photo upload ke Supabase Storage ── */
+async function handlePhotoUpload(stage, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const MAX = 5 * 1024 * 1024;
+  if (file.size > MAX) { toast('❌ Foto maksimal 5MB'); input.value=''; return; }
+
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const path = `${currentUserId}/${stage}_${Date.now()}.${ext}`;
+  const SB_URL_BASE = window.SUPABASE_URL;
+  const SB_KEY_VAL  = window.SUPABASE_ANON_KEY;
+
+  toast('⏳ Mengupload foto...');
+  try {
+    const res = await fetch(`${SB_URL_BASE}/storage/v1/object/followup-media/${path}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SB_KEY_VAL}`, 'Content-Type': file.type },
+      body: file,
+    });
+    if (!res.ok) throw new Error('Upload gagal');
+    const url = `${SB_URL_BASE}/storage/v1/object/public/followup-media/${path}`;
+    setPhotoPreview(stage, url, file.name);
+    toast('✅ Foto berhasil diupload');
+  } catch(e) {
+    toast('❌ ' + e.message);
+    input.value = '';
+  }
+}
+
+function setPhotoPreview(stage, url, name) {
+  document.getElementById(`fu-${stage}-img-url`).value = url;
+  document.getElementById(`fu-${stage}-photo-name`).textContent = name || 'Foto terpasang';
+  const thumb = document.getElementById(`fu-${stage}-photo`);
+  thumb.innerHTML = `<img src="${url}" class="fu-photo-thumb" onclick="document.getElementById('fu-${stage}-file').click()">`;
+  thumb.classList.remove('fu-photo-empty');
+  document.getElementById(`fu-${stage}-remove`).style.display = 'inline-flex';
+}
+
+function removePhoto(stage) {
+  document.getElementById(`fu-${stage}-img-url`).value = '';
+  document.getElementById(`fu-${stage}-photo-name`).textContent = 'Belum ada foto';
+  document.getElementById(`fu-${stage}-file`).value = '';
+  const thumb = document.getElementById(`fu-${stage}-photo`);
+  thumb.innerHTML = '📷';
+  thumb.className = 'fu-photo-empty';
+  thumb.onclick = () => document.getElementById(`fu-${stage}-file`).click();
+  document.getElementById(`fu-${stage}-remove`).style.display = 'none';
+}
+
 async function loadFUConfig() {
   if (!currentUserId) return;
   try {
@@ -687,13 +794,21 @@ async function loadFUConfig() {
       document.getElementById('fu-same-stop').value       = c.same_day_stop_hour ?? 21;
       document.getElementById('fu-h1-enabled').checked    = c.h1_enabled         ?? true;
       document.getElementById('fu-h1-delay').value        = c.h1_delay_hours     ?? 24;
+      document.getElementById('fu-h1-msg').value          = c.h1_message         || '';
       document.getElementById('fu-h3-enabled').checked    = c.h3_enabled         ?? true;
       document.getElementById('fu-h3-delay').value        = c.h3_delay_hours     ?? 72;
+      document.getElementById('fu-h3-msg').value          = c.h3_message         || '';
       document.getElementById('fu-h7-enabled').checked    = c.h7_enabled         ?? true;
       document.getElementById('fu-h7-delay').value        = c.h7_delay_hours     ?? 168;
+      document.getElementById('fu-h7-msg').value          = c.h7_message         || '';
+      // restore photo previews
+      ['h1','h3','h7'].forEach(s => {
+        const url = c[`${s}_image_url`];
+        if (url) setPhotoPreview(s, url, 'Foto tersimpan');
+      });
       syncFULabels();
     }
-  } catch(e) { /* tabel mungkin belum ada, pakai default */ }
+  } catch(e) { /* tabel belum ada, pakai default */ }
 }
 
 async function saveFUConfig() {
@@ -706,14 +821,19 @@ async function saveFUConfig() {
     same_day_stop_hour:   parseInt(document.getElementById('fu-same-stop').value) || 21,
     h1_enabled:           document.getElementById('fu-h1-enabled').checked,
     h1_delay_hours:       parseInt(document.getElementById('fu-h1-delay').value) || 24,
+    h1_message:           document.getElementById('fu-h1-msg').value.trim(),
+    h1_image_url:         document.getElementById('fu-h1-img-url').value || null,
     h3_enabled:           document.getElementById('fu-h3-enabled').checked,
     h3_delay_hours:       parseInt(document.getElementById('fu-h3-delay').value) || 72,
+    h3_message:           document.getElementById('fu-h3-msg').value.trim(),
+    h3_image_url:         document.getElementById('fu-h3-img-url').value || null,
     h7_enabled:           document.getElementById('fu-h7-enabled').checked,
     h7_delay_hours:       parseInt(document.getElementById('fu-h7-delay').value) || 168,
+    h7_message:           document.getElementById('fu-h7-msg').value.trim(),
+    h7_image_url:         document.getElementById('fu-h7-img-url').value || null,
     updated_at:           new Date().toISOString(),
   };
   try {
-    // upsert by user_id
     const existing = await sbGet('followup_config', `?user_id=eq.${currentUserId}&limit=1`);
     if (existing && existing[0]) {
       await sbPatch('followup_config', `?user_id=eq.${currentUserId}`, payload);
@@ -733,12 +853,14 @@ function resetFUConfig() {
   document.getElementById('fu-same-interval').value  = 3;
   document.getElementById('fu-same-max').value       = 3;
   document.getElementById('fu-same-stop').value      = 21;
-  document.getElementById('fu-h1-enabled').checked   = true;
-  document.getElementById('fu-h1-delay').value       = 24;
-  document.getElementById('fu-h3-enabled').checked   = true;
-  document.getElementById('fu-h3-delay').value       = 72;
-  document.getElementById('fu-h7-enabled').checked   = true;
-  document.getElementById('fu-h7-delay').value       = 168;
+  ['h1','h3','h7'].forEach(s => {
+    document.getElementById(`fu-${s}-enabled`).checked = true;
+    document.getElementById(`fu-${s}-msg`).value = '';
+    removePhoto(s);
+  });
+  document.getElementById('fu-h1-delay').value = 24;
+  document.getElementById('fu-h3-delay').value = 72;
+  document.getElementById('fu-h7-delay').value = 168;
   syncFULabels();
 }
 
