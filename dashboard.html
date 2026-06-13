@@ -71,6 +71,7 @@ body.light #case-board{background:#fff;min-width:300px}
 body.light .stat-card{background:#f8fafc;border-color:#e2e8f0}
 body.light .stat-num{color:#0f172a}
 body.light .stat-label{color:#64748b}
+body.light .stat-sub.muted{color:#94a3b8}
 body.light .ai-engine-card{background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.05));border-color:rgba(99,102,241,.2)}
 body.light #filter-bar{background:#fff;border-bottom-color:#e2e8f0}
 body.light .ftab{border-color:#e2e8f0;color:#64748b}
@@ -173,34 +174,39 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .th-notif:hover{border-color:#3b82f6;color:#3b82f6}
 
 /* ── STATS ROW ── */
-#stats-row{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:5px 20px;display:flex;gap:7px;flex-shrink:0;overflow-x:auto;align-items:flex-start}
+#stats-row{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:6px 20px;display:flex;gap:6px;flex-shrink:0;overflow-x:auto;align-items:flex-start}
 #stats-row::-webkit-scrollbar{height:3px}
 #stats-row::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
-.stat-card{flex:1;min-width:100px;background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:5px 8px;display:flex;align-items:center;gap:7px;transition:border-color .15s;cursor:default}
+.stat-card{flex:1;min-width:110px;background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:10px;transition:border-color .15s;cursor:default}
 .stat-card:hover{border-color:rgba(59,130,246,.3)}
-.stat-icon{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
-.stat-icon.blue{background:rgba(59,130,246,.12);color:#3b82f6}
-.stat-icon.red{background:rgba(239,68,68,.12);color:#ef4444}
-.stat-icon.purple{background:rgba(139,92,246,.12);color:#8b5cf6}
-.stat-icon.green{background:rgba(34,197,94,.12);color:#22c55e}
-.stat-icon.amber{background:rgba(245,158,11,.12);color:#f59e0b}
-.stat-num{font-size:18px;font-weight:700;color:#f1f5f9;line-height:1}
-.stat-label{font-size:10px;color:#64748b;margin-top:1px}
-.stat-sub{font-size:9px;margin-top:1px}
-.stat-sub.danger{color:#ef4444}
-.stat-sub.ok{color:#22c55e}
+.stat-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.stat-icon.blue{background:rgba(59,130,246,.13);color:#3b82f6}
+.stat-icon.red{background:rgba(239,68,68,.13);color:#ef4444}
+.stat-icon.purple{background:rgba(139,92,246,.13);color:#8b5cf6}
+.stat-icon.green{background:rgba(34,197,94,.13);color:#22c55e}
+.stat-icon.amber{background:rgba(245,158,11,.13);color:#f59e0b}
+.stat-text{display:flex;flex-direction:column;gap:0;min-width:0}
+.stat-label{font-size:10px;color:#64748b;line-height:1.2}
+.stat-num{font-size:20px;font-weight:700;color:#f1f5f9;line-height:1.1}
+.stat-sub{font-size:9.5px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-sub.danger{color:#f87171}
+.stat-sub.ok{color:#4ade80}
+.stat-sub.muted{color:#475569}
 
 /* AI Engine Card */
-.ai-engine-card{width:180px;background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(139,92,246,.1));border:1px solid rgba(99,102,241,.25);border-radius:7px;padding:5px 8px;flex-shrink:0}
-.ai-engine-title{font-size:10px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:flex;align-items:center;gap:5px}
-.ai-engine-sub{font-size:10px;color:#6366f1;margin-bottom:8px}
-.ai-mini-user{display:flex;align-items:center;gap:8px}
+.ai-engine-card{width:200px;background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(139,92,246,.1));border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:8px 10px;flex-shrink:0;position:relative;overflow:hidden}
+.ai-engine-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
+.ai-engine-title-wrap{}
+.ai-engine-title{font-size:10px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:4px}
+.ai-engine-sub{font-size:9px;color:#6366f1;margin-top:1px}
+.ai-sparkline{flex-shrink:0;opacity:.7}
+.ai-mini-user{display:flex;align-items:center;gap:8px;margin-top:5px}
 .ai-mini-av{width:28px;height:28px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
 .ai-mini-info{flex:1;min-width:0}
-.ai-mini-name{font-size:12px;font-weight:600;color:#e2e8f0}
+.ai-mini-name{font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ai-mini-num{font-size:10px;color:#6366f1}
-.ai-chips{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
-.ai-chip{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500}
+.ai-chips{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
+.ai-chip{font-size:9.5px;padding:2px 6px;border-radius:10px;font-weight:500}
 .ai-chip.intent{background:rgba(239,68,68,.12);color:#fca5a5}
 .ai-chip.sentiment{background:rgba(34,197,94,.12);color:#86efac}
 .ai-chip.prob{background:rgba(245,158,11,.12);color:#fcd34d}
@@ -449,42 +455,55 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
   <div id="stats-row">
     <div class="stat-card">
       <div class="stat-icon blue">💬</div>
-      <div>
-        <div class="stat-num" id="st-open">0</div>
+      <div class="stat-text">
         <div class="stat-label">Open Tickets</div>
+        <div class="stat-num" id="st-open">0</div>
+        <div class="stat-sub muted" id="st-open-sub">percakapan aktif</div>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon red">⚠️</div>
-      <div>
-        <div class="stat-num" id="st-eskalasi">0</div>
+      <div class="stat-text">
         <div class="stat-label">Eskalasi</div>
+        <div class="stat-num" id="st-eskalasi">0</div>
+        <div class="stat-sub danger" id="st-esc-sub">perlu penanganan</div>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon purple">🤖</div>
-      <div>
-        <div class="stat-num" id="st-ai">0</div>
+      <div class="stat-text">
         <div class="stat-label">AI Response</div>
+        <div class="stat-num" id="st-ai">0</div>
+        <div class="stat-sub ok" id="st-ai-sub">balasan AI hari ini</div>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon green">⚡</div>
-      <div>
-        <div class="stat-num" id="st-aktif">0</div>
+      <div class="stat-text">
         <div class="stat-label">Sesi Aktif</div>
+        <div class="stat-num" id="st-aktif">0</div>
+        <div class="stat-sub muted" id="st-aktif-sub">aktif dalam 24 jam</div>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon amber">👥</div>
-      <div>
-        <div class="stat-num" id="st-unik">0</div>
+      <div class="stat-text">
         <div class="stat-label">Customer Unik</div>
+        <div class="stat-num" id="st-unik">0</div>
+        <div class="stat-sub muted" id="st-unik-sub">pelanggan hari ini</div>
       </div>
     </div>
     <div class="ai-engine-card">
-      <div class="ai-engine-title">✨ AI Resolution Engine</div>
-      <div class="ai-engine-sub">Inteligensi Pelanggan</div>
+      <div class="ai-engine-header">
+        <div class="ai-engine-title-wrap">
+          <div class="ai-engine-title">✨ AI Resolution Engine</div>
+          <div class="ai-engine-sub">Inteligensi Pelanggan</div>
+        </div>
+        <svg class="ai-sparkline" width="48" height="20" viewBox="0 0 48 20" fill="none">
+          <polyline points="0,18 8,14 16,16 24,8 32,10 40,4 48,6" stroke="#6366f1" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="0,18 8,14 16,16 24,8 32,10 40,4 48,6 48,20 0,20" fill="rgba(99,102,241,.12)"/>
+        </svg>
+      </div>
       <div class="ai-mini-user" id="ai-engine-contact">
         <div class="ai-mini-av" id="ae-av">?</div>
         <div class="ai-mini-info">
@@ -763,11 +782,17 @@ async function loadStats() {
   const custIds   = [...new Set(convs.map(c=>c.customer_id).filter(Boolean))];
   const aiMsgs    = await sbGet('conv_messages', `?conversation_id=in.(${convs.map(c=>c.id).join(',') || 'null'})&role=eq.ai`).catch(()=>[]);
 
-  document.getElementById('st-open').textContent     = open;
-  document.getElementById('st-eskalasi').textContent = esc;
-  document.getElementById('st-ai').textContent       = aiMsgs.length||0;
-  document.getElementById('st-aktif').textContent    = aktif;
-  document.getElementById('st-unik').textContent     = custIds.length;
+  document.getElementById('st-open').textContent      = open;
+  document.getElementById('st-eskalasi').textContent  = esc;
+  document.getElementById('st-ai').textContent        = aiMsgs.length||0;
+  document.getElementById('st-aktif').textContent     = aktif;
+  document.getElementById('st-unik').textContent      = custIds.length;
+  document.getElementById('st-open-sub').textContent  = open + ' percakapan aktif';
+  document.getElementById('st-esc-sub').textContent   = esc > 0 ? esc + ' perlu penanganan' : 'aman terkendali';
+  document.getElementById('st-esc-sub').className     = 'stat-sub ' + (esc > 0 ? 'danger' : 'ok');
+  document.getElementById('st-ai-sub').textContent    = (aiMsgs.length||0) + ' balasan AI hari ini';
+  document.getElementById('st-aktif-sub').textContent = aktif + ' aktif dalam 24 jam';
+  document.getElementById('st-unik-sub').textContent  = custIds.length + ' pelanggan hari ini';
   document.getElementById('sb-total').textContent    = convs.length;
   document.getElementById('sb-selesai').textContent  = selesai;
   const lancar = convs.length > 0 ? Math.round(((convs.length-esc)/convs.length)*100)+'%' : '—';
@@ -1057,9 +1082,9 @@ async function updateCaseBoard() {
 
   // AI Engine chips
   document.getElementById('ae-chips').innerHTML = `
-    <span class="ai-chip intent">${activeConv.status === 'eskalasi' ? 'Order Intent: Tinggi' : 'Intent: Konsultasi'}</span>
-    <span class="ai-chip sentiment">Sentimen: Positif</span>
-    <span class="ai-chip prob">Closing: ${risk > 50 ? '70%' : '35%'}</span>`;
+    <span class="ai-chip intent">Order Intent: ${activeConv.status === 'eskalasi' ? 'Tinggi' : 'Sedang'}</span>
+    <span class="ai-chip sentiment">Sentiment: Positif</span>
+    <span class="ai-chip prob">Closing: ${risk > 50 ? risk+'%' : Math.max(20,risk)+'%'}</span>`;
 
   // NBA
   if (activeConv.status === 'eskalasi') {
