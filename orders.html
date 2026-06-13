@@ -6,6 +6,24 @@
 <title>Orders · Adsy CS</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
+/* ── Sidebar override ── */
+.app-layout{padding-left:0!important;display:flex!important;height:100vh!important;overflow:hidden!important}
+#sidebar{position:relative!important;left:auto!important;top:auto!important;z-index:auto!important;width:220px!important;min-width:220px!important;background:#1e293b!important;height:100vh!important;display:flex!important;flex-direction:column!important;flex-shrink:0!important;overflow:hidden!important;border-right:1px solid rgba(255,255,255,.07)!important}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sb-logo{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+.sb-subtitle{font-size:10px;color:#64748b;margin-top:1px}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0;scrollbar-width:none}
+.sb-nav::-webkit-scrollbar{display:none}
+.sb-section{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
+.sb-item{display:flex!important;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b!important;text-decoration:none!important;transition:all .12s}
+.sb-item:hover{background:rgba(255,255,255,.05)!important;color:#e2e8f0!important}
+.sb-item.active{background:rgba(59,130,246,.12)!important;color:#93c5fd!important}
+.sb-item .si{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
+.sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+/* ── Page styles ── */
 .s-tab { padding:6px 14px; border-radius:20px; border:1px solid var(--border); background:var(--white); font-size:12px; font-weight:500; color:var(--text-2); cursor:pointer; transition:all .15s; }
 .s-tab.active { background:var(--green); color:#fff; border-color:var(--green); }
 .orders-table { width:100%; border-collapse:collapse; }
@@ -31,7 +49,33 @@
 <body>
 <div id="toast"></div>
 <div class="app-layout">
-  <div id="sidebar-container"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">CS</div>
+    <div><div class="sb-title">Adsy CS</div><div class="sb-subtitle" id="sb-store">—</div></div>
+  </div>
+  <div class="sb-nav">
+    <a class="sb-item" href="analytics.html"><span class="si">📊</span> Ringkasan</a>
+    <a class="sb-item" href="dashboard.html"><span class="si">💬</span> Percakapan</a>
+    <a class="sb-item active" href="orders.html"><span class="si">✅</span> Closing</a>
+    <a class="sb-item" href="knowledge.html"><span class="si">📋</span> Katalog & SOP</a>
+    <a class="sb-item" href="products.html"><span class="si">🎁</span> Skema Promo</a>
+    <div class="sb-divider"></div>
+    <div class="sb-section">Akun</div>
+    <a class="sb-item" href="settings.html"><span class="si">⚙️</span> Pengaturan</a>
+    <a class="sb-item" href="analytics.html"><span class="si">📅</span> Ringkasan Harian</a>
+  </div>
+  <div class="sb-user">
+    <div class="sb-avatar" id="sb-av">A</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:500;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="sb-name">Admin</div>
+      <button style="font-size:11px;color:#475569;border:none;background:none;cursor:pointer;padding:0" onclick="Auth.logout()">Logout</button>
+    </div>
+  </div>
+</div>
+
   <div class="main-content">
 
     <div class="page-header">
@@ -163,7 +207,7 @@
 <script src="js/app.js"></script>
 <script>
 Auth.guard();
-document.getElementById('sidebar-container').innerHTML = renderSidebar('orders');
+(function(){const u=Auth.getUser();if(u){document.getElementById('sb-av').textContent=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();document.getElementById('sb-name').textContent=u.name||'Admin';document.getElementById('sb-store').textContent=u.store||'Adsy CS';}})();
 
 let currentFilter = 'semua';
 let allOrders = [];
