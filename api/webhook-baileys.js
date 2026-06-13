@@ -354,15 +354,16 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const wa_number   = body.reply_jid || normalizeWA(body.wa_number || ''); // pakai JID asli jika ada
+    const reply_jid   = body.reply_jid || normalizeWA(body.wa_number || ''); // untuk kirim WA (LID atau normal)
+    const wa_number   = normalizeWA(body.wa_number || '');                  // nomor asli untuk disimpan ke customer
     const pushName    = body.push_name || wa_number;
     const message     = String(body.message || '').trim();
     const messageType = body.message_type || 'text';
     const mediaUrl    = body.media_url || null;
     const referral    = body.referral || null; // dari CTWA
 
-    console.log(`wa_number="${wa_number}" message="${message}" type="${messageType}"`);
-    if (!wa_number || (!message && messageType === 'text')) { console.warn('wa_number atau message kosong'); return; }
+    console.log(`wa_number="${wa_number}" reply_jid="${reply_jid}" message="${message}" type="${messageType}"`);
+    if (!reply_jid || (!message && messageType === 'text')) { console.warn('wa_number atau message kosong'); return; }
 
     console.log(`Pesan dari ${pushName} (${wa_number}): ${message.slice(0, 80)}`);
 
@@ -452,7 +453,7 @@ module.exports = async function handler(req, res) {
 
     // ── Simpan & kirim balasan ─────────────────────────────────
     await saveMessage(conversation.id, 'ai', reply);
-    await sendWA(userId, wa_number, reply);
+    await sendWA(userId, reply_jid, reply);
 
     res.status(200).json({ ok: true });
 
