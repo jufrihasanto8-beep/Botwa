@@ -207,175 +207,41 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
   <div class="main-content" style="display:flex;flex-direction:column;overflow:hidden;">
 
-    <div class="page-header">
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;">
       <div>
         <h1>📚 Knowledge Base</h1>
         <p>Kelola info toko, produk, dan FAQ untuk AI Agent kamu</p>
       </div>
+      <button class="btn-secondary" onclick="seedHerbalCare()" id="seed-btn" style="gap:6px;font-size:12px;">
+        🌿 Isi Data HerbalCare
+      </button>
     </div>
 
     <div class="kb-layout">
 
       <!-- LEFT NAV -->
       <div class="kb-nav">
-        <div class="kb-nav-item active" onclick="showSection('toko', this)">
-          <span class="ni">🏪</span> Info Toko
-        </div>
-        <div class="kb-nav-item" onclick="showSection('produk', this)">
-          <span class="ni">📦</span> Produk
-        </div>
-        <div class="kb-nav-item" onclick="showSection('faq', this)">
-          <span class="ni">❓</span> FAQ
-        </div>
-        <div class="kb-nav-item" onclick="showSection('learning', this)">
-          <span class="ni">🧠</span> AI Learning
+        <a class="kb-nav-item" href="products.html" style="text-decoration:none;">
+          <span class="ni">📦</span> Katalog Produk
+        </a>
+        <div class="kb-nav-item active" onclick="showSection('sop', this)">
+          <span class="ni">📋</span> SOP Produk
         </div>
       </div>
 
       <!-- CONTENT -->
       <div class="kb-content">
 
-        <!-- ── INFO TOKO ── -->
-        <div class="kb-section active" id="sec-toko">
-          <div class="kb-section-title">Info Toko</div>
-          <div class="kb-section-desc">Data ini dipakai AI untuk menjawab pertanyaan seputar toko, jam buka, dan kebijakan.</div>
-
-          <div class="info-card">
-            <h3>🏪 Identitas Toko</h3>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Nama Toko</label>
-                <input type="text" id="store-name" placeholder="HerbalCare" />
-              </div>
-              <div class="form-group">
-                <label>No. WhatsApp CS</label>
-                <input type="text" id="store-wa" placeholder="628123456789" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Jam Operasional</label>
-                <input type="text" id="store-hours" placeholder="Senin–Sabtu, 08.00–17.00 WIB" />
-              </div>
-              <div class="form-group">
-                <label>Lokasi / Kota</label>
-                <input type="text" id="store-address" placeholder="Jakarta Selatan" />
-              </div>
-            </div>
-          </div>
-
-          <div class="info-card">
-            <h3>📋 Kebijakan Toko</h3>
-            <div class="form-group">
-              <label>Pengiriman & Pembayaran</label>
-              <textarea id="store-policy" rows="5" placeholder="Contoh:
-- Pengiriman ke seluruh Indonesia via JNE/J&T/SiCepat
-- Gratis ongkir untuk pembelian min. Rp 200.000
-- Pembayaran via Transfer BCA/BRI, GoPay, OVO, QRIS
-- Retur untuk produk rusak/salah kirim dalam 2x24 jam" style="resize:vertical;"></textarea>
-            </div>
-          </div>
-
-          <div class="info-card">
-            <h3>🛒 Cara Order</h3>
-            <div class="form-group">
-              <label>Langkah-langkah pemesanan</label>
-              <textarea id="store-order" rows="5" placeholder="Contoh:
-1. Pilih produk dan jumlah yang diinginkan
-2. Kabari CS nama, alamat lengkap, dan nomor HP
-3. CS akan kirim total harga + ongkir
-4. Transfer ke rekening yang diberikan
-5. Kirim bukti transfer ke CS
-6. Produk dikemas dan dikirim 1x24 jam" style="resize:vertical;"></textarea>
-            </div>
-          </div>
-
-          <div class="info-card">
-            <h3>✨ Instruksi Tambahan untuk AI</h3>
-            <div class="form-group">
-              <label>Hal khusus yang harus diketahui AI</label>
-              <textarea id="store-extra" rows="4" placeholder="Contoh:
-- Selalu tawari promo bundling jika pelanggan beli 2+ produk
-- Jika ditanya stok habis, tawarkan pre-order
-- Selalu akhiri percakapan dengan tawaran bantuan lebih lanjut" style="resize:vertical;"></textarea>
-            </div>
-          </div>
-
-          <div class="save-bar">
-            <button class="btn-primary" onclick="saveTokoInfo()">💾 Simpan Info Toko</button>
-          </div>
-        </div>
-
-        <!-- ── PRODUK ── -->
-        <div class="kb-section" id="sec-produk">
+        <!-- ── SOP PRODUK ── -->
+        <div class="kb-section active" id="sec-sop">
           <div class="section-action">
             <div>
-              <div class="kb-section-title">Katalog Produk</div>
-              <div class="kb-section-desc" style="margin-bottom:0;">AI akan menjawab berdasarkan produk yang terdaftar di sini.</div>
+              <div class="kb-section-title">SOP Produk</div>
+              <div class="kb-section-desc" style="margin-bottom:0;">Panduan cara AI merespons pertanyaan seputar produk, keluhan, dan rekomendasi.</div>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="openProductModal()">+ Tambah Produk</button>
+            <button class="btn-primary" onclick="openSOPModal()">+ Tambah SOP</button>
           </div>
-          <div id="product-list"></div>
-        </div>
-
-        <!-- ── FAQ ── -->
-        <div class="kb-section" id="sec-faq">
-          <div class="section-action">
-            <div>
-              <div class="kb-section-title">FAQ</div>
-              <div class="kb-section-desc" style="margin-bottom:0;">Pertanyaan yang sering masuk — AI akan jawab langsung berdasarkan ini.</div>
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="openFAQModal()">+ Tambah FAQ</button>
-          </div>
-          <div id="faq-list"></div>
-        </div>
-
-        <!-- ── AI LEARNING ── -->
-        <div class="kb-section" id="sec-learning">
-          <div class="kb-section-title">🧠 AI Learning</div>
-          <div class="kb-section-desc">AI belajar dari semua percakapan yang pernah terjadi — hasilnya dipakai untuk melayani semua pelanggan baru dengan lebih baik.</div>
-
-          <div class="info-card">
-            <h3>⚡ Cara Kerja</h3>
-            <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:#94a3b8;line-height:1.6;">
-              <div style="display:flex;gap:10px;align-items:flex-start;">
-                <span style="font-size:18px;">1️⃣</span>
-                <span>Klik <strong style="color:#e2e8f0;">Pelajari Sekarang</strong> — AI baca semua riwayat chat</span>
-              </div>
-              <div style="display:flex;gap:10px;align-items:flex-start;">
-                <span style="font-size:18px;">2️⃣</span>
-                <span>AI ekstrak pola: pertanyaan umum, keberatan, taktik yang berhasil</span>
-              </div>
-              <div style="display:flex;gap:10px;align-items:flex-start;">
-                <span style="font-size:18px;">3️⃣</span>
-                <span>Hasilnya otomatis masuk ke semua percakapan baru — AI langsung lebih pintar</span>
-              </div>
-              <div style="display:flex;gap:10px;align-items:flex-start;">
-                <span style="font-size:18px;">🔄</span>
-                <span>Ulangi setiap minggu atau setelah banyak chat baru masuk</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="info-card">
-            <h3>📊 Status</h3>
-            <div id="insight-status" style="font-size:13px;color:#94a3b8;margin-bottom:16px;">Belum pernah dijalankan</div>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <button class="btn-primary" id="learn-btn" onclick="runLearning()">🔄 Perbarui Sekarang</button>
-              <span style="font-size:12px;color:#64748b;">Auto-update setiap 12 jam & setiap 15 pesan</span>
-            </div>
-          </div>
-
-          <div class="info-card" id="insight-result-card" style="display:none;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-              <h3 style="margin-bottom:0;">📋 Hasil Pembelajaran</h3>
-              <button class="btn btn-secondary btn-sm" onclick="runLearning()">🔄 Perbarui</button>
-            </div>
-            <div id="insight-content" style="font-size:13px;color:#94a3b8;line-height:1.7;white-space:pre-wrap;background:#0d1117;padding:14px;border-radius:10px;"></div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);font-size:12px;color:#64748b;">
-              ✅ Pelajaran ini otomatis dipakai AI untuk semua percakapan baru
-            </div>
-          </div>
+          <div id="sop-list"></div>
         </div>
 
       </div>
@@ -383,86 +249,39 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   </div>
 </div>
 
-<!-- MODAL PRODUK -->
-<div class="modal-overlay" id="product-modal">
-  <div class="modal">
-    <h2 id="pm-title">Tambah Produk</h2>
-    <input type="hidden" id="pm-id" />
-    <div class="form-row">
-      <div class="form-group">
-        <label>Nama Produk *</label>
-        <input type="text" id="pm-name" placeholder="Jahe Merah Kapsul" />
-      </div>
-      <div class="form-group">
-        <label>Kode Produk</label>
-        <input type="text" id="pm-code" placeholder="JMK-001" />
-      </div>
+
+
+<!-- MODAL SOP -->
+<div class="modal-overlay" id="sop-modal">
+  <div class="modal" style="width:500px;">
+    <h2 id="sm-title">Tambah SOP</h2>
+    <input type="hidden" id="sm-id" />
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Judul SOP *</label>
+      <input type="text" id="sm-title-input" placeholder="Contoh: Cara Merespons Keluhan Produk" />
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Harga (Rp)</label>
-        <input type="text" id="pm-price" placeholder="50.000" />
-      </div>
-      <div class="form-group">
-        <label>Satuan</label>
-        <input type="text" id="pm-unit" placeholder="botol / pcs / sachet" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Status Stok</label>
-      <select id="pm-stock">
-        <option value="Tersedia">✅ Tersedia</option>
-        <option value="Terbatas">⚠️ Stok Terbatas</option>
-        <option value="Habis">❌ Habis</option>
-        <option value="Pre-order">🕐 Pre-order</option>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Kategori</label>
+      <select id="sm-category">
+        <option value="rekomendasi">🎯 Rekomendasi Produk</option>
+        <option value="keluhan">⚠️ Penanganan Keluhan</option>
+        <option value="pembelian">🛒 Proses Pembelian</option>
+        <option value="pengiriman">📦 Pengiriman & Retur</option>
+        <option value="umum">💬 Umum</option>
       </select>
     </div>
     <div class="form-group">
-      <label>Manfaat</label>
-      <textarea id="pm-benefits" rows="3" placeholder="Meningkatkan imun, meredakan masuk angin, anti inflamasi..." style="resize:vertical;"></textarea>
-      <div class="hint">Pisahkan dengan koma atau per baris</div>
-    </div>
-    <div class="form-group">
-      <label>Kandungan / Bahan Aktif</label>
-      <input type="text" id="pm-ingredients" placeholder="Ekstrak jahe merah 500mg, vitamin C..." />
-    </div>
-    <div class="form-group">
-      <label>Cara Pakai</label>
-      <input type="text" id="pm-usage" placeholder="2 kapsul, 2x sehari setelah makan" />
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Cocok Untuk</label>
-        <input type="text" id="pm-suitable" placeholder="Dewasa & lansia" />
-      </div>
-      <div class="form-group">
-        <label>Perhatian / Pantangan</label>
-        <input type="text" id="pm-contra" placeholder="Tidak untuk ibu hamil" />
-      </div>
+      <label>Isi SOP — tulis langkah atau panduan untuk AI *</label>
+      <textarea id="sm-content" rows="7" placeholder="Contoh:
+1. Tanyakan keluhan spesifik pelanggan (sinusitis/asma/batuk?)
+2. Cocokkan dengan produk yang sesuai dari katalog
+3. Sebutkan manfaat produk yang relevan dengan keluhan
+4. Tawarkan bundling jika ada produk komplementer
+5. Berikan info harga dan cara order" style="resize:vertical;"></textarea>
     </div>
     <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeProductModal()">Batal</button>
-      <button class="btn-primary" onclick="saveProduct()">Simpan Produk</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL FAQ -->
-<div class="modal-overlay" id="faq-modal">
-  <div class="modal" style="width:480px;">
-    <h2 id="fm-title">Tambah FAQ</h2>
-    <input type="hidden" id="fm-id" />
-    <div class="form-group">
-      <label>Pertanyaan *</label>
-      <input type="text" id="fm-q" placeholder="Apakah produk ini sudah BPOM?" />
-    </div>
-    <div class="form-group">
-      <label>Jawaban *</label>
-      <textarea id="fm-a" rows="4" placeholder="Produk kami dalam proses pendaftaran BPOM. Semua bahan 100% alami dan aman dikonsumsi." style="resize:vertical;"></textarea>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeFAQModal()">Batal</button>
-      <button class="btn-primary" onclick="saveFAQ()">Simpan FAQ</button>
+      <button class="btn-secondary" onclick="closeSOPModal()">Batal</button>
+      <button class="btn-primary" onclick="saveSOP()">Simpan SOP</button>
     </div>
   </div>
 </div>
@@ -473,14 +292,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 Auth.guard();
 (function(){const u=Auth.getUser();if(u){document.getElementById('sb-av').textContent=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();document.getElementById('sb-name').textContent=u.name||'Admin';document.getElementById('sb-store').textContent=u.store||'Adsy CS';}})();
 
-const STOCK_CLASS = {
-  'Tersedia': 'stock-available',
-  'Terbatas': 'stock-limited',
-  'Habis': 'stock-empty',
-  'Pre-order': 'stock-preorder',
-};
-const STOCK_ICON = { 'Tersedia': '✅', 'Terbatas': '⚠️', 'Habis': '❌', 'Pre-order': '🕐' };
-
 /* ── NAV ── */
 function showSection(name, el) {
   document.querySelectorAll('.kb-section').forEach(s => s.classList.remove('active'));
@@ -489,221 +300,99 @@ function showSection(name, el) {
   el.classList.add('active');
 }
 
-/* ── INFO TOKO ── */
 window.addEventListener('load', async () => {
-  const cfg = await Config.load();
-  document.getElementById('store-name').value = cfg.store_name || '';
-  document.getElementById('store-wa').value = cfg.store_wa || '';
-  document.getElementById('store-hours').value = cfg.store_hours || '';
-  document.getElementById('store-address').value = cfg.store_address || '';
-  document.getElementById('store-policy').value = cfg.store_policy || '';
-  document.getElementById('store-order').value = cfg.store_order || '';
-  document.getElementById('store-extra').value = cfg.ai_extra || '';
-
-  await renderProducts();
-  await renderFAQs();
-  loadInsightStatus();
+  await Config.load();
+  await renderSOPs();
 });
 
-async function saveTokoInfo() {
-  try {
-    await Config.save({
-      store_name: document.getElementById('store-name').value.trim(),
-      store_wa: document.getElementById('store-wa').value.trim().replace(/\D/g,''),
-      store_hours: document.getElementById('store-hours').value.trim(),
-      store_address: document.getElementById('store-address').value.trim(),
-      store_policy: document.getElementById('store-policy').value.trim(),
-      store_order: document.getElementById('store-order').value.trim(),
-      ai_extra: document.getElementById('store-extra').value.trim(),
-    });
-    showToast('✅ Info toko disimpan');
-  } catch(e) { showToast('❌ Gagal: ' + e.message); }
-}
+/* ── SOP ── */
+const CAT_LABEL = { rekomendasi:'🎯 Rekomendasi', keluhan:'⚠️ Keluhan', pembelian:'🛒 Pembelian', pengiriman:'📦 Pengiriman', umum:'💬 Umum' };
+const CAT_COLOR = { rekomendasi:'rgba(59,130,246,.12)', keluhan:'rgba(239,68,68,.10)', pembelian:'rgba(34,197,94,.10)', pengiriman:'rgba(245,158,11,.10)', umum:'rgba(100,116,139,.10)' };
+const CAT_TEXT  = { rekomendasi:'#93c5fd', keluhan:'#fca5a5', pembelian:'#86efac', pengiriman:'#fcd34d', umum:'#94a3b8' };
 
-/* ── PRODUK ── */
-async function renderProducts() {
-  const el = document.getElementById('product-list');
+async function renderSOPs() {
+  const el = document.getElementById('sop-list');
   try {
-    const list = await Products.getAll();
+    const uid = Auth.getUser()?.id;
+    const list = await SB.get('sops', `?user_id=eq.${uid}&order=created_at.asc`).catch(()=>[]);
     if (!list.length) {
-      el.innerHTML = `<div class="empty-state">
-        <div class="ei">📦</div>
-        <h3>Belum ada produk</h3>
-        <p>Klik "+ Tambah Produk" untuk mulai mengisi katalog.</p>
-      </div>`;
+      el.innerHTML = `<div class="empty-state"><div class="ei">📋</div><h3>Belum ada SOP</h3><p>Tambahkan panduan agar AI tahu cara merespons setiap situasi.</p></div>`;
       return;
     }
-    el.innerHTML = `<div class="product-grid">${list.map(p => `
-      <div class="product-card">
-        <div class="pc-top">
-          <div class="pc-icon">🌿</div>
-          <div class="pc-info">
-            <div class="pc-name">${p.name}</div>
-            ${p.code ? `<div class="pc-code">Kode: ${p.code}</div>` : ''}
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-          <div>
-            ${p.price ? `<div class="pc-price">Rp ${p.price}</div>` : ''}
-            ${p.unit ? `<div class="pc-unit">${p.unit}</div>` : ''}
-          </div>
-          <span class="stock-badge ${STOCK_CLASS[p.stock] || 'stock-available'}">${STOCK_ICON[p.stock] || '✅'} ${p.stock || 'Tersedia'}</span>
-        </div>
-        ${p.benefits ? `<div class="pc-benefits">${p.benefits.slice(0,120)}${p.benefits.length>120?'...':''}</div>` : ''}
-        <div class="pc-actions">
-          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="editProduct('${p.id}')">✏️ Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">🗑</button>
-        </div>
-      </div>`).join('')}</div>`;
-  } catch(e) {
-    el.innerHTML = `<div class="empty-state"><div class="ei">⚠️</div><h3>Gagal memuat produk</h3><p>${e.message}</p></div>`;
-  }
-}
-
-function openProductModal(id = null) {
-  document.getElementById('pm-title').textContent = id ? 'Edit Produk' : 'Tambah Produk';
-  document.getElementById('pm-id').value = id || '';
-  if (!id) {
-    ['pm-name','pm-code','pm-price','pm-unit','pm-benefits','pm-ingredients','pm-usage','pm-suitable','pm-contra'].forEach(i => {
-      document.getElementById(i).value = '';
-    });
-    document.getElementById('pm-stock').value = 'Tersedia';
-  }
-  document.getElementById('product-modal').classList.add('open');
-}
-function closeProductModal() { document.getElementById('product-modal').classList.remove('open'); }
-
-async function editProduct(id) {
-  const p = await Products.find(id);
-  if (!p) return;
-  document.getElementById('pm-title').textContent = 'Edit Produk';
-  document.getElementById('pm-id').value = p.id;
-  document.getElementById('pm-name').value = p.name || '';
-  document.getElementById('pm-code').value = p.code || '';
-  document.getElementById('pm-price').value = p.price || '';
-  document.getElementById('pm-unit').value = p.unit || '';
-  document.getElementById('pm-stock').value = p.stock || 'Tersedia';
-  document.getElementById('pm-benefits').value = p.benefits || '';
-  document.getElementById('pm-ingredients').value = p.ingredients || '';
-  document.getElementById('pm-usage').value = p.usage || '';
-  document.getElementById('pm-suitable').value = p.suitable_for || '';
-  document.getElementById('pm-contra').value = p.contraindications || '';
-  document.getElementById('product-modal').classList.add('open');
-}
-
-async function saveProduct() {
-  const name = document.getElementById('pm-name').value.trim();
-  if (!name) return showToast('⚠️ Nama produk wajib diisi');
-  const data = {
-    name,
-    code: document.getElementById('pm-code').value.trim(),
-    price: document.getElementById('pm-price').value.trim(),
-    unit: document.getElementById('pm-unit').value.trim(),
-    stock: document.getElementById('pm-stock').value,
-    benefits: document.getElementById('pm-benefits').value.trim(),
-    ingredients: document.getElementById('pm-ingredients').value.trim(),
-    usage: document.getElementById('pm-usage').value.trim(),
-    suitable_for: document.getElementById('pm-suitable').value.trim(),
-    contraindications: document.getElementById('pm-contra').value.trim(),
-  };
-  try {
-    const id = document.getElementById('pm-id').value;
-    if (id) await Products.update(id, data);
-    else await Products.add(data);
-    closeProductModal();
-    await renderProducts();
-    showToast(id ? '✅ Produk diperbarui' : '✅ Produk ditambahkan');
-  } catch(e) { showToast('❌ Gagal: ' + e.message); }
-}
-
-async function deleteProduct(id) {
-  if (!confirm('Hapus produk ini?')) return;
-  try {
-    await Products.delete(id);
-    await renderProducts();
-    showToast('🗑 Produk dihapus');
-  } catch(e) { showToast('❌ Gagal: ' + e.message); }
-}
-
-/* ── FAQ ── */
-async function renderFAQs() {
-  const el = document.getElementById('faq-list');
-  try {
-    const list = await FAQs.getAll();
-    if (!list.length) {
-      el.innerHTML = `<div class="empty-state">
-        <div class="ei">❓</div>
-        <h3>Belum ada FAQ</h3>
-        <p>Tambahkan pertanyaan yang sering masuk agar AI bisa jawab lebih akurat.</p>
-      </div>`;
-      return;
-    }
-    el.innerHTML = `<div class="faq-list">${list.map((f, i) => `
+    el.innerHTML = `<div class="faq-list">${list.map((s, i) => `
       <div class="faq-item">
-        <div class="faq-num">${i + 1}</div>
+        <div class="faq-num" style="background:${CAT_COLOR[s.category]||CAT_COLOR.umum};color:${CAT_TEXT[s.category]||CAT_TEXT.umum}">${i+1}</div>
         <div class="faq-body">
-          <div class="faq-q">Q: ${f.question}</div>
-          <div class="faq-a">A: ${f.answer}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+            <div class="faq-q" style="margin-bottom:0;">${s.title}</div>
+            <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${CAT_COLOR[s.category]||CAT_COLOR.umum};color:${CAT_TEXT[s.category]||CAT_TEXT.umum};font-weight:600;">${CAT_LABEL[s.category]||'💬 Umum'}</span>
+          </div>
+          <div class="faq-a" style="white-space:pre-line;">${s.content}</div>
         </div>
         <div class="faq-actions">
-          <button class="btn btn-secondary btn-sm" onclick="editFAQ('${f.id}')">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteFAQ('${f.id}')">🗑</button>
+          <button class="btn-secondary" onclick="editSOP('${s.id}')">✏️</button>
+          <button class="btn-danger" onclick="deleteSOP('${s.id}')">🗑</button>
         </div>
       </div>`).join('')}</div>`;
   } catch(e) {
-    el.innerHTML = `<div class="empty-state"><div class="ei">⚠️</div><h3>Gagal memuat FAQ</h3><p>${e.message}</p></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="ei">⚠️</div><h3>Gagal memuat SOP</h3><p>${e.message}</p></div>`;
   }
 }
 
-function openFAQModal(id = null) {
-  document.getElementById('fm-title').textContent = id ? 'Edit FAQ' : 'Tambah FAQ';
-  document.getElementById('fm-id').value = id || '';
+function openSOPModal(id = null) {
+  document.getElementById('sm-title').textContent = id ? 'Edit SOP' : 'Tambah SOP';
+  document.getElementById('sm-id').value = id || '';
   if (!id) {
-    document.getElementById('fm-q').value = '';
-    document.getElementById('fm-a').value = '';
+    document.getElementById('sm-title-input').value = '';
+    document.getElementById('sm-content').value = '';
+    document.getElementById('sm-category').value = 'rekomendasi';
   }
-  document.getElementById('faq-modal').classList.add('open');
+  document.getElementById('sop-modal').classList.add('open');
 }
-function closeFAQModal() { document.getElementById('faq-modal').classList.remove('open'); }
+function closeSOPModal() { document.getElementById('sop-modal').classList.remove('open'); }
 
-async function editFAQ(id) {
-  const list = await FAQs.getAll();
-  const f = list.find(x => x.id === id);
-  if (!f) return;
-  document.getElementById('fm-title').textContent = 'Edit FAQ';
-  document.getElementById('fm-id').value = f.id;
-  document.getElementById('fm-q').value = f.question;
-  document.getElementById('fm-a').value = f.answer;
-  document.getElementById('faq-modal').classList.add('open');
+async function editSOP(id) {
+  const uid = Auth.getUser()?.id;
+  const list = await SB.get('sops', `?user_id=eq.${uid}&id=eq.${id}`);
+  const s = list[0]; if (!s) return;
+  document.getElementById('sm-title').textContent = 'Edit SOP';
+  document.getElementById('sm-id').value = s.id;
+  document.getElementById('sm-title-input').value = s.title;
+  document.getElementById('sm-content').value = s.content;
+  document.getElementById('sm-category').value = s.category || 'umum';
+  document.getElementById('sop-modal').classList.add('open');
 }
 
-async function saveFAQ() {
-  const question = document.getElementById('fm-q').value.trim();
-  const answer = document.getElementById('fm-a').value.trim();
-  if (!question || !answer) return showToast('⚠️ Pertanyaan dan jawaban wajib diisi');
+async function saveSOP() {
+  const title = document.getElementById('sm-title-input').value.trim();
+  const content = document.getElementById('sm-content').value.trim();
+  if (!title || !content) return showToast('⚠️ Judul dan isi SOP wajib diisi');
+  const uid = Auth.getUser()?.id;
+  const data = { title, content, category: document.getElementById('sm-category').value, user_id: uid };
   try {
-    const id = document.getElementById('fm-id').value;
-    if (id) await FAQs.update(id, { question, answer });
-    else await FAQs.add({ question, answer });
-    closeFAQModal();
-    await renderFAQs();
-    showToast(id ? '✅ FAQ diperbarui' : '✅ FAQ ditambahkan');
+    const id = document.getElementById('sm-id').value;
+    if (id) await SB.patch('sops', `?id=eq.${id}`, data);
+    else await SB.post('sops', data);
+    closeSOPModal();
+    await renderSOPs();
+    showToast(id ? '✅ SOP diperbarui' : '✅ SOP ditambahkan');
   } catch(e) { showToast('❌ Gagal: ' + e.message); }
 }
 
-async function deleteFAQ(id) {
-  if (!confirm('Hapus FAQ ini?')) return;
+async function deleteSOP(id) {
+  if (!confirm('Hapus SOP ini?')) return;
+  const uid = Auth.getUser()?.id;
   try {
-    await FAQs.delete(id);
-    await renderFAQs();
-    showToast('🗑 FAQ dihapus');
+    await SB.delete('sops', `?id=eq.${id}&user_id=eq.${uid}`);
+    await renderSOPs();
+    showToast('🗑 SOP dihapus');
   } catch(e) { showToast('❌ Gagal: ' + e.message); }
 }
 
-/* ── AI LEARNING ── */
+/* ── DUMMY (agar tidak error jika dipanggil dari seed) ── */
 function loadInsightStatus() {
   const cfg = Config.get();
-  const statusEl = document.getElementById('insight-status');
+  const statusEl = document.getElementById('insight-status'); if(!statusEl) return;
   const resultCard = document.getElementById('insight-result-card');
   const contentEl = document.getElementById('insight-content');
 
@@ -741,11 +430,81 @@ async function runLearning() {
 }
 
 /* Close modal on overlay click */
-['product-modal','faq-modal'].forEach(id => {
+['sop-modal'].forEach(id => {
   document.getElementById(id).addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('open');
   });
 });
+
+/* ── SEED DATA HERBALCARE ── */
+async function seedHerbalCare() {
+  const btn = document.getElementById('seed-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Mengisi data...';
+
+  try {
+    // ── INFO TOKO ──
+    await Config.save({
+      store_name: 'HerbalCare',
+      store_wa: '6282112345678',
+      store_hours: 'Senin–Sabtu, 08.00–17.00 WIB',
+      store_address: 'Jakarta Selatan',
+      store_policy: `- Pengiriman ke seluruh Indonesia via JNE/J&T/SiCepat
+- Gratis ongkir untuk pembelian min. Rp 300.000
+- Pembayaran: Transfer BCA/BRI, GoPay, OVO, QRIS
+- Retur untuk produk rusak/salah kirim dalam 2x24 jam
+- Garansi keaslian produk 100%`,
+      store_order: `1. Chat CS HerbalCare di WhatsApp
+2. Sebutkan produk & jumlah yang ingin dibeli
+3. Kami kirimkan total tagihan + rekening tujuan
+4. Konfirmasi pembayaran
+5. Produk dikirim dalam 1-2 hari kerja`,
+      ai_extra: `Toko kami spesialis produk herbal untuk masalah pernafasan (sinusitis, asma, batuk kronis, TBC, paru-paru). Semua produk berbahan alami, aman dikonsumsi jangka panjang. Selalu tanyakan keluhan spesifik pelanggan sebelum merekomendasikan produk.`,
+    });
+
+    // ── SOP ──
+    const uid = Auth.getUser()?.id;
+    const existingSOPs = await SB.get('sops', `?user_id=eq.${uid}`).catch(()=>[]);
+    if (existingSOPs.length === 0) {
+      const sopList = [
+        { category:'rekomendasi', title:'Cara Merekomendasikan Produk Berdasarkan Keluhan', content:`1. Tanyakan keluhan spesifik pelanggan (sinusitis? asma? batuk kronis? paru-paru?)
+2. Cocokkan dengan produk: Sinucare→sinusitis, Asmacare→asma, BatukLega→batuk, Paru Sehat→paru/eks-perokok
+3. Sebutkan manfaat yang langsung relevan dengan keluhan tersebut
+4. Tawarkan bundling jika ada produk komplementer (misalnya Herbapil Plus + produk utama)
+5. Sampaikan harga, cara pakai, dan estimasi hasil` },
+        { category:'keluhan', title:'Penanganan Keluhan Produk Tidak Cocok / Efek Samping', content:`1. Dengarkan keluhan dengan empati, jangan langsung defensif
+2. Tanyakan: sudah berapa lama dikonsumsi? diminum setelah makan?
+3. Jika baru 1-3 hari: wajar ada reaksi adaptasi tubuh, minta lanjutkan
+4. Jika mual: pastikan diminum setelah makan, kurangi dosis jadi 1 kapsul dulu
+5. Jika alergi/parah: sarankan hentikan dan konsultasi dokter, tawarkan refund/ganti produk
+6. Eskalasi ke tim jika keluhan serius` },
+        { category:'pembelian', title:'Alur Konfirmasi Order', content:`1. Tanyakan: produk apa, berapa botol, dan alamat pengiriman
+2. Hitung total: harga produk + ongkir (cek kota tujuan)
+3. Kirimkan rincian: nama produk, qty, harga satuan, ongkir, TOTAL
+4. Berikan nomor rekening tujuan (sesuai yang ada di pengaturan)
+5. Minta pelanggan kirim bukti transfer
+6. Konfirmasi penerimaan dan info resi pengiriman 1x24 jam` },
+        { category:'pengiriman', title:'Penanganan Paket Terlambat / Tidak Sampai', content:`1. Minta nomor resi pengiriman
+2. Cek status di website kurir (JNE/J&T/SiCepat)
+3. Jika masih dalam batas waktu normal (dalam kota 1-2 hari, luar kota 2-5 hari): minta sabar
+4. Jika sudah melewati batas: eskalasi ke tim untuk cek dengan kurir
+5. Jika paket hilang: proses klaim asuransi pengiriman, kirim ulang atau refund` },
+      ];
+      for (const s of sopList) {
+        await SB.post('sops', { ...s, user_id: uid });
+      }
+    }
+
+    await renderSOPs();
+
+    showToast('✅ Data HerbalCare berhasil diisi!');
+    btn.textContent = '✅ Data sudah diisi';
+  } catch(e) {
+    showToast('❌ Gagal: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '🌿 Isi Data HerbalCare';
+  }
+}
 </script>
 </body>
 </html>
