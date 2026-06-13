@@ -407,20 +407,28 @@ async function hitungOngkir(wilayah, product) {
       `order/allEstimatePublic?origin_id=${MENGANTAR_ORIGIN_ID}&destination_id=${areaId}&weight=${weight}`
     );
     if (!ratesJson.success) return null;
-    let rates = ratesJson.data || [];
+
+    // Response Mengantar adalah object { "JNE": {...}, "SAP": {...} }, bukan array
+    const rawData = ratesJson.data || {};
+    let rates = Object.entries(rawData)
+      .filter(([name, info]) => {
+        // Skip cargo, skip unsupported, skip price 0
+        if (name.toLowerCase().includes('cargo')) return false;
+        if (info.unsupported) return false;
+        const harga = info.estimatedSpecialPrice || info.price || 0;
+        return harga > 0;
+      })
+      .map(([name, info]) => ({
+        courier_name: name,
+        price: info.estimatedSpecialPrice || info.price || 0,
+      }));
+
     if (!rates.length) return null;
 
     // Step 4: Filter whitelist dari tabel courier_whitelist
-    // (jika tabel kosong, pakai semua kurir)
     const whitelist = await sbGet('courier_whitelist',
       `?user_id=eq.${product?.user_id || ''}&aktif=eq.true`
     ).catch(() => []);
-
-    // Normalize field names dari Mengantar public API
-    rates = rates.map(r => ({
-      courier_name: r.courier_name || r.courierName || r.name || r.ekspedisi || '',
-      price: r.price || r.ongkir || r.cost || r.total || 0,
-    })).filter(r => r.courier_name && r.price > 0);
 
     if (whitelist.length) {
       const allowed = new Set(whitelist.map(w => w.nama.toLowerCase()));
