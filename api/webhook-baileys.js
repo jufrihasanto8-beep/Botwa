@@ -326,8 +326,9 @@ module.exports = async function handler(req, res) {
     const body = req.body || {};
 
     // Verifikasi secret
+    console.log(`Secret check: body="${body.secret}" env="${WEBHOOK_SECRET}"`);
     if (body.secret !== WEBHOOK_SECRET) {
-      console.warn('Secret tidak valid');
+      console.warn('Secret tidak valid — tidak cocok');
       return;
     }
 
@@ -338,15 +339,14 @@ module.exports = async function handler(req, res) {
     const mediaUrl    = body.media_url || null;
     const referral    = body.referral || null; // dari CTWA
 
-    if (!wa_number || (!message && messageType === 'text')) return;
+    console.log(`wa_number="${wa_number}" message="${message}" type="${messageType}"`);
+    if (!wa_number || (!message && messageType === 'text')) { console.warn('wa_number atau message kosong'); return; }
 
     console.log(`Pesan dari ${pushName} (${wa_number}): ${message.slice(0, 80)}`);
 
-    // ── Ambil user/config (pakai user pertama untuk sekarang) ──
-    const configs = await sbGet('configs', `?limit=1`);
-    if (!configs.length) return;
-    const config = configs[0];
-    const userId = config.user_id;
+    // ── Ambil userId dari session_id (= user UUID dari dashboard) ──
+    const userId = body.session_id;
+    if (!userId) { console.warn('session_id kosong'); return; }
 
     // ── Routing: cari produk dari referral/isi chat ────────────
     const { product, sumber } = await resolveProduct(userId, referral, message);
