@@ -66,6 +66,8 @@ body.light .th-search{background:#f1f5f9;border-color:#e2e8f0}
 body.light .th-search input{color:#0f172a}
 body.light .th-notif{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
 body.light #stats-row{background:#fff;border-bottom-color:#e2e8f0}
+body.light #inbox{background:#fff;min-width:280px}
+body.light #case-board{background:#fff;min-width:300px}
 body.light .stat-card{background:#f8fafc;border-color:#e2e8f0}
 body.light .stat-num{color:#0f172a}
 body.light .stat-label{color:#64748b}
@@ -132,7 +134,7 @@ body.light .empty-inbox{color:#94a3b8}
 body.light .bot-online{background:rgba(34,197,94,.06)}
 
 /* ── SIDEBAR ── */
-#sidebar{width:220px;background:#161b22;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0;height:100vh}
+#sidebar{width:220px;background:#1e293b;border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;flex-shrink:0;height:100vh;position:relative!important;left:auto!important;top:auto!important;z-index:auto!important}
 .sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
 .sb-logo{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
 .sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
@@ -171,8 +173,10 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .th-notif:hover{border-color:#3b82f6;color:#3b82f6}
 
 /* ── STATS ROW ── */
-#stats-row{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:12px 20px;display:flex;gap:10px;flex-shrink:0}
-.stat-card{flex:1;background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:border-color .15s;cursor:default}
+#stats-row{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:12px 20px;display:flex;gap:10px;flex-shrink:0;overflow-x:auto}
+#stats-row::-webkit-scrollbar{height:3px}
+#stats-row::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
+.stat-card{flex:1;min-width:130px;background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:border-color .15s;cursor:default}
 .stat-card:hover{border-color:rgba(59,130,246,.3)}
 .stat-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 .stat-icon.blue{background:rgba(59,130,246,.12);color:#3b82f6}
@@ -216,7 +220,7 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 #content-area{flex:1;display:flex;overflow:hidden;min-width:0}
 
 /* ── INBOX LIST ── */
-#inbox{width:280px;background:#161b22;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0}
+#inbox{width:280px;min-width:280px;background:#161b22;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0}
 .inbox-header{padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between}
 .inbox-title{font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
 .inbox-count{min-width:18px;height:18px;background:#3b82f6;border-radius:9px;font-size:10px;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
@@ -305,7 +309,7 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 #send-btn:disabled{background:#1e293b;cursor:not-allowed;box-shadow:none;transform:none}
 
 /* ── CASE RESOLUTION BOARD ── */
-#case-board{width:300px;background:#161b22;border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+#case-board{width:300px;min-width:300px;background:#161b22;border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
 #case-board::-webkit-scrollbar{width:3px}
 #case-board::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06)}
 .cb-header{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0}
