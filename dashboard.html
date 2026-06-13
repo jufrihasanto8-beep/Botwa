@@ -1260,7 +1260,7 @@ async function poll() {
   if (activeConvId) {
     try {
       const query = lastMsgTimestamp
-        ? `?conversation_id=eq.${activeConvId}&created_at=gt.${lastMsgTimestamp}&order=created_at.asc`
+        ? `?conversation_id=eq.${activeConvId}&created_at=gt.${encodeURIComponent(lastMsgTimestamp)}&order=created_at.asc`
         : `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=100`;
 
       const msgs = await sbGet('conv_messages', query);
