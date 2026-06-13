@@ -768,7 +768,6 @@ async function loadStats() {
   document.getElementById('st-ai').textContent       = aiMsgs.length||0;
   document.getElementById('st-aktif').textContent    = aktif;
   document.getElementById('st-unik').textContent     = custIds.length;
-  document.getElementById('st-esc-sub').textContent  = esc > 0 ? 'perlu penanganan' : 'tidak ada';
   document.getElementById('sb-total').textContent    = convs.length;
   document.getElementById('sb-selesai').textContent  = selesai;
   const lancar = convs.length > 0 ? Math.round(((convs.length-esc)/convs.length)*100)+'%' : '—';
@@ -861,7 +860,12 @@ function filterConvs(val) { searchFilter = val.toLowerCase(); renderInbox(); }
 async function selectConv(id) {
   activeConvId = id;
   sessionStorage.setItem('cs_active_conv', id);
-  await renderInbox();
+  // Update active class langsung tanpa re-render seluruh inbox
+  document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+  const items = document.querySelectorAll('.conv-item');
+  items.forEach(el => {
+    if (el.getAttribute('onclick')?.includes(id)) el.classList.add('active');
+  });
   await renderChat();
   await updateCaseBoard();
   updateSLA();
