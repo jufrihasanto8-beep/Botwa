@@ -11,6 +11,7 @@ const BAILEYS_URL        = process.env.BAILEYS_URL;
 const WEBHOOK_SECRET     = process.env.WEBHOOK_SECRET;
 const MENGANTAR_KEY      = process.env.MENGANTAR_KEY;
 const GROQ_API_KEY       = process.env.GROQ_API_KEY;
+const WA_GROUP_JID       = process.env.WA_GROUP_JID; // JID grup WA tujuan recap order
 
 /* ── SUPABASE HELPERS ─────────────────────────────────────── */
 const sbH = () => ({
@@ -242,7 +243,10 @@ Urutan WAJIB diikuti:
 5. Alamat kurang → minta yang kurang aja, jangan ulang dari nol.
 6. Ada jalan/gang → boleh proaktif tawarkan patokan dari maps.
 7. Tutup dengan KONFIRMASI ORDER (rincian+total), minta "oke".
-8. Setelah customer konfirmasi → tulis [ORDER_CONFIRMED] di akhir balasan.
+8. Setelah customer konfirmasi → tulis di akhir balasan:
+   [ORDER_CONFIRMED]
+   [ORDER_DATA:alamat="ALAMAT LENGKAP DARI CUSTOMER" keluhan="KELUHAN UTAMA CUSTOMER" metode="COD atau Transfer" qty=1]
+   Isi ORDER_DATA dengan data AKTUAL yang sudah dikumpulkan dari customer. Jangan dikosongkan.
 JANGAN minta data diri SEBELUM tunjukkan total ongkir dan tanya pilihan bayar.
 
 INFO PEMBAYARAN TRANSFER
@@ -525,6 +529,13 @@ async function hitungOngkir(wilayah, product) {
       totalCOD: totalCODBulat,
       feeCOD: feeCODBulat,
       harga,
+      area: {
+        kelurahan: areas[0].subdistrict || '',
+        kecamatan: areas[0].district   || '',
+        kota:      areas[0].city       || areas[0].regency || '',
+        provinsi:  areas[0].province   || '',
+        kodePos:   areas[0].postal_code|| areas[0].zip     || '',
+      },
     };
   } catch (e) {
     console.error('Hitung ongkir error:', e.message);
@@ -560,6 +571,55 @@ async function updateConvState(convId, stateUpdate) {
     state: { ...currentState, ...stateUpdate },
     last_msg_at: new Date().toISOString(),
   });
+}
+
+/* ── NOMOR URUT ORDER HARIAN ──────────────────────────────── */
+async function getOrderNumber(userId) {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const rows = await sbGet('conversations',
+    `?user_id=eq.${userId}&status=eq.selesai&last_msg_at=gte.${today}T00:00:00Z&select=id`
+  ).catch(() => []);
+  return rows.length + 1; // +1 karena yang sekarang baru mau di-close
+}
+
+/* ── BUILD CLOSING RECAP MESSAGE ─────────────────────────── */
+function buildClosingMessage({ nomorUrut, customer, alamat, ongkir, product, keluhan, metode, qty, csNama }) {
+  const h          = ongkir?.harga      || 0;
+  const ongkirAsli = ongkir?.ongkirAsli || 0;
+  const ongkirPromo= ongkir?.ongkirPromo|| 0;
+  const potongan   = ongkirAsli - ongkirPromo;
+  const feeCOD     = ongkir?.feeCOD    || 0;
+  const diskon     = 0;
+  const ekspLabel  = (ongkir?.ekspedisi || 'KURIR').toUpperCase();
+  const area       = ongkir?.area || {};
+  const isCOD      = (metode || '').toLowerCase() !== 'transfer';
+  const total      = isCOD ? (h + ongkirPromo + feeCOD) : (h + ongkirPromo);
+  const no         = String(nomorUrut).padStart(2, '0');
+  const cs         = (csNama || 'CS').toUpperCase();
+
+  const formula = isCOD
+    ? `${h}+${ongkirPromo}+${feeCOD}=${total}`
+    : `${h}+${ongkirPromo}=${total}`;
+
+  return `No. ${no}. ${ekspLabel}-MENG
+
+Nama   : ${(customer?.nama || '').toUpperCase()}
+No. Hp : ${customer?.wa_number || ''}
+Alamat : ${(alamat || '-').toUpperCase()}|Pengirim CS ${cs}|${ongkirAsli}|${potongan}|${feeCOD}|${diskon}|${h}
+
+${(area.kelurahan || '').toUpperCase()}
+${(area.kecamatan || '').toUpperCase()}
+${(area.kota      || '').toUpperCase()}
+${(area.provinsi  || '').toUpperCase()}
+${area.kodePos    || ''}
+
+Jumlah pesanan: ${qty} ${(product?.nama || 'PRODUK').toUpperCase()}
+Pembayaran: ${isCOD ? `COD ${ekspLabel}-MENG` : 'TRANSFER'}
+Total pembayaran: ${formula}
+
+${(product?.nama || 'PRODUK').toUpperCase()} ${qty} CS ${cs}
+
+KELUHAN: ${keluhan || 'tidak disebutkan'}`.trim();
 }
 
 /* ── MAIN HANDLER ─────────────────────────────────────────── */
@@ -794,6 +854,26 @@ Kakak enaknya COD atau transfer? 🙏`;
     const cekOngkirMatch   = rawReply.match(/\[CEK_ONGKIR:([^\]]+)\]/);
     const wilayahOkMatch   = rawReply.match(/\[WILAYAH_OK:([^\]]+)\]/);
 
+    // Parse ORDER_DATA sebelum rawReply mungkin di-overwrite ongkir handler
+    let orderDataParsed = {};
+    const orderDataMatch = rawReply.match(/\[ORDER_DATA:([^\]]+)\]/);
+    if (orderDataMatch) {
+      try {
+        const s = orderDataMatch[1];
+        const alamatM  = s.match(/alamat="([^"]+)"/);
+        const keluhanM = s.match(/keluhan="([^"]+)"/);
+        const metodeM  = s.match(/metode="([^"]+)"/);
+        const qtyM     = s.match(/qty=(\d+)/);
+        orderDataParsed = {
+          alamat:  alamatM?.[1]  || '',
+          keluhan: keluhanM?.[1] || '',
+          metode:  metodeM?.[1]  || 'COD',
+          qty:     parseInt(qtyM?.[1] || '1'),
+        };
+        console.log('ORDER_DATA parsed:', JSON.stringify(orderDataParsed));
+      } catch(e) { console.error('ORDER_DATA parse error:', e.message); }
+    }
+
     // ── Handle [WILAYAH_OK:] → langsung hitung ongkir ────────
     if (wilayahOkMatch && !autoOngkirResult && !convState.ongkir) {
       const wilayah = wilayahOkMatch[1].trim();
@@ -922,6 +1002,7 @@ Kakak enaknya COD atau transfer? 🙏`;
     let reply = rawReply
       .replace('[ESCALATE]', '')
       .replace('[ORDER_CONFIRMED]', '')
+      .replace(/\[ORDER_DATA:[^\]]+\]/, '')
       .replace(/\[CEK_ONGKIR:[^\]]+\]/, '')
       .replace(/\[WILAYAH_OK:[^\]]+\]/, '')
       .trim();
@@ -938,9 +1019,37 @@ Kakak enaknya COD atau transfer? 🙏`;
       });
     }
 
-    // ── Update state jika order confirmed → auto closing ─────
+    // ── Update state jika order confirmed → auto closing + kirim recap ke grup ──
     if (orderConfirmed) {
       await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
+
+      if (WA_GROUP_JID) {
+        try {
+          // Ambil state terbaru (ongkir + area sudah tersimpan di state)
+          const convFull = await sbGet('conversations', `?id=eq.${conversation.id}&limit=1`);
+          const latestState = convFull[0]?.state || {};
+          const ongkirData  = latestState.ongkir || convState.ongkir;
+          const csNama      = product?.persona_cs_nama || 'CS';
+          const nomorUrut   = await getOrderNumber(userId);
+
+          const closingMsg = buildClosingMessage({
+            nomorUrut,
+            customer,
+            alamat:  orderDataParsed.alamat  || latestState.alamat  || '-',
+            ongkir:  ongkirData,
+            product,
+            keluhan: orderDataParsed.keluhan || latestState.keluhan || '-',
+            metode:  orderDataParsed.metode  || latestState.metode_bayar || 'COD',
+            qty:     orderDataParsed.qty     || latestState.qty     || 1,
+            csNama,
+          });
+
+          await sendWA(userId, WA_GROUP_JID, closingMsg, true);
+          console.log(`Recap order #${nomorUrut} terkirim ke grup`);
+        } catch(e) {
+          console.error('Send recap ke grup error:', e.message);
+        }
+      }
     }
 
     // ── Simpan & kirim balasan ─────────────────────────────────
