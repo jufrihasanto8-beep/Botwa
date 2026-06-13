@@ -306,82 +306,93 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans
 <script>
 Auth.guard();
 
-let activeContactId = null;
-let aiOn = true, waOn = true, busy = false;
-let stats = { msg:0, ai:0, wa:0 };
-let tabFilter = 'all', searchFilter = '';
+const userId  = Auth.getUser()?.id;
+const SB_URL  = window.SUPABASE_URL;
+const SB_KEY  = window.SUPABASE_ANON_KEY;
+const PROXY   = '/api/baileys-proxy';
+const sbH     = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
 
-/* Init user info */
+let activeConvId = null, activeCustomer = null;
+let tabFilter = 'all', searchFilter = '';
+let lastMsgCount = 0;
+let stats = { msg:0, ai:0, wa:0 };
+
 const user = Auth.getUser();
-document.getElementById('tb-av2').textContent = initials(user?.name || '?');
+document.getElementById('tb-av2').textContent  = initials(user?.name || '?');
 document.getElementById('tb-name2').textContent = user?.name || 'Admin';
 
-/* ── PAGE SWITCHING ── */
-const pages = ['chat','fanpage','analytics','conversations','broadcast','aiagents'];
-function showPage(name, btn) {
-  pages.forEach(p => {
-    const el = document.getElementById(p + '-page');
-    if (el) el.style.display = p === name ? 'flex' : 'none';
-  });
-  document.querySelectorAll('.nav-item[data-page]').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+/* ── SUPABASE HELPERS ── */
+async function sbGet(t, q='') {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, { headers: sbH });
+  return r.json();
 }
-
-function switchInbox(filter, el) {
-  tabFilter = filter;
-  document.querySelectorAll('#left-nav .nav-item[data-filter]').forEach(n => n.classList.remove('active'));
-  el.classList.add('active');
-  renderInbox();
+async function sbPost(t, b) {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}`, { method:'POST', headers:{...sbH,'Prefer':'return=representation'}, body:JSON.stringify(b) });
+  return r.json();
 }
 
 /* ── INBOX ── */
 async function renderInbox() {
-  let list = await Contacts.getAll();
-  if (searchFilter) list = list.filter(c => c.name.toLowerCase().includes(searchFilter) || c.phone.includes(searchFilter));
+  let convs = await sbGet('conversations',
+    `?user_id=eq.${userId}&order=last_msg_at.desc.nullslast`);
+
+  if (searchFilter) {
+    convs = convs.filter(c => {
+      const cust = c._customer;
+      return !cust || cust.nama?.toLowerCase().includes(searchFilter) || cust.wa_number?.includes(searchFilter);
+    });
+  }
+  if (tabFilter === 'unread') convs = convs.filter(c => c.status === 'baru');
 
   const el = document.getElementById('conv-list');
-  if (!list.length) {
+  if (!convs.length) {
     el.innerHTML = `<div class="empty-inbox">
       <div style="font-size:32px;margin-bottom:8px;">📭</div>
-      <div style="font-size:13px;font-weight:500;">Belum ada kontak</div>
-      <a href="contacts.html" style="font-size:12px;color:#16a679;">+ Tambah kontak</a>
+      <div style="font-size:13px;font-weight:500;">Belum ada percakapan</div>
     </div>`;
+    document.getElementById('unread-badge').textContent = '0';
+    document.getElementById('unread-badge').style.display = 'none';
     return;
   }
 
-  const rows = await Promise.all(list.map(async c => {
-    const hist = await ChatHistory.get(c.id, 1);
-    const last = hist[hist.length - 1];
-    return { c, last };
-  }));
-
-  // Sort by last message time
-  rows.sort((a, b) => {
-    const ta = a.last?.created_at || a.c.created_at || '';
-    const tb = b.last?.created_at || b.c.created_at || '';
-    return tb.localeCompare(ta);
-  });
-
-  if (tabFilter === 'unread') {
-    rows.filter(r => r.last?.role === 'user');
+  // Ambil data customer untuk semua conv sekaligus
+  const custIds = [...new Set(convs.map(c => c.customer_id).filter(Boolean))];
+  let customers = [];
+  if (custIds.length) {
+    customers = await sbGet('customers', `?id=in.(${custIds.join(',')})`);
   }
+  const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
 
-  el.innerHTML = rows.map(({ c, last }) => {
-    const preview = last ? last.content.slice(0,50) : 'Belum ada pesan';
-    const isUnread = last?.role === 'user';
-    const color = avatarColor(c.name);
-    return `<div class="conv-item ${activeContactId===c.id?'active':''}" onclick="selectContact('${c.id}')">
-      <div class="conv-avatar" style="background:${color}">${initials(c.name)}</div>
+  // Ambil pesan terakhir tiap conversation
+  const lastMsgs = await Promise.all(convs.map(c =>
+    sbGet('conv_messages', `?conversation_id=eq.${c.id}&order=created_at.desc&limit=1`)
+  ));
+
+  el.innerHTML = convs.map((conv, i) => {
+    const cust  = custMap[conv.customer_id] || {};
+    const nama  = cust.nama || cust.wa_number || 'Unknown';
+    const last  = lastMsgs[i]?.[0];
+    const preview = last?.isi?.slice(0,50) || 'Belum ada pesan';
+    const isUnread = conv.status === 'baru';
+    const color = avatarColor(nama);
+    const statusBadge = conv.status === 'eskalasi'
+      ? `<span style="font-size:10px;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:10px;">Eskalasi</span>`
+      : conv.status === 'baru'
+      ? `<div class="unread-dot"></div>` : '';
+    return `<div class="conv-item ${activeConvId===conv.id?'active':''}" onclick="selectConv('${conv.id}')">
+      <div class="conv-avatar" style="background:${color}">${initials(nama)}</div>
       <div class="conv-info">
-        <div class="conv-name">${c.name}<span class="ctime">${last ? timeStr(last.created_at) : ''}</span></div>
+        <div class="conv-name">${nama}<span class="ctime">${last ? timeStr(last.created_at) : ''}</span></div>
         <div class="conv-preview">${preview}</div>
-        <div class="conv-meta"><span class="ch-wa">WhatsApp</span>${isUnread?'<div class="unread-dot"></div>':''}</div>
+        <div class="conv-meta"><span class="ch-wa">WhatsApp</span>${statusBadge}</div>
       </div>
     </div>`;
   }).join('');
 
-  const unreadCount = rows.filter(r => r.last?.role === 'user').length;
-  document.getElementById('unread-badge').textContent = unreadCount || '0';
+  const unreadCount = convs.filter(c => c.status === 'baru').length;
+  const badge = document.getElementById('unread-badge');
+  badge.textContent = unreadCount || '0';
+  badge.style.display = unreadCount ? '' : 'none';
 }
 
 function setTab(tab, btn) {
@@ -390,202 +401,166 @@ function setTab(tab, btn) {
   btn.classList.add('active');
   renderInbox();
 }
-
 function filterConvs(val) { searchFilter = val.toLowerCase(); renderInbox(); }
 
-async function selectContact(id) {
-  activeContactId = id;
+async function selectConv(id) {
+  activeConvId = id;
   await renderInbox();
   await renderChat();
-  updateRightPanel();
+  await updateRightPanel();
 }
 
 /* ── CHAT ── */
 async function renderChat() {
   const area = document.getElementById('messages-area');
-  if (!activeContactId) return;
-  const c = await Contacts.find(activeContactId);
-  if (!c) return;
+  if (!activeConvId) return;
 
-  document.getElementById('ch-av').textContent = initials(c.name);
-  document.getElementById('ch-av').style.background = avatarColor(c.name);
-  document.getElementById('ch-name').textContent = c.name;
-  document.getElementById('ch-sub').innerHTML = `<span class="online-dot"></span> WhatsApp &middot; +${c.phone}`;
+  const convs = await sbGet('conversations', `?id=eq.${activeConvId}&limit=1`);
+  const conv  = convs[0]; if (!conv) return;
+  const custs = conv.customer_id ? await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`) : [];
+  activeCustomer = custs[0] || null;
+
+  const nama = activeCustomer?.nama || activeCustomer?.wa_number || 'Customer';
+  document.getElementById('ch-av').textContent   = initials(nama);
+  document.getElementById('ch-av').style.background = avatarColor(nama);
+  document.getElementById('ch-name').textContent = nama;
+  document.getElementById('ch-sub').innerHTML    = `<span class="online-dot"></span> WhatsApp &middot; +${activeCustomer?.wa_number || ''}`;
+
+  const msgs = await sbGet('conv_messages',
+    `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=100`);
+  lastMsgCount = msgs.length;
 
   area.innerHTML = '<div class="day-divider">Hari ini</div>';
-  const hist = await ChatHistory.get(activeContactId, 100);
-  hist.forEach(m => appendBubble(m.role === 'user' ? 'customer' : 'bot', m.content, false, m.created_at));
+  msgs.forEach(m => appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, false, m.created_at, m.role));
   area.scrollTop = area.scrollHeight;
 }
 
-function appendBubble(type, text, scroll=true, ts=null) {
+function appendBubble(type, text, scroll=true, ts=null, role=null) {
   const area = document.getElementById('messages-area');
-  const noChat = area.querySelector('.no-chat');
-  if (noChat) noChat.remove();
-
-  const div = document.createElement('div');
+  area.querySelector('.no-chat')?.remove();
+  const div  = document.createElement('div');
   div.className = `msg-row from-${type}`;
-  const safe = text.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  const t = timeStr(ts);
-
+  const safe = (text||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  const t    = timeStr(ts);
+  const nama = document.getElementById('ch-name').textContent;
+  const label = role === 'cs' ? '👤 CS Manual' : '🤖 AI Agent';
   if (type === 'customer') {
-    const c = { name: document.getElementById('ch-name').textContent };
-    div.innerHTML = `<div class="msg-av" style="background:${avatarColor(c.name)}">${initials(c.name)}</div>
+    div.innerHTML = `<div class="msg-av" style="background:${avatarColor(nama)}">${initials(nama)}</div>
       <div><div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
   } else {
-    div.innerHTML = `<div>
-      <div class="bot-label">🤖 AI Agent</div>
-      <div class="bubble">${safe}</div>
-      <div class="msg-meta">${t}</div>
-    </div>`;
+    div.innerHTML = `<div><div class="bot-label">${label}</div>
+      <div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
   }
   area.appendChild(div);
   if (scroll) area.scrollTop = area.scrollHeight;
   return div;
 }
 
-function showTyping() {
-  const area = document.getElementById('messages-area');
-  const d = document.createElement('div');
-  d.className = 'msg-row from-bot'; d.id = 'typing';
-  d.innerHTML = `<div><div class="bot-label">🤖 AI Agent</div>
-    <div class="bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>`;
-  area.appendChild(d); area.scrollTop = area.scrollHeight;
-}
-function removeTyping() { const e = document.getElementById('typing'); if(e) e.remove(); }
-
 function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
-function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
+function handleKey(e)   { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
 
-/* ── SEND ── */
+/* ── SEND (CS manual override) ── */
 async function sendMsg() {
-  if (busy || !activeContactId) return;
+  if (!activeConvId || !activeCustomer) return;
   const input = document.getElementById('msg-input');
-  const text = input.value.trim();
+  const text  = input.value.trim();
   if (!text) return;
   input.value = ''; autoResize(input);
 
-  await ChatHistory.add(activeContactId, 'user', text);
-  appendBubble('customer', text);
-  stats.msg++; updateStats();
-  renderInbox();
+  // Simpan ke conv_messages sebagai role 'cs'
+  await sbPost('conv_messages', { conversation_id: activeConvId, role: 'cs', isi: text });
+  appendBubble('bot', text, true, new Date().toISOString(), 'cs');
+  stats.wa++; updateStats();
 
-  if (!aiOn) return;
-
-  busy = true;
-  document.getElementById('send-btn').disabled = true;
-  showTyping();
-
+  // Kirim via Baileys
   try {
-    const hist = await ChatHistory.get(activeContactId, 20);
-    const messages = hist.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
-    const reply = await Claude.chat(messages, await buildSystemPrompt());
-    await ChatHistory.add(activeContactId, 'assistant', reply);
-    removeTyping();
-    const msgEl = appendBubble('bot', reply);
-    stats.ai++; updateStats();
-    renderInbox();
-
-    // Auto-learning setiap 15 pesan AI — jalan di background, tidak ganggu chat
-    if (stats.ai % 15 === 0) {
-      GlobalInsight.generate().catch(() => {});
-    }
-
-    if (waOn) {
-      const c = await Contacts.find(activeContactId);
-      const r = await Fonnte.send(c.phone, reply);
-      const inner = msgEl.querySelector('.bubble');
-      if (inner) {
-        const lbl = document.createElement('div');
-        lbl.className = r.ok ? 'wa-sent' : 'wa-fail';
-        lbl.textContent = r.ok ? '&#10003;&#10003; Terkirim ke WhatsApp' : '&#10007; Gagal kirim ke WA';
-        inner.after(lbl);
-      }
-      if (r.ok) { stats.wa++; updateStats(); }
-    }
-  } catch(e) {
-    removeTyping();
-    appendBubble('bot', 'Maaf, ada kendala: ' + e.message);
-    if (e.message.includes('API key')) showToast('Set Anthropic API key di Pengaturan');
-  } finally {
-    busy = false;
-    document.getElementById('send-btn').disabled = false;
-  }
+    await fetch(`${PROXY}?path=${encodeURIComponent('/send')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        secret: 'adsysukses2026',
+        session_id: userId,
+        wa_number: activeCustomer.wa_number,
+        message: text,
+      }),
+    });
+  } catch(e) { showToast('Gagal kirim WA: ' + e.message); }
 }
 
-/* ── TOGGLES ── */
-function toggleAI() {
-  aiOn = !aiOn;
-  document.getElementById('ai-lbl').textContent = aiOn ? 'ON' : 'OFF';
-  document.getElementById('ai-btn').className = 'tool-btn' + (aiOn ? ' on' : '');
-}
-function toggleWA() {
-  waOn = !waOn;
-  document.getElementById('wa-lbl').textContent = waOn ? 'ON' : 'OFF';
-  document.getElementById('wa-btn').className = 'tool-btn' + (waOn ? ' on' : '');
-}
+/* ── TOGGLES (disable AI toggle — AI via webhook otomatis) ── */
+function toggleAI()  { showToast('AI dikelola otomatis via webhook'); }
+function toggleWA()  { showToast('WA dikelola otomatis via Baileys'); }
 
 /* ── RIGHT PANEL ── */
 async function updateRightPanel() {
-  if (!activeContactId) return;
-  const c = await Contacts.find(activeContactId);
-  const color = avatarColor(c.name);
+  if (!activeConvId) return;
+  const nama  = activeCustomer?.nama || activeCustomer?.wa_number || 'Customer';
+  const color = avatarColor(nama);
   document.getElementById('rd-contact').innerHTML = `
-    <div class="rd-contact-av" style="background:${color}">${initials(c.name)}</div>
-    <div style="font-weight:600;font-size:14px;">${c.name}</div>
-    <div style="font-size:12px;color:#6b7280;margin-top:2px;">+${c.phone}</div>
-    ${c.address ? `<div style="font-size:12px;color:#6b7280;">&#128205; ${c.address}</div>` : ''}
-    <a href="contacts.html" style="font-size:11px;margin-top:8px;display:inline-block;color:#16a679;">Edit kontak</a>`;
+    <div class="rd-contact-av" style="background:${color}">${initials(nama)}</div>
+    <div style="font-weight:600;font-size:14px;">${nama}</div>
+    <div style="font-size:12px;color:#6b7280;margin-top:2px;">+${activeCustomer?.wa_number || ''}</div>`;
 }
 
-function updatePKStatus() {
-  const pk = Config.getKey('product_knowledge');
-  document.getElementById('pk-rp-status').innerHTML = pk
-    ? `<span style="color:#15803d;font-weight:500;">&#10003; Katalog aktif</span> <span style="color:#9ca3af;">(${pk.length.toLocaleString()} karakter)</span>`
-    : `<span style="color:#92400e;">&#9888; Belum ada katalog</span> <a href="settings.html" style="font-size:11px;display:block;margin-top:4px;">Upload di Pengaturan</a>`;
-}
-
+/* ── WA STATUS (Baileys) ── */
 async function checkWA() {
   const badge = document.getElementById('wa-status-badge');
-  const dot = document.getElementById('wa-dot');
-  const txt = document.getElementById('wa-status-txt');
+  const dot   = document.getElementById('wa-dot');
+  const txt   = document.getElementById('wa-status-txt');
   txt.textContent = 'Mengecek...';
-  const r = await Fonnte.checkDevice();
-  if (r.ok) {
-    badge.className = 'wa-badge connected';
-    dot.className = 'wa-dot on';
-    txt.textContent = 'Terhubung';
-  } else {
+  try {
+    const res    = await fetch(`${PROXY}?path=${encodeURIComponent('/session/status/' + userId)}`);
+    const status = await res.json();
+    if (status.status === 'connected') {
+      badge.className = 'wa-badge connected';
+      dot.className   = 'wa-dot on';
+      txt.textContent = '+' + status.waNumber;
+    } else {
+      badge.className = 'wa-badge disconnected';
+      dot.className   = 'wa-dot off';
+      txt.textContent = status.status || 'Tidak terhubung';
+    }
+  } catch(e) {
     badge.className = 'wa-badge disconnected';
-    dot.className = 'wa-dot off';
+    dot.className   = 'wa-dot off';
     txt.textContent = 'Tidak terhubung';
   }
 }
 
 function updateStats() {
   document.getElementById('s-msg').textContent = stats.msg;
-  document.getElementById('s-ai').textContent = stats.ai;
-  document.getElementById('s-wa').textContent = stats.wa;
+  document.getElementById('s-ai').textContent  = stats.ai;
+  document.getElementById('s-wa').textContent  = stats.wa;
 }
 
-function goContact() { if (activeContactId) window.location.href = 'contacts.html'; }
+function updatePKStatus() {
+  document.getElementById('pk-rp-status').innerHTML =
+    `<span style="color:#15803d;font-weight:500;">&#10003; Dikelola di halaman Produk</span>`;
+}
+
+function goContact()  { /* noop */ }
 async function clearChat() {
-  if (!activeContactId) return;
-  if (!confirm('Hapus riwayat chat ini?')) return;
-  await ChatHistory.clear(activeContactId);
+  if (!activeConvId || !confirm('Hapus riwayat chat ini?')) return;
+  await fetch(`${SB_URL}/rest/v1/conv_messages?conversation_id=eq.${activeConvId}`,
+    { method:'DELETE', headers: sbH });
   await renderChat();
-  await renderInbox();
   showToast('Chat dihapus');
 }
 
 /* ── POLLING ── */
-let lastMsgCount = 0;
 async function poll() {
-  if (activeContactId) {
-    const msgs = await ChatHistory.get(activeContactId, 100);
+  if (activeConvId) {
+    const msgs = await sbGet('conv_messages',
+      `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=100`);
     if (msgs.length !== lastMsgCount) {
+      const prevCount = lastMsgCount;
+      // Append hanya pesan baru
+      msgs.slice(prevCount).forEach(m =>
+        appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, true, m.created_at, m.role)
+      );
       lastMsgCount = msgs.length;
-      await renderChat();
+      if (msgs[msgs.length-1]?.role === 'customer') { stats.msg++; updateStats(); }
+      if (msgs[msgs.length-1]?.role === 'ai')       { stats.ai++;  updateStats(); }
     }
   }
   await renderInbox();
@@ -593,24 +568,10 @@ async function poll() {
 
 /* ── INIT ── */
 window.addEventListener('load', async () => {
-  await Config.load();
   await renderInbox();
   updatePKStatus();
   checkWA();
-
-  const params = new URLSearchParams(location.search);
-  const cid = params.get('contact');
-  if (cid) selectContact(cid);
-
   setInterval(poll, 5000);
-
-  // Auto-learning: jalan di background kalau belum pernah atau sudah > 12 jam
-  const cfg = Config.get();
-  const lastUpdated = cfg.ai_insights_updated;
-  const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-  if (!lastUpdated || lastUpdated < twelveHoursAgo) {
-    GlobalInsight.generate().catch(() => {});
-  }
 });
 </script>
 </body>
