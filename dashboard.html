@@ -914,6 +914,7 @@ async function selectConv(id) {
 async function renderChat() {
   const area = document.getElementById('messages-area');
   if (!activeConvId) return;
+  lastMsgTimestamp = null; // reset saat ganti conversation
 
   const convs = await sbGet('conversations', `?id=eq.${activeConvId}&limit=1`);
   activeConv  = convs[0]; if (!activeConv) return;
@@ -1240,20 +1241,33 @@ function toggleAI()  { showToast('AI dikelola otomatis via webhook'); }
 function toggleWA()  { showToast('WA dikelola otomatis via Baileys'); }
 
 /* ── POLLING ── */
+let lastMsgTimestamp = null;
+
 async function poll() {
   if (activeConvId) {
-    const msgs = await sbGet('conv_messages',
-      `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=100`);
-    if (msgs.length !== lastMsgCount) {
-      const prevCount = lastMsgCount;
-      msgs.slice(prevCount).forEach(m =>
-        appendBubble(m.role==='customer'?'customer':'bot', m.isi, true, m.created_at, m.role)
-      );
-      lastMsgCount = msgs.length;
-    }
+    try {
+      const query = lastMsgTimestamp
+        ? `?conversation_id=eq.${activeConvId}&created_at=gt.${lastMsgTimestamp}&order=created_at.asc`
+        : `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=100`;
+
+      const msgs = await sbGet('conv_messages', query);
+
+      if (lastMsgTimestamp) {
+        // Append hanya pesan baru
+        msgs.forEach(m => {
+          appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, true, m.created_at, m.role);
+          lastMsgTimestamp = m.created_at;
+          lastMsgCount++;
+        });
+      } else {
+        // Initial load sudah ditangani renderChat, cukup set timestamp
+        if (msgs.length) lastMsgTimestamp = msgs[msgs.length - 1].created_at;
+        lastMsgCount = msgs.length;
+      }
+    } catch(e) { console.error('poll error:', e.message); }
   }
-  await renderInbox();
-  await loadStats();
+  await renderInbox().catch(()=>{});
+  await loadStats().catch(()=>{});
 }
 
 /* ── INIT ── */
