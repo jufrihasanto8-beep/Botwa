@@ -220,6 +220,7 @@ ATURAN HARGA, ONGKIR & COD
 - Wilayah tak konsisten → konfirmasi halus, jangan asal proses.
 - Kurir dipilih SISTEM berdasarkan grade + ongkir daerah itu.
 - Fee COD 5% ke customer, dibulatkan ke terdekat.
+- JANGAN sebutkan dari mana barang dikirim / lokasi gudang / asal pengiriman. Fokus ke estimasi tiba dan total biaya saja.
 - Promo ongkir diterapkan SISTEM (berlaku COD & transfer).
 
 FORMAT TAMPIL HARGA (pakai persis ini saat tampilkan total)
@@ -433,7 +434,7 @@ function bulatkan(nilai, kelipatan = 500) {
 }
 
 /* ── MENGANTAR PUBLIC API (tanpa API key) ────────────────── */
-const MENGANTAR_ORIGIN_ID = '5fc63315f8f44b34aa4c44ca'; // Kranggan, Galur, Kulon Progo
+const MENGANTAR_ORIGIN_ID = process.env.MENGANTAR_ORIGIN_ID || '5fc63315f8f44b34aa4c44ca';
 const MENGANTAR_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
   'Accept': 'application/json',
