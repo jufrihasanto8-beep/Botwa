@@ -279,33 +279,96 @@ async function callClaude(systemPrompt, messages) {
   return data.content?.[0]?.text || '';
 }
 
-/* ── CEK ONGKIR via Mengantar API ─────────────────────────── */
-async function cekOngkir(wilayah, productId) {
+/* ── PEMBULATAN ke kelipatan terdekat ────────────────────── */
+function bulatkan(nilai, kelipatan = 500) {
+  const bawah = Math.floor(nilai / kelipatan) * kelipatan;
+  const atas  = bawah + kelipatan;
+  return (nilai - bawah) <= (atas - nilai) ? bawah : atas;
+}
+
+/* ── HITUNG ONGKIR: step 4–8 blueprint §4 ───────────────── */
+async function hitungOngkir(wilayah, product) {
   if (!MENGANTAR_KEY) return null;
   try {
-    // Mengantar: cari kota
-    const searchRes = await fetch(`https://api.mengantar.com/v1/areas?search=${encodeURIComponent(wilayah)}`, {
-      headers: { 'Authorization': `Bearer ${MENGANTAR_KEY}` },
-    });
+    // Step 3: Cek ongkir via Mengantar API
+    const searchRes = await fetch(
+      `https://api.mengantar.com/v1/areas?search=${encodeURIComponent(wilayah)}`,
+      { headers: { 'Authorization': `Bearer ${MENGANTAR_KEY}` } }
+    );
     const areas = await searchRes.json();
     if (!areas?.data?.length) return null;
 
-    const areaId = areas.data[0].id;
+    const areaId   = areas.data[0].id;
+    const areaNama = areas.data[0].name || wilayah;
+    const weight   = product?.berat_gram || 500;
 
-    // Ambil data produk untuk harga
-    const products = productId
-      ? await sbGet('products', `?id=eq.${productId}&limit=1`)
-      : [];
-    const weight = 500; // gram default, bisa per produk
-    const price  = products[0]?.harga || 0;
+    const ongkirRes = await fetch(
+      `https://api.mengantar.com/v1/rates?destination_id=${areaId}&weight=${weight}`,
+      { headers: { 'Authorization': `Bearer ${MENGANTAR_KEY}` } }
+    );
+    const ratesData = await ongkirRes.json();
+    let rates = ratesData?.data || [];
+    if (!rates.length) return null;
 
-    const ongkirRes = await fetch(`https://api.mengantar.com/v1/rates?destination_id=${areaId}&weight=${weight}`, {
-      headers: { 'Authorization': `Bearer ${MENGANTAR_KEY}` },
-    });
-    const rates = await ongkirRes.json();
-    return rates?.data || null;
+    // Step 4: Filter whitelist & grade dari tabel couriers_grade
+    // (jika tabel belum ada / kosong, pakai semua kurir)
+    const gradeRows = await sbGet('couriers_grade',
+      `?daerah=ilike.%25${encodeURIComponent(areaNama)}%25&boleh_dipakai=eq.true`
+    ).catch(() => []);
+
+    if (gradeRows.length) {
+      const gradeMap = {};
+      for (const g of gradeRows) gradeMap[g.ekspedisi.toLowerCase()] = g.grade;
+
+      // Step 5: Pilih kurir terbaik — grade A dulu, lalu termurah
+      rates = rates.filter(r => gradeMap[r.courier_name?.toLowerCase()]);
+      rates.sort((a, b) => {
+        const ga = gradeMap[a.courier_name?.toLowerCase()] || 'E';
+        const gb = gradeMap[b.courier_name?.toLowerCase()] || 'E';
+        if (ga !== gb) return ga.localeCompare(gb); // A < B < C ...
+        return (a.price || 0) - (b.price || 0);
+      });
+    } else {
+      // Fallback: urutkan dari termurah
+      rates.sort((a, b) => (a.price || 0) - (b.price || 0));
+    }
+
+    if (!rates.length) return null;
+
+    const best      = rates[0];
+    const ekspedisi = best.courier_name || 'ekspedisi';
+    const ongkirAsli = best.price || 0;
+
+    // Step 6: Terapkan promo ongkir produk
+    const promo = product?.promo_ongkir;
+    let ongkirPromo = ongkirAsli;
+    if (promo?.tipe === 'gratis_penuh')   ongkirPromo = 0;
+    else if (promo?.tipe === 'potong')    ongkirPromo = Math.max(0, ongkirAsli - (promo.nilai || 0));
+    else if (promo?.tipe === 'gratis_sd') ongkirPromo = Math.max(0, ongkirAsli - (promo.nilai || 0));
+
+    const harga = product?.harga || 0;
+
+    // Step 7: Hitung total
+    const totalTransfer = harga + ongkirPromo;
+    const feeCOD        = Math.ceil((harga + ongkirPromo) * 0.05);
+    const totalCOD      = harga + ongkirPromo + feeCOD;
+
+    // Step 8: Bulatkan
+    const totalTransferBulat = bulatkan(totalTransfer);
+    const totalCODBulat      = bulatkan(totalCOD);
+    const feeCODBulat        = totalCODBulat - harga - ongkirPromo;
+
+    return {
+      ekspedisi,
+      ongkirAsli,
+      ongkirPromo,
+      totalTransfer: totalTransferBulat,
+      totalCOD: totalCODBulat,
+      feeCOD: feeCODBulat,
+      harga,
+    };
   } catch (e) {
-    console.error('Cek ongkir error:', e.message);
+    console.error('Hitung ongkir error:', e.message);
     return null;
   }
 }
@@ -411,20 +474,41 @@ module.exports = async function handler(req, res) {
     if (cekOngkirMatch) {
       const wilayah = cekOngkirMatch[1].trim();
       await updateConvState(conversation.id, { wilayah });
-      const rates = await cekOngkir(wilayah, product?.id);
-      if (rates) {
-        // Inject info ongkir ke prompt & panggil Claude lagi
-        const ongkirInfo = rates.slice(0, 3).map(r =>
-          `${r.courier_name}: Rp ${r.price?.toLocaleString('id-ID')}`
-        ).join(', ');
+      const hasil = await hitungOngkir(wilayah, product);
+      if (hasil) {
+        // Simpan hasil ke conversation state
+        await updateConvState(conversation.id, { ongkir: hasil });
+
+        const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+        const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
+          ? `~~${fmt(hasil.ongkirAsli)}~~ ${fmt(hasil.ongkirPromo)}`
+          : fmt(hasil.ongkirPromo);
+
+        // Inject angka final — Claude tinggal tampilkan, TIDAK perlu hitung lagi
+        const injeksi = `[SISTEM] Data ongkir ke ${wilayah} sudah dihitung. Gunakan PERSIS angka ini:
+Produk: ${product?.nama || 'produk'} ${fmt(hasil.harga)}
+
+💳 Transfer
+${product?.nama || 'produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
+
+📦 COD
+${product?.nama || 'produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
+
+Via ${hasil.ekspedisi} ya kak 🚗
+Kakak enaknya COD atau transfer? 🙏
+
+PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
+
         const historyWithOngkir = [
           ...history,
-          { role: 'assistant', content: rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '') },
-          { role: 'user', content: `[SISTEM] Hasil cek ongkir ke ${wilayah}: ${ongkirInfo}. Tampilkan format harga yang benar ke customer.` },
+          { role: 'assistant', content: rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() },
+          { role: 'user', content: injeksi },
         ];
         rawReply = await callClaude(systemPrompt, historyWithOngkir);
       } else {
-        rawReply = rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '');
+        // Ongkir gagal — minta customer konfirmasi wilayah lagi
+        rawReply = rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() ||
+          'Maaf kak, aku belum bisa cek ongkir ke wilayah itu. Bisa sebutkan nama kota/kabupatennya lengkap? 🙏';
       }
     }
 
