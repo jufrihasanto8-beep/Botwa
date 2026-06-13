@@ -451,7 +451,9 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Simpan pesan masuk ─────────────────────────────────────
+    console.log(`[4] saveMessage...`);
     await saveMessage(conversation.id, 'customer', message || `[${messageType}]`);
+    console.log(`[5] saveMessage OK`);
 
     // ── Cek apakah sudah eskalasi → AI diam, CS manusia yang balas ──
     if (conversation.status === 'eskalasi') {
@@ -463,8 +465,11 @@ module.exports = async function handler(req, res) {
     const systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber);
 
     // ── Ambil history & panggil Claude ────────────────────────
+    console.log(`[6] getContextMessages...`);
     const history = await getContextMessages(conversation.id);
+    console.log(`[7] callClaude... history=${history.length} msgs`);
     let rawReply  = await callClaude(systemPrompt, history);
+    console.log(`[8] Claude reply: ${rawReply?.slice(0,60)}`);
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
 
     // ── Deteksi marker khusus ──────────────────────────────────
