@@ -242,19 +242,18 @@ function formatPromoOngkir(promo) {
 
 /* ── GET HISTORY & CONTEXT INJECTION ─────────────────────── */
 async function getContextMessages(conversationId) {
-  // Ambil 20 pesan TERAKHIR (desc), lalu balik urutan jadi kronologis
+  // Ambil 10 pesan TERAKHIR saja — ringkasan berjalan yang pegang konteks panjang
   const msgs = await sbGet('conv_messages',
-    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=20`
+    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=10`
   );
   msgs.reverse();
 
-  // Map roles
   const mapped = msgs.map(m => ({
     role: m.role === 'customer' ? 'user' : 'assistant',
     content: m.isi || '',
   })).filter(m => m.content.trim());
 
-  // Claude API butuh alternating user/assistant — gabungkan consecutive same role
+  // Gabungkan consecutive same role (Claude API wajib alternating)
   const result = [];
   for (const msg of mapped) {
     const last = result[result.length - 1];
@@ -269,6 +268,31 @@ async function getContextMessages(conversationId) {
   if (result.length && result[0].role === 'assistant') result.shift();
 
   return result;
+}
+
+/* ── UPDATE RINGKASAN BERJALAN (non-blocking) ─────────────── */
+async function updateRingkasan(conversationId) {
+  try {
+    const msgs = await sbGet('conv_messages',
+      `?conversation_id=eq.${conversationId}&order=created_at.asc`
+    );
+    if (msgs.length < 6) return; // belum cukup untuk diringkas
+
+    const transcript = msgs.map(m =>
+      `${m.role === 'customer' ? 'Customer' : 'AI'}: ${m.isi}`
+    ).join('\n');
+
+    const ringkasan = await callClaude(
+      'Buat ringkasan singkat percakapan CS ini dalam 3-5 kalimat bahasa Indonesia. Fokus pada: keluhan customer, produk yang dibahas, tahap percakapan (konsultasi/tertarik/mau beli/sudah order), dan data yang sudah terkumpul (nama/HP/alamat). Singkat dan padat.',
+      [{ role: 'user', content: transcript }]
+    );
+
+    if (ringkasan) {
+      await sbPatch('conversations', `?id=eq.${conversationId}`, { ringkasan });
+    }
+  } catch (e) {
+    console.error('updateRingkasan error:', e.message);
+  }
 }
 
 async function saveMessage(conversationId, role, isi) {
@@ -476,10 +500,13 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, skipped: 'eskalasi' });
     }
 
-    // ── Build system prompt ────────────────────────────────────
-    const systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber);
+    // ── Build system prompt + inject ringkasan ────────────────
+    let systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber);
+    if (conversation.ringkasan) {
+      systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
+    }
 
-    // ── Ambil history & panggil Claude ────────────────────────
+    // ── Ambil 10 pesan terakhir & panggil Claude ──────────────
     const history = await getContextMessages(conversation.id);
     let rawReply  = await callClaude(systemPrompt, history);
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
@@ -560,6 +587,11 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
     await sendWA(userId, reply_jid, reply);
 
     res.status(200).json({ ok: true });
+
+    // ── Update ringkasan berjalan (non-blocking, setiap 5 pesan) ──
+    sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`)
+      .then(all => { if (all.length % 5 === 0) updateRingkasan(conversation.id); })
+      .catch(() => {});
 
   } catch (err) {
     console.error('Webhook error:', err.message, err.stack);
