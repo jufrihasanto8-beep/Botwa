@@ -126,13 +126,17 @@ body.light .cb-section{border-bottom-color:#f1f5f9}
 body.light .cb-card{background:#f8fafc;border-color:#e2e8f0}
 body.light .cb-card-body{color:#0f172a}
 body.light .cb-card-sub{color:#64748b}
-body.light .risk-section{border-bottom-color:#f1f5f9}
+body.light .detect-section{border-bottom-color:#f1f5f9}
+body.light .detect-card{background:#f8fafc;border-color:#e2e8f0}
+body.light .detect-card-label{color:#64748b}
+body.light .detect-card-value{color:#0f172a}
+body.light .detect-card-sub{color:#94a3b8}
+body.light .detect-summary{background:#f8fafc;border-color:#e2e8f0}
+body.light .detect-summary-text{color:#64748b}
 body.light .sla-section{border-bottom-color:#f1f5f9}
 body.light .nba-section{border-bottom-color:#f1f5f9}
 body.light .wa-section{border-bottom-color:#f1f5f9}
 body.light .timeline-section{border-bottom-color:#f1f5f9}
-body.light .risk-label{color:#0f172a}
-body.light .risk-factor{color:#64748b!important}
 body.light .sla-status.ok{color:#16a34a}
 body.light .sla-bar{background:#e2e8f0}
 body.light .sla-time{color:#64748b}
@@ -346,17 +350,23 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .priority-badge.high{background:rgba(239,68,68,.1);color:#fca5a5}
 .priority-badge.urgent{background:rgba(220,38,38,.15);color:#ef4444}
 
-/* Risk Score */
-.risk-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
-.risk-row{display:flex;align-items:center;gap:12px}
-.risk-circle{width:52px;height:52px;border-radius:50%;background:rgba(34,197,94,.08);border:2px solid rgba(34,197,94,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
-.risk-num{font-size:16px;font-weight:700;color:#22c55e;line-height:1}
-.risk-max{font-size:9px;color:#374151}
-.risk-info{flex:1}
-.risk-label{font-size:12px;font-weight:600;color:#e2e8f0}
-.risk-factors{margin-top:6px}
-.risk-factor{font-size:11px;color:#64748b;display:flex;align-items:flex-start;gap:4px;margin-bottom:2px}
-.risk-factor::before{content:'•';flex-shrink:0;margin-top:1px}
+/* Deteksi Customer */
+.detect-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.detect-card{display:flex;align-items:center;gap:10px;background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:11px 12px;margin-bottom:8px}
+.detect-card:last-child{margin-bottom:0}
+.detect-card-icon{font-size:20px;flex-shrink:0;width:32px;text-align:center}
+.detect-card-content{flex:1;min-width:0}
+.detect-card-label{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.detect-card-value{font-size:13px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detect-card-sub{font-size:11px;color:#64748b;margin-top:2px}
+.detect-badge{flex-shrink:0;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.detect-badge.aman{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.2)}
+.detect-badge.hati,.detect-badge.sedang{background:rgba(245,158,11,.12);color:#fcd34d;border:1px solid rgba(245,158,11,.2)}
+.detect-badge.tinggi{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.detect-badge.unknown{background:rgba(100,116,139,.12);color:#94a3b8;border:1px solid rgba(100,116,139,.2)}
+.detect-summary{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:9px 12px;margin-top:4px}
+.detect-summary-text{font-size:11px;color:#64748b;line-height:1.5}
+.detect-loading{text-align:center;padding:16px 0;color:#475569;font-size:12px}
 
 /* SLA */
 .sla-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -606,54 +616,33 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 
     <!-- CASE RESOLUTION BOARD -->
     <div id="case-board">
-      <div class="cb-header">✦ Case Resolution Board</div>
+      <div class="cb-header">🔍 Deteksi Customer</div>
 
-      <!-- Isu & Konflik -->
-      <div class="cb-section">
-        <div class="cb-grid">
-          <div class="cb-card">
-            <div class="cb-card-title">🎯 Isu Utama</div>
-            <div class="cb-card-body" id="cb-isu">—</div>
-            <div class="cb-card-sub" id="cb-isu-sub"></div>
+      <!-- Deteksi RTS & Wilayah -->
+      <div class="detect-section">
+        <!-- RTS History -->
+        <div class="detect-card">
+          <div class="detect-card-icon" id="det-rts-icon">📦</div>
+          <div class="detect-card-content">
+            <div class="detect-card-label">Riwayat RTS</div>
+            <div class="detect-card-value" id="det-rts-value">—</div>
+            <div class="detect-card-sub" id="det-rts-sub">Pilih percakapan</div>
           </div>
-          <div class="cb-card">
-            <div class="cb-card-title">⚡ Konflik</div>
-            <div class="cb-card-body" id="cb-konflik">—</div>
-            <div class="cb-card-sub" id="cb-konflik-sub"></div>
-          </div>
+          <div class="detect-badge unknown" id="det-rts-badge">—</div>
         </div>
-      </div>
-
-      <!-- Prioritas & Root Cause -->
-      <div class="cb-section">
-        <div class="cb-grid">
-          <div class="cb-card">
-            <div class="cb-card-title">📊 Prioritas</div>
-            <div id="cb-prioritas"><span class="priority-badge low">Low</span></div>
-            <div class="cb-card-sub" id="cb-prioritas-sub" style="margin-top:5px">Risk score 0/100</div>
+        <!-- Wilayah Risk -->
+        <div class="detect-card">
+          <div class="detect-card-icon" id="det-wil-icon">📍</div>
+          <div class="detect-card-content">
+            <div class="detect-card-label">Risiko Wilayah</div>
+            <div class="detect-card-value" id="det-wil-value">—</div>
+            <div class="detect-card-sub" id="det-wil-sub">Pilih percakapan</div>
           </div>
-          <div class="cb-card">
-            <div class="cb-card-title">🔍 Root Cause</div>
-            <div class="cb-card-body" id="cb-root">—</div>
-            <div class="cb-card-sub" id="cb-root-sub"></div>
-          </div>
+          <div class="detect-badge unknown" id="det-wil-badge">—</div>
         </div>
-      </div>
-
-      <!-- Risk Score -->
-      <div class="risk-section">
-        <div class="cb-title">🛡 Deteksi Risiko & Konflik</div>
-        <div class="risk-row">
-          <div class="risk-circle" id="risk-circle">
-            <div class="risk-num" id="risk-num">0</div>
-            <div class="risk-max">/100</div>
-          </div>
-          <div class="risk-info">
-            <div class="risk-label" id="risk-label">Low Risk</div>
-            <div class="risk-factors" id="risk-factors">
-              <div class="risk-factor" style="color:#374151">Belum ada data</div>
-            </div>
-          </div>
+        <!-- Summary -->
+        <div class="detect-summary" id="det-summary">
+          <div class="detect-summary-text" id="det-summary-text">Pilih percakapan untuk deteksi customer.</div>
         </div>
       </div>
 
@@ -1074,33 +1063,11 @@ function closeAISuggest() {
 async function updateCaseBoard() {
   if (!activeConvId || !activeConv) return;
 
-  // Prioritas
-  const priMap = { low:'low', med:'med', medium:'med', high:'high', urgent:'urgent' };
-  const pri    = priMap[activeConv.prioritas] || 'low';
-  const priLabel = { low:'Rendah', med:'Sedang', high:'Tinggi', urgent:'Urgent' };
-  document.getElementById('cb-prioritas').innerHTML =
-    `<span class="priority-badge ${pri}">${priLabel[pri]||'Rendah'}</span>`;
-  document.getElementById('cb-prioritas-sub').textContent = `Risk score ${getRiskScore()}/100`;
-
-  // Isu & Konflik dari state atau default
-  const state = activeConv.state || {};
-  document.getElementById('cb-isu').textContent     = state.isu_utama || 'Permintaan informasi produk';
-  document.getElementById('cb-isu-sub').textContent = state.isu_detail || '';
-  document.getElementById('cb-konflik').textContent = activeConv.status === 'eskalasi' ? 'Ada konflik' : 'Tidak ada';
-  document.getElementById('cb-konflik-sub').textContent = activeConv.status === 'eskalasi'
-    ? 'Memerlukan penanganan CS manusia' : 'Pelanggan kooperatif';
-  document.getElementById('cb-root').textContent    = state.root_cause || 'Informasi belum lengkap';
-  document.getElementById('cb-root-sub').textContent = state.root_detail || '';
-
-  // Risk
-  const risk = getRiskScore();
-  updateRiskDisplay(risk);
-
   // AI Engine chips
   document.getElementById('ae-chips').innerHTML = `
-    <span class="ai-chip intent">Order Intent: ${activeConv.status === 'eskalasi' ? 'Tinggi' : 'Sedang'}</span>
+    <span class="ai-chip intent">Status: ${activeConv.status === 'eskalasi' ? 'Eskalasi' : activeConv.status === 'selesai' ? 'Selesai' : 'Aktif'}</span>
     <span class="ai-chip sentiment">Sentiment: Positif</span>
-    <span class="ai-chip prob">Closing: ${risk > 50 ? risk+'%' : Math.max(20,risk)+'%'}</span>`;
+    <span class="ai-chip prob">AI: Aktif</span>`;
 
   // NBA
   if (activeConv.status === 'eskalasi') {
@@ -1108,38 +1075,83 @@ async function updateCaseBoard() {
   } else {
     document.getElementById('nba-text').textContent = 'Klik "Saran AI" untuk mendapatkan rekomendasi balasan terbaik dari AI.';
   }
-}
 
-function getRiskScore() {
-  if (!activeConv) return 0;
-  let score = 0;
-  if (activeConv.status === 'eskalasi') score += 60;
-  else if (activeConv.status === 'diproses') score += 20;
-  if (activeConv.prioritas === 'high') score += 20;
-  else if (activeConv.prioritas === 'urgent') score += 40;
-  return Math.min(score, 100);
-}
+  // Reset ke loading state
+  document.getElementById('det-rts-value').textContent = 'Mengecek...';
+  document.getElementById('det-rts-sub').textContent   = '';
+  document.getElementById('det-wil-value').textContent = 'Mengecek...';
+  document.getElementById('det-wil-sub').textContent   = '';
+  document.getElementById('det-summary-text').textContent = 'Sedang deteksi customer...';
 
-function updateRiskDisplay(score) {
-  const circle = document.getElementById('risk-circle');
-  const num    = document.getElementById('risk-num');
-  const label  = document.getElementById('risk-label');
-  const factors = document.getElementById('risk-factors');
-  num.textContent = score;
-  if (score < 30) {
-    circle.style.borderColor = 'rgba(34,197,94,.3)'; circle.style.background = 'rgba(34,197,94,.08)';
-    num.style.color = '#22c55e'; label.textContent = 'Low Risk';
-  } else if (score < 60) {
-    circle.style.borderColor = 'rgba(245,158,11,.3)'; circle.style.background = 'rgba(245,158,11,.08)';
-    num.style.color = '#f59e0b'; label.textContent = 'Medium Risk';
-  } else {
-    circle.style.borderColor = 'rgba(239,68,68,.3)'; circle.style.background = 'rgba(239,68,68,.08)';
-    num.style.color = '#ef4444'; label.textContent = 'High Risk';
+  const waNumber = activeCustomer?.wa_number || '';
+  const state    = activeConv.state || {};
+  const wilayah  = state.wilayah || state.proposed_wilayah || '';
+
+  if (!waNumber) {
+    document.getElementById('det-rts-value').textContent = '—';
+    document.getElementById('det-rts-sub').textContent   = 'Nomor tidak diketahui';
+    document.getElementById('det-wil-value').textContent = '—';
+    document.getElementById('det-wil-sub').textContent   = 'Wilayah belum ada';
+    document.getElementById('det-summary-text').textContent = 'Data customer tidak tersedia.';
+    return;
   }
-  document.getElementById('cb-prioritas-sub').textContent = `Risk score ${score}/100`;
-  factors.innerHTML = score > 0
-    ? `<div class="risk-factor" style="color:#94a3b8">${activeConv?.status==='eskalasi'?'Status eskalasi aktif':'Percakapan berjalan normal'}</div>`
-    : `<div class="risk-factor" style="color:#374151">Belum ada data</div>`;
+
+  try {
+    const params = new URLSearchParams({ wa_number: waNumber });
+    if (wilayah) params.append('wilayah', wilayah);
+    const resp = await fetch(`/api/customer-risk?${params}`);
+    const data = await resp.json();
+
+    // RTS
+    const rts = data.rts;
+    if (rts) {
+      const lvlIcon = rts.level === 'aman' ? '✅' : rts.level === 'hati' ? '⚠️' : '🚨';
+      document.getElementById('det-rts-icon').textContent    = lvlIcon;
+      document.getElementById('det-rts-value').textContent   = rts.label;
+      document.getElementById('det-rts-sub').textContent     = `Total order: ${rts.total}`;
+      const badge = document.getElementById('det-rts-badge');
+      badge.textContent  = rts.level === 'aman' ? 'Aman' : rts.level === 'hati' ? 'Hati-hati' : 'Tinggi';
+      badge.className    = `detect-badge ${rts.level}`;
+    }
+
+    // Wilayah
+    const wil = data.wilayah;
+    if (wil) {
+      const wilIcon = wil.level === 'aman' ? '📍' : wil.level === 'sedang' ? '⚠️' : wil.level === 'tinggi' ? '🚨' : '📍';
+      document.getElementById('det-wil-icon').textContent    = wilIcon;
+      document.getElementById('det-wil-value').textContent   = wil.nama || wilayah || '—';
+      document.getElementById('det-wil-sub').textContent     = wil.label || 'Data kurang';
+      const wbadge = document.getElementById('det-wil-badge');
+      wbadge.textContent = wil.level === 'aman' ? 'Aman' : wil.level === 'sedang' ? 'Sedang' : wil.level === 'tinggi' ? 'Tinggi' : '—';
+      wbadge.className   = `detect-badge ${wil.level || 'unknown'}`;
+    } else {
+      document.getElementById('det-wil-value').textContent = wilayah || '—';
+      document.getElementById('det-wil-sub').textContent   = wilayah ? 'Data wilayah kurang' : 'Wilayah belum diketahui';
+    }
+
+    // Summary
+    const rtsLevel = rts?.level || 'unknown';
+    const wilLevel = wil?.level || 'unknown';
+    let summaryText = '';
+    if (rtsLevel === 'tinggi' || wilLevel === 'tinggi') {
+      summaryText = '🚨 Customer berisiko tinggi. Waspadai kemungkinan RTS.';
+    } else if (rtsLevel === 'hati' || wilLevel === 'sedang') {
+      summaryText = '⚠️ Ada indikasi risiko. Konfirmasi data sebelum proses order.';
+    } else if (rtsLevel === 'aman' && (wilLevel === 'aman' || wilLevel === 'unknown')) {
+      summaryText = '✅ Customer terdeteksi aman. Tidak ada riwayat RTS.';
+    } else {
+      summaryText = 'Data deteksi tersedia. Cek detail di atas.';
+    }
+    document.getElementById('det-summary-text').textContent = summaryText;
+
+  } catch(e) {
+    console.error('Customer risk error:', e);
+    document.getElementById('det-rts-value').textContent = '—';
+    document.getElementById('det-rts-sub').textContent   = 'Gagal memuat';
+    document.getElementById('det-wil-value').textContent = '—';
+    document.getElementById('det-wil-sub').textContent   = 'Gagal memuat';
+    document.getElementById('det-summary-text').textContent = 'Gagal cek data customer.';
+  }
 }
 
 /* ── SLA COUNTDOWN ── */
