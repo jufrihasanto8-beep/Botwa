@@ -117,7 +117,7 @@ async function resolveProduct(userId, referral, messageText) {
 }
 
 /* ── BUILD TEMPLATE SYSTEM PROMPT (Blueprint §3) ─────────── */
-function buildTemplatePrompt(product, customer, conversation, sumber) {
+function buildTemplatePrompt(product, customer, conversation, sumber, userRekening = null) {
   const csNama     = product?.persona_cs_nama || 'Sari';
   const namaToko   = product?.persona_cs_nama ? 'toko kami' : 'Adsy Store';
   const namaProduk = product?.nama || 'produk kami';
@@ -136,6 +136,10 @@ function buildTemplatePrompt(product, customer, conversation, sumber) {
     : 'tidak ada';
 
   const namaCustomer = customer?.nama || '';
+
+  const rekeningInfo = userRekening
+    ? userRekening
+    : '(belum diisi — jangan kasih info rekening, bilang "nanti kami kirimkan info rekeningnya ya kak 🙏")';
 
   return `IDENTITAS
 Kamu "${csNama}", CS toko ${namaToko} di WhatsApp.
@@ -161,6 +165,7 @@ Cocok untuk : ${keluhan}
 Cara pakai  : ${product?.cara_pakai || '(lihat kemasan)'}
 Knowledge   : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
 Promo ongkir: ${promoOngkir}
+Rekening TF : ${rekeningInfo}
 
 ALUR KONSULTASI
 1. SAMBUT hangat (sambung ke iklan), jangan langsung jualan
@@ -224,6 +229,12 @@ Urutan WAJIB diikuti:
 7. Tutup dengan KONFIRMASI ORDER (rincian+total), minta "oke".
 8. Setelah customer konfirmasi → tulis [ORDER_CONFIRMED] di akhir balasan.
 JANGAN minta data diri SEBELUM tunjukkan total ongkir dan tanya pilihan bayar.
+
+INFO PEMBAYARAN TRANSFER
+- Kalau customer pilih Transfer → LANGSUNG kasih info rekening dari DATA PRODUK di atas.
+- JANGAN bilang "tim kami akan hubungi" atau "nanti kami konfirmasi" — rekening sudah ada, kasih langsung.
+- Format: "Silakan transfer ke: [rekening]. Setelah transfer, kirim bukti TF ya kak 🙏"
+- Kalau rekening belum diisi di data produk → baru bilang "Nanti kami kirimkan info rekeningnya ya kak 🙏"
 
 REM ETIS
 - JANGAN klaim medis berlebihan ("pasti sembuh").
@@ -547,6 +558,10 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: false, reason: 'no_session_id' });
     }
 
+    // ── Ambil rekening dari users table ───────────────────────
+    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening&limit=1`).catch(() => []);
+    const userRekening = userRows[0]?.rekening || null;
+
     // ── Routing: cari produk dari referral/isi chat ────────────
     const { product, sumber } = await resolveProduct(userId, referral, message);
     console.log(`Produk: ${product?.nama || 'tidak diketahui'} (${sumber})`);
@@ -570,7 +585,7 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Build system prompt + inject ringkasan ────────────────
-    let systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber);
+    let systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber, userRekening);
     if (conversation.ringkasan) {
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
