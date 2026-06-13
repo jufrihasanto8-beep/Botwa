@@ -256,31 +256,36 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
         <div class="section-title">Rekening Transfer</div>
         <div class="section-desc">Info rekening yang akan dikirim otomatis ke customer saat mereka pilih bayar lewat Transfer Bank.</div>
 
-        <!-- Card preview rekening tersimpan -->
-        <div id="rek-card" style="display:none;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;margin-bottom:16px">
+        <!-- Card rekening tersimpan -->
+        <div id="rek-card" style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;margin-bottom:16px">
           <div style="display:flex;align-items:flex-start;gap:12px">
             <div style="width:44px;height:44px;background:rgba(59,130,246,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">💳</div>
             <div style="flex:1">
-              <div style="font-weight:600;font-size:14px;color:#f1f5f9;margin-bottom:4px">Rekening Aktif</div>
+              <div style="font-weight:600;font-size:14px;color:#f1f5f9;margin-bottom:6px" id="rek-card-title">Memuat...</div>
               <div id="rek-card-lines" style="font-size:13px;color:#94a3b8;line-height:1.8;white-space:pre-wrap"></div>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-              <span style="width:8px;height:8px;border-radius:50%;background:#86efac;display:inline-block"></span>
-              <span style="font-size:12px;color:#86efac;font-weight:600">Aktif</span>
-            </div>
+            <div id="rek-card-status" style="display:flex;align-items:center;gap:6px;flex-shrink:0"></div>
+          </div>
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:8px">
+            <button class="btn btn-sm" onclick="toggleEditRekening()">✏️ Edit Rekening</button>
+            <button class="btn-danger btn-sm" id="rek-hapus-btn" onclick="hapusRekening()" style="display:none">Hapus</button>
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Info Rekening</label>
-          <textarea id="rek-info" rows="5" placeholder="Contoh:
+        <!-- Form edit (hidden by default) -->
+        <div id="rek-form" style="display:none">
+          <div class="form-group">
+            <label>Info Rekening</label>
+            <textarea id="rek-info" rows="5" placeholder="Contoh:
 BCA 1234567890 a.n. Budi Santoso
 BRI 0987654321 a.n. Budi Santoso
 
 Bisa isi lebih dari satu rekening."></textarea>
-        </div>
-        <div class="save-bar">
-          <button class="btn-primary" onclick="saveRekening()">Simpan Rekening</button>
+          </div>
+          <div class="save-bar">
+            <button class="btn" onclick="toggleEditRekening()">Batal</button>
+            <button class="btn-primary" onclick="saveRekening()">Simpan Rekening</button>
+          </div>
         </div>
       </div>
 
@@ -530,23 +535,49 @@ window.showSection = function(name, el) {
 
 /* ── REKENING TRANSFER ── */
 function showRekeningCard(rek) {
-  const card = document.getElementById('rek-card');
+  const title = document.getElementById('rek-card-title');
+  const lines = document.getElementById('rek-card-lines');
+  const statusEl = document.getElementById('rek-card-status');
+  const hapusBtn = document.getElementById('rek-hapus-btn');
+
   if (rek) {
-    document.getElementById('rek-card-lines').textContent = rek;
-    card.style.display = 'block';
+    title.textContent = 'Rekening Aktif';
+    lines.textContent = rek;
+    statusEl.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#86efac;display:inline-block"></span>
+      <span style="font-size:12px;color:#86efac;font-weight:600">Aktif</span>`;
+    hapusBtn.style.display = 'inline-flex';
   } else {
-    card.style.display = 'none';
+    title.textContent = 'Belum ada rekening';
+    lines.textContent = 'Klik "Edit Rekening" untuk menambahkan info rekening bank.';
+    statusEl.innerHTML = `<span style="font-size:12px;color:#64748b">Belum diisi</span>`;
+    hapusBtn.style.display = 'none';
   }
+}
+
+function toggleEditRekening() {
+  const form = document.getElementById('rek-form');
+  const isHidden = form.style.display === 'none';
+  form.style.display = isHidden ? 'block' : 'none';
+}
+
+async function hapusRekening() {
+  if (!confirm('Hapus info rekening?')) return;
+  document.getElementById('rek-info').value = '';
+  await saveRekening();
 }
 
 async function loadRekening() {
   const userId = Auth.getUser()?.id;
+  document.getElementById('rek-card-title').textContent = 'Memuat...';
   try {
     const data = await SB.get('users', `?id=eq.${userId}&select=rekening&limit=1`);
     const rek = data[0]?.rekening || '';
     document.getElementById('rek-info').value = rek;
     showRekeningCard(rek);
-  } catch(e) { console.error('loadRekening:', e.message); }
+  } catch(e) {
+    document.getElementById('rek-card-title').textContent = '⚠️ Gagal memuat';
+    console.error('loadRekening:', e.message);
+  }
 }
 
 async function saveRekening() {
@@ -573,9 +604,9 @@ async function saveRekening() {
     if (tersimpan === rekening) {
       toast('✅ Rekening berhasil disimpan');
       showRekeningCard(rekening);
+      document.getElementById('rek-form').style.display = 'none';
     } else {
       toast('⚠️ Belum tersimpan dengan benar — coba lagi');
-      showRekeningCard('');
     }
   } catch(e) {
     toast('❌ Gagal simpan: ' + e.message);
