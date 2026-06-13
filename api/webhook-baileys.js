@@ -526,7 +526,11 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
       .replace(/\[CEK_ONGKIR:[^\]]+\]/, '')
       .trim();
 
-    if (!reply) return;
+    console.log(`[9] rawReply="${rawReply?.slice(0,100)}" reply="${reply?.slice(0,100)}"`);
+    if (!reply) {
+      console.warn('[9] reply kosong setelah bersihkan marker — skip kirim');
+      return res.status(200).json({ ok: true, skipped: 'empty_reply' });
+    }
 
     console.log(`Reply untuk ${wa_number}${isEscalated?' [ESKALASI]':''}${orderConfirmed?' [ORDER]':''}: ${reply.slice(0, 80)}`);
 
@@ -544,8 +548,10 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
     }
 
     // ── Simpan & kirim balasan ─────────────────────────────────
+    console.log(`[10] sendWA → reply_jid=${reply_jid}`);
     await saveMessage(conversation.id, 'ai', reply);
     await sendWA(userId, reply_jid, reply);
+    console.log(`[11] sendWA OK`);
 
     res.status(200).json({ ok: true });
 
