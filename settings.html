@@ -79,6 +79,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .btn-danger{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;font-size:12px;cursor:pointer;transition:all .15s}
 .btn-danger:hover{background:rgba(239,68,68,.18)}
 
+/* ── Ekspedisi whitelist ── */
+.kurir-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.kurir-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:10px}
+.kurir-row-left{display:flex;align-items:center;gap:10px;font-size:13px;color:#e2e8f0;font-weight:500}
+.kurir-icon{width:32px;height:32px;background:rgba(59,130,246,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.toggle-wrap{display:flex;align-items:center;gap:10px}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#374151;border-radius:20px;cursor:pointer;transition:.2s}
+.toggle-slider:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:#3b82f6}
+.toggle input:checked+.toggle-slider:before{transform:translateX(16px)}
+.kurir-add-row{display:flex;gap:8px;margin-top:8px}
+.kurir-add-row input{flex:1;background:#161b22;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 12px;font-size:13px;color:#e2e8f0;outline:none}
+.kurir-add-row input:focus{border-color:rgba(59,130,246,.4)}
+body.light .kurir-row{background:#fff;border-color:#e2e8f0}
+body.light .kurir-row-left{color:#0f172a}
+body.light .kurir-icon{background:rgba(59,130,246,.08)}
+body.light .toggle-slider{background:#cbd5e1}
+body.light .kurir-add-row input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+
 /* ── WA status ── */
 .wa-status-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .wa-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
@@ -169,6 +190,7 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
     <div class="settings-nav">
       <a href="#" class="active" onclick="showSection('account',this)">👤 Akun</a>
       <a href="#" onclick="showSection('wa',this)">📱 Connect WhatsApp</a>
+      <a href="#" onclick="showSection('kurir',this)">🚚 Ekspedisi</a>
     </div>
 
     <div class="settings-body">
@@ -225,6 +247,20 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
           </div>
           <button class="btn-secondary" style="margin-top:16px" onclick="cancelQR()">Batal</button>
         </div>
+      </div>
+
+      <!-- ── EKSPEDISI WHITELIST ── -->
+      <div class="settings-section" id="sec-kurir">
+        <div class="section-title">Ekspedisi yang Dipakai</div>
+        <div class="section-desc">Pilih ekspedisi mana yang boleh dipakai saat sistem memilih kurir otomatis. Ekspedisi yang dimatikan tidak akan dipilih meski tersedia di Mengantar API.</div>
+        <div class="kurir-list" id="kurir-list">
+          <div style="color:#64748b;font-size:13px;padding:12px 0">Memuat...</div>
+        </div>
+        <div class="kurir-add-row">
+          <input type="text" id="kurir-input" placeholder="Nama ekspedisi baru (misal: JNE, J&T, Sicepat)" onkeydown="if(event.key==='Enter')addKurir()">
+          <button class="btn-primary" onclick="addKurir()">+ Tambah</button>
+        </div>
+        <p class="hint" style="margin-top:10px">💡 Kalau daftar ini kosong, sistem akan otomatis pilih kurir termurah dari Mengantar.</p>
       </div>
 
     </div><!-- settings-body -->
@@ -454,7 +490,92 @@ const origShowSection = showSection;
 window.showSection = function(name, el) {
   origShowSection(name, el);
   if (name === 'wa') loadWAStatus();
+  if (name === 'kurir') loadKurir();
 };
+
+/* ── EKSPEDISI WHITELIST ── */
+const KURIR_DEFAULT = ['JNE','J&T Express','SiCepat','Anteraja','ID Express','Ninja Xpress','Lion Parcel','SAP Express'];
+let kurirData = []; // [{id, nama, aktif}]
+
+async function loadKurir() {
+  const userId = Auth.getUser()?.id;
+  const list = document.getElementById('kurir-list');
+  list.innerHTML = '<div style="color:#64748b;font-size:13px;padding:12px 0">Memuat...</div>';
+
+  const { data, error } = await supabase
+    .from('courier_whitelist')
+    .select('*')
+    .eq('user_id', userId)
+    .order('nama');
+
+  if (error) { list.innerHTML = `<div style="color:#fca5a5;font-size:13px">⚠️ ${error.message}</div>`; return; }
+
+  // Kalau baru pertama kali (kosong), isi default
+  if (!data.length) {
+    await Promise.all(KURIR_DEFAULT.map(nama =>
+      supabase.from('courier_whitelist').insert({ user_id: userId, nama, aktif: true })
+    ));
+    return loadKurir();
+  }
+
+  kurirData = data;
+  renderKurir();
+}
+
+function renderKurir() {
+  const list = document.getElementById('kurir-list');
+  if (!kurirData.length) {
+    list.innerHTML = '<div style="color:#64748b;font-size:13px;padding:8px 0">Belum ada ekspedisi. Tambah dulu di bawah.</div>';
+    return;
+  }
+  list.innerHTML = kurirData.map(k => `
+    <div class="kurir-row" id="kr-${k.id}">
+      <div class="kurir-row-left">
+        <div class="kurir-icon">🚚</div>
+        <span>${k.nama}</span>
+      </div>
+      <div class="toggle-wrap">
+        <label class="toggle">
+          <input type="checkbox" ${k.aktif ? 'checked' : ''} onchange="toggleKurir('${k.id}', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <button class="btn btn-sm" style="color:#fca5a5;border-color:rgba(239,68,68,.2)" onclick="deleteKurir('${k.id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+async function toggleKurir(id, aktif) {
+  const userId = Auth.getUser()?.id;
+  const { error } = await supabase.from('courier_whitelist').update({ aktif }).eq('id', id).eq('user_id', userId);
+  if (error) { toast('⚠️ Gagal update: ' + error.message); loadKurir(); return; }
+  const k = kurirData.find(x => x.id === id);
+  if (k) k.aktif = aktif;
+}
+
+async function addKurir() {
+  const input = document.getElementById('kurir-input');
+  const nama = input.value.trim();
+  if (!nama) return;
+  const userId = Auth.getUser()?.id;
+  if (kurirData.some(k => k.nama.toLowerCase() === nama.toLowerCase())) {
+    toast('⚠️ Ekspedisi sudah ada'); return;
+  }
+  const { data, error } = await supabase.from('courier_whitelist').insert({ user_id: userId, nama, aktif: true }).select().single();
+  if (error) { toast('⚠️ Gagal tambah: ' + error.message); return; }
+  kurirData.push(data);
+  kurirData.sort((a,b) => a.nama.localeCompare(b.nama));
+  input.value = '';
+  renderKurir();
+  toast('✅ Ekspedisi ditambah');
+}
+
+async function deleteKurir(id) {
+  const userId = Auth.getUser()?.id;
+  const { error } = await supabase.from('courier_whitelist').delete().eq('id', id).eq('user_id', userId);
+  if (error) { toast('⚠️ Gagal hapus: ' + error.message); return; }
+  kurirData = kurirData.filter(k => k.id !== id);
+  renderKurir();
+}
 </script>
 </body>
 </html>
