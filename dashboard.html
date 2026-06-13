@@ -92,13 +92,14 @@ body.light .act-btn:hover{background:#eff6ff;border-color:#bfdbfe;color:#2563eb}
 body.light #messages-area{background:#f8fafc}
 body.light .from-customer .bubble{background:#fff;border-color:#e2e8f0;color:#0f172a}
 body.light .day-divider{color:#94a3b8}
-body.light .day-divider::before,.day-divider::after{background:#e2e8f0}
+body.light .day-divider::before{background:#e2e8f0}
+body.light .day-divider::after{background:#e2e8f0}
 body.light .no-chat{color:#94a3b8}
 body.light #ai-suggest-box{background:#fff;border-top-color:rgba(99,102,241,.15)}
 body.light .ai-suggest-text{background:#f8fafc;border-color:rgba(99,102,241,.15);color:#0f172a}
 body.light #input-box{background:#fff;border-top-color:#e2e8f0}
 body.light .tool-pill{border-color:#e2e8f0;color:#64748b}
-body.light .tool-pill:hover,.tool-pill.on{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}
+body.light .tool-pill:hover{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}
 body.light .tool-pill.on{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}
 body.light .tool-pill.suggest-btn{background:rgba(99,102,241,.06);color:#6366f1;border-color:rgba(99,102,241,.15)}
 body.light #msg-input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
@@ -109,7 +110,11 @@ body.light .cb-section{border-bottom-color:#f1f5f9}
 body.light .cb-card{background:#f8fafc;border-color:#e2e8f0}
 body.light .cb-card-body{color:#0f172a}
 body.light .cb-card-sub{color:#64748b}
-body.light .risk-section,.sla-section,.nba-section,.wa-section,.timeline-section{border-bottom-color:#f1f5f9}
+body.light .risk-section{border-bottom-color:#f1f5f9}
+body.light .sla-section{border-bottom-color:#f1f5f9}
+body.light .nba-section{border-bottom-color:#f1f5f9}
+body.light .wa-section{border-bottom-color:#f1f5f9}
+body.light .timeline-section{border-bottom-color:#f1f5f9}
 body.light .risk-label{color:#0f172a}
 body.light .risk-factor{color:#64748b!important}
 body.light .sla-status.ok{color:#16a34a}
@@ -682,15 +687,13 @@ let slaInterval = null;
 // ── THEME TOGGLE ────────────────────────────────────────
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
-  document.getElementById('theme-btn').textContent = isLight ? '☀️' : '🌙';
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isLight ? '☀️' : '🌙';
   localStorage.setItem('cs_theme', isLight ? 'light' : 'dark');
 }
-(function initTheme() {
-  const saved = localStorage.getItem('cs_theme');
-  if (saved === 'light') {
-    document.body.classList.add('light');
-    document.getElementById('theme-btn').textContent = '☀️';
-  }
+// Apply saved theme immediately (before paint)
+(function() {
+  if (localStorage.getItem('cs_theme') === 'light') document.body.classList.add('light');
 })();
 
 // ── Init UI ─────────────────────────────────────────────
@@ -861,6 +864,7 @@ function filterConvs(val) { searchFilter = val.toLowerCase(); renderInbox(); }
 /* ── SELECT CONVERSATION ── */
 async function selectConv(id) {
   activeConvId = id;
+  sessionStorage.setItem('cs_active_conv', id);
   await renderInbox();
   await renderChat();
   await updateCaseBoard();
@@ -1215,9 +1219,23 @@ async function poll() {
 
 /* ── INIT ── */
 window.addEventListener('load', async () => {
+  // Restore theme button icon
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+
   await renderInbox();
   await loadStats();
   checkWA();
+
+  // Restore last active conversation
+  const savedConv = sessionStorage.getItem('cs_active_conv');
+  if (savedConv) {
+    activeConvId = savedConv;
+    await renderChat();
+    await updateCaseBoard();
+    updateSLA();
+  }
+
   setInterval(poll, 5000);
 });
 </script>
