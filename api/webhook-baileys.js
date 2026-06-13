@@ -319,7 +319,7 @@ async function callClaude(systemPrompt, messages) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 600,
       system: systemPrompt,
       messages,
@@ -328,6 +328,28 @@ async function callClaude(systemPrompt, messages) {
   const data = await res.json();
   if (data.error) throw new Error(`Claude: ${data.error.message}`);
   return data.content?.[0]?.text || '';
+}
+
+/* ── DETEKSI KONFIRMASI WILAYAH (webhook-level, tidak bergantung Claude) ── */
+
+// Ekstrak wilayah yang AI sedang konfirmasikan ("Sumba NTT ya kak?" → "Sumba NTT")
+function extractProposedWilayah(aiMsg) {
+  const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    const m = line.match(/(?:jadi\s+|ke\s+)?([A-Za-z][A-Za-z\s,]{2,50}?)\s+ya\s+kak[?😊🙏\s]/i);
+    if (m) {
+      const candidate = m[1].trim().replace(/,\s*$/, '');
+      if (candidate.length >= 3) return candidate;
+    }
+  }
+  return null;
+}
+
+// Deteksi apakah pesan customer adalah konfirmasi singkat
+function isConfirmation(msg) {
+  const lower = msg.toLowerCase().trim().replace(/[.!]+$/, '');
+  return /^(iya|ya|yakin|bener|betul|ok|oke|okey|yep|yup|iyah|bnar|benar|yes|confirm|bisa|boleh|lanjut)(\s+kak)?$/.test(lower);
 }
 
 /* ── PEMBULATAN ke kelipatan terdekat ────────────────────── */
@@ -529,9 +551,60 @@ module.exports = async function handler(req, res) {
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
 
-    // ── Ambil 10 pesan terakhir & panggil Claude ──────────────
+    // ── Ambil 10 pesan terakhir ────────────────────────────────
     const history = await getContextMessages(conversation.id);
-    let rawReply  = await callClaude(systemPrompt, history);
+
+    // ── WEBHOOK-LEVEL: Auto-trigger ongkir jika customer konfirmasi wilayah ──
+    // Cek apakah AI sebelumnya sedang tanya konfirmasi wilayah ("Sumba NTT ya kak?")
+    // dan customer menjawab konfirmasi singkat ("iya", "yakin", "bener", dll)
+    let autoOngkirResult = null;
+    const convState = conversation.state || {};
+    const proposedWilayah = convState.proposed_wilayah;
+    if (proposedWilayah && isConfirmation(message) && !convState.ongkir) {
+      console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
+      const hasil = await hitungOngkir(proposedWilayah, product);
+      if (hasil) {
+        await updateConvState(conversation.id, {
+          wilayah: proposedWilayah,
+          proposed_wilayah: null,
+          ongkir: hasil,
+        });
+        autoOngkirResult = { wilayah: proposedWilayah, hasil };
+      }
+    }
+
+    let rawReply;
+
+    if (autoOngkirResult) {
+      // Inject hasil ongkir langsung ke Claude — skip nunggu marker
+      const { wilayah, hasil } = autoOngkirResult;
+      const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+      const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
+        ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
+        : fmt(hasil.ongkirPromo);
+
+      const injeksi = `[SISTEM] Customer konfirmasi wilayah: ${wilayah}. Ongkir sudah dihitung. Tampilkan PERSIS ini ke customer tanpa ubah angka:
+
+${product?.nama || 'Produk'} ${fmt(hasil.harga)}
+
+💳 Transfer
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
+
+📦 COD
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
+
+Via ${hasil.ekspedisi} ya kak 🚗
+Kakak enaknya COD atau transfer? 🙏`;
+
+      const historyWithOngkir = [
+        ...history,
+        { role: 'user', content: injeksi },
+      ];
+      rawReply = await callClaude(systemPrompt, historyWithOngkir);
+    } else {
+      rawReply = await callClaude(systemPrompt, history);
+    }
+
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
 
     // ── Deteksi marker khusus ──────────────────────────────────
@@ -539,29 +612,28 @@ module.exports = async function handler(req, res) {
     const orderConfirmed   = rawReply.includes('[ORDER_CONFIRMED]');
     const cekOngkirMatch   = rawReply.match(/\[CEK_ONGKIR:([^\]]+)\]/);
 
-    // ── Handle cek ongkir ──────────────────────────────────────
-    if (cekOngkirMatch) {
+    // ── Handle cek ongkir (dari marker Claude — fallback) ─────
+    if (cekOngkirMatch && !autoOngkirResult) {
       const wilayah = cekOngkirMatch[1].trim();
       await updateConvState(conversation.id, { wilayah });
       const hasil = await hitungOngkir(wilayah, product);
       if (hasil) {
-        // Simpan hasil ke conversation state
         await updateConvState(conversation.id, { ongkir: hasil });
 
         const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
         const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-          ? `~~${fmt(hasil.ongkirAsli)}~~ ${fmt(hasil.ongkirPromo)}`
+          ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
           : fmt(hasil.ongkirPromo);
 
-        // Inject angka final — Claude tinggal tampilkan, TIDAK perlu hitung lagi
         const injeksi = `[SISTEM] Data ongkir ke ${wilayah} sudah dihitung. Gunakan PERSIS angka ini:
-Produk: ${product?.nama || 'produk'} ${fmt(hasil.harga)}
+
+${product?.nama || 'Produk'} ${fmt(hasil.harga)}
 
 💳 Transfer
-${product?.nama || 'produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
 
 📦 COD
-${product?.nama || 'produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
 
 Via ${hasil.ekspedisi} ya kak 🚗
 Kakak enaknya COD atau transfer? 🙏
@@ -575,10 +647,16 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
         ];
         rawReply = await callClaude(systemPrompt, historyWithOngkir);
       } else {
-        // Ongkir gagal — minta customer konfirmasi wilayah lagi
         rawReply = rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() ||
           'Maaf kak, aku belum bisa cek ongkir ke wilayah itu. Bisa sebutkan nama kota/kabupatennya lengkap? 🙏';
       }
+    }
+
+    // ── Simpan proposed_wilayah jika Claude baru tanya konfirmasi lokasi ──
+    const newProposed = extractProposedWilayah(rawReply);
+    if (newProposed && newProposed !== convState.proposed_wilayah) {
+      console.log(`Simpan proposed_wilayah: ${newProposed}`);
+      await updateConvState(conversation.id, { proposed_wilayah: newProposed });
     }
 
     // ── Bersihkan marker dari reply final ─────────────────────
