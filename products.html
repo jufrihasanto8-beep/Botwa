@@ -352,65 +352,6 @@ body.light .fu-msg-lbl{color:#94a3b8}
               </div>
             </div>
 
-            <!-- H+1 -->
-            <div class="fu-stage">
-              <div class="fu-dot h1" style="margin-top:4px"></div>
-              <div class="fu-stage-info">
-                <div class="fu-stage-label">H+1 — Besok</div>
-                <div class="fu-stage-desc">Kirim SOP H+1 keesokan harinya jika tidak ada balasan. Isi pesan & foto diatur lewat tombol <strong>+ Tambah SOP</strong> di bawah.</div>
-                <div class="fu-fields">
-                  <div class="fu-field">
-                    <label>Kirim setelah</label>
-                    <input type="number" id="fu-h1-delay" value="24" min="12" max="48">
-                    <div class="unit">jam tidak balas</div>
-                  </div>
-                </div>
-              </div>
-              <div class="fu-toggle">
-                <input type="checkbox" id="fu-h1-enabled" checked>
-                <span id="fu-h1-label">Aktif</span>
-              </div>
-            </div>
-
-            <!-- H+3 -->
-            <div class="fu-stage">
-              <div class="fu-dot h3" style="margin-top:4px"></div>
-              <div class="fu-stage-info">
-                <div class="fu-stage-label">H+3 — 3 Hari Kemudian</div>
-                <div class="fu-stage-desc">Kirim SOP H+3 jika setelah H+1 masih tidak ada balasan. Isi pesan & foto diatur lewat tombol <strong>+ Tambah SOP</strong> di bawah.</div>
-                <div class="fu-fields">
-                  <div class="fu-field">
-                    <label>Kirim setelah</label>
-                    <input type="number" id="fu-h3-delay" value="72" min="24" max="120">
-                    <div class="unit">jam sejak H+1</div>
-                  </div>
-                </div>
-              </div>
-              <div class="fu-toggle">
-                <input type="checkbox" id="fu-h3-enabled" checked>
-                <span id="fu-h3-label">Aktif</span>
-              </div>
-            </div>
-
-            <!-- H+7 -->
-            <div class="fu-stage">
-              <div class="fu-dot h7" style="margin-top:4px"></div>
-              <div class="fu-stage-info">
-                <div class="fu-stage-label">H+7 — 7 Hari Kemudian</div>
-                <div class="fu-stage-desc">Follow up terakhir. Isi pesan & foto diatur lewat tombol <strong>+ Tambah SOP</strong> di bawah.</div>
-                <div class="fu-fields">
-                  <div class="fu-field">
-                    <label>Kirim setelah</label>
-                    <input type="number" id="fu-h7-delay" value="168" min="72" max="240">
-                    <div class="unit">jam sejak H+3</div>
-                  </div>
-                </div>
-              </div>
-              <div class="fu-toggle">
-                <input type="checkbox" id="fu-h7-enabled" checked>
-                <span id="fu-h7-label">Aktif</span>
-              </div>
-            </div>
 
           </div><!-- fu-card-body -->
           <div class="fu-save-bar" id="fu-save-bar">
@@ -688,23 +629,17 @@ function toggleFUCard() {
 
 // Sync toggle label
 function syncFULabels() {
-  ['same','h1','h3','h7'].forEach(k => {
-    const cb = document.getElementById(`fu-${k}-enabled`);
-    const lbl = document.getElementById(`fu-${k}-label`);
-    if (cb && lbl) lbl.textContent = cb.checked ? 'Aktif' : 'Nonaktif';
-  });
-  // update badge
-  const anyActive = ['same','h1','h3','h7'].some(k => document.getElementById(`fu-${k}-enabled`)?.checked);
+  const cb  = document.getElementById('fu-same-enabled');
+  const lbl = document.getElementById('fu-same-label');
+  if (cb && lbl) lbl.textContent = cb.checked ? 'Aktif' : 'Nonaktif';
   const badge = document.getElementById('fu-status-badge');
   if (badge) {
-    badge.textContent = anyActive ? 'Aktif' : 'Nonaktif';
-    badge.style.background = anyActive ? 'rgba(34,197,94,.12)' : 'rgba(100,116,139,.12)';
-    badge.style.color = anyActive ? '#86efac' : '#64748b';
+    badge.textContent = cb?.checked ? 'Aktif' : 'Nonaktif';
+    badge.style.background = cb?.checked ? 'rgba(34,197,94,.12)' : 'rgba(100,116,139,.12)';
+    badge.style.color = cb?.checked ? '#86efac' : '#64748b';
   }
 }
-['same','h1','h3','h7'].forEach(k => {
-  document.getElementById(`fu-${k}-enabled`)?.addEventListener('change', syncFULabels);
-});
+document.getElementById('fu-same-enabled')?.addEventListener('change', syncFULabels);
 
 /* ── Photo upload ke Supabase Storage ── */
 async function handlePhotoUpload(stage, input) {
@@ -761,24 +696,10 @@ async function loadFUConfig() {
     const data = await sbGet('followup_config', `?user_id=eq.${currentUserId}&limit=1`);
     if (data && data[0]) {
       const c = data[0];
-      document.getElementById('fu-same-enabled').checked  = c.same_day_enabled  ?? true;
-      document.getElementById('fu-same-interval').value   = c.same_day_interval  ?? 3;
-      document.getElementById('fu-same-max').value        = c.same_day_max       ?? 3;
-      document.getElementById('fu-same-stop').value       = c.same_day_stop_hour ?? 21;
-      document.getElementById('fu-h1-enabled').checked    = c.h1_enabled         ?? true;
-      document.getElementById('fu-h1-delay').value        = c.h1_delay_hours     ?? 24;
-      document.getElementById('fu-h1-msg').value          = c.h1_message         || '';
-      document.getElementById('fu-h3-enabled').checked    = c.h3_enabled         ?? true;
-      document.getElementById('fu-h3-delay').value        = c.h3_delay_hours     ?? 72;
-      document.getElementById('fu-h3-msg').value          = c.h3_message         || '';
-      document.getElementById('fu-h7-enabled').checked    = c.h7_enabled         ?? true;
-      document.getElementById('fu-h7-delay').value        = c.h7_delay_hours     ?? 168;
-      document.getElementById('fu-h7-msg').value          = c.h7_message         || '';
-      // restore photo previews
-      ['h1','h3','h7'].forEach(s => {
-        const url = c[`${s}_image_url`];
-        if (url) setPhotoPreview(s, url, 'Foto tersimpan');
-      });
+      document.getElementById('fu-same-enabled').checked = c.same_day_enabled  ?? true;
+      document.getElementById('fu-same-interval').value  = c.same_day_interval  ?? 3;
+      document.getElementById('fu-same-max').value       = c.same_day_max       ?? 3;
+      document.getElementById('fu-same-stop').value      = c.same_day_stop_hour ?? 21;
       syncFULabels();
     }
   } catch(e) { /* tabel belum ada, pakai default */ }
@@ -787,24 +708,12 @@ async function loadFUConfig() {
 async function saveFUConfig() {
   if (!currentUserId) return;
   const payload = {
-    user_id:              currentUserId,
-    same_day_enabled:     document.getElementById('fu-same-enabled').checked,
-    same_day_interval:    parseInt(document.getElementById('fu-same-interval').value) || 3,
-    same_day_max:         parseInt(document.getElementById('fu-same-max').value) || 3,
-    same_day_stop_hour:   parseInt(document.getElementById('fu-same-stop').value) || 21,
-    h1_enabled:           document.getElementById('fu-h1-enabled').checked,
-    h1_delay_hours:       parseInt(document.getElementById('fu-h1-delay').value) || 24,
-    h1_message:           document.getElementById('fu-h1-msg').value.trim(),
-    h1_image_url:         document.getElementById('fu-h1-img-url').value || null,
-    h3_enabled:           document.getElementById('fu-h3-enabled').checked,
-    h3_delay_hours:       parseInt(document.getElementById('fu-h3-delay').value) || 72,
-    h3_message:           document.getElementById('fu-h3-msg').value.trim(),
-    h3_image_url:         document.getElementById('fu-h3-img-url').value || null,
-    h7_enabled:           document.getElementById('fu-h7-enabled').checked,
-    h7_delay_hours:       parseInt(document.getElementById('fu-h7-delay').value) || 168,
-    h7_message:           document.getElementById('fu-h7-msg').value.trim(),
-    h7_image_url:         document.getElementById('fu-h7-img-url').value || null,
-    updated_at:           new Date().toISOString(),
+    user_id:           currentUserId,
+    same_day_enabled:  document.getElementById('fu-same-enabled').checked,
+    same_day_interval: parseInt(document.getElementById('fu-same-interval').value) || 3,
+    same_day_max:      parseInt(document.getElementById('fu-same-max').value) || 3,
+    same_day_stop_hour:parseInt(document.getElementById('fu-same-stop').value) || 21,
+    updated_at:        new Date().toISOString(),
   };
   try {
     const existing = await sbGet('followup_config', `?user_id=eq.${currentUserId}&limit=1`);
@@ -826,14 +735,6 @@ function resetFUConfig() {
   document.getElementById('fu-same-interval').value  = 3;
   document.getElementById('fu-same-max').value       = 3;
   document.getElementById('fu-same-stop').value      = 21;
-  ['h1','h3','h7'].forEach(s => {
-    document.getElementById(`fu-${s}-enabled`).checked = true;
-    document.getElementById(`fu-${s}-msg`).value = '';
-    removePhoto(s);
-  });
-  document.getElementById('fu-h1-delay').value = 24;
-  document.getElementById('fu-h3-delay').value = 72;
-  document.getElementById('fu-h7-delay').value = 168;
   syncFULabels();
 }
 
