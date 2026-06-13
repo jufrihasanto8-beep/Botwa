@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pengaturan · Adsy CS</title>
 <link rel="stylesheet" href="css/style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:#0d1117;color:#e2e8f0;font-size:13px}
@@ -69,26 +67,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .account-info{display:flex;align-items:center;gap:16px;padding:18px 20px;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;margin-bottom:24px}
 .account-avatar{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#6366f1);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0}
 
-/* ── Upload zone ── */
-.upload-zone{border:2px dashed rgba(255,255,255,.1);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:border-color .15s;position:relative;background:#161b22}
-.upload-zone:hover,.upload-zone.drag{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.04)}
-.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.pk-preview-box{background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px;font-size:12px;color:#64748b;line-height:1.6;max-height:200px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;margin-top:12px;display:none}
-
-/* ── WA test badge ── */
-.wa-badge{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:500}
-.wa-badge.connected{background:rgba(34,197,94,.1);color:#86efac;border:1px solid rgba(34,197,94,.2)}
-.wa-badge.disconnected{background:rgba(100,116,139,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.06)}
-.wa-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.wa-dot.on{background:#22c55e}
-.wa-dot.off{background:#475569}
-
-/* ── Info boxes ── */
-.info-box-blue{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.15);border-radius:8px;padding:12px 14px;font-size:12px;color:#93c5fd;margin-bottom:16px;line-height:1.7}
-.info-box-green{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.12);border-radius:8px;padding:14px;font-size:13px;color:#86efac;margin-bottom:16px;line-height:1.8}
-
-/* ── Badge ── */
-.badge-green{display:inline-block;background:rgba(34,197,94,.12);color:#86efac;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
 
 /* ── Buttons ── */
 .btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
@@ -148,12 +126,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <!-- Left nav -->
     <div class="settings-nav">
       <a href="#" class="active" onclick="showSection('account',this)">👤 Akun</a>
-      <a href="#" onclick="showSection('api',this)">🔑 API Keys</a>
-      <a href="#" onclick="showSection('wa',this)">📱 WhatsApp</a>
-      <a href="#" onclick="showSection('pk',this)">🌿 Product Knowledge</a>
-      <a href="#" onclick="showSection('ai',this)">🤖 AI Agent</a>
-      <a href="#" onclick="showSection('followup',this)">🔁 Follow-up Otomatis</a>
-      <a href="#" onclick="showSection('rekap',this)">📊 Rekap Harian</a>
+      <a href="#" onclick="showSection('wa',this)">📱 Connect WhatsApp</a>
     </div>
 
     <div class="settings-body">
@@ -191,163 +164,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
         </div>
       </div>
 
-      <!-- ── API KEYS ── -->
-      <div class="settings-section" id="sec-api">
-        <div class="section-title">API Keys</div>
-        <div class="section-desc">Kunci API tersimpan di database dan digunakan oleh server untuk membalas pesan.</div>
-        <div class="form-group">
-          <label>Anthropic API Key</label>
-          <input type="password" id="cfg-anthropic" placeholder="sk-ant-api03-...">
-          <div class="hint">Dapatkan di <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
-        </div>
-        <div class="form-group">
-          <label>Fonnte API Token</label>
-          <input type="password" id="cfg-fonnte" placeholder="Token dari dashboard.fonnte.com">
-          <div class="hint">Login ke <a href="https://dashboard.fonnte.com" target="_blank">dashboard.fonnte.com</a> → Devices → Copy token</div>
-        </div>
-        <div class="save-bar">
-          <button class="btn-primary" onclick="saveConfig()">Simpan API Keys</button>
-        </div>
-      </div>
-
-      <!-- ── WHATSAPP ── -->
+      <!-- ── CONNECT WA ── -->
       <div class="settings-section" id="sec-wa">
-        <div class="section-title">Konfigurasi WhatsApp</div>
-        <div class="section-desc">Nomor WA dan pengaturan pengiriman pesan via Fonnte.</div>
-        <div class="form-group">
-          <label>Nomor WA CS (format: 628xxx)</label>
-          <input type="text" id="cfg-cs-number" placeholder="628123456789">
-          <div class="hint">Nomor yang terhubung ke Fonnte (tanpa + atau spasi)</div>
-        </div>
-        <div style="margin-bottom:20px">
-          <button class="btn-secondary" onclick="testWAConnection()">🔍 Test Koneksi WA</button>
-          <div class="wa-badge disconnected" id="wa-test-result" style="margin-top:12px;display:none">
-            <div class="wa-dot off" id="wa-test-dot"></div>
-            <span id="wa-test-text">—</span>
-          </div>
-        </div>
-        <div class="save-bar">
-          <button class="btn-primary" onclick="saveWAConfig()">Simpan</button>
-        </div>
-      </div>
-
-      <!-- ── PRODUCT KNOWLEDGE ── -->
-      <div class="settings-section" id="sec-pk">
-        <div class="section-title">Product Knowledge</div>
-        <div class="section-desc">Upload katalog produk herbal Anda. AI hanya akan menjawab berdasarkan data di sini.</div>
-
-        <div class="upload-zone" id="pk-upload-zone"
-          ondragover="event.preventDefault();this.classList.add('drag')"
-          ondragleave="this.classList.remove('drag')"
-          ondrop="handlePKDrop(event)">
-          <input type="file" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" onchange="handlePKFile(this.files[0])">
-          <div style="font-size:32px;margin-bottom:8px">📂</div>
-          <div style="font-size:14px;font-weight:500;color:#e2e8f0;margin-bottom:4px">Upload katalog produk</div>
-          <div style="font-size:12px;color:#64748b">PDF, Excel (.xlsx), Word (.docx), CSV, TXT · Drag & drop atau klik</div>
-        </div>
-
-        <div id="pk-loaded-info" style="display:none;margin-top:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div class="badge-green" id="pk-filename-badge">📄 —</div>
-            <button class="btn-danger btn-sm" onclick="clearPK()">🗑 Hapus</button>
-          </div>
-          <div style="font-size:12px;color:#64748b;margin-top:8px" id="pk-char-count"></div>
-          <div class="pk-preview-box" id="pk-preview-box"></div>
-          <button class="btn btn-sm" style="margin-top:8px" onclick="togglePreview()">👁 Lihat isi katalog</button>
-        </div>
-
-        <div class="save-bar">
-          <button class="btn-primary" onclick="savePK()">Simpan Product Knowledge</button>
-        </div>
-      </div>
-
-      <!-- ── AI AGENT ── -->
-      <div class="settings-section" id="sec-ai">
-        <div class="section-title">Konfigurasi AI Agent</div>
-        <div class="section-desc">Atur perilaku dan persona AI customer service Anda.</div>
-        <div class="form-group">
-          <label>Nama Toko (dipakai di prompt AI)</label>
-          <input type="text" id="ai-store-name" placeholder="HerbalCare">
-        </div>
-        <div class="form-group">
-          <label>Instruksi Tambahan untuk AI</label>
-          <textarea id="ai-extra" rows="5" placeholder="Contoh: Selalu tawarkan free ongkir untuk pembelian di atas Rp 150.000. Jam operasional 08.00-17.00 WIB..."></textarea>
-        </div>
-        <div class="form-group">
-          <label>Max karakter balasan AI</label>
-          <select id="ai-max-len">
-            <option value="500">Pendek (~2-3 kalimat)</option>
-            <option value="1000" selected>Sedang (~4-6 kalimat)</option>
-            <option value="2000">Panjang (~8-10 kalimat)</option>
-          </select>
-        </div>
-        <div class="save-bar">
-          <button class="btn-primary" onclick="saveAIConfig()">Simpan</button>
-        </div>
-      </div>
-
-      <!-- ── FOLLOW-UP OTOMATIS ── -->
-      <div class="settings-section" id="sec-followup">
-        <div class="section-title">🔁 Follow-up Otomatis</div>
-        <div class="section-desc">Kirim pesan follow-up otomatis ke leads yang sudah lama tidak dibalas.</div>
-
-        <div class="form-group">
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:500;color:#e2e8f0">
-            <input type="checkbox" id="fu-enabled" style="width:16px;height:16px;accent-color:#3b82f6">
-            Aktifkan follow-up otomatis
-          </label>
-        </div>
-
-        <div class="form-group">
-          <label>Kirim follow-up setelah berapa jam tidak ada balasan?</label>
-          <select id="fu-delay">
-            <option value="1">1 jam</option>
-            <option value="2">2 jam</option>
-            <option value="3" selected>3 jam</option>
-            <option value="6">6 jam</option>
-            <option value="12">12 jam</option>
-            <option value="24">24 jam (1 hari)</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Pesan Follow-up</label>
-          <textarea id="fu-message" rows="4" placeholder="Halo kak, masih ada yang bisa kami bantu? 😊"></textarea>
-          <div class="hint">Pesan ini akan dikirim ke customer yang belum dibalas melewati batas waktu di atas.</div>
-        </div>
-
-        <div class="info-box-blue">
-          💡 Follow-up hanya dikirim jika pesan terakhir dari customer (bukan dari AI). Satu follow-up per sesi percakapan.
-        </div>
-
-        <div class="save-bar">
-          <button class="btn-secondary" id="test-fu-btn" onclick="testFollowup()">🧪 Test Jalankan Sekarang</button>
-          <button class="btn-primary" onclick="saveFollowup()">Simpan</button>
-        </div>
-      </div>
-
-      <!-- ── REKAP HARIAN ── -->
-      <div class="settings-section" id="sec-rekap">
-        <div class="section-title">📊 Rekap Harian Otomatis</div>
-        <div class="section-desc">Laporan ringkasan harian akan dikirim otomatis ke nomor WA yang ditentukan setiap jam 21:00 WIB.</div>
-
-        <div class="form-group">
-          <label>Nomor WA Tujuan Rekap</label>
-          <input type="text" id="rekap-wa" placeholder="628123456789">
-          <div class="hint">Format: 628xxx (tanpa + atau spasi). Bisa nomor pribadi, grup, atau nomor lain.</div>
-        </div>
-
-        <div class="info-box-green">
-          <div style="font-weight:600;margin-bottom:6px">📋 Isi rekap yang dikirim:</div>
-          • Total pesan masuk & dibalas AI hari ini<br>
-          • Jumlah cases (baru, selesai, eskalasi)<br>
-          • Total order & revenue hari ini<br>
-          • Kontak baru
-        </div>
-
-        <div class="save-bar">
-          <button class="btn-secondary" id="test-rekap-btn" onclick="testRekap()">🧪 Test Kirim Sekarang</button>
-          <button class="btn-primary" onclick="saveRekap()">Simpan</button>
+        <div class="section-title">Connect WhatsApp</div>
+        <div class="section-desc">Hubungkan nomor WhatsApp ke sistem AI CS via Baileys. Scan QR code untuk mulai.</div>
+        <div style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:28px;text-align:center">
+          <div style="font-size:40px;margin-bottom:12px">📱</div>
+          <div style="font-size:15px;font-weight:600;color:#f1f5f9;margin-bottom:8px">Kelola Koneksi WhatsApp</div>
+          <div style="font-size:13px;color:#64748b;margin-bottom:20px;line-height:1.6">Scan QR, cek status koneksi,<br>dan kelola sesi Baileys di halaman ini.</div>
+          <a href="connect-wa.html" class="btn-primary" style="text-decoration:none;display:inline-flex">Buka Halaman Connect WA →</a>
         </div>
       </div>
 
@@ -370,8 +195,6 @@ Auth.guard();
   }
 })();
 
-let pkText = '';
-
 function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -393,8 +216,6 @@ function initials(name) {
 
 window.addEventListener('load', async () => {
   const user = Auth.getUser();
-  const cfg = await Config.load();
-
   document.getElementById('account-info').innerHTML = `
     <div class="account-avatar">${initials(user?.name||'?')}</div>
     <div>
@@ -402,27 +223,9 @@ window.addEventListener('load', async () => {
       <div style="font-size:13px;color:#93c5fd;margin-top:2px">${user?.store||'—'}</div>
       <div style="font-size:12px;color:#64748b;margin-top:2px">${user?.email||'—'}</div>
     </div>`;
-
   document.getElementById('acc-name').value = user?.name || '';
   document.getElementById('acc-store').value = user?.store || '';
   document.getElementById('acc-email').value = user?.email || '';
-
-  document.getElementById('cfg-anthropic').value = cfg.anthropic_key || '';
-  document.getElementById('cfg-fonnte').value = cfg.fonnte_token || '';
-  document.getElementById('cfg-cs-number').value = cfg.cs_number || '';
-
-  document.getElementById('ai-store-name').value = cfg.store_name || user?.store || 'HerbalCare';
-  document.getElementById('ai-extra').value = cfg.ai_extra || '';
-  document.getElementById('ai-max-len').value = cfg.ai_max_len || '1000';
-
-  pkText = cfg.product_knowledge || '';
-  if (pkText) showPKLoaded(cfg.pk_filename || 'katalog.txt', pkText);
-
-  document.getElementById('fu-enabled').checked = cfg.followup_enabled === true || cfg.followup_enabled === 'true';
-  document.getElementById('fu-delay').value = cfg.followup_delay || '3';
-  document.getElementById('fu-message').value = cfg.followup_message || 'Halo kak, masih ada yang bisa kami bantu? 😊 Jangan ragu kalau ada pertanyaan ya!';
-
-  document.getElementById('rekap-wa').value = cfg.rekap_wa || '';
 });
 
 function saveAccount() {
@@ -445,143 +248,6 @@ function saveAccount() {
   toast('✅ Akun diperbarui');
 }
 
-async function saveConfig() {
-  try {
-    await Config.save({
-      anthropic_key: document.getElementById('cfg-anthropic').value.trim(),
-      fonnte_token:  document.getElementById('cfg-fonnte').value.trim(),
-    });
-    toast('✅ API keys disimpan');
-  } catch(e) { toast('❌ Gagal simpan: ' + e.message); }
-}
-
-async function saveWAConfig() {
-  try {
-    await Config.save({ cs_number: document.getElementById('cfg-cs-number').value.trim().replace(/\D/g,'') });
-    toast('✅ Konfigurasi WA disimpan');
-  } catch(e) { toast('❌ Gagal simpan: ' + e.message); }
-}
-
-async function saveAIConfig() {
-  try {
-    await Config.save({
-      store_name: document.getElementById('ai-store-name').value.trim() || 'HerbalCare',
-      ai_extra:   document.getElementById('ai-extra').value.trim(),
-      ai_max_len: document.getElementById('ai-max-len').value,
-    });
-    toast('✅ Konfigurasi AI disimpan');
-  } catch(e) { toast('❌ Gagal simpan: ' + e.message); }
-}
-
-async function savePK() {
-  if (!pkText) { toast('⚠️ Upload katalog terlebih dahulu'); return; }
-  try {
-    await Config.save({
-      product_knowledge: pkText,
-      pk_filename: document.getElementById('pk-filename-badge').textContent.replace('📄 ',''),
-    });
-    toast('✅ Product knowledge disimpan');
-  } catch(e) { toast('❌ Gagal simpan: ' + e.message); }
-}
-
-async function testWAConnection() {
-  const result = document.getElementById('wa-test-result');
-  const dot = document.getElementById('wa-test-dot');
-  const txt = document.getElementById('wa-test-text');
-  result.style.display = 'flex';
-  result.className = 'wa-badge disconnected';
-  dot.className = 'wa-dot off';
-  txt.textContent = 'Mengecek...';
-  const r = await Fonnte.checkDevice();
-  if (r.ok) {
-    result.className = 'wa-badge connected';
-    dot.className = 'wa-dot on';
-    txt.textContent = 'Terhubung ✓ ' + (r.data?.name || '');
-    toast('✅ WA terhubung!');
-  } else {
-    txt.textContent = 'Tidak terhubung: ' + (r.error || 'Cek token Fonnte');
-    toast('⚠️ Koneksi WA gagal');
-  }
-}
-
-function handlePKDrop(e) {
-  e.preventDefault();
-  document.getElementById('pk-upload-zone').classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if (file) handlePKFile(file);
-}
-
-async function handlePKFile(file) {
-  if (!file) return;
-  toast('⏳ Membaca katalog...');
-  try {
-    let text = await FileReader2.auto(file);
-    if (!text || text.trim().length < 10) { toast('❌ File kosong atau tidak terbaca'); return; }
-    if (text.length > 15000) text = text.slice(0, 15000) + '\n...[dipotong]';
-    pkText = text.trim();
-    showPKLoaded(file.name, pkText);
-    toast('✅ Katalog berhasil dibaca! Klik "Simpan" untuk menyimpan.');
-  } catch(e) { toast('❌ Gagal baca: ' + e.message); }
-}
-
-function showPKLoaded(filename, text) {
-  document.getElementById('pk-upload-zone').style.display = 'none';
-  document.getElementById('pk-loaded-info').style.display = 'block';
-  document.getElementById('pk-filename-badge').textContent = '📄 ' + filename;
-  document.getElementById('pk-char-count').textContent = text.length.toLocaleString() + ' karakter · ' + text.split('\n').length + ' baris';
-  document.getElementById('pk-preview-box').textContent = text.slice(0, 800) + (text.length > 800 ? '\n...' : '');
-}
-
-async function clearPK() {
-  pkText = '';
-  try { await Config.save({ product_knowledge: '', pk_filename: '' }); } catch {}
-  document.getElementById('pk-upload-zone').style.display = 'block';
-  document.getElementById('pk-loaded-info').style.display = 'none';
-  toast('🗑 Product knowledge dihapus');
-}
-
-function togglePreview() {
-  const box = document.getElementById('pk-preview-box');
-  box.style.display = box.style.display === 'none' ? 'block' : 'none';
-}
-
-async function saveFollowup() {
-  try {
-    await Config.save({
-      followup_enabled: document.getElementById('fu-enabled').checked,
-      followup_delay:   document.getElementById('fu-delay').value || '3',
-      followup_message: document.getElementById('fu-message').value.trim(),
-    });
-    toast('✅ Pengaturan follow-up disimpan');
-  } catch(e) { toast('❌ ' + e.message); }
-}
-
-async function saveRekap() {
-  try {
-    await Config.save({ rekap_wa: document.getElementById('rekap-wa').value.trim() });
-    toast('✅ Pengaturan rekap disimpan');
-  } catch(e) { toast('❌ ' + e.message); }
-}
-
-async function testRekap() {
-  const btn = document.getElementById('test-rekap-btn');
-  btn.disabled = true; btn.textContent = 'Mengirim...';
-  try {
-    const r = await fetch('/api/rekap'); const data = await r.json();
-    toast(data.ok ? '✅ Rekap test terkirim!' : '❌ ' + (data.error||'Error'));
-  } catch(e) { toast('❌ ' + e.message); }
-  finally { btn.disabled = false; btn.textContent = '🧪 Test Kirim Sekarang'; }
-}
-
-async function testFollowup() {
-  const btn = document.getElementById('test-fu-btn');
-  btn.disabled = true; btn.textContent = 'Mengecek...';
-  try {
-    const r = await fetch('/api/followup'); const data = await r.json();
-    toast(data.ok ? `✅ Follow-up: ${data.sent} terkirim` : '❌ ' + (data.error||'Error'));
-  } catch(e) { toast('❌ ' + e.message); }
-  finally { btn.disabled = false; btn.textContent = '🧪 Test Jalankan Sekarang'; }
-}
 </script>
 </body>
 </html>
