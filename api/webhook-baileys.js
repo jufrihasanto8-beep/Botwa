@@ -7,9 +7,10 @@
 const SUPABASE_URL       = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY      = process.env.ANTHROPIC_KEY;
-const BAILEYS_URL        = process.env.BAILEYS_URL;        // http://185.194.219.199:3000
+const BAILEYS_URL        = process.env.BAILEYS_URL;
 const WEBHOOK_SECRET     = process.env.WEBHOOK_SECRET;
 const MENGANTAR_KEY      = process.env.MENGANTAR_KEY;
+const GROQ_API_KEY       = process.env.GROQ_API_KEY;
 
 /* ── SUPABASE HELPERS ─────────────────────────────────────── */
 const sbH = () => ({
@@ -357,6 +358,30 @@ async function callClaude(systemPrompt, messages) {
   return data.content?.[0]?.text || '';
 }
 
+/* ── TRANSCRIBE VOICE NOTE via Groq Whisper ──────────────────── */
+async function transcribeAudio(base64Audio) {
+  if (!GROQ_API_KEY) return null;
+  try {
+    const buffer = Buffer.from(base64Audio.replace('data:audio/ogg;base64,', ''), 'base64');
+    const formData = new FormData();
+    formData.append('file', new Blob([buffer], { type: 'audio/ogg' }), 'audio.ogg');
+    formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('language', 'id');
+    formData.append('response_format', 'json');
+
+    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${GROQ_API_KEY}` },
+      body: formData,
+    });
+    const data = await res.json();
+    return data.text || null;
+  } catch(e) {
+    console.error('Groq transcribe error:', e.message);
+    return null;
+  }
+}
+
 /* ── DETEKSI KONFIRMASI WILAYAH (webhook-level, tidak bergantung Claude) ── */
 
 // Ekstrak wilayah yang AI sedang konfirmasikan — pertanyaan ("Sumba NTT ya kak?")
@@ -587,6 +612,20 @@ module.exports = async function handler(req, res) {
     // Update produk ke conversation jika baru ketemu
     if (product?.id && !conversation.product_id) {
       await sbPatch('conversations', `?id=eq.${conversation.id}`, { product_id: product.id });
+    }
+
+    // ── Transcribe voice note jika ada (Groq Whisper) ─────────
+    if (messageType === 'audio' && mediaUrl) {
+      const transkripsi = await transcribeAudio(mediaUrl);
+      if (transkripsi) {
+        console.log(`VN transcribed: ${transkripsi.slice(0, 80)}`);
+        // Ganti message dengan hasil transkripsi
+        Object.assign(body, { message: `[Voice Note] ${transkripsi}` });
+        // Update variable message
+        message = `[Voice Note] ${transkripsi}`;
+      } else {
+        message = '[Voice Note — tidak bisa ditranskrip]';
+      }
     }
 
     // ── Analisa gambar jika ada (Claude Vision) ────────────────
