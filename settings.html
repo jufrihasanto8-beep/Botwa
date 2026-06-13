@@ -255,6 +255,22 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
       <div class="settings-section" id="sec-rekening">
         <div class="section-title">Rekening Transfer</div>
         <div class="section-desc">Info rekening yang akan dikirim otomatis ke customer saat mereka pilih bayar lewat Transfer Bank.</div>
+
+        <!-- Card preview rekening tersimpan -->
+        <div id="rek-card" style="display:none;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;margin-bottom:16px">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="width:44px;height:44px;background:rgba(59,130,246,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">💳</div>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#f1f5f9;margin-bottom:4px">Rekening Aktif</div>
+              <div id="rek-card-lines" style="font-size:13px;color:#94a3b8;line-height:1.8;white-space:pre-wrap"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+              <span style="width:8px;height:8px;border-radius:50%;background:#86efac;display:inline-block"></span>
+              <span style="font-size:12px;color:#86efac;font-weight:600">Aktif</span>
+            </div>
+          </div>
+        </div>
+
         <div class="form-group">
           <label>Info Rekening</label>
           <textarea id="rek-info" rows="5" placeholder="Contoh:
@@ -263,8 +279,7 @@ BRI 0987654321 a.n. Budi Santoso
 
 Bisa isi lebih dari satu rekening."></textarea>
         </div>
-        <div class="save-bar" style="align-items:center;gap:16px">
-          <span id="rek-status" style="font-size:12px;color:#64748b"></span>
+        <div class="save-bar">
           <button class="btn-primary" onclick="saveRekening()">Simpan Rekening</button>
         </div>
       </div>
@@ -514,20 +529,24 @@ window.showSection = function(name, el) {
 };
 
 /* ── REKENING TRANSFER ── */
+function showRekeningCard(rek) {
+  const card = document.getElementById('rek-card');
+  if (rek) {
+    document.getElementById('rek-card-lines').textContent = rek;
+    card.style.display = 'block';
+  } else {
+    card.style.display = 'none';
+  }
+}
+
 async function loadRekening() {
   const userId = Auth.getUser()?.id;
-  const status = document.getElementById('rek-status');
-  status.innerHTML = '<span style="color:#64748b">Memuat...</span>';
   try {
     const data = await SB.get('users', `?id=eq.${userId}&select=rekening&limit=1`);
     const rek = data[0]?.rekening || '';
     document.getElementById('rek-info').value = rek;
-    status.innerHTML = rek
-      ? `<span style="color:#86efac">✅ Tersimpan di database</span>`
-      : `<span style="color:#64748b">Belum ada rekening</span>`;
-  } catch(e) {
-    status.innerHTML = `<span style="color:#fca5a5">❌ Gagal load: ${e.message}</span>`;
-  }
+    showRekeningCard(rek);
+  } catch(e) { console.error('loadRekening:', e.message); }
 }
 
 async function saveRekening() {
@@ -552,18 +571,14 @@ async function saveRekening() {
     const tersimpan = verify[0]?.rekening || '';
 
     if (tersimpan === rekening) {
-      toast('✅ Rekening berhasil disimpan & terverifikasi');
-      document.getElementById('rek-status').innerHTML =
-        `<span style="color:#86efac">✅ Tersimpan di database</span>`;
+      toast('✅ Rekening berhasil disimpan');
+      showRekeningCard(rekening);
     } else {
-      toast('⚠️ Tersimpan tapi data berbeda — coba reload');
-      document.getElementById('rek-status').innerHTML =
-        `<span style="color:#fbbf24">⚠️ Belum tersimpan dengan benar</span>`;
+      toast('⚠️ Belum tersimpan dengan benar — coba lagi');
+      showRekeningCard('');
     }
   } catch(e) {
     toast('❌ Gagal simpan: ' + e.message);
-    document.getElementById('rek-status').innerHTML =
-      `<span style="color:#fca5a5">❌ Error: ${e.message}</span>`;
   } finally {
     btn.textContent = 'Simpan Rekening';
     btn.disabled = false;
