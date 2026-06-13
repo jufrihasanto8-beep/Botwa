@@ -384,6 +384,9 @@ async function transcribeAudio(base64Audio) {
 
 /* ── DETEKSI KONFIRMASI WILAYAH (webhook-level, tidak bergantung Claude) ── */
 
+// Kata-kata yang bukan nama wilayah
+const BUKAN_WILAYAH = /^(via|pakai|dengan|pake|lewat|dari|ke|di|ya|oke|siap|baik|nanti|kalau|jika|untuk|sudah|belum|bisa|tidak|iya|tidak)\s/i;
+
 // Ekstrak wilayah yang AI sedang konfirmasikan — pertanyaan ("Sumba NTT ya kak?")
 function extractProposedWilayah(aiMsg) {
   const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
@@ -392,7 +395,7 @@ function extractProposedWilayah(aiMsg) {
     const m = line.match(/(?:jadi\s+|ke\s+)?([A-Za-z][A-Za-z\s,]{2,50}?)\s+ya\s+kak[?😊🙏\s]/i);
     if (m) {
       const candidate = m[1].trim().replace(/,\s*$/, '');
-      if (candidate.length >= 3) return candidate;
+      if (candidate.length >= 3 && !BUKAN_WILAYAH.test(candidate)) return candidate;
     }
   }
   return null;
@@ -560,7 +563,15 @@ async function updateConvState(convId, stateUpdate) {
 }
 
 /* ── MAIN HANDLER ─────────────────────────────────────────── */
+module.exports.config = {
+  api: { bodyParser: { sizeLimit: '10mb' } },
+};
+
 module.exports = async function handler(req, res) {
+  // Vercel body size config
+  if (req.method === 'POST' && !req.body) {
+    return res.status(400).json({ ok: false, reason: 'no_body' });
+  }
   if (req.method === 'GET') return res.status(200).send('Webhook Baileys aktif ✅');
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -784,7 +795,7 @@ Kakak enaknya COD atau transfer? 🙏`;
     const wilayahOkMatch   = rawReply.match(/\[WILAYAH_OK:([^\]]+)\]/);
 
     // ── Handle [WILAYAH_OK:] → langsung hitung ongkir ────────
-    if (wilayahOkMatch && !autoOngkirResult) {
+    if (wilayahOkMatch && !autoOngkirResult && !convState.ongkir) {
       const wilayah = wilayahOkMatch[1].trim();
       console.log(`[WILAYAH_OK] detected: ${wilayah}`);
       await updateConvState(conversation.id, { wilayah, proposed_wilayah: null });
@@ -898,10 +909,13 @@ Kakak enaknya COD atau transfer? 🙏`;
     }
 
     // ── Simpan proposed_wilayah jika Claude baru tanya konfirmasi lokasi ──
-    const newProposed = extractProposedWilayah(rawReply);
-    if (newProposed && newProposed !== convState.proposed_wilayah) {
-      console.log(`Simpan proposed_wilayah: ${newProposed}`);
-      await updateConvState(conversation.id, { proposed_wilayah: newProposed });
+    // Skip jika ongkir sudah ada (tidak perlu tanya wilayah lagi)
+    if (!convState.ongkir) {
+      const newProposed = extractProposedWilayah(rawReply);
+      if (newProposed && newProposed !== convState.proposed_wilayah) {
+        console.log(`Simpan proposed_wilayah: ${newProposed}`);
+        await updateConvState(conversation.id, { proposed_wilayah: newProposed });
+      }
     }
 
     // ── Bersihkan marker dari reply final ─────────────────────
