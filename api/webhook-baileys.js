@@ -242,9 +242,11 @@ function formatPromoOngkir(promo) {
 
 /* ── GET HISTORY & CONTEXT INJECTION ─────────────────────── */
 async function getContextMessages(conversationId) {
+  // Ambil 20 pesan TERAKHIR (desc), lalu balik urutan jadi kronologis
   const msgs = await sbGet('conv_messages',
-    `?conversation_id=eq.${conversationId}&order=created_at.asc&limit=30`
+    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=20`
   );
+  msgs.reverse();
 
   // Map roles
   const mapped = msgs.map(m => ({
@@ -257,7 +259,7 @@ async function getContextMessages(conversationId) {
   for (const msg of mapped) {
     const last = result[result.length - 1];
     if (last && last.role === msg.role) {
-      last.content += '\n' + msg.content; // gabung
+      last.content += '\n' + msg.content;
     } else {
       result.push({ ...msg });
     }
