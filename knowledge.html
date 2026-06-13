@@ -23,109 +23,153 @@
 .sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
 .sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+/* ── DARK THEME VARS ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:#0d1117;color:#e2e8f0;font-size:13px}
+
+/* ── PAGE HEADER ── */
+.page-header{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:14px 24px;flex-shrink:0}
+.page-header h1{font-size:18px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+.page-header p{font-size:12px;color:#64748b;margin-top:2px}
+
 /* ── LAYOUT ── */
 .kb-layout { display: flex; flex: 1; overflow: hidden; }
 
 /* ── TAB NAV ── */
 .kb-nav {
-  width: 200px; background: var(--white); border-right: 1px solid var(--border);
-  display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; flex-shrink: 0;
+  width: 190px; background: #161b22; border-right: 1px solid rgba(255,255,255,.06);
+  display: flex; flex-direction: column; padding: 10px 8px; gap: 2px; flex-shrink: 0;
 }
 .kb-nav-item {
-  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-  border-radius: 10px; font-size: 13px; font-weight: 500; color: var(--text-2);
-  cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px;
+  border-radius: 8px; font-size: 13px; font-weight: 500; color: #64748b;
+  cursor: pointer; transition: all .12s;
 }
-.kb-nav-item:hover { background: var(--bg); color: var(--text); }
-.kb-nav-item.active { background: var(--green-light); color: var(--green-dark); }
-.kb-nav-item .ni { font-size: 16px; }
+.kb-nav-item:hover { background: rgba(255,255,255,.05); color: #e2e8f0; }
+.kb-nav-item.active { background: rgba(59,130,246,.12); color: #93c5fd; }
+.kb-nav-item .ni { font-size: 15px; }
 
 /* ── CONTENT ── */
-.kb-content { flex: 1; overflow-y: auto; padding: 28px; background: var(--bg); }
+.kb-content { flex: 1; overflow-y: auto; padding: 24px 28px; background: #0d1117; }
+.kb-content::-webkit-scrollbar{width:4px}
+.kb-content::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px}
 .kb-section { display: none; }
 .kb-section.active { display: block; }
-.kb-section-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
-.kb-section-desc { font-size: 13px; color: var(--text-2); margin-bottom: 24px; }
+.kb-section-title { font-size: 16px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+.kb-section-desc { font-size: 12px; color: #64748b; margin-bottom: 20px; }
 
 /* ── CARDS ── */
 .info-card {
-  background: var(--white); border-radius: var(--radius-lg); border: 1px solid var(--border);
-  padding: 20px; margin-bottom: 16px;
+  background: #161b22; border-radius: 10px; border: 1px solid rgba(255,255,255,.06);
+  padding: 18px 20px; margin-bottom: 14px;
 }
-.info-card h3 { font-size: 13px; font-weight: 600; color: var(--green-dark); margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.info-card h3 { font-size: 12px; font-weight: 700; color: #93c5fd; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: .3px; }
+
+/* ── FORM ELEMENTS ── */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .3px; }
+.form-group input,.form-group textarea,.form-group select {
+  background: #0d1117; border: 1px solid rgba(255,255,255,.08); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; color: #e2e8f0; font-family: inherit;
+  transition: border-color .15s; outline: none; resize: vertical;
+}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus {
+  border-color: rgba(59,130,246,.4); background: #0d1117;
+}
+.form-group input::placeholder,.form-group textarea::placeholder { color: #374151; }
 
 /* ── PRODUCT GRID ── */
 .product-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 4px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 4px;
 }
 .product-card {
-  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 16px; display: flex; flex-direction: column; gap: 10px; transition: box-shadow .15s;
+  background: #161b22; border: 1px solid rgba(255,255,255,.06); border-radius: 10px;
+  padding: 14px; display: flex; flex-direction: column; gap: 10px; transition: border-color .15s;
 }
-.product-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.product-card:hover { border-color: rgba(59,130,246,.25); }
 .pc-top { display: flex; align-items: flex-start; gap: 10px; }
 .pc-icon {
-  width: 42px; height: 42px; border-radius: 10px; background: var(--green-light);
-  display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 9px; background: rgba(59,130,246,.12);
+  display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0;
 }
 .pc-info { flex: 1; min-width: 0; }
-.pc-name { font-weight: 700; font-size: 14px; color: var(--text); }
-.pc-code { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-.pc-price { font-size: 15px; font-weight: 700; color: var(--green); }
-.pc-unit { font-size: 12px; color: var(--text-2); }
+.pc-name { font-weight: 700; font-size: 13px; color: #f1f5f9; }
+.pc-code { font-size: 11px; color: #475569; margin-top: 1px; }
+.pc-price { font-size: 14px; font-weight: 700; color: #3b82f6; }
+.pc-unit { font-size: 11px; color: #64748b; }
 .stock-badge {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
 }
-.stock-available { background: #dcfce7; color: #15803d; }
-.stock-empty { background: #fee2e2; color: #991b1b; }
-.stock-limited { background: #fef9c3; color: #92400e; }
-.stock-preorder { background: #ede9fe; color: #5b21b6; }
-.pc-benefits { font-size: 12px; color: var(--text-2); line-height: 1.5; background: var(--bg); padding: 8px 10px; border-radius: 8px; }
+.stock-available { background: rgba(34,197,94,.12); color: #86efac; }
+.stock-empty { background: rgba(239,68,68,.12); color: #fca5a5; }
+.stock-limited { background: rgba(245,158,11,.12); color: #fcd34d; }
+.stock-preorder { background: rgba(139,92,246,.12); color: #c4b5fd; }
+.pc-benefits { font-size: 12px; color: #94a3b8; line-height: 1.5; background: #0d1117; padding: 8px 10px; border-radius: 7px; }
 .pc-actions { display: flex; gap: 6px; }
 
 /* ── FAQ LIST ── */
-.faq-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.faq-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 .faq-item {
-  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 16px 18px; display: flex; gap: 14px; align-items: flex-start; transition: box-shadow .15s;
+  background: #161b22; border: 1px solid rgba(255,255,255,.06); border-radius: 10px;
+  padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; transition: border-color .15s;
 }
-.faq-item:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+.faq-item:hover { border-color: rgba(59,130,246,.2); }
 .faq-num {
-  width: 28px; height: 28px; border-radius: 8px; background: var(--green-light);
-  color: var(--green-dark); font-size: 12px; font-weight: 700;
+  width: 26px; height: 26px; border-radius: 7px; background: rgba(59,130,246,.12);
+  color: #93c5fd; font-size: 11px; font-weight: 700;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
 }
 .faq-body { flex: 1; min-width: 0; }
-.faq-q { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
-.faq-a { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+.faq-q { font-weight: 600; font-size: 13px; color: #e2e8f0; margin-bottom: 4px; }
+.faq-a { font-size: 12px; color: #94a3b8; line-height: 1.55; }
 .faq-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 /* ── EMPTY STATE ── */
 .empty-state {
-  text-align: center; padding: 50px 20px; color: var(--text-2);
+  text-align: center; padding: 50px 20px; color: #475569;
 }
-.empty-state .ei { font-size: 44px; margin-bottom: 12px; }
-.empty-state h3 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
-.empty-state p { font-size: 13px; }
+.empty-state .ei { font-size: 44px; margin-bottom: 12px; opacity: .5; }
+.empty-state h3 { font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 6px; }
+.empty-state p { font-size: 12px; }
 
 /* ── ADD BUTTON ROW ── */
-.section-action { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.section-action { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+
+/* ── BUTTONS ── */
+.btn-primary {
+  display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;
+  background:linear-gradient(135deg,#2563eb,#3b82f6);border:none;color:#fff;
+  font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.btn-primary:hover{box-shadow:0 4px 12px rgba(59,130,246,.35);transform:translateY(-1px)}
+.btn-secondary {
+  display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#94a3b8;
+  font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;
+}
+.btn-secondary:hover{background:rgba(255,255,255,.07);color:#e2e8f0;border-color:rgba(255,255,255,.12)}
+.btn-danger {
+  display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;
+  background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;
+  font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;
+}
+.btn-danger:hover{background:rgba(239,68,68,.18)}
 
 /* ── MODAL ── */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; display: none; align-items: center; justify-content: center; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 200; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
 .modal-overlay.open { display: flex; }
 .modal {
-  background: var(--white); border-radius: var(--radius-lg); padding: 24px;
+  background: #1e293b; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 24px;
   width: 520px; max-height: 90vh; overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  box-shadow: 0 24px 64px rgba(0,0,0,.5);
 }
-.modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
-.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal h2 { font-size: 15px; font-weight: 700; color: #f1f5f9; margin-bottom: 18px; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.06); }
 
 /* ── SAVE BAR ── */
-.save-bar { display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.save-bar { display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.06); }
 
 #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1d23; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; z-index: 9999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
 #toast.show { opacity: 1; }
@@ -258,7 +302,7 @@
           </div>
 
           <div class="save-bar">
-            <button class="btn btn-primary" onclick="saveTokoInfo()">💾 Simpan Info Toko</button>
+            <button class="btn-primary" onclick="saveTokoInfo()">💾 Simpan Info Toko</button>
           </div>
         </div>
 
@@ -293,10 +337,10 @@
 
           <div class="info-card">
             <h3>⚡ Cara Kerja</h3>
-            <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--text-2);line-height:1.6;">
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:#94a3b8;line-height:1.6;">
               <div style="display:flex;gap:10px;align-items:flex-start;">
                 <span style="font-size:18px;">1️⃣</span>
-                <span>Klik <strong style="color:var(--text);">Pelajari Sekarang</strong> — AI baca semua riwayat chat</span>
+                <span>Klik <strong style="color:#e2e8f0;">Pelajari Sekarang</strong> — AI baca semua riwayat chat</span>
               </div>
               <div style="display:flex;gap:10px;align-items:flex-start;">
                 <span style="font-size:18px;">2️⃣</span>
@@ -315,10 +359,10 @@
 
           <div class="info-card">
             <h3>📊 Status</h3>
-            <div id="insight-status" style="font-size:13px;color:var(--text-2);margin-bottom:16px;">Belum pernah dijalankan</div>
+            <div id="insight-status" style="font-size:13px;color:#94a3b8;margin-bottom:16px;">Belum pernah dijalankan</div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <button class="btn btn-primary" id="learn-btn" onclick="runLearning()">🔄 Perbarui Sekarang</button>
-              <span style="font-size:12px;color:var(--text-3);">Auto-update setiap 12 jam & setiap 15 pesan</span>
+              <button class="btn-primary" id="learn-btn" onclick="runLearning()">🔄 Perbarui Sekarang</button>
+              <span style="font-size:12px;color:#64748b;">Auto-update setiap 12 jam & setiap 15 pesan</span>
             </div>
           </div>
 
@@ -327,8 +371,8 @@
               <h3 style="margin-bottom:0;">📋 Hasil Pembelajaran</h3>
               <button class="btn btn-secondary btn-sm" onclick="runLearning()">🔄 Perbarui</button>
             </div>
-            <div id="insight-content" style="font-size:13px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;background:var(--bg);padding:14px;border-radius:10px;"></div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-3);">
+            <div id="insight-content" style="font-size:13px;color:#94a3b8;line-height:1.7;white-space:pre-wrap;background:#0d1117;padding:14px;border-radius:10px;"></div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);font-size:12px;color:#64748b;">
               ✅ Pelajaran ini otomatis dipakai AI untuk semua percakapan baru
             </div>
           </div>
@@ -397,8 +441,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeProductModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveProduct()">Simpan Produk</button>
+      <button class="btn-secondary" onclick="closeProductModal()">Batal</button>
+      <button class="btn-primary" onclick="saveProduct()">Simpan Produk</button>
     </div>
   </div>
 </div>
@@ -417,8 +461,8 @@
       <textarea id="fm-a" rows="4" placeholder="Produk kami dalam proses pendaftaran BPOM. Semua bahan 100% alami dan aman dikonsumsi." style="resize:vertical;"></textarea>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeFAQModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveFAQ()">Simpan FAQ</button>
+      <button class="btn-secondary" onclick="closeFAQModal()">Batal</button>
+      <button class="btn-primary" onclick="saveFAQ()">Simpan FAQ</button>
     </div>
   </div>
 </div>
@@ -666,11 +710,11 @@ function loadInsightStatus() {
   if (cfg.ai_insights) {
     const updated = cfg.ai_insights_updated ? new Date(cfg.ai_insights_updated).toLocaleString('id-ID') : '—';
     const count = cfg.ai_insights_count || '?';
-    statusEl.innerHTML = `<span style="color:var(--green);font-weight:600;">✅ Aktif</span> &nbsp;·&nbsp; Dipelajari dari <strong>${count} percakapan</strong> &nbsp;·&nbsp; Terakhir diperbarui: ${updated}`;
+    statusEl.innerHTML = `<span style="color:#4ade80;font-weight:600;">✅ Aktif</span> &nbsp;·&nbsp; Dipelajari dari <strong>${count} percakapan</strong> &nbsp;·&nbsp; Terakhir diperbarui: ${updated}`;
     resultCard.style.display = 'block';
     contentEl.textContent = cfg.ai_insights;
   } else {
-    statusEl.innerHTML = `<span style="color:var(--text-3);">⏳ Belum pernah dijalankan</span> — Klik tombol di bawah untuk mulai`;
+    statusEl.innerHTML = `<span style="color:#64748b;">⏳ Belum pernah dijalankan</span> — Klik tombol di bawah untuk mulai`;
     resultCard.style.display = 'none';
   }
 }
@@ -680,7 +724,7 @@ async function runLearning() {
   const statusEl = document.getElementById('insight-status');
   btn.disabled = true;
   btn.textContent = '⏳ Sedang belajar dari semua chat...';
-  statusEl.innerHTML = `<span style="color:var(--text-2);">⏳ AI sedang membaca dan menganalisis semua percakapan...</span>`;
+  statusEl.innerHTML = `<span style="color:#94a3b8;">⏳ AI sedang membaca dan menganalisis semua percakapan...</span>`;
 
   try {
     const { insights, contactCount } = await GlobalInsight.generate();
