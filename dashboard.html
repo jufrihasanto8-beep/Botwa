@@ -290,7 +290,8 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .msg-row.from-customer{justify-content:flex-start}
 .msg-row.from-bot,.msg-row.from-agent{justify-content:flex-end}
 .msg-av-s{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:700}
-.bubble{max-width:65%;padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.6;word-break:break-word}
+.msg-wrap{max-width:65%;min-width:0}
+.bubble{padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.6;word-break:break-word;overflow-wrap:anywhere}
 .from-customer .bubble{background:#1e293b;border:1px solid rgba(255,255,255,.06);border-bottom-left-radius:4px;color:#e2e8f0}
 .from-bot .bubble,.from-agent .bubble{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(59,130,246,.25)}
 .msg-meta{font-size:10px;color:#374151;margin-top:3px}
@@ -962,9 +963,9 @@ function appendBubble(type, text, scroll=true, ts=null, role=null) {
   const label = role === 'cs' ? '👤 CS' : '🤖 AI Agent';
   if (type === 'customer') {
     div.innerHTML = `<div class="msg-av-s" style="background:${avatarColor(nama)}">${initials(nama)}</div>
-      <div><div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
+      <div class="msg-wrap"><div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
   } else {
-    div.innerHTML = `<div>
+    div.innerHTML = `<div class="msg-wrap">
       <div class="bot-label">${label}</div>
       <div class="bubble">${safe}</div>
       <div class="msg-meta">${t}</div>
