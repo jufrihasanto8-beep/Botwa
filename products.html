@@ -124,6 +124,36 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .tag-item .rm{cursor:pointer;opacity:.6}
 .tag-item .rm:hover{opacity:1}
 
+/* ── Follow Up Config ── */
+.fu-card{background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;margin-bottom:20px;overflow:hidden}
+.fu-card-head{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;user-select:none}
+.fu-card-head h4{font-size:13px;font-weight:600;color:#e2e8f0;display:flex;align-items:center;gap:8px}
+.fu-card-body{padding:18px;display:flex;flex-direction:column;gap:0}
+.fu-stage{display:grid;grid-template-columns:28px 1fr auto;gap:0 14px;align-items:start;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.fu-stage:last-child{border-bottom:none;padding-bottom:0}
+.fu-stage:first-child{padding-top:0}
+.fu-dot{width:10px;height:10px;border-radius:50%;margin-top:3px;flex-shrink:0}
+.fu-dot.same-day{background:#f59e0b}
+.fu-dot.h1{background:#3b82f6}
+.fu-dot.h3{background:#8b5cf6}
+.fu-dot.h7{background:#10b981}
+.fu-stage-info{min-width:0}
+.fu-stage-label{font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:6px}
+.fu-stage-desc{font-size:11px;color:#64748b;line-height:1.5}
+.fu-fields{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.fu-field{display:flex;flex-direction:column;gap:3px}
+.fu-field label{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.3px}
+.fu-field input{background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:5px 9px;font-size:12px;color:#e2e8f0;width:72px;outline:none;transition:border-color .15s}
+.fu-field input:focus{border-color:rgba(59,130,246,.4)}
+.fu-field .unit{font-size:10px;color:#475569;margin-top:2px}
+.fu-toggle{display:flex;align-items:center;gap:6px;margin-top:3px}
+.fu-toggle input[type=checkbox]{width:16px;height:16px;accent-color:#3b82f6;cursor:pointer}
+.fu-toggle span{font-size:11px;color:#64748b}
+.fu-save-bar{padding:14px 18px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:flex-end;gap:8px;align-items:center}
+.fu-save-hint{font-size:11px;color:#475569;flex:1}
+.fu-chevron{font-size:12px;color:#475569;transition:transform .2s}
+.fu-chevron.open{transform:rotate(180deg)}
+
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 #toast.show{opacity:1}
@@ -172,6 +202,16 @@ body.light .modal-foot{background:#fff;border-color:#e2e8f0}
 body.light .tab-row{border-color:#e2e8f0}
 body.light .tab-btn{color:#64748b}
 body.light .tab-btn.active{color:#2563eb;border-bottom-color:#3b82f6}
+body.light .fu-card{background:#fff;border-color:#e2e8f0}
+body.light .fu-card-head{border-color:#e2e8f0}
+body.light .fu-card-head h4{color:#0f172a}
+body.light .fu-stage{border-color:#f1f5f9}
+body.light .fu-stage-label{color:#0f172a}
+body.light .fu-stage-desc{color:#94a3b8}
+body.light .fu-field label{color:#94a3b8}
+body.light .fu-field input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+body.light .fu-save-bar{border-color:#e2e8f0}
+body.light .fu-save-hint{color:#94a3b8}
 </style>
 </head>
 <body>
@@ -257,6 +297,115 @@ body.light .tab-btn.active{color:#2563eb;border-bottom-color:#3b82f6}
           </div>
           <button class="btn-primary" onclick="openSOPModal()">+ Tambah SOP</button>
         </div>
+
+        <!-- ── Follow Up Config Card ── -->
+        <div class="fu-card" id="fu-config-card">
+          <div class="fu-card-head" onclick="toggleFUCard()">
+            <h4>⚡ Aturan Follow Up Otomatis <span style="font-size:11px;font-weight:400;color:#64748b;margin-left:4px">— kapan bot kirim follow up?</span></h4>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="fu-status-badge" style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(34,197,94,.12);color:#86efac;font-weight:600">Aktif</span>
+              <span class="fu-chevron open" id="fu-chevron">▼</span>
+            </div>
+          </div>
+          <div id="fu-card-body" class="fu-card-body">
+
+            <!-- Hari H -->
+            <div class="fu-stage">
+              <div class="fu-dot same-day" style="margin-top:4px"></div>
+              <div class="fu-stage-info">
+                <div class="fu-stage-label">Hari H — Hari Pertama Lead Masuk</div>
+                <div class="fu-stage-desc">Bot follow up tiap X jam di hari yang sama jika tidak ada balasan. AI akan generate pesan kontekstual berdasarkan percakapan terakhir.</div>
+                <div class="fu-fields">
+                  <div class="fu-field">
+                    <label>Interval</label>
+                    <input type="number" id="fu-same-interval" value="3" min="1" max="12">
+                    <div class="unit">jam sekali</div>
+                  </div>
+                  <div class="fu-field">
+                    <label>Maks kirim</label>
+                    <input type="number" id="fu-same-max" value="3" min="1" max="10">
+                    <div class="unit">kali/hari</div>
+                  </div>
+                  <div class="fu-field">
+                    <label>Stop jam</label>
+                    <input type="number" id="fu-same-stop" value="21" min="18" max="23">
+                    <div class="unit">malam (WIB)</div>
+                  </div>
+                </div>
+              </div>
+              <div class="fu-toggle">
+                <input type="checkbox" id="fu-same-enabled" checked>
+                <span id="fu-same-label">Aktif</span>
+              </div>
+            </div>
+
+            <!-- H+1 -->
+            <div class="fu-stage">
+              <div class="fu-dot h1" style="margin-top:4px"></div>
+              <div class="fu-stage-info">
+                <div class="fu-stage-label">H+1 — Besok</div>
+                <div class="fu-stage-desc">Kirim SOP H+1 setelah X jam sejak pesan terakhir di hari H. Konten diambil dari SOP H+1 di bawah.</div>
+                <div class="fu-fields">
+                  <div class="fu-field">
+                    <label>Kirim setelah</label>
+                    <input type="number" id="fu-h1-delay" value="24" min="12" max="48">
+                    <div class="unit">jam tidak balas</div>
+                  </div>
+                </div>
+              </div>
+              <div class="fu-toggle">
+                <input type="checkbox" id="fu-h1-enabled" checked>
+                <span id="fu-h1-label">Aktif</span>
+              </div>
+            </div>
+
+            <!-- H+3 -->
+            <div class="fu-stage">
+              <div class="fu-dot h3" style="margin-top:4px"></div>
+              <div class="fu-stage-info">
+                <div class="fu-stage-label">H+3 — 3 Hari Kemudian</div>
+                <div class="fu-stage-desc">Kirim SOP H+3 jika setelah H+1 masih tidak ada balasan dalam X jam.</div>
+                <div class="fu-fields">
+                  <div class="fu-field">
+                    <label>Kirim setelah</label>
+                    <input type="number" id="fu-h3-delay" value="72" min="24" max="120">
+                    <div class="unit">jam sejak H+1</div>
+                  </div>
+                </div>
+              </div>
+              <div class="fu-toggle">
+                <input type="checkbox" id="fu-h3-enabled" checked>
+                <span id="fu-h3-label">Aktif</span>
+              </div>
+            </div>
+
+            <!-- H+7 -->
+            <div class="fu-stage">
+              <div class="fu-dot h7" style="margin-top:4px"></div>
+              <div class="fu-stage-info">
+                <div class="fu-stage-label">H+7 — 7 Hari Kemudian</div>
+                <div class="fu-stage-desc">Follow up terakhir. Kirim SOP H+7 jika setelah H+3 masih tidak ada balasan dalam X jam.</div>
+                <div class="fu-fields">
+                  <div class="fu-field">
+                    <label>Kirim setelah</label>
+                    <input type="number" id="fu-h7-delay" value="168" min="72" max="240">
+                    <div class="unit">jam sejak H+3</div>
+                  </div>
+                </div>
+              </div>
+              <div class="fu-toggle">
+                <input type="checkbox" id="fu-h7-enabled" checked>
+                <span id="fu-h7-label">Aktif</span>
+              </div>
+            </div>
+
+          </div><!-- fu-card-body -->
+          <div class="fu-save-bar" id="fu-save-bar">
+            <span class="fu-save-hint" id="fu-save-hint">💡 Scheduler aktif via n8n — pastikan workflow sudah terhubung</span>
+            <button class="btn-secondary btn-sm" onclick="resetFUConfig()">Reset Default</button>
+            <button class="btn-primary" onclick="saveFUConfig()">Simpan Aturan</button>
+          </div>
+        </div><!-- fu-config-card -->
 
         <div class="filter-tabs" id="sop-filter-tabs">
           <button class="s-tab active" onclick="setSOPFilter('semua',this)">Semua</button>
@@ -488,7 +637,109 @@ Auth.guard();
 
 async function init() {
   currentUserId = Auth.getUser()?.id;
-  await Promise.all([loadProducts(), loadSOPs()]);
+  await Promise.all([loadProducts(), loadSOPs(), loadFUConfig()]);
+}
+
+/* ══════════════════════════════════════
+   FOLLOW UP CONFIG
+══════════════════════════════════════ */
+
+// Toggle card collapse
+function toggleFUCard() {
+  const body = document.getElementById('fu-card-body');
+  const bar  = document.getElementById('fu-save-bar');
+  const chev = document.getElementById('fu-chevron');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  bar.style.display  = open ? 'none' : '';
+  chev.classList.toggle('open', !open);
+}
+
+// Sync toggle label
+function syncFULabels() {
+  ['same','h1','h3','h7'].forEach(k => {
+    const cb = document.getElementById(`fu-${k}-enabled`);
+    const lbl = document.getElementById(`fu-${k}-label`);
+    if (cb && lbl) lbl.textContent = cb.checked ? 'Aktif' : 'Nonaktif';
+  });
+  // update badge
+  const anyActive = ['same','h1','h3','h7'].some(k => document.getElementById(`fu-${k}-enabled`)?.checked);
+  const badge = document.getElementById('fu-status-badge');
+  if (badge) {
+    badge.textContent = anyActive ? 'Aktif' : 'Nonaktif';
+    badge.style.background = anyActive ? 'rgba(34,197,94,.12)' : 'rgba(100,116,139,.12)';
+    badge.style.color = anyActive ? '#86efac' : '#64748b';
+  }
+}
+['same','h1','h3','h7'].forEach(k => {
+  document.getElementById(`fu-${k}-enabled`)?.addEventListener('change', syncFULabels);
+});
+
+async function loadFUConfig() {
+  if (!currentUserId) return;
+  try {
+    const data = await sbGet('followup_config', `?user_id=eq.${currentUserId}&limit=1`);
+    if (data && data[0]) {
+      const c = data[0];
+      document.getElementById('fu-same-enabled').checked  = c.same_day_enabled  ?? true;
+      document.getElementById('fu-same-interval').value   = c.same_day_interval  ?? 3;
+      document.getElementById('fu-same-max').value        = c.same_day_max       ?? 3;
+      document.getElementById('fu-same-stop').value       = c.same_day_stop_hour ?? 21;
+      document.getElementById('fu-h1-enabled').checked    = c.h1_enabled         ?? true;
+      document.getElementById('fu-h1-delay').value        = c.h1_delay_hours     ?? 24;
+      document.getElementById('fu-h3-enabled').checked    = c.h3_enabled         ?? true;
+      document.getElementById('fu-h3-delay').value        = c.h3_delay_hours     ?? 72;
+      document.getElementById('fu-h7-enabled').checked    = c.h7_enabled         ?? true;
+      document.getElementById('fu-h7-delay').value        = c.h7_delay_hours     ?? 168;
+      syncFULabels();
+    }
+  } catch(e) { /* tabel mungkin belum ada, pakai default */ }
+}
+
+async function saveFUConfig() {
+  if (!currentUserId) return;
+  const payload = {
+    user_id:              currentUserId,
+    same_day_enabled:     document.getElementById('fu-same-enabled').checked,
+    same_day_interval:    parseInt(document.getElementById('fu-same-interval').value) || 3,
+    same_day_max:         parseInt(document.getElementById('fu-same-max').value) || 3,
+    same_day_stop_hour:   parseInt(document.getElementById('fu-same-stop').value) || 21,
+    h1_enabled:           document.getElementById('fu-h1-enabled').checked,
+    h1_delay_hours:       parseInt(document.getElementById('fu-h1-delay').value) || 24,
+    h3_enabled:           document.getElementById('fu-h3-enabled').checked,
+    h3_delay_hours:       parseInt(document.getElementById('fu-h3-delay').value) || 72,
+    h7_enabled:           document.getElementById('fu-h7-enabled').checked,
+    h7_delay_hours:       parseInt(document.getElementById('fu-h7-delay').value) || 168,
+    updated_at:           new Date().toISOString(),
+  };
+  try {
+    // upsert by user_id
+    const existing = await sbGet('followup_config', `?user_id=eq.${currentUserId}&limit=1`);
+    if (existing && existing[0]) {
+      await sbPatch('followup_config', `?user_id=eq.${currentUserId}`, payload);
+    } else {
+      await sbPost('followup_config', payload);
+    }
+    syncFULabels();
+    toast('✅ Aturan follow up disimpan');
+  } catch(e) {
+    toast('❌ Gagal simpan: ' + e.message);
+  }
+}
+
+function resetFUConfig() {
+  if (!confirm('Reset ke pengaturan default?')) return;
+  document.getElementById('fu-same-enabled').checked = true;
+  document.getElementById('fu-same-interval').value  = 3;
+  document.getElementById('fu-same-max').value       = 3;
+  document.getElementById('fu-same-stop').value      = 21;
+  document.getElementById('fu-h1-enabled').checked   = true;
+  document.getElementById('fu-h1-delay').value       = 24;
+  document.getElementById('fu-h3-enabled').checked   = true;
+  document.getElementById('fu-h3-delay').value       = 72;
+  document.getElementById('fu-h7-enabled').checked   = true;
+  document.getElementById('fu-h7-delay').value       = 168;
+  syncFULabels();
 }
 
 /* ══════════════════════════════════════
