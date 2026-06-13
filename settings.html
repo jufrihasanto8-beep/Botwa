@@ -263,7 +263,8 @@ BRI 0987654321 a.n. Budi Santoso
 
 Bisa isi lebih dari satu rekening."></textarea>
         </div>
-        <div class="save-bar">
+        <div class="save-bar" style="align-items:center;gap:16px">
+          <span id="rek-status" style="font-size:12px;color:#64748b"></span>
           <button class="btn-primary" onclick="saveRekening()">Simpan Rekening</button>
         </div>
       </div>
@@ -515,21 +516,58 @@ window.showSection = function(name, el) {
 /* ── REKENING TRANSFER ── */
 async function loadRekening() {
   const userId = Auth.getUser()?.id;
+  const status = document.getElementById('rek-status');
+  status.innerHTML = '<span style="color:#64748b">Memuat...</span>';
   try {
     const data = await SB.get('users', `?id=eq.${userId}&select=rekening&limit=1`);
-    if (data[0]?.rekening) {
-      document.getElementById('rek-info').value = data[0].rekening;
-    }
-  } catch(e) { console.error('loadRekening:', e.message); }
+    const rek = data[0]?.rekening || '';
+    document.getElementById('rek-info').value = rek;
+    status.innerHTML = rek
+      ? `<span style="color:#86efac">✅ Tersimpan di database</span>`
+      : `<span style="color:#64748b">Belum ada rekening</span>`;
+  } catch(e) {
+    status.innerHTML = `<span style="color:#fca5a5">❌ Gagal load: ${e.message}</span>`;
+  }
 }
 
 async function saveRekening() {
   const userId = Auth.getUser()?.id;
   const rekening = document.getElementById('rek-info').value.trim();
+  const btn = document.querySelector('#sec-rekening .btn-primary');
+  btn.textContent = 'Menyimpan...';
+  btn.disabled = true;
+
   try {
-    await SB.patch('users', `?id=eq.${userId}`, { rekening });
-    toast('✅ Info rekening disimpan');
-  } catch(e) { toast('❌ Gagal simpan: ' + e.message); }
+    // Save via API (pakai service key, bypass RLS)
+    const res = await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, rekening }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) throw new Error(json.error || 'Gagal');
+
+    // Verifikasi baca balik dari DB
+    const verify = await SB.get('users', `?id=eq.${userId}&select=rekening&limit=1`);
+    const tersimpan = verify[0]?.rekening || '';
+
+    if (tersimpan === rekening) {
+      toast('✅ Rekening berhasil disimpan & terverifikasi');
+      document.getElementById('rek-status').innerHTML =
+        `<span style="color:#86efac">✅ Tersimpan di database</span>`;
+    } else {
+      toast('⚠️ Tersimpan tapi data berbeda — coba reload');
+      document.getElementById('rek-status').innerHTML =
+        `<span style="color:#fbbf24">⚠️ Belum tersimpan dengan benar</span>`;
+    }
+  } catch(e) {
+    toast('❌ Gagal simpan: ' + e.message);
+    document.getElementById('rek-status').innerHTML =
+      `<span style="color:#fca5a5">❌ Error: ${e.message}</span>`;
+  } finally {
+    btn.textContent = 'Simpan Rekening';
+    btn.disabled = false;
+  }
 }
 
 /* ── EKSPEDISI WHITELIST ── */
