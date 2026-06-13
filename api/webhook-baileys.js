@@ -330,7 +330,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const wa_number   = normalizeWA(body.wa_number || '');
+    const wa_number   = body.reply_jid || normalizeWA(body.wa_number || ''); // pakai JID asli jika ada
     const pushName    = body.push_name || wa_number;
     const message     = String(body.message || '').trim();
     const messageType = body.message_type || 'text';
