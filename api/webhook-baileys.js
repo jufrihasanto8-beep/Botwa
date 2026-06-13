@@ -286,13 +286,14 @@ async function cekOngkir(wilayah, productId) {
 }
 
 /* ── KIRIM WA via Baileys server ──────────────────────────── */
-async function sendWA(waNumber, message, isOutbound = false) {
+async function sendWA(sessionId, waNumber, message, isOutbound = false) {
   if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
   const res = await fetch(`${BAILEYS_URL}/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       secret: WEBHOOK_SECRET,
+      session_id: sessionId,
       wa_number: waNumber,
       message,
       is_outbound: isOutbound,
@@ -421,7 +422,7 @@ module.exports = async function handler(req, res) {
 
     // ── Simpan & kirim balasan ─────────────────────────────────
     await saveMessage(conversation.id, 'ai', reply);
-    await sendWA(wa_number, reply);
+    await sendWA(userId, wa_number, reply);
 
     res.status(200).json({ ok: true });
 
