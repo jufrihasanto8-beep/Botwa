@@ -194,14 +194,19 @@ async function sbGet(t, q='') {
 }
 async function sbPost(t, b) {
   const r = await fetch(`${SB_URL}/rest/v1/${t}`, { method:'POST', headers:{...sbH,'Prefer':'return=representation'}, body:JSON.stringify(b) });
-  return r.json();
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.message || data?.error || JSON.stringify(data));
+  return data;
 }
 async function sbPatch(t, q, b) {
   const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, { method:'PATCH', headers:{...sbH,'Prefer':'return=representation'}, body:JSON.stringify(b) });
-  return r.json();
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.message || data?.error || JSON.stringify(data));
+  return data;
 }
 async function sbDelete(t, q) {
-  await fetch(`${SB_URL}/rest/v1/${t}${q}`, { method:'DELETE', headers: sbH });
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, { method:'DELETE', headers: sbH });
+  if (!r.ok) { const d = await r.json(); throw new Error(d?.message || JSON.stringify(d)); }
 }
 
 function toast(msg, type='success') {
