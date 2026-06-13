@@ -82,6 +82,8 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
       const updated = await sbPatch('conversations', `?id=eq.${conv.id}`, {
         status: 'baru',
         last_msg_at: new Date().toISOString(),
+        ringkasan: null, // reset ringkasan agar konteks lama tidak kebawa
+        state: { tahap: 'sambut', produk_locked: !!conv.state?.produk_locked },
       });
       return updated[0] || conv;
     }
