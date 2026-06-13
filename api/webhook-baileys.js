@@ -612,7 +612,21 @@ module.exports = async function handler(req, res) {
                 },
                 {
                   type: 'text',
-                  text: 'Analisa gambar ini. Apakah ini bukti transfer/pembayaran bank yang valid? Jawab dalam format JSON: {"is_bukti_tf": true/false, "keterangan": "penjelasan singkat", "bank": "nama bank jika ada", "nominal": "nominal jika terbaca", "tanggal": "tanggal jika ada"}',
+                  text: `Analisa gambar ini. Apakah ini bukti transfer/pembayaran bank?
+Rekening tujuan yang valid di sistem: ${userRekening || '(tidak ada)'}
+
+Jawab dalam format JSON:
+{
+  "is_bukti_tf": true/false,
+  "keterangan": "penjelasan singkat",
+  "bank": "nama bank pengirim jika ada",
+  "nominal": "nominal transfer jika terbaca",
+  "tanggal": "tanggal jika ada",
+  "no_rekening_tujuan": "nomor rekening tujuan yang tertera di struk",
+  "rekening_cocok": true/false/null
+}
+
+rekening_cocok: true jika no_rekening_tujuan cocok dengan salah satu rekening di sistem, false jika tidak cocok, null jika tidak terbaca.`,
                 },
               ],
             }],
@@ -651,9 +665,20 @@ module.exports = async function handler(req, res) {
 
     // ── Inject hasil analisa gambar ke history ─────────────────
     if (imageAnalysis) {
-      const notif = imageAnalysis.is_bukti_tf
-        ? `[SISTEM] Customer baru kirim bukti transfer. Hasil verifikasi: VALID ✅ | Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'} | Tanggal: ${imageAnalysis.tanggal || '?'}. Balas dengan konfirmasi penerimaan bukti TF dan info selanjutnya (misal kapan dikirim).`
-        : `[SISTEM] Customer baru kirim gambar tapi BUKAN bukti transfer. Keterangan: ${imageAnalysis.keterangan}. Minta dengan sopan untuk kirim bukti transfer yang benar.`;
+      let notif;
+      if (!imageAnalysis.is_bukti_tf) {
+        notif = `[SISTEM] Customer kirim gambar tapi BUKAN bukti transfer. Keterangan: ${imageAnalysis.keterangan}. Minta dengan sopan kirim bukti transfer yang benar.`;
+      } else if (imageAnalysis.rekening_cocok === false) {
+        notif = `[SISTEM] Customer kirim bukti transfer TAPI nomor rekening tujuan TIDAK COCOK dengan rekening toko.
+Rekening di struk: ${imageAnalysis.no_rekening_tujuan || '?'}
+Rekening toko: ${userRekening || '?'}
+Nominal: ${imageAnalysis.nominal || '?'} | Bank: ${imageAnalysis.bank || '?'}
+Beritahu customer dengan sopan bahwa transfer sepertinya salah rekening, minta konfirmasi ulang atau kirim ulang ke rekening yang benar.`;
+      } else {
+        notif = `[SISTEM] Bukti transfer VALID dan rekening COCOK ✅
+Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'} | Tanggal: ${imageAnalysis.tanggal || '?'}
+Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan estimasi pengiriman.`;
+      }
       history.push({ role: 'user', content: notif });
     }
 
