@@ -334,28 +334,39 @@ function bulatkan(nilai, kelipatan = 500) {
   return (nilai - bawah) <= (atas - nilai) ? bawah : atas;
 }
 
+/* ── MENGANTAR PUBLIC API (tanpa API key) ────────────────── */
+const MENGANTAR_ORIGIN_ID = '5fc63315f8f44b34aa4c44ca'; // Kranggan, Galur, Kulon Progo
+const MENGANTAR_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+  'Accept': 'application/json',
+  'Referer': 'https://www.mengantar.com/',
+  'Origin': 'https://www.mengantar.com',
+};
+
+async function mengantarFetch(path) {
+  const res = await fetch(`https://app.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS });
+  const json = await res.json();
+  return json;
+}
+
 /* ── HITUNG ONGKIR: step 4–8 blueprint §4 ───────────────── */
 async function hitungOngkir(wilayah, product) {
-  if (!MENGANTAR_KEY) return null;
   try {
-    // Step 3: Cek ongkir via Mengantar API
-    const searchRes = await fetch(
-      `https://api.mengantar.com/v1/areas?search=${encodeURIComponent(wilayah)}`,
-      { headers: { 'Authorization': `Bearer ${MENGANTAR_KEY}` } }
-    );
-    const areas = await searchRes.json();
-    if (!areas?.data?.length) return null;
+    // Step 3a: Cari destination_id dari nama wilayah
+    const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(wilayah)}`);
+    const areas = searchJson.data || searchJson;
+    if (!Array.isArray(areas) || !areas.length) return null;
 
-    const areaId   = areas.data[0].id;
-    const areaNama = areas.data[0].name || wilayah;
-    const weight   = product?.berat_gram || 500;
+    const areaId   = areas[0]._id || areas[0].id;
+    const areaNama = areas[0].subdistrict || areas[0].name || wilayah;
+    const weight = product?.berat_gram || 1; // Mengantar public pakai satuan kg
 
-    const ongkirRes = await fetch(
-      `https://api.mengantar.com/v1/rates?destination_id=${areaId}&weight=${weight}`,
-      { headers: { 'Authorization': `Bearer ${MENGANTAR_KEY}` } }
+    // Step 3b: Ambil estimasi semua kurir
+    const ratesJson = await mengantarFetch(
+      `order/allEstimatePublic?origin_id=${MENGANTAR_ORIGIN_ID}&destination_id=${areaId}&weight=${weight}`
     );
-    const ratesData = await ongkirRes.json();
-    let rates = ratesData?.data || [];
+    if (!ratesJson.success) return null;
+    let rates = ratesJson.data || [];
     if (!rates.length) return null;
 
     // Step 4: Filter whitelist dari tabel courier_whitelist
@@ -364,21 +375,26 @@ async function hitungOngkir(wilayah, product) {
       `?user_id=eq.${product?.user_id || ''}&aktif=eq.true`
     ).catch(() => []);
 
+    // Normalize field names dari Mengantar public API
+    rates = rates.map(r => ({
+      courier_name: r.courier_name || r.courierName || r.name || r.ekspedisi || '',
+      price: r.price || r.ongkir || r.cost || r.total || 0,
+    })).filter(r => r.courier_name && r.price > 0);
+
     if (whitelist.length) {
       const allowed = new Set(whitelist.map(w => w.nama.toLowerCase()));
-      const filtered = rates.filter(r => allowed.has(r.courier_name?.toLowerCase()));
-      // Kalau ada yang masuk whitelist, pakai itu. Kalau tidak ada match, fallback semua
+      const filtered = rates.filter(r => allowed.has(r.courier_name.toLowerCase()));
       if (filtered.length) rates = filtered;
     }
 
     // Step 5: Pilih termurah dari yang lolos filter
-    rates.sort((a, b) => (a.price || 0) - (b.price || 0));
+    rates.sort((a, b) => a.price - b.price);
 
     if (!rates.length) return null;
 
-    const best      = rates[0];
-    const ekspedisi = best.courier_name || 'ekspedisi';
-    const ongkirAsli = best.price || 0;
+    const best       = rates[0];
+    const ekspedisi  = best.courier_name;
+    const ongkirAsli = best.price;
 
     // Step 6: Terapkan promo ongkir produk
     const promo = product?.promo_ongkir;
