@@ -439,8 +439,11 @@ module.exports = async function handler(req, res) {
     console.log(`Produk: ${product?.nama || 'tidak diketahui'} (${sumber})`);
 
     // ── Find/create customer & conversation ───────────────────
-    const customer     = await findOrCreateCustomer(userId, wa_number, pushName);
+    console.log(`[1] findOrCreateCustomer: userId=${userId} wa_number=${wa_number}`);
+    const customer = await findOrCreateCustomer(userId, wa_number, pushName);
+    console.log(`[2] customer: id=${customer?.id}`);
     const conversation = await findOrCreateConversation(userId, customer.id, sumber, product?.id);
+    console.log(`[3] conversation: id=${conversation?.id} status=${conversation?.status}`);
 
     // Update produk ke conversation jika baru ketemu
     if (product?.id && !conversation.product_id) {
