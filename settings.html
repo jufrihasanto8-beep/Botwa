@@ -79,6 +79,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .btn-danger{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;font-size:12px;cursor:pointer;transition:all .15s}
 .btn-danger:hover{background:rgba(239,68,68,.18)}
 
+/* ── WA status ── */
+.wa-status-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.wa-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
+.dot-connected{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.2)}
+.dot-disconnected,.dot-not_found,.dot-logged_out{background:#475569}
+.dot-qr_ready{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.2);animation:blink 1s infinite}
+.dot-connecting,.dot-reconnecting{background:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.2);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 #toast.show{opacity:1}
@@ -167,12 +176,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
       <!-- ── CONNECT WA ── -->
       <div class="settings-section" id="sec-wa">
         <div class="section-title">Connect WhatsApp</div>
-        <div class="section-desc">Hubungkan nomor WhatsApp ke sistem AI CS via Baileys. Scan QR code untuk mulai.</div>
-        <div style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:28px;text-align:center">
-          <div style="font-size:40px;margin-bottom:12px">📱</div>
-          <div style="font-size:15px;font-weight:600;color:#f1f5f9;margin-bottom:8px">Kelola Koneksi WhatsApp</div>
-          <div style="font-size:13px;color:#64748b;margin-bottom:20px;line-height:1.6">Scan QR, cek status koneksi,<br>dan kelola sesi Baileys di halaman ini.</div>
-          <a href="connect-wa.html" class="btn-primary" style="text-decoration:none;display:inline-flex">Buka Halaman Connect WA →</a>
+        <div class="section-desc">Hubungkan nomor WhatsApp ke sistem AI CS via Baileys.</div>
+
+        <!-- Status card -->
+        <div id="wa-status-card" style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;margin-bottom:16px">
+          <div style="text-align:center;padding:20px;color:#64748b">Memuat status...</div>
+        </div>
+
+        <!-- QR area (muncul saat connecting) -->
+        <div id="wa-qr-area" style="display:none;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:28px;text-align:center">
+          <div style="font-size:13px;color:#64748b;margin-bottom:16px">Buka WhatsApp → <strong style="color:#e2e8f0">Perangkat Tertaut</strong> → Tautkan Perangkat → Scan QR</div>
+          <div id="wa-qr-container">
+            <div style="font-size:36px;margin-bottom:8px">⏳</div>
+            <div style="color:#64748b;font-size:13px">Memuat QR code...</div>
+          </div>
+          <button class="btn-secondary" style="margin-top:16px" onclick="cancelQR()">Batal</button>
         </div>
       </div>
 
@@ -248,6 +266,161 @@ function saveAccount() {
   toast('✅ Akun diperbarui');
 }
 
+/* ── WA Connect logic ── */
+const BAILEYS_PROXY  = '/api/baileys-proxy';
+const BAILEYS_SECRET = 'adsysukses2026';
+let waUserId = null;
+let waPollInterval = null;
+
+async function baileysFetch(path, opts = {}) {
+  return fetch(`${BAILEYS_PROXY}?path=${encodeURIComponent(path)}`, opts);
+}
+
+async function loadWAStatus() {
+  waUserId = Auth.getUser()?.id;
+  const card = document.getElementById('wa-status-card');
+  let status = { status: 'not_found', waNumber: null };
+  try {
+    const res = await baileysFetch(`/session/status/${waUserId}`);
+    status = await res.json();
+  } catch(e) {
+    card.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:#fca5a5">
+      <span style="font-size:20px">⚠️</span>
+      <div><div style="font-weight:600">Tidak bisa terhubung ke Baileys server</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px">Pastikan VPS aktif</div></div></div>`;
+    return;
+  }
+
+  const isConnected = status.status === 'connected';
+  const dotClass = `dot-${status.status}`;
+  const statusLabel = {
+    connected:    '✅ Terhubung',
+    connecting:   '🔄 Menghubungkan...',
+    qr_ready:     '📷 Menunggu scan QR',
+    reconnecting: '🔄 Reconnecting...',
+    logged_out:   '❌ Logged out',
+    not_found:    'Belum terhubung',
+  }[status.status] || status.status;
+
+  card.innerHTML = `
+    <div class="wa-status-row">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:44px;height:44px;background:rgba(37,211,102,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📱</div>
+        <div>
+          <div style="font-weight:600;font-size:14px;color:#f1f5f9">${isConnected ? '+' + status.waNumber : 'WhatsApp'}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+            <span class="wa-dot ${dotClass}"></span>
+            <span style="font-size:12px;color:#94a3b8">${statusLabel}</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        ${isConnected
+          ? `<button class="btn btn-sm" onclick="startQR()">🔗 Ganti Nomor</button>
+             <button class="btn-danger btn-sm" onclick="disconnectWA()">Disconnect</button>`
+          : `<button class="btn-primary" onclick="startQR()">+ Hubungkan WA</button>`
+        }
+      </div>
+    </div>
+    ${isConnected ? `
+    <div style="display:flex;gap:24px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06)">
+      <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.3px">Nomor Aktif</div>
+           <div style="font-weight:600;color:#e2e8f0;margin-top:3px">+${status.waNumber}</div></div>
+      <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.3px">Status AI</div>
+           <div style="font-weight:600;color:#86efac;margin-top:3px">● ON</div></div>
+    </div>` : ''}`;
+}
+
+async function startQR() {
+  document.getElementById('wa-qr-area').style.display = 'block';
+  document.getElementById('wa-qr-container').innerHTML = `<div style="font-size:36px;margin-bottom:8px">⏳</div><div style="color:#64748b;font-size:13px">Memulai sesi...</div>`;
+
+  try {
+    await baileysFetch(`/session/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: waUserId }),
+    });
+  } catch(e) {
+    document.getElementById('wa-qr-container').innerHTML = `<div style="color:#fca5a5;font-size:13px">⚠️ Tidak bisa terhubung ke server</div>`;
+    return;
+  }
+
+  pollWAQR();
+}
+
+function pollWAQR() {
+  if (waPollInterval) clearInterval(waPollInterval);
+  loadWAQR();
+  waPollInterval = setInterval(async () => {
+    const s = await getWAStatus();
+    if (s?.status === 'connected') {
+      clearInterval(waPollInterval); waPollInterval = null;
+      document.getElementById('wa-qr-container').innerHTML = `
+        <div style="font-size:48px;margin-bottom:8px">✅</div>
+        <div style="font-size:15px;font-weight:600;color:#86efac">+${s.waNumber}</div>
+        <div style="font-size:13px;color:#64748b;margin-top:4px">WhatsApp berhasil terhubung!</div>
+        <button class="btn-primary" style="margin-top:16px" onclick="cancelQR()">Selesai</button>`;
+      loadWAStatus();
+    } else {
+      await loadWAQR();
+    }
+  }, 5000);
+}
+
+async function loadWAQR() {
+  const container = document.getElementById('wa-qr-container');
+  if (!container) return;
+  try {
+    const res = await baileysFetch(`/session/status/${waUserId}`);
+    const s = await res.json();
+    if (s.status === 'qr_ready') {
+      const qrRes = await baileysFetch(`/qr-data/${waUserId}`);
+      const qrData = await qrRes.json();
+      container.innerHTML = qrData.qrDataUrl
+        ? `<img src="${qrData.qrDataUrl}" style="width:240px;border-radius:12px;border:1px solid rgba(255,255,255,.08)">
+           <div style="font-size:12px;color:#64748b;margin-top:10px">QR berlaku ~60 detik · refresh otomatis</div>`
+        : `<div style="font-size:36px;margin-bottom:8px">⏳</div><div style="color:#64748b;font-size:13px">Memuat QR...</div>`;
+    } else if (s.status !== 'connected') {
+      container.innerHTML = `<div style="font-size:36px;margin-bottom:8px">⏳</div><div style="color:#64748b;font-size:13px">${s.status === 'connecting' ? 'Menghubungkan...' : 'Menunggu QR...'}</div>`;
+    }
+  } catch(e) {
+    container.innerHTML = `<div style="color:#fca5a5;font-size:13px">⚠️ ${e.message}</div>`;
+  }
+}
+
+function cancelQR() {
+  if (waPollInterval) { clearInterval(waPollInterval); waPollInterval = null; }
+  document.getElementById('wa-qr-area').style.display = 'none';
+  loadWAStatus();
+}
+
+async function disconnectWA() {
+  if (!confirm('Disconnect nomor WhatsApp ini?')) return;
+  try {
+    await baileysFetch(`/session/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: waUserId }),
+    });
+    toast('✅ WhatsApp berhasil disconnect');
+    loadWAStatus();
+  } catch(e) { toast('❌ Gagal disconnect: ' + e.message); }
+}
+
+async function getWAStatus() {
+  try {
+    const res = await baileysFetch(`/session/status/${waUserId}`);
+    return await res.json();
+  } catch(e) { return null; }
+}
+
+// Load WA status saat tab Connect WA dibuka
+const origShowSection = showSection;
+window.showSection = function(name, el) {
+  origShowSection(name, el);
+  if (name === 'wa') loadWAStatus();
+};
 </script>
 </body>
 </html>
