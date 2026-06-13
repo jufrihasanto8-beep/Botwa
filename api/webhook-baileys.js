@@ -187,8 +187,10 @@ ATURAN HARGA, ONGKIR & COD
 - Harga/dosis/klaim HANYA dari DATA PRODUK. JANGAN ngarang.
 - Semua angka diambil dari SISTEM, bukan dihitung dari ingatan.
 - Sebelum kasih TOTAL → WAJIB konfirmasi WILAYAH dulu.
-- ⚠️ KRITIS: Begitu wilayah SUDAH dipastikan (customer konfirmasi "iya", "bener", "iya kak", dll) → LANGSUNG tulis [CEK_ONGKIR:wilayah] di akhir pesan yang SAMA. JANGAN bilang "bentar ya" dulu lalu tunggu pesan berikutnya. Sistem akan langsung hitung dan replace marker dengan total harga otomatis.
-- Sebelum [CEK_ONGKIR] → WAJIB pastikan wilayah sudah spesifik sampai provinsi atau kota/kab yang tidak mungkin salah.
+- ⚠️ WAJIB: Setiap kali kamu menyebut/mengkonfirmasi wilayah ke customer (contoh: "Oke kak, Mariso Makassar ya!"), SELALU tulis [WILAYAH_OK:nama wilayah] di akhir pesan. Sistem pakai ini untuk hitung ongkir otomatis. Tanpa marker ini, ongkir tidak bisa dihitung.
+  Contoh: "Oke kak, Makassar, Sulawesi Selatan ya! 😊 [WILAYAH_OK:Makassar, Sulawesi Selatan]"
+  Contoh: "Siap kak, Ambarawa, Jawa Tengah ya 😊 [WILAYAH_OK:Ambarawa, Jawa Tengah]"
+- Sebelum [WILAYAH_OK] → WAJIB pastikan wilayah sudah spesifik sampai provinsi atau kota/kab yang tidak mungkin salah.
 - Wilayah parsial (nama desa/kecamatan kecil yang unik) → tebak & konfirmasi provinsinya: "Pringsewu, Lampung ya kak?"
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
   Prinsip: kalau nama itu bisa jadi kota/kab di lebih dari satu provinsi, TANYA dulu.
@@ -332,7 +334,7 @@ async function callClaude(systemPrompt, messages) {
 
 /* ── DETEKSI KONFIRMASI WILAYAH (webhook-level, tidak bergantung Claude) ── */
 
-// Ekstrak wilayah yang AI sedang konfirmasikan ("Sumba NTT ya kak?" → "Sumba NTT")
+// Ekstrak wilayah yang AI sedang konfirmasikan — pertanyaan ("Sumba NTT ya kak?")
 function extractProposedWilayah(aiMsg) {
   const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -340,6 +342,20 @@ function extractProposedWilayah(aiMsg) {
     const m = line.match(/(?:jadi\s+|ke\s+)?([A-Za-z][A-Za-z\s,]{2,50}?)\s+ya\s+kak[?😊🙏\s]/i);
     if (m) {
       const candidate = m[1].trim().replace(/,\s*$/, '');
+      if (candidate.length >= 3) return candidate;
+    }
+  }
+  return null;
+}
+
+// Ekstrak wilayah dari pernyataan konfirmasi AI ("Oke kak, Ambarawa Jawa Tengah ya! 😊")
+function extractConfirmedWilayah(aiMsg) {
+  const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
+  for (const line of lines) {
+    // "Oke kak, Ambarawa Jawa Tengah ya!" / "Siap kak, pengirimannya ke Sumba NTT ya!"
+    const m = line.match(/(?:oke|siap|dicatat|baik|noted)\s+kak[,!]?\s+(?:pengirimannya\s+ke\s+|jadi\s+ke\s+)?([A-Za-z][A-Za-z\s,]{2,50}?)\s+ya[!😊🙏\s]/i);
+    if (m) {
+      const candidate = m[1].trim().replace(/[,!]+$/, '');
       if (candidate.length >= 3) return candidate;
     }
   }
@@ -611,9 +627,49 @@ Kakak enaknya COD atau transfer? 🙏`;
     const isEscalated      = rawReply.includes('[ESCALATE]');
     const orderConfirmed   = rawReply.includes('[ORDER_CONFIRMED]');
     const cekOngkirMatch   = rawReply.match(/\[CEK_ONGKIR:([^\]]+)\]/);
+    const wilayahOkMatch   = rawReply.match(/\[WILAYAH_OK:([^\]]+)\]/);
+
+    // ── Handle [WILAYAH_OK:] → langsung hitung ongkir ────────
+    if (wilayahOkMatch && !autoOngkirResult) {
+      const wilayah = wilayahOkMatch[1].trim();
+      console.log(`[WILAYAH_OK] detected: ${wilayah}`);
+      await updateConvState(conversation.id, { wilayah, proposed_wilayah: null });
+      const hasil = await hitungOngkir(wilayah, product);
+      if (hasil) {
+        await updateConvState(conversation.id, { ongkir: hasil });
+        const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+        const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
+          ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
+          : fmt(hasil.ongkirPromo);
+        const injeksi = `[SISTEM] Ongkir ke ${wilayah} sudah dihitung. Lanjutkan balasan di atas dan tampilkan PERSIS ini (jangan ubah angka):
+
+${product?.nama || 'Produk'} ${fmt(hasil.harga)}
+
+💳 Transfer
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
+
+📦 COD
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
+
+Via ${hasil.ekspedisi} ya kak 🚗
+Kakak enaknya COD atau transfer? 🙏`;
+
+        const histWithOngkir = [
+          ...history,
+          { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
+          { role: 'user', content: injeksi },
+        ];
+        rawReply = await callClaude(systemPrompt, histWithOngkir);
+      } else {
+        console.warn(`hitungOngkir gagal untuk wilayah: ${wilayah}`);
+        // Simpan sebagai proposed_wilayah untuk retry di pesan berikutnya
+        await updateConvState(conversation.id, { proposed_wilayah: wilayah });
+        rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim();
+      }
+    }
 
     // ── Handle cek ongkir (dari marker Claude — fallback) ─────
-    if (cekOngkirMatch && !autoOngkirResult) {
+    if (cekOngkirMatch && !autoOngkirResult && !wilayahOkMatch) {
       const wilayah = cekOngkirMatch[1].trim();
       await updateConvState(conversation.id, { wilayah });
       const hasil = await hitungOngkir(wilayah, product);
@@ -652,6 +708,41 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
       }
     }
 
+    // ── Jika Claude baru KONFIRMASI wilayah ("Oke kak, X ya!") → langsung hitung ongkir ──
+    if (!autoOngkirResult && !cekOngkirMatch) {
+      const confirmedWilayah = extractConfirmedWilayah(rawReply);
+      if (confirmedWilayah && !convState.ongkir) {
+        console.log(`Auto-trigger ongkir dari konfirmasi wilayah: ${confirmedWilayah}`);
+        const hasil = await hitungOngkir(confirmedWilayah, product);
+        if (hasil) {
+          await updateConvState(conversation.id, { wilayah: confirmedWilayah, ongkir: hasil, proposed_wilayah: null });
+          const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+          const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
+            ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
+            : fmt(hasil.ongkirPromo);
+          const injeksi = `[SISTEM] Ongkir ke ${confirmedWilayah} sudah dihitung. Lanjutkan balasan di atas dengan menampilkan PERSIS ini:
+
+${product?.nama || 'Produk'} ${fmt(hasil.harga)}
+
+💳 Transfer
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
+
+📦 COD
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
+
+Via ${hasil.ekspedisi} ya kak 🚗
+Kakak enaknya COD atau transfer? 🙏`;
+
+          const histCombined = [
+            ...history,
+            { role: 'assistant', content: rawReply.trim() },
+            { role: 'user', content: injeksi },
+          ];
+          rawReply = await callClaude(systemPrompt, histCombined);
+        }
+      }
+    }
+
     // ── Simpan proposed_wilayah jika Claude baru tanya konfirmasi lokasi ──
     const newProposed = extractProposedWilayah(rawReply);
     if (newProposed && newProposed !== convState.proposed_wilayah) {
@@ -664,6 +755,7 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
       .replace('[ESCALATE]', '')
       .replace('[ORDER_CONFIRMED]', '')
       .replace(/\[CEK_ONGKIR:[^\]]+\]/, '')
+      .replace(/\[WILAYAH_OK:[^\]]+\]/, '')
       .trim();
 
     if (!reply) return res.status(200).json({ ok: true, skipped: 'empty_reply' });
