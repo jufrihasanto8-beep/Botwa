@@ -245,10 +245,28 @@ async function getContextMessages(conversationId) {
   const msgs = await sbGet('conv_messages',
     `?conversation_id=eq.${conversationId}&order=created_at.asc&limit=30`
   );
-  return msgs.map(m => ({
+
+  // Map roles
+  const mapped = msgs.map(m => ({
     role: m.role === 'customer' ? 'user' : 'assistant',
-    content: m.isi,
-  }));
+    content: m.isi || '',
+  })).filter(m => m.content.trim());
+
+  // Claude API butuh alternating user/assistant — gabungkan consecutive same role
+  const result = [];
+  for (const msg of mapped) {
+    const last = result[result.length - 1];
+    if (last && last.role === msg.role) {
+      last.content += '\n' + msg.content; // gabung
+    } else {
+      result.push({ ...msg });
+    }
+  }
+
+  // Harus mulai dari 'user'
+  if (result.length && result[0].role === 'assistant') result.shift();
+
+  return result;
 }
 
 async function saveMessage(conversationId, role, isi) {
