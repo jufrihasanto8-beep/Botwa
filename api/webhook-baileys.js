@@ -67,12 +67,26 @@ async function findOrCreateCustomer(userId, waNumber, nama) {
 
 /* ── FIND / CREATE CONVERSATION ──────────────────────────── */
 async function findOrCreateConversation(userId, customerId, sumber, productId) {
-  // Cari conversation aktif (belum selesai)
+  // Ambil conversation terakhir customer ini (apapun statusnya)
   const existing = await sbGet('conversations',
-    `?user_id=eq.${userId}&customer_id=eq.${customerId}&status=neq.selesai&order=created_at.desc&limit=1`
+    `?user_id=eq.${userId}&customer_id=eq.${customerId}&order=created_at.desc&limit=1`
   );
-  if (existing.length) return existing[0];
 
+  if (existing.length) {
+    const conv = existing[0];
+    // Kalau sudah di-closing manual → re-open
+    if (conv.status === 'selesai') {
+      console.log(`Re-open conversation ${conv.id}`);
+      const updated = await sbPatch('conversations', `?id=eq.${conv.id}`, {
+        status: 'baru',
+        last_msg_at: new Date().toISOString(),
+      });
+      return updated[0] || conv;
+    }
+    return conv;
+  }
+
+  // Customer baru sama sekali → buat conversation baru
   const rows = await sbPost('conversations', {
     user_id: userId,
     customer_id: customerId,
@@ -793,9 +807,9 @@ Kakak enaknya COD atau transfer? 🙏`;
       });
     }
 
-    // ── Update state jika order confirmed ─────────────────────
+    // ── Update state jika order confirmed → tandai di state, CS tutup manual ──
     if (orderConfirmed) {
-      await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
+      await updateConvState(conversation.id, { order_confirmed: true });
     }
 
     // ── Simpan & kirim balasan ─────────────────────────────────
