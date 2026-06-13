@@ -515,25 +515,21 @@ window.showSection = function(name, el) {
 /* ── REKENING TRANSFER ── */
 async function loadRekening() {
   const userId = Auth.getUser()?.id;
-  const { data, error } = await supabase
-    .from('users')
-    .select('rekening')
-    .eq('id', userId)
-    .single();
-  if (!error && data?.rekening) {
-    document.getElementById('rek-info').value = data.rekening;
-  }
+  try {
+    const data = await SB.get('users', `?id=eq.${userId}&select=rekening&limit=1`);
+    if (data[0]?.rekening) {
+      document.getElementById('rek-info').value = data[0].rekening;
+    }
+  } catch(e) { console.error('loadRekening:', e.message); }
 }
 
 async function saveRekening() {
   const userId = Auth.getUser()?.id;
   const rekening = document.getElementById('rek-info').value.trim();
-  const { error } = await supabase
-    .from('users')
-    .update({ rekening })
-    .eq('id', userId);
-  if (error) { toast('❌ Gagal simpan: ' + error.message); return; }
-  toast('✅ Info rekening disimpan');
+  try {
+    await SB.patch('users', `?id=eq.${userId}`, { rekening });
+    toast('✅ Info rekening disimpan');
+  } catch(e) { toast('❌ Gagal simpan: ' + e.message); }
 }
 
 /* ── EKSPEDISI WHITELIST ── */
