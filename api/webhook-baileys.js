@@ -647,7 +647,7 @@ Kakak enaknya COD atau transfer? 🙏`;
         await updateConvState(conversation.id, { ongkir: hasil });
         const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
         const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-          ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
+          ? `${fmt(hasil.ongkirPromo)} (hemat ${fmt(hasil.ongkirAsli - hasil.ongkirPromo)} dari normal ${fmt(hasil.ongkirAsli)})`
           : fmt(hasil.ongkirPromo);
         const injeksi = `[SISTEM] Ongkir ke ${wilayah} sudah dihitung. Lanjutkan balasan di atas dan tampilkan PERSIS ini (jangan ubah angka):
 
@@ -686,7 +686,7 @@ Kakak enaknya COD atau transfer? 🙏`;
 
         const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
         const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-          ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
+          ? `${fmt(hasil.ongkirPromo)} (hemat ${fmt(hasil.ongkirAsli - hasil.ongkirPromo)} dari normal ${fmt(hasil.ongkirAsli)})`
           : fmt(hasil.ongkirPromo);
 
         const injeksi = `[SISTEM] Data ongkir ke ${wilayah} sudah dihitung. Gunakan PERSIS angka ini:
