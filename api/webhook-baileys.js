@@ -1078,10 +1078,6 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
       .replace(/\[WILAYAH_OK:[^\]]+\]/, '')
       .trim();
 
-    if (!reply) return res.status(200).json({ ok: true, skipped: 'empty_reply' });
-
-    console.log(`Reply untuk ${wa_number}${isEscalated?' [ESKALASI]':''}${orderConfirmed?' [ORDER]':''}: ${reply.slice(0, 80)}`);
-
     // ── Update conversation status jika eskalasi ──────────────
     if (isEscalated) {
       await sbPatch('conversations', `?id=eq.${conversation.id}`, {
@@ -1091,6 +1087,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     }
 
     // ── Update state jika order confirmed → auto closing + kirim recap ke grup ──
+    // (dijalankan SEBELUM cek reply kosong agar tidak terlewat meski Claude hanya tulis marker)
     if (orderConfirmed) {
       await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
 
@@ -1122,6 +1119,10 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
         }
       }
     }
+
+    if (!reply) return res.status(200).json({ ok: true, skipped: 'empty_reply' });
+
+    console.log(`Reply untuk ${wa_number}${isEscalated?' [ESKALASI]':''}${orderConfirmed?' [ORDER]':''}: ${reply.slice(0, 80)}`);
 
     // ── Simpan & kirim balasan ─────────────────────────────────
     await saveMessage(conversation.id, 'ai', reply);
