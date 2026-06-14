@@ -1018,31 +1018,26 @@ Rules: pendek (1-2 kalimat), hangat, natural, tidak formal, tidak markdown.`;
 
     const res  = await fetch('/api/baileys-proxy?path=%2Fnoop', { method: 'GET' }).catch(()=>null);
     // Call Claude via Vercel env proxy — use fetch to anthropic via a helper
-    const reply = await callClaudeFromFrontend(sysPrompt, history);
+    const reply = await callClaudeFromFrontend(sysPrompt, history, prod);
     aiSuggestText = reply;
     txt.textContent = reply;
-    document.getElementById('ai-conf').textContent = '92% Confidence';
+    document.getElementById('ai-conf').textContent = 'Claude Haiku';
     document.getElementById('nba-text').textContent = reply.slice(0,120)+'...';
   } catch(e) {
     txt.textContent = 'Gagal generate saran: '+e.message;
   }
 }
 
-async function callClaudeFromFrontend(system, messages) {
-  // Panggil via webhook-baileys proxy tidak langsung tersedia dari frontend
-  // Fallback: gunakan suggest berdasarkan pesan terakhir customer
-  const lastCustomer = messages.filter(m=>m.role==='user').slice(-1)[0];
-  if (!lastCustomer) return 'Halo kak! 😊 Ada yang bisa aku bantu?';
-
-  // Simple rule-based suggestion based on last message
-  const msg = (lastCustomer.content||'').toLowerCase();
-  if (msg.includes('harga') || msg.includes('berapa')) return 'Harga produknya terjangkau kak, mau aku infokan detailnya? 😊';
-  if (msg.includes('ongkir') || msg.includes('kirim')) return 'Untuk cek ongkir, boleh tau kak dari daerah mana? 🙏';
-  if (msg.includes('cod')) return 'Bisa COD kak! Kakak di daerah mana ya? 😊';
-  if (msg.includes('transfer') || msg.includes('bayar')) return 'Bisa transfer kak, nanti aku kirimkan nomor rekeningnya ya 😊';
-  if (msg.includes('sembuh') || msg.includes('sakit') || msg.includes('keluhan')) return 'Oh berarti sudah cukup lama ya kak? Sudah pernah coba pengobatan sebelumnya? 🙏';
-  if (msg.includes('tidak jadi') || msg.includes('cancel')) return 'Oh oke kak, ada yang kurang pas? Boleh cerita biar aku bisa bantu 😊';
-  return 'Oke kak, ada lagi yang bisa aku bantu? 😊';
+async function callClaudeFromFrontend(system, messages, product) {
+  const userId = Auth.getUser()?.id;
+  const res = await fetch('/api/ai-suggest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, product, userId }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.reply;
 }
 
 function useAISuggest() {
