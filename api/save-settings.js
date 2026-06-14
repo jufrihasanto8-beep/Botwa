@@ -29,10 +29,13 @@ module.exports = async function handler(req, res) {
 
   const body = req.body || {};
 
-  // ── Legacy: update rekening di users ──
-  if (body.user_id && 'rekening' in body) {
+  // ── Legacy: update kolom users (rekening / anthropic_key) ──
+  if (body.user_id && ('rekening' in body || 'anthropic_key' in body)) {
     try {
-      await sbReq('PATCH', `users?id=eq.${body.user_id}`, { rekening: body.rekening });
+      const patch = {};
+      if ('rekening' in body)      patch.rekening      = body.rekening;
+      if ('anthropic_key' in body) patch.anthropic_key = body.anthropic_key;
+      await sbReq('PATCH', `users?id=eq.${body.user_id}`, patch);
       return res.status(200).json({ ok: true });
     } catch(e) {
       return res.status(500).json({ error: e.message });

@@ -347,8 +347,8 @@ async function saveMessage(conversationId, role, isi) {
 }
 
 /* ── CALL CLAUDE ──────────────────────────────────────────── */
-async function callClaude(systemPrompt, messages, model = 'claude-sonnet-4-6') {
-  const key = ANTHROPIC_KEY;
+async function callClaude(systemPrompt, messages, model = 'claude-sonnet-4-6', apiKey = null) {
+  const key = apiKey || ANTHROPIC_KEY;
   if (!key) throw new Error('ANTHROPIC_KEY belum diset');
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -738,8 +738,9 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Ambil rekening dari users table ───────────────────────
-    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening&limit=1`).catch(() => []);
-    const userRekening = userRows[0]?.rekening || null;
+    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key&limit=1`).catch(() => []);
+    const userRekening   = userRows[0]?.rekening     || null;
+    const userAnthropicKey = userRows[0]?.anthropic_key || ANTHROPIC_KEY; // fallback ke env
 
     // ── Routing: cari produk dari referral/isi chat ────────────
     const { product, sumber } = await resolveProduct(userId, referral, message);
@@ -942,9 +943,9 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
         ...history,
         { role: 'user', content: injeksi },
       ];
-      rawReply = await callClaude(systemPrompt, historyWithOngkir, 'claude-sonnet-4-6');
+      rawReply = await callClaude(systemPrompt, historyWithOngkir, 'claude-sonnet-4-6', userAnthropicKey);
     } else {
-      rawReply = await callClaude(systemPrompt, history);
+      rawReply = await callClaude(systemPrompt, history, 'claude-sonnet-4-6', userAnthropicKey);
     }
 
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
@@ -990,7 +991,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
           { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, histWithOngkir, 'claude-sonnet-4-6');
+        rawReply = await callClaude(systemPrompt, histWithOngkir, 'claude-sonnet-4-6', userAnthropicKey);
       } else {
         console.warn(`hitungOngkir gagal untuk wilayah: ${wilayah}`);
         // Simpan sebagai proposed_wilayah untuk retry di pesan berikutnya
@@ -1013,7 +1014,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
           { role: 'assistant', content: rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, historyWithOngkir, 'claude-sonnet-4-6');
+        rawReply = await callClaude(systemPrompt, historyWithOngkir, 'claude-sonnet-4-6', userAnthropicKey);
       } else {
         rawReply = rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() ||
           'Maaf kak, aku belum bisa cek ongkir ke wilayah itu. Bisa sebutkan nama kota/kabupatennya lengkap? 🙏';
@@ -1035,7 +1036,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
             { role: 'assistant', content: rawReply.trim() },
             { role: 'user', content: injeksi },
           ];
-          rawReply = await callClaude(systemPrompt, histCombined, 'claude-sonnet-4-6');
+          rawReply = await callClaude(systemPrompt, histCombined, 'claude-sonnet-4-6', userAnthropicKey);
         }
       }
     }
