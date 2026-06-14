@@ -837,6 +837,27 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
       history.push({ role: 'user', content: notif });
     }
 
+    // ── WEBHOOK-LEVEL: Auto-search wilayah via Mengantar (bantu Claude identifikasi lokasi) ──
+    // Jika belum ada wilayah tersimpan, coba cari pesan customer di Mengantar autocomplete
+    // Hasilnya diinject ke Claude agar Claude bisa langsung konfirmasi tanpa tanya balik
+    if (!convState.wilayah && !convState.ongkir && message.length >= 4 && message.length <= 80) {
+      try {
+        const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(message)}`);
+        const areas = searchJson.data || searchJson;
+        if (Array.isArray(areas) && areas.length >= 1 && areas.length <= 6) {
+          const candidates = areas.slice(0, 3).map(a => {
+            return [a.subdistrict, a.district, a.city || a.regency, a.province]
+              .filter(Boolean).join(', ');
+          });
+          const hint = `[SISTEM] Mengantar menemukan lokasi yang cocok untuk "${message}":\n`
+            + candidates.map((c, i) => `${i + 1}. ${c}`).join('\n')
+            + `\nKalau ini cocok, langsung konfirmasi ke customer (jangan tanya provinsi lagi). Pilih yang paling relevan lalu tulis [WILAYAH_OK:nama wilayah].`;
+          history.push({ role: 'user', content: hint });
+          console.log(`Wilayah autocomplete untuk "${message}": ${candidates.join(' | ')}`);
+        }
+      } catch(e) { /* silent — tidak blokir flow utama */ }
+    }
+
     // ── WEBHOOK-LEVEL: Auto-trigger ongkir jika customer konfirmasi wilayah ──
     // Cek apakah AI sebelumnya sedang tanya konfirmasi wilayah ("Sumba NTT ya kak?")
     // dan customer menjawab konfirmasi singkat ("iya", "yakin", "bener", dll)
