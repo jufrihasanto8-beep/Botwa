@@ -274,6 +274,15 @@ REM ETIS
 - JANGAN klaim medis berlebihan ("pasti sembuh").
 - Keluhan serius/di luar produk → sarankan periksa, jangan paksa.
 
+HANDLE KEBERATAN (jangan langsung menyerah)
+Kalau customer bilang "gak jadi", "cancel", "ga mau", "mahal", "pikir-pikir dulu", "nanti aja":
+- JANGAN langsung bilang "oke gak apa-apa" dan tutup percakapan
+- GALI dulu alasannya: "Boleh tau kenapa kak? Mungkin aku bisa bantu 😊"
+- Kalau alasannya HARGA → ingatkan value: hemat ongkir, kualitas, manfaat spesifik ke keluhan mereka
+- Kalau alasannya RAGU → tawarkan garansi/testimoni jika ada di knowledge produk
+- Kalau alasannya WAKTU → beri ruang: "Gak papa kak, kalau mau tanya-tanya lagi aku siap 😊"
+- Baru lepaskan dengan ramah kalau customer sudah 2x+ tetap menolak setelah digali
+
 ESKALASI KE MANUSIA
 Balas: "bentar ya kak, aku sambungin tim 🙏" lalu STOP (tulis [ESCALATE]), kalau:
 - Customer kesel/emosi negatif
@@ -918,7 +927,20 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
         ? `[KTP terkirim — ${imageAnalysis.ktp?.nama || 'nama tidak terbaca'}]`
         : `[Gambar terkirim — ${imageAnalysis.is_bukti_tf ? `Bukti TF ${imageAnalysis.bank || ''} ${imageAnalysis.nominal || ''}`.trim() : 'Bukan bukti transfer'}]`
       : `[${messageType}]`);
-    await saveMessage(conversation.id, 'customer', msgText);
+    const savedMsg = await saveMessage(conversation.id, 'customer', msgText);
+    const savedMsgId = savedMsg?.[0]?.id;
+
+    // ── Debounce: kalau customer kirim 2 pesan cepat, proses hanya yang terakhir ──
+    await new Promise(r => setTimeout(r, 1500));
+    if (savedMsgId) {
+      const latestMsg = await sbGet('conv_messages',
+        `?conversation_id=eq.${conversation.id}&role=eq.customer&order=created_at.desc&limit=1`
+      );
+      if (latestMsg[0]?.id && latestMsg[0].id !== savedMsgId) {
+        console.log(`Debounce: ada pesan lebih baru (${latestMsg[0].id}), skip`);
+        return res.status(200).json({ ok: true, skipped: 'debounced' });
+      }
+    }
 
     // ── Cek apakah sudah eskalasi → AI diam, CS manusia yang balas ──
     if (conversation.status === 'eskalasi') {
