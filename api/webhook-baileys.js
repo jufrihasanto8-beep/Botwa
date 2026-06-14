@@ -331,7 +331,8 @@ async function updateRingkasan(conversationId) {
 
     const ringkasan = await callClaude(
       'Buat ringkasan singkat percakapan CS ini dalam 3-5 kalimat bahasa Indonesia. Fokus pada: keluhan customer, produk yang dibahas, tahap percakapan (konsultasi/tertarik/mau beli/sudah order), dan data yang sudah terkumpul (nama/HP/alamat). Singkat dan padat.',
-      [{ role: 'user', content: transcript }]
+      [{ role: 'user', content: transcript }],
+      'claude-haiku-4-5-20251001'
     );
 
     if (ringkasan) {
@@ -896,7 +897,10 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     // ── WEBHOOK-LEVEL: Auto-search wilayah via Mengantar (bantu Claude identifikasi lokasi) ──
     // Jika belum ada wilayah tersimpan, coba cari pesan customer di Mengantar autocomplete
     // Hasilnya diinject ke Claude agar Claude bisa langsung konfirmasi tanpa tanya balik
-    if (!convState.wilayah && !convState.ongkir && message.length >= 4 && message.length <= 80) {
+    // Hanya search Mengantar kalau AI sebelumnya lagi nanya soal lokasi/wilayah
+    const lastAiMsg = history.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
+    const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
+    if (!convState.wilayah && !convState.ongkir && aiTanyaLokasi && message.length >= 4 && message.length <= 80) {
       try {
         const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(message)}`);
         const areas = searchJson.data || searchJson;
