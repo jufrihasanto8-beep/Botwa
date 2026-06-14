@@ -986,7 +986,7 @@ async function sendMsg() {
   try {
     await fetch(`${PROXY}?path=${encodeURIComponent('/send')}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: 'adsysukses2026', session_id: userId, wa_number: activeCustomer.wa_number, message: text }),
+      body: JSON.stringify({ session_id: userId, wa_number: activeCustomer.wa_number, message: text, is_outbound: true }),
     });
   } catch(e) { showToast('Gagal kirim WA: '+e.message); }
 }
