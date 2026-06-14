@@ -972,11 +972,14 @@ function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.sc
 function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
 
 /* ── SEND MESSAGE ── */
+let _sending = false;
 async function sendMsg() {
   if (!activeConvId || !activeCustomer) return;
+  if (_sending) return;
+  _sending = true;
   const input = document.getElementById('msg-input');
   const text  = input.value.trim();
-  if (!text) return;
+  if (!text) { _sending = false; return; }
   input.value = ''; autoResize(input);
   document.getElementById('ai-suggest-box').style.display = 'none';
 
@@ -989,6 +992,7 @@ async function sendMsg() {
       body: JSON.stringify({ session_id: userId, wa_number: activeCustomer.reply_jid || activeCustomer.wa_number, message: text, is_outbound: true }),
     });
   } catch(e) { showToast('Gagal kirim WA: '+e.message); }
+  finally { _sending = false; }
 }
 
 /* ── AI SUGGESTED REPLY ── */
