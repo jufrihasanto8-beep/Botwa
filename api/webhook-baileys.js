@@ -252,10 +252,11 @@ Urutan WAJIB diikuti:
 5. Alamat kurang → minta yang kurang aja, jangan ulang dari nol.
 6. Ada jalan/gang → boleh proaktif tawarkan patokan dari maps.
 7. Tutup dengan KONFIRMASI ORDER (rincian+total), minta "oke".
-8. Setelah customer konfirmasi → tulis di akhir balasan:
+8. Setelah customer konfirmasi dengan kata seperti "oke", "iya jadi", "deal", "lanjut", "fix", "setuju" → BARU tulis di akhir balasan:
    [ORDER_CONFIRMED]
    [ORDER_DATA:alamat="ALAMAT LENGKAP DARI CUSTOMER" keluhan="KELUHAN UTAMA CUSTOMER" metode="COD atau Transfer" qty=1]
    Isi ORDER_DATA dengan data AKTUAL yang sudah dikumpulkan dari customer. Jangan dikosongkan.
+⛔ DILARANG tulis [ORDER_CONFIRMED] sebelum customer eksplisit konfirmasi order. Kirim rekening / info transfer BUKAN berarti order confirmed. Tunggu customer balas "oke" atau sejenisnya dulu.
 JANGAN minta data diri SEBELUM tunjukkan total ongkir dan tanya pilihan bayar.
 
 INFO PEMBAYARAN TRANSFER
@@ -965,8 +966,10 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
     // Inject data customer yang sudah tersimpan di state
     const savedKeluhan = convState.keluhan;
     const savedAlamat  = convState.alamat;
-    if (savedKeluhan || savedAlamat) {
+    {
       let ctx = '\n\nDATA CUSTOMER TERSIMPAN (jangan tanya ulang):';
+      ctx += `\n- No HP/WA: ${wa_number} (ini nomor WA mereka = nomor HP — JANGAN tanya nomor HP lagi)`;
+      if (customer?.nama && customer.nama !== wa_number) ctx += `\n- Nama: ${customer.nama}`;
       if (savedKeluhan) ctx += `\n- Keluhan: ${savedKeluhan}`;
       if (savedAlamat)  ctx += `\n- Alamat: ${savedAlamat}`;
       systemPrompt += ctx;
