@@ -775,6 +775,9 @@ rekening_cocok: true jika no_rekening_tujuan cocok dengan salah satu rekening di
       return res.status(200).json({ ok: true, skipped: 'eskalasi' });
     }
 
+    // ── State conversation ────────────────────────────────────
+    const convState = conversation.state || {};
+
     // ── Build system prompt + inject ringkasan ────────────────
     let systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber, userRekening);
 
@@ -818,7 +821,6 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     // Cek apakah AI sebelumnya sedang tanya konfirmasi wilayah ("Sumba NTT ya kak?")
     // dan customer menjawab konfirmasi singkat ("iya", "yakin", "bener", dll)
     let autoOngkirResult = null;
-    const convState = conversation.state || {};
     const proposedWilayah = convState.proposed_wilayah;
     if (proposedWilayah && isConfirmation(message) && !convState.ongkir) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
