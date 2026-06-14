@@ -542,6 +542,18 @@ async function hitungOngkir(wilayah, product) {
     const totalCODBulat      = bulatkan(totalCOD);
     const feeCODBulat        = totalCODBulat - harga - ongkirPromo;
 
+    // Hitung total untuk semua kurir (untuk ditampilkan ke Claude)
+    const allRates = rates.map(r => {
+      let rPromo = r.price;
+      if (promo?.tipe === 'gratis_penuh')   rPromo = 0;
+      else if (promo?.tipe === 'potong')    rPromo = Math.max(0, r.price - (promo.nilai || 0));
+      else if (promo?.tipe === 'gratis_sd') rPromo = Math.max(0, r.price - (promo.nilai || 0));
+      const rFeeCOD  = Math.ceil((harga + rPromo) * 0.05);
+      const rTotalTF = bulatkan(harga + rPromo);
+      const rTotalCOD= bulatkan(harga + rPromo + rFeeCOD);
+      return { nama: r.courier_name, ongkir: r.price, ongkirPromo: rPromo, totalTF: rTotalTF, totalCOD: rTotalCOD };
+    });
+
     return {
       ekspedisi,
       ongkirAsli,
@@ -550,6 +562,7 @@ async function hitungOngkir(wilayah, product) {
       totalCOD: totalCODBulat,
       feeCOD: feeCODBulat,
       harga,
+      allRates,
       area: {
         kelurahan: areas[0].subdistrict || '',
         kecamatan: areas[0].district   || '',
@@ -580,6 +593,41 @@ async function sendWA(sessionId, waNumber, message, isOutbound = false) {
   });
   if (!res.ok) throw new Error(`Baileys send error: ${await res.text()}`);
   return res.json();
+}
+
+/* ── BUILD INJEKSI ONGKIR untuk Claude ───────────────────── */
+function buildOngkirInjeksi(hasil, product, konteks = '') {
+  const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+  const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
+    ? `~~${fmt(hasil.ongkirAsli)}~~ ${fmt(hasil.ongkirPromo)}`
+    : fmt(hasil.ongkirPromo);
+
+  // Tabel semua kurir yang tersedia
+  const tabelKurir = (hasil.allRates || []).map(r => {
+    const potongan = r.ongkir !== r.ongkirPromo ? ` (hemat ${fmt(r.ongkir - r.ongkirPromo)})` : '';
+    return `- ${r.nama}: ongkir ${fmt(r.ongkir)}${potongan} → TF total ${fmt(r.totalTF)} | COD total ${fmt(r.totalCOD)}`;
+  }).join('\n');
+
+  return `[SISTEM] ${konteks}Ongkir sudah dihitung. Rekomendasi termurah: ${hasil.ekspedisi}.
+
+Tampilkan PERSIS ini ke customer (jangan ubah angka):
+
+${product?.nama || 'Produk'} ${fmt(hasil.harga)}
+
+💳 Transfer
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
+
+📦 COD
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
+
+Via ${hasil.ekspedisi} ya kak 🚗
+
+SETELAH tampilkan harga di atas, tanya dengan santai: "Biasanya kakak lebih suka pakai kurir apa kak? Bisa aku cekkan juga 😊"
+
+DATA SEMUA KURIR TERSEDIA (untuk jawab kalau customer tanya kurir lain — jangan sebut ke customer kecuali ditanya):
+${tabelKurir}
+
+Kalau customer tanya harga kurir lain (misal "kalau JNE berapa?"), jawab langsung dari data di atas. Jangan bilang "sistem pilih otomatis".`;
 }
 
 /* ── UPDATE CONVERSATION STATE ───────────────────────────── */
@@ -888,23 +936,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     if (autoOngkirResult) {
       // Inject hasil ongkir langsung ke Claude — skip nunggu marker
       const { wilayah, hasil } = autoOngkirResult;
-      const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
-      const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-        ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
-        : fmt(hasil.ongkirPromo);
-
-      const injeksi = `[SISTEM] Customer konfirmasi wilayah: ${wilayah}. Ongkir sudah dihitung. Tampilkan PERSIS ini ke customer tanpa ubah angka:
-
-${product?.nama || 'Produk'} ${fmt(hasil.harga)}
-
-💳 Transfer
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
-
-📦 COD
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
-
-Via ${hasil.ekspedisi} ya kak 🚗
-Kakak enaknya COD atau transfer? 🙏`;
+      const injeksi = buildOngkirInjeksi(hasil, product, `Customer konfirmasi wilayah: ${wilayah}. `);
 
       const historyWithOngkir = [
         ...history,
@@ -951,22 +983,7 @@ Kakak enaknya COD atau transfer? 🙏`;
       const hasil = await hitungOngkir(wilayah, product);
       if (hasil) {
         await updateConvState(conversation.id, { ongkir: hasil });
-        const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
-        const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-          ? `${fmt(hasil.ongkirPromo)} (hemat ${fmt(hasil.ongkirAsli - hasil.ongkirPromo)} dari normal ${fmt(hasil.ongkirAsli)})`
-          : fmt(hasil.ongkirPromo);
-        const injeksi = `[SISTEM] Ongkir ke ${wilayah} sudah dihitung. Lanjutkan balasan di atas dan tampilkan PERSIS ini (jangan ubah angka):
-
-${product?.nama || 'Produk'} ${fmt(hasil.harga)}
-
-💳 Transfer
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
-
-📦 COD
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
-
-Via ${hasil.ekspedisi} ya kak 🚗
-Kakak enaknya COD atau transfer? 🙏`;
+        const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
 
         const histWithOngkir = [
           ...history,
@@ -989,26 +1006,7 @@ Kakak enaknya COD atau transfer? 🙏`;
       const hasil = await hitungOngkir(wilayah, product);
       if (hasil) {
         await updateConvState(conversation.id, { ongkir: hasil });
-
-        const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
-        const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-          ? `${fmt(hasil.ongkirPromo)} (hemat ${fmt(hasil.ongkirAsli - hasil.ongkirPromo)} dari normal ${fmt(hasil.ongkirAsli)})`
-          : fmt(hasil.ongkirPromo);
-
-        const injeksi = `[SISTEM] Data ongkir ke ${wilayah} sudah dihitung. Gunakan PERSIS angka ini:
-
-${product?.nama || 'Produk'} ${fmt(hasil.harga)}
-
-💳 Transfer
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
-
-📦 COD
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
-
-Via ${hasil.ekspedisi} ya kak 🚗
-Kakak enaknya COD atau transfer? 🙏
-
-PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
+        const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. `);
 
         const historyWithOngkir = [
           ...history,
@@ -1030,22 +1028,7 @@ PENTING: Jangan ubah angka di atas. Tampilkan persis seperti itu ke customer.`;
         const hasil = await hitungOngkir(confirmedWilayah, product);
         if (hasil) {
           await updateConvState(conversation.id, { wilayah: confirmedWilayah, ongkir: hasil, proposed_wilayah: null });
-          const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
-          const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-            ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
-            : fmt(hasil.ongkirPromo);
-          const injeksi = `[SISTEM] Ongkir ke ${confirmedWilayah} sudah dihitung. Lanjutkan balasan di atas dengan menampilkan PERSIS ini:
-
-${product?.nama || 'Produk'} ${fmt(hasil.harga)}
-
-💳 Transfer
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
-
-📦 COD
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
-
-Via ${hasil.ekspedisi} ya kak 🚗
-Kakak enaknya COD atau transfer? 🙏`;
+          const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${confirmedWilayah}. Lanjutkan balasan di atas dengan `);
 
           const histCombined = [
             ...history,
