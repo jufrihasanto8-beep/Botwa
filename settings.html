@@ -300,9 +300,11 @@ Bisa isi lebih dari satu rekening."></textarea>
         <div class="section-title">🤖 Anthropic API Key</div>
         <div class="section-desc">API key Anthropic milikmu sendiri. Dipakai untuk semua percakapan AI bot kamu. Pantau penggunaan & biaya di console.anthropic.com.</div>
         <div style="margin-top:12px">
-          <input type="password" id="f-anthropic-key" placeholder="sk-ant-api03-..." autocomplete="off"
-            style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:13px;font-family:monospace;box-sizing:border-box">
-          <div style="display:flex;gap:8px;margin-top:10px">
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="password" id="f-anthropic-key" placeholder="sk-ant-api03-..." autocomplete="off" style="font-family:monospace">
+          </div>
+          <div style="display:flex;gap:8px">
             <button class="btn btn-primary" onclick="saveAnthropicKey()" style="flex:1">Simpan API Key</button>
             <button class="btn" onclick="document.getElementById('f-anthropic-key').type = document.getElementById('f-anthropic-key').type === 'password' ? 'text' : 'password'" style="padding:8px 14px">👁</button>
           </div>
