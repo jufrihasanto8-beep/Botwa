@@ -799,21 +799,35 @@ module.exports = async function handler(req, res) {
                 },
                 {
                   type: 'text',
-                  text: `Analisa gambar ini. Apakah ini bukti transfer/pembayaran bank?
+                  text: `Analisa gambar ini. Kemungkinan tipenya:
+1. Bukti transfer/pembayaran bank
+2. KTP (Kartu Tanda Penduduk) Indonesia
+3. Lainnya
+
 Rekening tujuan yang valid di sistem: ${userRekening || '(tidak ada)'}
 
 Jawab dalam format JSON:
 {
+  "tipe": "bukti_tf" atau "ktp" atau "lainnya",
   "is_bukti_tf": true/false,
   "keterangan": "penjelasan singkat",
   "bank": "nama bank pengirim jika ada",
   "nominal": "nominal transfer jika terbaca",
   "tanggal": "tanggal jika ada",
   "no_rekening_tujuan": "nomor rekening tujuan yang tertera di struk",
-  "rekening_cocok": true/false/null
+  "rekening_cocok": true/false/null,
+  "ktp": {
+    "nama": "nama lengkap di KTP",
+    "alamat": "isi kolom ALAMAT di KTP (jalan/gang/nomor/RT/RW)",
+    "kelurahan": "nama kelurahan/desa",
+    "kecamatan": "nama kecamatan",
+    "kota": "nama kota atau kabupaten",
+    "provinsi": "nama provinsi"
+  }
 }
 
-rekening_cocok: true jika no_rekening_tujuan cocok dengan salah satu rekening di sistem, false jika tidak cocok, null jika tidak terbaca.`,
+Field "ktp" hanya diisi jika tipe = "ktp", selainnya null.
+rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null jika tidak terbaca.`,
                 },
               ],
             }],
@@ -831,7 +845,9 @@ rekening_cocok: true jika no_rekening_tujuan cocok dengan salah satu rekening di
 
     // ── Simpan pesan masuk ─────────────────────────────────────
     const msgText = message || (imageAnalysis
-      ? `[Gambar terkirim — ${imageAnalysis.is_bukti_tf ? `Bukti TF ${imageAnalysis.bank || ''} ${imageAnalysis.nominal || ''}`.trim() : 'Bukan bukti transfer'}]`
+      ? imageAnalysis.tipe === 'ktp'
+        ? `[KTP terkirim — ${imageAnalysis.ktp?.nama || 'nama tidak terbaca'}]`
+        : `[Gambar terkirim — ${imageAnalysis.is_bukti_tf ? `Bukti TF ${imageAnalysis.bank || ''} ${imageAnalysis.nominal || ''}`.trim() : 'Bukan bukti transfer'}]`
       : `[${messageType}]`);
     await saveMessage(conversation.id, 'customer', msgText);
 
@@ -881,7 +897,50 @@ rekening_cocok: true jika no_rekening_tujuan cocok dengan salah satu rekening di
     // ── Inject hasil analisa gambar ke history ─────────────────
     if (imageAnalysis) {
       let notif;
-      if (!imageAnalysis.is_bukti_tf) {
+      if (imageAnalysis.tipe === 'ktp') {
+        const ktp = imageAnalysis.ktp || {};
+        const wilayahKTP = [ktp.kecamatan, ktp.kota, ktp.provinsi].filter(Boolean).join(', ');
+
+        // Update nama customer dari KTP
+        if (ktp.nama && ktp.nama !== customer.nama) {
+          await sbPatch('customers', `?id=eq.${customer.id}`, { nama: ktp.nama });
+        }
+
+        // Simpan alamat lengkap ke state
+        const alamatLengkap = [ktp.alamat, ktp.kelurahan, ktp.kecamatan, ktp.kota, ktp.provinsi].filter(Boolean).join(', ');
+        const stateKTP = {};
+        if (alamatLengkap) stateKTP.alamat = alamatLengkap;
+
+        // Hitung ongkir otomatis dari wilayah KTP
+        let hasilKTP = null;
+        if (wilayahKTP && !convState.ongkir) {
+          hasilKTP = await hitungOngkir(wilayahKTP, product).catch(() => null);
+          if (hasilKTP) {
+            stateKTP.wilayah = wilayahKTP;
+            stateKTP.ongkir  = hasilKTP;
+            convState.ongkir  = hasilKTP;
+            convState.wilayah = wilayahKTP;
+          }
+        }
+        if (Object.keys(stateKTP).length) await updateConvState(conversation.id, stateKTP);
+
+        const ongkirInfo = hasilKTP
+          ? buildOngkirInjeksi(hasilKTP, product, 'Ongkir sudah dihitung dari alamat KTP. ')
+          : 'Wilayah tidak ditemukan di sistem ongkir — minta customer konfirmasi kota/kabupatennya.';
+
+        notif = `[SISTEM] Customer kirim foto KTP ✅
+Nama     : ${ktp.nama || '?'}
+Alamat   : ${ktp.alamat || '?'}
+Kel/Desa : ${ktp.kelurahan || '?'}
+Kecamatan: ${ktp.kecamatan || '?'}
+Kota/Kab : ${ktp.kota || '?'}
+Provinsi : ${ktp.provinsi || '?'}
+
+${ongkirInfo}
+
+Data sudah tersimpan. Konfirmasi ke customer bahwa data sudah tercatat, lanjutkan proses order (tanya metode bayar COD/Transfer jika belum).`;
+
+      } else if (!imageAnalysis.is_bukti_tf) {
         notif = `[SISTEM] Customer kirim gambar tapi BUKAN bukti transfer. Keterangan: ${imageAnalysis.keterangan}. Minta dengan sopan kirim bukti transfer yang benar.`;
       } else if (imageAnalysis.rekening_cocok === false) {
         notif = `[SISTEM] Customer kirim bukti transfer TAPI nomor rekening tujuan TIDAK COCOK dengan rekening toko.
