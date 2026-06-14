@@ -483,7 +483,7 @@ async function hitungOngkir(wilayah, product) {
       })
       .map(([name, info]) => ({
         courier_name: name,
-        price:        info.price, // tarif Mengantar (ongkir asli, sebelum promo toko)
+        price:        info.price, // tarif normal (sebelum diskon Mengantar)
       }));
 
     if (!rates.length) return null;
@@ -493,18 +493,25 @@ async function hitungOngkir(wilayah, product) {
       `?user_id=eq.${product?.user_id || ''}&aktif=eq.true`
     ).catch(() => []);
 
+    console.log(`Whitelist (${whitelist.length}): ${whitelist.map(w => w.nama).join(', ')}`);
+    console.log(`Rates sebelum filter: ${rates.map(r => `${r.courier_name}:${r.price}`).join(', ')}`);
+
     if (whitelist.length) {
       // Normalisasi: strip non-alphanumeric agar "J&T Express" cocok dengan "JT", "Lion Parcel" cocok dengan "lion", dll
       const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       const filtered = rates.filter(r => {
         const rn = norm(r.courier_name);
-        return whitelist.some(w => {
+        const match = whitelist.some(w => {
           const wn = norm(w.nama);
           return rn === wn || rn.startsWith(wn) || wn.startsWith(rn);
         });
+        if (!match) console.log(`  [skip] ${r.courier_name} (${rn}) — tidak ada di whitelist`);
+        return match;
       });
       if (filtered.length) rates = filtered;
     }
+
+    console.log(`Rates setelah filter: ${rates.map(r => `${r.courier_name}:${r.price}`).join(', ')}`);
 
     // Step 5: Pilih termurah dari yang lolos filter
     rates.sort((a, b) => a.price - b.price);
