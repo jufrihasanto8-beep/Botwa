@@ -806,6 +806,14 @@ module.exports = async function handler(req, res) {
 
     // ── Find/create customer & conversation ───────────────────
     const customer = await findOrCreateCustomer(userId, wa_number, pushName);
+
+    // Simpan reply_jid (bisa berupa LID format seperti 224029940129807@lid)
+    // supaya CS dari dashboard bisa kirim ke JID yang benar
+    if (reply_jid && reply_jid !== customer.reply_jid) {
+      await sbPatch('customers', `?id=eq.${customer.id}`, { reply_jid }).catch(() => {});
+      customer.reply_jid = reply_jid;
+    }
+
     const conversation = await findOrCreateConversation(userId, customer.id, sumber, product?.id);
 
     // Update produk ke conversation jika baru ketemu
