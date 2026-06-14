@@ -747,6 +747,9 @@ module.exports = async function handler(req, res) {
     const { product, sumber } = await resolveProduct(userId, referral, message);
     console.log(`Produk: ${product?.nama || 'tidak diketahui'} (${sumber})`);
 
+    // CTWA → Haiku (volume tinggi, hemat biaya), Form/Inbound → Sonnet (lebih pintar)
+    const chatModel = sumber === 'ctwa' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6';
+
     // ── Find/create customer & conversation ───────────────────
     const customer = await findOrCreateCustomer(userId, wa_number, pushName);
     const conversation = await findOrCreateConversation(userId, customer.id, sumber, product?.id);
@@ -947,9 +950,9 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
         ...history,
         { role: 'user', content: injeksi },
       ];
-      rawReply = await callClaude(systemPrompt, historyWithOngkir, 'claude-sonnet-4-6', userAnthropicKey);
+      rawReply = await callClaude(systemPrompt, historyWithOngkir, chatModel, userAnthropicKey);
     } else {
-      rawReply = await callClaude(systemPrompt, history, 'claude-sonnet-4-6', userAnthropicKey);
+      rawReply = await callClaude(systemPrompt, history, chatModel, userAnthropicKey);
     }
 
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
@@ -995,7 +998,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
           { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, histWithOngkir, 'claude-sonnet-4-6', userAnthropicKey);
+        rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, userAnthropicKey);
       } else {
         console.warn(`hitungOngkir gagal untuk wilayah: ${wilayah}`);
         // Simpan sebagai proposed_wilayah untuk retry di pesan berikutnya
@@ -1018,7 +1021,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
           { role: 'assistant', content: rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, historyWithOngkir, 'claude-sonnet-4-6', userAnthropicKey);
+        rawReply = await callClaude(systemPrompt, historyWithOngkir, chatModel, userAnthropicKey);
       } else {
         rawReply = rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() ||
           'Maaf kak, aku belum bisa cek ongkir ke wilayah itu. Bisa sebutkan nama kota/kabupatennya lengkap? 🙏';
@@ -1040,7 +1043,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
             { role: 'assistant', content: rawReply.trim() },
             { role: 'user', content: injeksi },
           ];
-          rawReply = await callClaude(systemPrompt, histCombined, 'claude-sonnet-4-6', userAnthropicKey);
+          rawReply = await callClaude(systemPrompt, histCombined, chatModel, userAnthropicKey);
         }
       }
     }
