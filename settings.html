@@ -197,6 +197,7 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
       <a href="#" onclick="showSection('wa',this)">📱 Connect WhatsApp</a>
       <a href="#" onclick="showSection('rekening',this)">💳 Rekening Transfer</a>
       <a href="#" onclick="showSection('kurir',this)">🚚 Ekspedisi</a>
+      <a href="#" onclick="showSection('ai',this)">🤖 AI Key</a>
     </div>
 
     <div class="settings-body">
@@ -291,6 +292,21 @@ Bisa isi lebih dari satu rekening."></textarea>
             <button class="btn" onclick="toggleEditRekening()">Batal</button>
             <button class="btn-primary" onclick="saveRekening()">Simpan Rekening</button>
           </div>
+        </div>
+      </div>
+
+      <!-- ── ANTHROPIC API KEY ── -->
+      <div class="settings-section" id="sec-ai">
+        <div class="section-title">🤖 Anthropic API Key</div>
+        <div class="section-desc">API key Anthropic milikmu sendiri. Dipakai untuk semua percakapan AI bot kamu. Pantau penggunaan & biaya di console.anthropic.com.</div>
+        <div style="margin-top:12px">
+          <input type="password" id="f-anthropic-key" placeholder="sk-ant-api03-..." autocomplete="off"
+            style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:13px;font-family:monospace;box-sizing:border-box">
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-primary" onclick="saveAnthropicKey()" style="flex:1">Simpan API Key</button>
+            <button class="btn" onclick="document.getElementById('f-anthropic-key').type = document.getElementById('f-anthropic-key').type === 'password' ? 'text' : 'password'" style="padding:8px 14px">👁</button>
+          </div>
+          <div id="anthropic-key-status" style="font-size:12px;color:#64748b;margin-top:8px"></div>
         </div>
       </div>
 
@@ -532,6 +548,7 @@ window.showSection = function(name, el) {
   if (name === 'wa') loadWAStatus();
   if (name === 'kurir') loadKurir();
   if (name === 'rekening') loadRekening();
+  if (name === 'ai') loadAnthropicKey();
 };
 
 /* ── REKENING TRANSFER ── */
@@ -565,6 +582,40 @@ async function hapusRekening() {
   if (!confirm('Hapus info rekening?')) return;
   document.getElementById('rek-info').value = '';
   await saveRekening();
+}
+
+/* ── ANTHROPIC API KEY ── */
+async function loadAnthropicKey() {
+  const userId = Auth.getUser()?.id;
+  try {
+    const data = await SB.get('users', `?id=eq.${userId}&select=anthropic_key&limit=1`);
+    const key = data[0]?.anthropic_key || '';
+    const el = document.getElementById('f-anthropic-key');
+    if (el) {
+      el.value = key;
+      document.getElementById('anthropic-key-status').textContent = key ? '✅ API key tersimpan' : 'Belum ada API key — bot pakai key default sistem';
+    }
+  } catch(e) { console.error('loadAnthropicKey:', e.message); }
+}
+
+async function saveAnthropicKey() {
+  const userId = Auth.getUser()?.id;
+  const key = document.getElementById('f-anthropic-key').value.trim();
+  const status = document.getElementById('anthropic-key-status');
+  status.textContent = 'Menyimpan...';
+  try {
+    const res = await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, anthropic_key: key }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) throw new Error(json.error || 'Gagal');
+    status.textContent = key ? '✅ API key berhasil disimpan' : '✅ API key dihapus, pakai key default sistem';
+    toast(key ? '✅ Anthropic API key tersimpan' : '✅ API key dihapus');
+  } catch(e) {
+    status.textContent = '⚠️ Gagal: ' + e.message;
+  }
 }
 
 async function loadRekening() {
