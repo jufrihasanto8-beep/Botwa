@@ -650,9 +650,24 @@ async function loadKurir() {
       if (k.aktif) kurirAktif.add(k.nama);
     });
 
-    // Kalau belum ada sama sekali, aktifkan semua by default
+    // Kalau belum ada sama sekali, aktifkan semua by default dan simpan ke DB
     if (!data.length) {
       kurirAktif = new Set(KURIR_MENGANTAR.map(k => k.nama));
+      // Simpan semua ke DB agar toggle berikutnya tidak reset
+      for (const k of KURIR_MENGANTAR) {
+        try {
+          const res = await fetch('/api/save-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, table: 'courier_whitelist', action: 'insert', payload: { user_id: userId, nama: k.nama, aktif: true } }),
+          });
+          const result = await res.json();
+          if (result.data) {
+            const row = Array.isArray(result.data) ? result.data[0] : result.data;
+            if (row) kurirDbMap[k.nama] = row;
+          }
+        } catch(e) { /* silent */ }
+      }
     }
 
     renderKurir();
