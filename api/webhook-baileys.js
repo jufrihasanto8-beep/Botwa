@@ -477,15 +477,13 @@ async function hitungOngkir(wilayah, product) {
     const rawData = ratesJson.data || {};
     let rates = Object.entries(rawData)
       .filter(([name, info]) => {
-        // Skip cargo, skip unsupported, skip price 0
         if (name.toLowerCase().includes('cargo')) return false;
         if (info.unsupported) return false;
-        const harga = info.estimatedSpecialPrice || info.price || 0;
-        return harga > 0;
+        return (info.price || 0) > 0;
       })
       .map(([name, info]) => ({
         courier_name: name,
-        price: info.estimatedSpecialPrice || info.price || 0,
+        price: info.price,
       }));
 
     if (!rates.length) return null;
@@ -496,8 +494,15 @@ async function hitungOngkir(wilayah, product) {
     ).catch(() => []);
 
     if (whitelist.length) {
-      const allowed = new Set(whitelist.map(w => w.nama.toLowerCase()));
-      const filtered = rates.filter(r => allowed.has(r.courier_name.toLowerCase()));
+      // Normalisasi: strip non-alphanumeric agar "J&T Express" cocok dengan "JT", "Lion Parcel" cocok dengan "lion", dll
+      const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const filtered = rates.filter(r => {
+        const rn = norm(r.courier_name);
+        return whitelist.some(w => {
+          const wn = norm(w.nama);
+          return rn === wn || rn.startsWith(wn) || wn.startsWith(rn);
+        });
+      });
       if (filtered.length) rates = filtered;
     }
 
