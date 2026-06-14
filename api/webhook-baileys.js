@@ -347,7 +347,7 @@ async function saveMessage(conversationId, role, isi) {
 }
 
 /* ── CALL CLAUDE ──────────────────────────────────────────── */
-async function callClaude(systemPrompt, messages, model = 'claude-haiku-4-5-20251001') {
+async function callClaude(systemPrompt, messages, model = 'claude-sonnet-4-6') {
   const key = ANTHROPIC_KEY;
   if (!key) throw new Error('ANTHROPIC_KEY belum diset');
 
