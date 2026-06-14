@@ -347,7 +347,7 @@ async function saveMessage(conversationId, role, isi) {
 }
 
 /* ── CALL CLAUDE ──────────────────────────────────────────── */
-async function callClaude(systemPrompt, messages) {
+async function callClaude(systemPrompt, messages, model = 'claude-haiku-4-5-20251001') {
   const key = ANTHROPIC_KEY;
   if (!key) throw new Error('ANTHROPIC_KEY belum diset');
 
@@ -359,7 +359,7 @@ async function callClaude(systemPrompt, messages) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model,
       max_tokens: 600,
       system: systemPrompt,
       messages,
@@ -942,7 +942,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
         ...history,
         { role: 'user', content: injeksi },
       ];
-      rawReply = await callClaude(systemPrompt, historyWithOngkir);
+      rawReply = await callClaude(systemPrompt, historyWithOngkir, 'claude-sonnet-4-6');
     } else {
       rawReply = await callClaude(systemPrompt, history);
     }
@@ -990,7 +990,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
           { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, histWithOngkir);
+        rawReply = await callClaude(systemPrompt, histWithOngkir, 'claude-sonnet-4-6');
       } else {
         console.warn(`hitungOngkir gagal untuk wilayah: ${wilayah}`);
         // Simpan sebagai proposed_wilayah untuk retry di pesan berikutnya
@@ -1013,7 +1013,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
           { role: 'assistant', content: rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, historyWithOngkir);
+        rawReply = await callClaude(systemPrompt, historyWithOngkir, 'claude-sonnet-4-6');
       } else {
         rawReply = rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() ||
           'Maaf kak, aku belum bisa cek ongkir ke wilayah itu. Bisa sebutkan nama kota/kabupatennya lengkap? 🙏';
@@ -1035,7 +1035,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
             { role: 'assistant', content: rawReply.trim() },
             { role: 'user', content: injeksi },
           ];
-          rawReply = await callClaude(systemPrompt, histCombined);
+          rawReply = await callClaude(systemPrompt, histCombined, 'claude-sonnet-4-6');
         }
       }
     }
