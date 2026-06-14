@@ -517,6 +517,7 @@ async function hitungOngkir(wilayah, product) {
 
     // Step 6: Terapkan promo ongkir produk
     const promo = product?.promo_ongkir;
+    console.log(`promo_ongkir product: ${JSON.stringify(promo)}`);
     let ongkirPromo = ongkirAsli;
     if (promo?.tipe === 'gratis_penuh')   ongkirPromo = 0;
     else if (promo?.tipe === 'potong')    ongkirPromo = Math.max(0, ongkirAsli - (promo.nilai || 0));
@@ -782,6 +783,20 @@ rekening_cocok: true jika no_rekening_tujuan cocok dengan salah satu rekening di
 
     // ── State conversation ────────────────────────────────────
     const convState = conversation.state || {};
+
+    // ── Refresh ongkir jika wilayah sudah diketahui (ambil promo terbaru) ──
+    if (convState.wilayah && product) {
+      try {
+        const freshOngkir = await hitungOngkir(convState.wilayah, product);
+        if (freshOngkir) {
+          await updateConvState(conversation.id, { ongkir: freshOngkir });
+          convState.ongkir = freshOngkir;
+          console.log(`Ongkir di-refresh: ${convState.wilayah} → asli ${freshOngkir.ongkirAsli} promo ${freshOngkir.ongkirPromo}`);
+        }
+      } catch(e) {
+        console.error('Refresh ongkir error:', e.message);
+      }
+    }
 
     // ── Build system prompt + inject ringkasan ────────────────
     let systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber, userRekening);
