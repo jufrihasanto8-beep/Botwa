@@ -218,6 +218,7 @@ ATURAN HARGA, ONGKIR & COD
 - ⚠️ WAJIB: Setiap kali kamu menyebut/mengkonfirmasi wilayah ke customer (contoh: "Oke kak, Mariso Makassar ya!"), SELALU tulis [WILAYAH_OK:nama wilayah] di akhir pesan. Sistem pakai ini untuk hitung ongkir otomatis. Tanpa marker ini, ongkir tidak bisa dihitung.
   Contoh: "Oke kak, Makassar, Sulawesi Selatan ya! 😊 [WILAYAH_OK:Makassar, Sulawesi Selatan]"
   Contoh: "Siap kak, Ambarawa, Jawa Tengah ya 😊 [WILAYAH_OK:Ambarawa, Jawa Tengah]"
+- ⛔ DILARANG KERAS: Jangan pernah bilang "sebentar ya aku cek ongkir", "aku cek dulu", "tunggu aku cek", atau kalimat apapun yang minta customer menunggu. Sistem hitung ongkir OTOMATIS saat kamu tulis [WILAYAH_OK:]. Cukup tulis marker itu dan ongkir langsung tersedia — tidak perlu bilang "sebentar".
 - Sebelum [WILAYAH_OK] → WAJIB pastikan wilayah sudah spesifik sampai provinsi atau kota/kab yang tidak mungkin salah.
 - Wilayah parsial (nama desa/kecamatan kecil yang unik) → tebak & konfirmasi provinsinya: "Pringsewu, Lampung ya kak?"
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
@@ -578,6 +579,59 @@ async function hitungOngkir(wilayah, product) {
   }
 }
 
+/* ── GOOGLE MAPS URL → KOORDINAT ─────────────────────────── */
+function extractGoogleMapsCoords(text) {
+  // Format: /@-7.9316498,110.2715208, (paling umum)
+  const m1 = text.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m1) return { lat: parseFloat(m1[1]), lng: parseFloat(m1[2]) };
+  // Format: ?q=-7.93,110.27
+  const m2 = text.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
+  return null;
+}
+
+async function resolveGoogleMapsUrl(text) {
+  // Cari URL Maps di teks (termasuk goo.gl shortlink)
+  const urlMatch = text.match(/https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl|maps\.google\.com|www\.google\.com\/maps)[^\s]*/);
+  if (!urlMatch) return null;
+
+  let url = urlMatch[0];
+
+  // Kalau shortlink → resolve redirect untuk dapat URL panjang
+  if (url.includes('goo.gl')) {
+    try {
+      const res = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+      url = res.url; // URL final setelah redirect
+      console.log(`Resolved goo.gl → ${url.slice(0, 100)}`);
+    } catch(e) {
+      console.error('Resolve goo.gl error:', e.message);
+      return null;
+    }
+  }
+
+  return extractGoogleMapsCoords(url);
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=id`,
+      { headers: { 'User-Agent': 'BotWA-CS/1.0 (contact@adsy.id)' } }
+    );
+    const data = await res.json();
+    const a = data.address || {};
+    return {
+      kelurahan: a.village || a.suburb || '',
+      kecamatan: a.city_district || a.county || a.suburb || '',
+      kota:      a.city || a.town || a.county || '',
+      provinsi:  a.state || '',
+    };
+  } catch(e) {
+    console.error('Nominatim error:', e.message);
+    return null;
+  }
+}
+
 /* ── KIRIM WA via Baileys server ──────────────────────────── */
 async function sendWA(sessionId, waNumber, message, isOutbound = false) {
   if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
@@ -773,6 +827,39 @@ module.exports = async function handler(req, res) {
       } else {
         console.log(`VN noise/gagal: ${transkripsi}`);
         message = `[SISTEM: Customer kirim voice note tapi isinya tidak jelas/noise. Minta customer kirim ulang VN-nya atau ketik pesannya.]`;
+      }
+    }
+
+    // ── Deteksi Google Maps URL di pesan ──────────────────────
+    if (messageType === 'text' && !convState.ongkir && /goo\.gl|google\.com\/maps|maps\.app/i.test(message)) {
+      const coords = await resolveGoogleMapsUrl(message);
+      if (coords) {
+        console.log(`Google Maps coords: ${coords.lat}, ${coords.lng}`);
+        const geo = await reverseGeocode(coords.lat, coords.lng);
+        if (geo?.kota || geo?.kecamatan) {
+          const wilayahGeo = [geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
+          const alamatGeo  = [geo.kelurahan, geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
+          console.log(`Reverse geocode: ${wilayahGeo}`);
+
+          const hasilGeo = await hitungOngkir(wilayahGeo, product).catch(() => null);
+          if (hasilGeo) {
+            await updateConvState(conversation.id, {
+              wilayah: wilayahGeo,
+              ongkir:  hasilGeo,
+              alamat:  alamatGeo,
+            });
+            convState.ongkir  = hasilGeo;
+            convState.wilayah = wilayahGeo;
+
+            // Ganti pesan asli (URL panjang) dengan hint untuk Claude
+            message = `[SISTEM] Customer kirim lokasi Google Maps.
+Hasil geocoding: ${alamatGeo}
+${buildOngkirInjeksi(hasilGeo, product, `Ongkir ke ${wilayahGeo} sudah dihitung. `)}
+Konfirmasi lokasi ke customer dan tampilkan total harga.`;
+          } else {
+            message = `[SISTEM] Customer kirim lokasi Google Maps → ${wilayahGeo}, tapi ongkir tidak ditemukan. Konfirmasi lokasi ke customer dan minta sebutkan nama kota/kabupatennya.`;
+          }
+        }
       }
     }
 
@@ -1107,10 +1194,20 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
       }
     }
 
-    // ── Simpan proposed_wilayah jika Claude baru tanya konfirmasi lokasi ──
+    // ── Simpan proposed_wilayah jika Claude baru tanya/sebut lokasi ──
     // Skip jika ongkir sudah ada (tidak perlu tanya wilayah lagi)
     if (!convState.ongkir) {
-      const newProposed = extractProposedWilayah(rawReply);
+      let newProposed = extractProposedWilayah(rawReply);
+
+      // Fallback: Claude bilang "cek ongkir ke X" / "ongkir ke X dulu" tanpa marker
+      if (!newProposed) {
+        const cekMatch = rawReply.match(/(?:cek ongkir ke|ongkir ke|kirim ke)\s+([A-Za-z][A-Za-z\s,]{2,40}?)(?:\s+dulu|\s+ya|\s*[😊🙏]|$)/i);
+        if (cekMatch) {
+          const candidate = cekMatch[1].trim().replace(/[,!.]+$/, '');
+          if (candidate.length >= 3) newProposed = candidate;
+        }
+      }
+
       if (newProposed && newProposed !== convState.proposed_wilayah) {
         console.log(`Simpan proposed_wilayah: ${newProposed}`);
         await updateConvState(conversation.id, { proposed_wilayah: newProposed });
