@@ -29,6 +29,41 @@ module.exports = async function handler(req, res) {
   const apiKey  = userKey || ANTHROPIC_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
 
+  // Bersihkan messages sebelum dikirim ke Claude
+  const cleaned = messages
+    .map(m => ({
+      role: m.role,
+      // Hapus semua marker internal dan pesan sistem
+      content: (m.content || '')
+        .replace(/\[SISTEM[^\]]*\]/g, '')
+        .replace(/\[WILAYAH_OK:[^\]]+\]/g, '')
+        .replace(/\[CEK_ONGKIR:[^\]]+\]/g, '')
+        .replace(/\[KELUHAN:[^\]]+\]/g, '')
+        .replace(/\[ALAMAT_OK:[^\]]+\]/g, '')
+        .replace(/\[ORDER_CONFIRMED\]/g, '')
+        .replace(/\[ORDER_DATA:[^\]]+\]/g, '')
+        .replace(/\[ESCALATE\]/g, '')
+        .trim(),
+    }))
+    .filter(m => m.content.length > 0)                 // buang pesan kosong setelah dibersihkan
+    .filter(m => !m.content.startsWith('[SISTEM'))      // buang sisa injeksi sistem
+    .filter(m => !m.content.startsWith('[KTP '))        // buang notif KTP
+    .filter(m => !m.content.startsWith('[Gambar '));    // buang notif gambar
+
+  // Pastikan role alternating (Claude API wajib user→assistant→user)
+  const alternating = [];
+  for (const msg of cleaned) {
+    const last = alternating[alternating.length - 1];
+    if (last && last.role === msg.role) {
+      last.content += '\n' + msg.content; // gabung consecutive same role
+    } else {
+      alternating.push({ ...msg });
+    }
+  }
+  // Harus mulai dari 'user'
+  if (alternating.length && alternating[0].role === 'assistant') alternating.shift();
+  if (!alternating.length) return res.status(400).json({ error: 'Tidak ada pesan yang valid' });
+
   const sysPrompt = `Kamu CS toko yang membalas pesan WhatsApp customer. Nama kamu "Sari".
 Tugas: buat SATU balasan terbaik untuk melanjutkan percakapan ini.
 ${product ? `Produk: ${product.nama}, Harga: Rp ${product.harga?.toLocaleString('id-ID')}` : ''}
@@ -36,7 +71,8 @@ Rules:
 - Pendek (1-3 kalimat), hangat, natural, tidak formal
 - DILARANG markdown (*bold*, _italic_, dll) — ini WhatsApp
 - Panggil "Kak", emoji secukupnya
-- Jangan ulangi apa yang sudah dibahas`;
+- Jangan ulangi apa yang sudah dibahas
+- Baca seluruh konteks percakapan dan buat balasan yang RELEVAN dengan pesan terakhir`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -50,7 +86,7 @@ Rules:
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
         system: sysPrompt,
-        messages,
+        messages: alternating,
       }),
     });
     const data = await response.json();
