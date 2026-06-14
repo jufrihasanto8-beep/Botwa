@@ -15,5 +15,11 @@
     { "source": "/followup-engine", "destination": "/followup-engine.html" },
     { "source": "/connect-wa", "destination": "/connect-wa.html" }
   ],
+  "functions": {
+    "api/webhook-baileys.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
   "crons": []
 }
