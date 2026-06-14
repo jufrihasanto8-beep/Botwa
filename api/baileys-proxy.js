@@ -6,7 +6,7 @@
 const BAILEYS_URL    = process.env.BAILEYS_URL    || 'http://13.140.178.4:3000';
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -22,7 +22,9 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
     };
     if (req.method === 'POST' && req.body) {
-      fetchOpts.body = JSON.stringify(req.body);
+      // Inject secret dari env — frontend tidak perlu tahu secret-nya
+      const body = { ...req.body, secret: WEBHOOK_SECRET };
+      fetchOpts.body = JSON.stringify(body);
     }
 
     const upstream = await fetch(url, fetchOpts);
