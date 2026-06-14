@@ -193,10 +193,10 @@ ALUR KONSULTASI
 5. REKOMENDASI ${namaProduk} dengan alasan SPESIFIK ke keluhan
 6. Baru kalau customer mantap → bantu order
 
-WAJIB — saat kamu berhasil identifikasi keluhan utama customer, tulis di akhir balasan:
-[KELUHAN:keluhan singkat]
-Contoh: [KELUHAN:sinusitis kronis] atau [KELUHAN:batuk menahun, asma]
-Tulis SEKALI SAJA di pesan pertama kamu tahu keluhannya. Jangan tulis ulang di setiap pesan.
+WAJIB — simpan data penting customer dengan marker berikut (tulis SEKALI saja saat pertama kali tahu):
+- Saat tahu keluhan: [KELUHAN:keluhan singkat] — contoh: [KELUHAN:sinusitis kronis]
+- Saat customer konfirmasi alamat lengkap: [ALAMAT_OK:alamat lengkap] — contoh: [ALAMAT_OK:Jl. Dahlia RT 4 RW 3, Kelurahan Mariso]
+Jangan tulis ulang marker yang sama di pesan berikutnya.
 
 GAYA NGOBROL
 - Panggil "Kak"; kalimat PENDEK (1–2 kalimat/balasan)
@@ -289,9 +289,9 @@ function formatPromoOngkir(promo) {
 
 /* ── GET HISTORY & CONTEXT INJECTION ─────────────────────── */
 async function getContextMessages(conversationId) {
-  // Ambil 10 pesan TERAKHIR saja — ringkasan berjalan yang pegang konteks panjang
+  // Ambil 30 pesan TERAKHIR — cukup untuk konteks panjang tanpa terlalu boros token
   const msgs = await sbGet('conv_messages',
-    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=10`
+    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=30`
   );
   msgs.reverse();
 
@@ -778,10 +778,14 @@ rekening_cocok: true jika no_rekening_tujuan cocok dengan salah satu rekening di
     // ── Build system prompt + inject ringkasan ────────────────
     let systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber, userRekening);
 
-    // Inject keluhan tersimpan agar tidak terlupa meski di luar window 10 pesan
+    // Inject data customer yang sudah tersimpan di state
     const savedKeluhan = convState.keluhan;
-    if (savedKeluhan) {
-      systemPrompt += `\n\nKELUHAN CUSTOMER (sudah teridentifikasi sebelumnya): ${savedKeluhan}\nJANGAN tanya keluhan ini lagi — sudah diketahui. Lanjutkan dari sini.`;
+    const savedAlamat  = convState.alamat;
+    if (savedKeluhan || savedAlamat) {
+      let ctx = '\n\nDATA CUSTOMER TERSIMPAN (jangan tanya ulang):';
+      if (savedKeluhan) ctx += `\n- Keluhan: ${savedKeluhan}`;
+      if (savedAlamat)  ctx += `\n- Alamat: ${savedAlamat}`;
+      systemPrompt += ctx;
     }
 
     if (conversation.ringkasan) {
@@ -1013,12 +1017,20 @@ Kakak enaknya COD atau transfer? 🙏`;
       }
     }
 
-    // ── Simpan keluhan ke state kalau baru terdeteksi ─────────
+    // ── Simpan data penting ke state kalau baru terdeteksi ────
     const keluhanMatch = rawReply.match(/\[KELUHAN:([^\]]+)\]/);
+    const alamatMatch  = rawReply.match(/\[ALAMAT_OK:([^\]]+)\]/);
+    const stateUpdate  = {};
     if (keluhanMatch && !convState.keluhan) {
-      const keluhan = keluhanMatch[1].trim();
-      console.log(`Keluhan terdeteksi: ${keluhan}`);
-      await updateConvState(conversation.id, { keluhan });
+      stateUpdate.keluhan = keluhanMatch[1].trim();
+      console.log(`Keluhan tersimpan: ${stateUpdate.keluhan}`);
+    }
+    if (alamatMatch && !convState.alamat) {
+      stateUpdate.alamat = alamatMatch[1].trim();
+      console.log(`Alamat tersimpan: ${stateUpdate.alamat}`);
+    }
+    if (Object.keys(stateUpdate).length) {
+      await updateConvState(conversation.id, stateUpdate);
     }
 
     // ── Bersihkan marker dari reply final ─────────────────────
@@ -1027,6 +1039,7 @@ Kakak enaknya COD atau transfer? 🙏`;
       .replace('[ORDER_CONFIRMED]', '')
       .replace(/\[ORDER_DATA:[^\]]+\]/, '')
       .replace(/\[KELUHAN:[^\]]+\]/, '')
+      .replace(/\[ALAMAT_OK:[^\]]+\]/, '')
       .replace(/\[CEK_ONGKIR:[^\]]+\]/, '')
       .replace(/\[WILAYAH_OK:[^\]]+\]/, '')
       .trim();
