@@ -193,6 +193,11 @@ ALUR KONSULTASI
 5. REKOMENDASI ${namaProduk} dengan alasan SPESIFIK ke keluhan
 6. Baru kalau customer mantap → bantu order
 
+WAJIB — saat kamu berhasil identifikasi keluhan utama customer, tulis di akhir balasan:
+[KELUHAN:keluhan singkat]
+Contoh: [KELUHAN:sinusitis kronis] atau [KELUHAN:batuk menahun, asma]
+Tulis SEKALI SAJA di pesan pertama kamu tahu keluhannya. Jangan tulis ulang di setiap pesan.
+
 GAYA NGOBROL
 - Panggil "Kak"; kalimat PENDEK (1–2 kalimat/balasan)
 - Hangat, sabar, peduli; emoji secukupnya 😊🙏, jangan lebay
@@ -772,6 +777,13 @@ rekening_cocok: true jika no_rekening_tujuan cocok dengan salah satu rekening di
 
     // ── Build system prompt + inject ringkasan ────────────────
     let systemPrompt = buildTemplatePrompt(product, customer, conversation, sumber, userRekening);
+
+    // Inject keluhan tersimpan agar tidak terlupa meski di luar window 10 pesan
+    const savedKeluhan = convState.keluhan;
+    if (savedKeluhan) {
+      systemPrompt += `\n\nKELUHAN CUSTOMER (sudah teridentifikasi sebelumnya): ${savedKeluhan}\nJANGAN tanya keluhan ini lagi — sudah diketahui. Lanjutkan dari sini.`;
+    }
+
     if (conversation.ringkasan) {
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
@@ -1001,11 +1013,20 @@ Kakak enaknya COD atau transfer? 🙏`;
       }
     }
 
+    // ── Simpan keluhan ke state kalau baru terdeteksi ─────────
+    const keluhanMatch = rawReply.match(/\[KELUHAN:([^\]]+)\]/);
+    if (keluhanMatch && !convState.keluhan) {
+      const keluhan = keluhanMatch[1].trim();
+      console.log(`Keluhan terdeteksi: ${keluhan}`);
+      await updateConvState(conversation.id, { keluhan });
+    }
+
     // ── Bersihkan marker dari reply final ─────────────────────
     let reply = rawReply
       .replace('[ESCALATE]', '')
       .replace('[ORDER_CONFIRMED]', '')
       .replace(/\[ORDER_DATA:[^\]]+\]/, '')
+      .replace(/\[KELUHAN:[^\]]+\]/, '')
       .replace(/\[CEK_ONGKIR:[^\]]+\]/, '')
       .replace(/\[WILAYAH_OK:[^\]]+\]/, '')
       .trim();
