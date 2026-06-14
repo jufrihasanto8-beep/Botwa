@@ -79,13 +79,14 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
     // Kalau sudah di-closing manual → re-open
     if (conv.status === 'selesai') {
       console.log(`Re-open conversation ${conv.id}`);
+      const reopenedAt = new Date().toISOString();
       const updated = await sbPatch('conversations', `?id=eq.${conv.id}`, {
         status: 'baru',
-        last_msg_at: new Date().toISOString(),
-        ringkasan: null, // reset ringkasan agar konteks lama tidak kebawa
-        state: { tahap: 'sambut', produk_locked: !!conv.state?.produk_locked },
+        last_msg_at: reopenedAt,
+        ringkasan: null,
+        state: { tahap: 'sambut', produk_locked: !!conv.state?.produk_locked, reopened_at: reopenedAt },
       });
-      return updated[0] || conv;
+      return updated[0] || { ...conv, status: 'baru', state: { tahap: 'sambut', reopened_at: reopenedAt } };
     }
     return conv;
   }
@@ -252,11 +253,15 @@ Urutan WAJIB diikuti:
 5. Alamat kurang → minta yang kurang aja, jangan ulang dari nol.
 6. Ada jalan/gang → boleh proaktif tawarkan patokan dari maps.
 7. Tutup dengan KONFIRMASI ORDER (rincian+total), minta "oke".
-8. Setelah customer konfirmasi dengan kata seperti "oke", "iya jadi", "deal", "lanjut", "fix", "setuju" → BARU tulis di akhir balasan:
+8. Setelah customer konfirmasi order (semua data terkumpul: nama ✓, alamat ✓, metode bayar ✓) DAN kamu sudah kirim ringkasan order lengkap ke customer → BARU tulis di akhir balasan:
    [ORDER_CONFIRMED]
    [ORDER_DATA:alamat="ALAMAT LENGKAP DARI CUSTOMER" keluhan="KELUHAN UTAMA CUSTOMER" metode="COD atau Transfer" qty=1]
    Isi ORDER_DATA dengan data AKTUAL yang sudah dikumpulkan dari customer. Jangan dikosongkan.
-⛔ DILARANG tulis [ORDER_CONFIRMED] sebelum customer eksplisit konfirmasi order. Kirim rekening / info transfer BUKAN berarti order confirmed. Tunggu customer balas "oke" atau sejenisnya dulu.
+⛔ DILARANG tulis [ORDER_CONFIRMED] kecuali SEMUA kondisi ini terpenuhi:
+   - Sudah tunjukkan total harga (termasuk ongkir)
+   - Sudah dapat nama + alamat lengkap + metode bayar dari customer
+   - Kamu sudah kirim ringkasan order ke customer di pesan ini atau sebelumnya
+   Kirim rekening, tanya alamat, atau customer bilang "oke" untuk hal lain = BELUM boleh tulis [ORDER_CONFIRMED].
 JANGAN minta data diri SEBELUM tunjukkan total ongkir dan tanya pilihan bayar.
 
 INFO PEMBAYARAN TRANSFER
@@ -290,10 +295,11 @@ function formatPromoOngkir(promo) {
 }
 
 /* ── GET HISTORY & CONTEXT INJECTION ─────────────────────── */
-async function getContextMessages(conversationId) {
+async function getContextMessages(conversationId, afterTimestamp = null) {
   // Ambil 30 pesan TERAKHIR — cukup untuk konteks panjang tanpa terlalu boros token
+  const timeFilter = afterTimestamp ? `&created_at=gte.${encodeURIComponent(afterTimestamp)}` : '';
   const msgs = await sbGet('conv_messages',
-    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=30`
+    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=30${timeFilter}`
   );
   msgs.reverse();
 
@@ -979,8 +985,8 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
 
-    // ── Ambil 10 pesan terakhir ────────────────────────────────
-    const history = await getContextMessages(conversation.id);
+    // ── Ambil pesan terakhir (filter setelah re-open jika ada) ───
+    const history = await getContextMessages(conversation.id, convState.reopened_at || null);
 
     // ── Inject hasil analisa gambar ke history ─────────────────
     if (imageAnalysis) {
