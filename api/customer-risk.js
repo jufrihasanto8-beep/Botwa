@@ -66,21 +66,33 @@ module.exports = async function handler(req, res) {
   // ── 2. Cek wilayah rawan retur ────────────────────────────
   if (wilayah) {
     try {
-      // Ambil bagian kota dari wilayah (sebelum koma pertama)
-      const kota = wilayah.split(',')[0].trim();
+      const parts  = wilayah.split(',').map(s => s.trim());
+      const kecamatan = parts[0]; // misal: "Medan Perjuangan"
+      const kota      = parts[1] || parts[0]; // misal: "Kota Medan"
 
-      const wilayahOrders = await sbGet(
-        `all_orderan?kabupaten=ilike.*${encodeURIComponent(kota)}*&select=status_akhir&limit=1000`
+      // Coba kecamatan dulu
+      let orders = await sbGet(
+        `all_orderan?kecamatan=ilike.*${encodeURIComponent(kecamatan)}*&select=status_akhir&limit=1000`
       );
-      const wTotal = wilayahOrders.length;
-      const wRetur = wilayahOrders.filter(r =>
+      let namaLabel = kecamatan;
+
+      // Kalau kurang dari 3 data → fallback ke kabupaten/kota
+      if (orders.length < 3 && kota !== kecamatan) {
+        orders = await sbGet(
+          `all_orderan?kabupaten=ilike.*${encodeURIComponent(kota)}*&select=status_akhir&limit=1000`
+        );
+        namaLabel = kota;
+      }
+
+      const wTotal = orders.length;
+      const wRetur = orders.filter(r =>
         (r.status_akhir || '').toLowerCase().includes('retur')
       ).length;
 
       if (wTotal >= 3) {
         const pct = Math.round((wRetur / wTotal) * 100);
         result.wilayah = {
-          nama: kota,
+          nama: namaLabel,
           total: wTotal,
           retur: wRetur,
           pct,
@@ -92,7 +104,7 @@ module.exports = async function handler(req, res) {
                : 'tinggi',
         };
       } else {
-        result.wilayah = { nama: kota, label: 'Data kurang', level: 'unknown', total: wTotal };
+        result.wilayah = { nama: namaLabel, label: 'Data kurang', level: 'unknown', total: wTotal };
       }
     } catch(e) {
       console.error('Wilayah check error:', e.message);
