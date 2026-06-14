@@ -838,39 +838,6 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── Deteksi Google Maps URL di pesan ──────────────────────
-    if (messageType === 'text' && !convState.ongkir && /goo\.gl|google\.com\/maps|maps\.app/i.test(message)) {
-      const coords = await resolveGoogleMapsUrl(message);
-      if (coords) {
-        console.log(`Google Maps coords: ${coords.lat}, ${coords.lng}`);
-        const geo = await reverseGeocode(coords.lat, coords.lng);
-        if (geo?.kota || geo?.kecamatan) {
-          const wilayahGeo = [geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
-          const alamatGeo  = [geo.kelurahan, geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
-          console.log(`Reverse geocode: ${wilayahGeo}`);
-
-          const hasilGeo = await hitungOngkir(wilayahGeo, product).catch(() => null);
-          if (hasilGeo) {
-            await updateConvState(conversation.id, {
-              wilayah: wilayahGeo,
-              ongkir:  hasilGeo,
-              alamat:  alamatGeo,
-            });
-            convState.ongkir  = hasilGeo;
-            convState.wilayah = wilayahGeo;
-
-            // Ganti pesan asli (URL panjang) dengan hint untuk Claude
-            message = `[SISTEM] Customer kirim lokasi Google Maps.
-Hasil geocoding: ${alamatGeo}
-${buildOngkirInjeksi(hasilGeo, product, `Ongkir ke ${wilayahGeo} sudah dihitung. `)}
-Konfirmasi lokasi ke customer dan tampilkan total harga.`;
-          } else {
-            message = `[SISTEM] Customer kirim lokasi Google Maps → ${wilayahGeo}, tapi ongkir tidak ditemukan. Konfirmasi lokasi ke customer dan minta sebutkan nama kota/kabupatennya.`;
-          }
-        }
-      }
-    }
-
     // ── Analisa gambar jika ada (Claude Vision) ────────────────
     let imageAnalysis = null;
     if (messageType === 'image' && mediaUrl && mediaUrl.startsWith('data:image')) {
@@ -954,6 +921,29 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
 
     // ── State conversation ────────────────────────────────────
     const convState = conversation.state || {};
+
+    // ── Deteksi Google Maps URL di pesan ──────────────────────
+    if (messageType === 'text' && !convState.ongkir && /goo\.gl|google\.com\/maps|maps\.app/i.test(message)) {
+      const coords = await resolveGoogleMapsUrl(message);
+      if (coords) {
+        console.log(`Google Maps coords: ${coords.lat}, ${coords.lng}`);
+        const geo = await reverseGeocode(coords.lat, coords.lng);
+        if (geo?.kota || geo?.kecamatan) {
+          const wilayahGeo = [geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
+          const alamatGeo  = [geo.kelurahan, geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
+          console.log(`Reverse geocode: ${wilayahGeo}`);
+          const hasilGeo = await hitungOngkir(wilayahGeo, product).catch(() => null);
+          if (hasilGeo) {
+            await updateConvState(conversation.id, { wilayah: wilayahGeo, ongkir: hasilGeo, alamat: alamatGeo });
+            convState.ongkir  = hasilGeo;
+            convState.wilayah = wilayahGeo;
+            message = `[SISTEM] Customer kirim lokasi Google Maps.\nHasil geocoding: ${alamatGeo}\n${buildOngkirInjeksi(hasilGeo, product, `Ongkir ke ${wilayahGeo} sudah dihitung. `)}\nKonfirmasi lokasi ke customer dan tampilkan total harga.`;
+          } else {
+            message = `[SISTEM] Customer kirim lokasi Google Maps → ${wilayahGeo}, tapi ongkir tidak ditemukan. Konfirmasi lokasi ke customer dan minta sebutkan nama kota/kabupatennya.`;
+          }
+        }
+      }
+    }
 
     // ── Refresh ongkir jika wilayah sudah diketahui (ambil promo terbaru) ──
     if (convState.wilayah && product) {
