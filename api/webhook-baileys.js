@@ -483,7 +483,7 @@ async function hitungOngkir(wilayah, product) {
       })
       .map(([name, info]) => ({
         courier_name: name,
-        price: info.price,
+        price:        info.price, // tarif Mengantar (ongkir asli, sebelum promo toko)
       }));
 
     if (!rates.length) return null;
