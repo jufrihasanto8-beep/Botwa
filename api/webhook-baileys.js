@@ -1097,6 +1097,8 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     // (dijalankan SEBELUM cek reply kosong agar tidak terlewat meski Claude hanya tulis marker)
     if (orderConfirmed) {
       await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
+      // Tandai bahwa conversation ini punya order — dipakai resi webhook untuk filter
+      await updateConvState(conversation.id, { order_placed: true });
 
       if (WA_GROUP_JID) {
         try {
