@@ -577,6 +577,7 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
         </div>
         <div id="ch-status-area"></div>
         <div class="ch-acts">
+          <button class="act-btn" title="Ambil alih dari AI" onclick="manualEscalate()" id="btn-ambil">🙋</button>
           <button class="act-btn" title="Tandai selesai" onclick="markSelesai()" id="btn-selesai">✅</button>
           <button class="act-btn" title="Hapus chat" onclick="clearChat()">🗑</button>
         </div>
@@ -1191,6 +1192,20 @@ async function markSelesai() {
   await sbPatch('conversations', `?id=eq.${activeConvId}`, { status: 'selesai' });
   showToast('Percakapan ditandai selesai');
   activeConv.status = 'selesai';
+  await renderChat();
+  await renderInbox();
+}
+
+/* ── MANUAL ESCALATE (CS ambil alih dari AI) ── */
+async function manualEscalate() {
+  if (!activeConvId) return;
+  if (activeConv?.status === 'eskalasi') {
+    showToast('Sudah dalam mode eskalasi');
+    return;
+  }
+  await sbPatch('conversations', `?id=eq.${activeConvId}`, { status: 'eskalasi', prioritas: 'high' });
+  showToast('✋ AI dimatikan — kamu yang balas sekarang');
+  activeConv.status = 'eskalasi';
   await renderChat();
   await renderInbox();
 }
