@@ -179,7 +179,8 @@ PRINSIP UTAMA
 - JANGAN tawarkan beli sebelum paham masalah customer.
 - Kalau customer buru-buru & langsung mau beli → layani.
 
-DATA PRODUK (jangan ngarang di luar ini)
+DATA CHAT & PRODUK
+Sumber chat     : ${sumber === 'ctwa' ? 'CTWA (dari iklan)' : sumber === 'form' ? 'Form (isi formulir)' : 'Inbound (customer chat duluan)'}
 Produk          : ${namaProduk}
 Harga           : ${harga}
 Cocok untuk     : ${keluhan}
@@ -188,6 +189,7 @@ Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
+Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI
 1. SAMBUT hangat (sambung ke iklan), jangan langsung jualan
@@ -239,17 +241,19 @@ FORMAT TAMPIL HARGA (pakai persis ini saat tampilkan total)
 ${namaProduk} ${harga} 😊
 
 💳 Transfer
-${namaProduk} ${harga} + ongkir ~~{ongkir_asli}~~ {ongkir_promo} = TOTAL
+${namaProduk} ${harga} + ongkir ~{ongkir_asli}~ {ongkir_promo} = TOTAL
 
 📦 COD
-${namaProduk} ${harga} + ongkir ~~{ongkir_asli}~~ {ongkir_promo} + admin {fee} = TOTAL
+${namaProduk} ${harga} + ongkir ~{ongkir_asli}~ {ongkir_promo} + admin {fee} = TOTAL
 
 Via {ekspedisi} ya kak 🚗
 Kakak enaknya COD atau transfer? 🙏
 
+Catatan format: ~text~ adalah strikethrough di WhatsApp. Kalau tidak ada promo ongkir, jangan pakai strikethrough — tulis angka ongkir langsung.
+
 ALUR CATAT ORDER
 Urutan WAJIB diikuti:
-1. Dapat wilayah → [CEK_ONGKIR] → sistem tampilkan total TF & COD otomatis → tanya "Kakak enaknya COD atau transfer? 🙏"
+1. Dapat wilayah → konfirmasi dengan [WILAYAH_OK:nama wilayah] → sistem tampilkan total TF & COD otomatis → tanya "Kakak enaknya COD atau transfer? 🙏"
 2. Customer pilih TF/COD → BARU minta data yang BELUM ADA saja
 3. CEK dulu data dari form (nama/HP/alamat). Yang sudah ada → JANGAN ditanya ulang, cukup konfirmasi.
 4. Yang kurang: (1) nama (2) no HP (3) alamat lengkap (jalan/gang, no rumah, RT/RW, kelurahan, kecamatan, patokan).
@@ -267,6 +271,11 @@ Urutan WAJIB diikuti:
    Kirim rekening, tanya alamat, atau customer bilang "oke" untuk hal lain = BELUM boleh tulis [ORDER_CONFIRMED].
 JANGAN minta data diri SEBELUM tunjukkan total ongkir dan tanya pilihan bayar.
 
+JUMLAH / QTY
+- Default qty = 1. Kalau customer bilang "mau 2" atau "buat 3 orang", hitung total = harga × qty + ongkir.
+- Tanya konfirmasi: "Berarti 2 ${namaProduk} ya kak? Total jadi Rp X + ongkir 😊"
+- Isi qty di ORDER_DATA sesuai jumlah yang dipesan.
+
 INFO PEMBAYARAN TRANSFER
 - Kalau customer pilih Transfer → LANGSUNG kasih info rekening dari DATA PRODUK di atas.
 - JANGAN bilang "tim kami akan hubungi" atau "nanti kami konfirmasi" — rekening sudah ada, kasih langsung.
@@ -276,6 +285,19 @@ INFO PEMBAYARAN TRANSFER
 REM ETIS
 - JANGAN klaim medis berlebihan ("pasti sembuh").
 - Keluhan serius/di luar produk → sarankan periksa, jangan paksa.
+
+HANDLE PERTANYAAN UMUM
+- "Stok masih ada?" → "Masih ready kak, langsung proses aja 😊"
+- "Ada diskon/promo?" → Kalau ada promo ongkir, sebut itu. Kalau tidak ada, bilang "Untuk saat ini belum ada promo khusus kak, tapi harganya sudah yang terbaik 😊"
+- "Bisa kirim hari ini?" → "Kalau ordernya sebelum jam 12 siang biasanya bisa kirim hari ini kak 😊" (atau sesuaikan dengan knowledge produk)
+- "Estimasi sampai berapa hari?" → "Tergantung wilayahnya kak, biasanya 2-4 hari kerja 😊" (atau lihat dari kurir yang dipilih)
+- "Pengiriman dari mana?" → Jawab dari DATA PRODUK (Asal pengiriman)
+
+CUSTOMER LANGSUNG ORDER
+Kalau customer dari awal langsung kirim alamat atau bilang "mau order", "mau beli":
+- JANGAN paksa konsultasi dulu — langsung layani
+- Konfirmasi wilayah → hitung ongkir → tanya metode bayar → proses
+- Tetap hangat: "Siap kak! 😊 Alamatnya di mana ya biar aku cek ongkirnya?"
 
 HANDLE KEBERATAN (jangan langsung menyerah)
 Kalau customer bilang "gak jadi", "cancel", "ga mau", "mahal", "pikir-pikir dulu", "nanti aja", "tidak jadi kalau...", "kalau gak bisa X":
@@ -655,7 +677,7 @@ async function hitungOngkir(wilayah, product) {
     const areaId   = bestArea._id || bestArea.id;
     const areaNama = bestArea.subdistrict || bestArea.name || wilayah;
     console.log(`Mengantar match: "${queryMengantar}" → "${areaNama}" (score ${bestScore})`);
-    const weight = product?.berat_gram || 1; // Mengantar public pakai satuan kg
+    const weight = (product?.berat_gram || 1000) / 1000; // gram → kg untuk Mengantar
 
     // Step 3b: Ambil estimasi semua kurir
     const ratesJson = await mengantarFetch(
@@ -843,8 +865,9 @@ async function sendWA(sessionId, waNumber, message, isOutbound = false) {
 /* ── BUILD INJEKSI ONGKIR untuk Claude ───────────────────── */
 function buildOngkirInjeksi(hasil, product, konteks = '') {
   const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+  // Single tilde ~ untuk strikethrough WhatsApp (bukan double ~~)
   const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-    ? `~~${fmt(hasil.ongkirAsli)}~~ ${fmt(hasil.ongkirPromo)}`
+    ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
     : fmt(hasil.ongkirPromo);
 
   // Tabel semua kurir yang tersedia
@@ -883,6 +906,9 @@ Contoh: "Oke kak, pakai JNE ya! Total Transfer Rp X / COD Rp Y 😊 [GANTI_KURIR
 }
 
 /* ── UPDATE CONVERSATION STATE ───────────────────────────── */
+// ⚠️ CATATAN: Fungsi ini punya potensi race condition jika 2 request masuk bersamaan.
+// Debounce 1500ms di handler utama sudah mitigasi sebagian besar kasus.
+// Untuk fix penuh, perlu pakai Supabase RPC dengan jsonb_concat atau optimistic locking.
 async function updateConvState(convId, stateUpdate) {
   // Ambil state sekarang dulu
   const existing = await sbGet('conversations', `?id=eq.${convId}&limit=1`);
@@ -1022,9 +1048,10 @@ module.exports = async function handler(req, res) {
     if (messageType === 'audio' && mediaUrl) {
       const transkripsi = await transcribeAudio(mediaUrl);
       // Cek apakah hasil transkripsi bermakna (bukan noise)
+      // Noise = tidak ada huruf/angka sama sekali, ATAU terlalu banyak huruf berulang (5+ kali, >5 kemunculan)
       const isNoise = !transkripsi || transkripsi.trim().length < 3
         || /^[^a-zA-Z0-9\u00C0-\u024F\u4E00-\u9FFF\u0600-\u06FF]*$/.test(transkripsi)
-        || (transkripsi.match(/(.)\1{2,}/g) || []).length > 3; // banyak huruf berulang = noise
+        || (transkripsi.match(/([a-zA-Z])\1{4,}/g) || []).length > 5; // huruf berulang 5+ kali, >5 kemunculan
 
       if (transkripsi && !isNoise) {
         console.log(`VN transcribed: ${transkripsi.slice(0, 80)}`);
@@ -1462,6 +1489,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           const hasil = await hitungOngkir(wilayah, product);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
+            convState.ongkir = hasil; // update local state
             const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
             const histWithOngkir = [
               ...history,
@@ -1481,6 +1509,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         const hasil = await hitungOngkir(wilayah, product);
         if (hasil) {
           await updateConvState(conversation.id, { ongkir: hasil });
+          convState.ongkir = hasil; // update local state
           const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
           const histWithOngkir = [
             ...history,
@@ -1503,6 +1532,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       const hasil = await hitungOngkir(wilayah, product);
       if (hasil) {
         await updateConvState(conversation.id, { ongkir: hasil });
+        convState.ongkir = hasil; // update local state
         const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. `);
 
         const historyWithOngkir = [
@@ -1518,13 +1548,15 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     }
 
     // ── Jika Claude baru KONFIRMASI wilayah ("Oke kak, X ya!") → langsung hitung ongkir ──
-    if (!autoOngkirResult && !cekOngkirMatch) {
+    // Skip kalau sudah diproses via [WILAYAH_OK:] marker
+    if (!autoOngkirResult && !cekOngkirMatch && !wilayahOkMatch) {
       const confirmedWilayah = extractConfirmedWilayah(rawReply);
       if (confirmedWilayah && !convState.ongkir) {
         console.log(`Auto-trigger ongkir dari konfirmasi wilayah: ${confirmedWilayah}`);
         const hasil = await hitungOngkir(confirmedWilayah, product);
         if (hasil) {
           await updateConvState(conversation.id, { wilayah: confirmedWilayah, ongkir: hasil, proposed_wilayah: null });
+          convState.ongkir = hasil; // update local state
           const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${confirmedWilayah}. Lanjutkan balasan di atas dengan `);
 
           const histCombined = [
@@ -1592,15 +1624,18 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         else if (promo?.tipe === 'gratis_sd') ongkirPromo = Math.max(0, match.ongkir - (promo.nilai || 0));
 
         const harga = product?.harga || 0;
-        const feeCOD = Math.ceil((harga + ongkirPromo) * 0.05);
+        const totalTransferBulat = bulatkan(harga + ongkirPromo);
+        const feeCODRaw = Math.ceil((harga + ongkirPromo) * 0.05);
+        const totalCODBulat = bulatkan(harga + ongkirPromo + feeCODRaw);
+        const feeCODBulat = totalCODBulat - harga - ongkirPromo; // derive dari total agar konsisten
         const newOngkir = {
           ...convState.ongkir,
           ekspedisi:     match.nama,
           ongkirAsli:    match.ongkir,
           ongkirPromo:   ongkirPromo,
-          totalTransfer: bulatkan(harga + ongkirPromo),
-          totalCOD:      bulatkan(harga + ongkirPromo + feeCOD),
-          feeCOD:        bulatkan(feeCOD),
+          totalTransfer: totalTransferBulat,
+          totalCOD:      totalCODBulat,
+          feeCOD:        feeCODBulat,
         };
         await updateConvState(conversation.id, { ongkir: newOngkir });
         convState.ongkir = newOngkir;
