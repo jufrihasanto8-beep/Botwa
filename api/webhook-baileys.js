@@ -496,9 +496,28 @@ async function cariWilayah(keyword, limit = 5) {
   }
 }
 
-// Format satu baris wilayah jadi string lengkap
+// Format wilayah untuk tampil ke Claude/customer (kecamatan + kabupaten + provinsi)
 function formatWilayah(row) {
   return [row.kecamatan, row.kabupaten, row.provinsi].filter(Boolean).join(', ');
+}
+
+// Format wilayah untuk query ke Mengantar — pakai kelurahan + kecamatan agar dapat destination_id yang tepat
+function formatWilayahMengantar(row) {
+  return [row.kelurahan, row.kecamatan, row.kabupaten].filter(Boolean).join(', ');
+}
+
+// Ambil semua kelurahan di satu kecamatan (untuk ditawarkan ke customer sebagai pilihan)
+async function getKelurahanByKecamatan(kecamatan, kabupaten) {
+  try {
+    const rows = await sbGet('wilayah_id',
+      `?kecamatan=ilike.${encodeURIComponent(kecamatan)}&kabupaten=ilike.${encodeURIComponent(kabupaten)}&select=kelurahan&order=kelurahan.asc&limit=20`
+    );
+    // Deduplikasi
+    return [...new Set(rows.map(r => r.kelurahan))];
+  } catch(e) {
+    console.error('getKelurahanByKecamatan error:', e.message);
+    return [];
+  }
 }
 
 // Deteksi apakah pesan customer adalah konfirmasi singkat
@@ -532,35 +551,73 @@ async function mengantarFetch(path) {
 /* ── HITUNG ONGKIR: step 4–8 blueprint §4 ───────────────── */
 async function hitungOngkir(wilayah, product) {
   try {
-    // Step 3a: Normalisasi nama wilayah via tabel lokal dulu
-    // Mengantar lebih akurat kalau dapat nama standar (kecamatan + kabupaten + provinsi)
-    let queryWilayah = wilayah;
-    const lokalMatch = await cariWilayah(wilayah, 1);
-    if (lokalMatch.length > 0) {
-      queryWilayah = formatWilayah(lokalMatch[0]);
-      console.log(`Wilayah normalized: "${wilayah}" → "${queryWilayah}"`);
+    // Step 1: Cari di tabel lokal wilayah_id
+    // Coba kelurahan+kecamatan dulu (paling spesifik), fallback ke kecamatan/kabupaten
+    const lokalMatch = await cariWilayah(wilayah, 3);
+    let lokal = lokalMatch[0] || null;
+
+    // Kalau ada lebih dari 1 hasil, pilih yang paling mirip dengan input
+    if (lokalMatch.length > 1) {
+      const kw = wilayah.toLowerCase();
+      const scored = lokalMatch.map(r => {
+        let score = 0;
+        if (r.kelurahan.toLowerCase() === kw) score += 50;
+        else if (r.kelurahan.toLowerCase().includes(kw)) score += 30;
+        if (r.kecamatan.toLowerCase() === kw) score += 40;
+        else if (r.kecamatan.toLowerCase().includes(kw)) score += 20;
+        if (r.kabupaten.toLowerCase().includes(kw)) score += 10;
+        return { row: r, score };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      lokal = scored[0].row;
     }
 
-    // Step 3b: Cari destination_id dari Mengantar pakai nama yang sudah dinormalisasi
-    const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(queryWilayah)}`);
+    // Step 2: Bangun query Mengantar — kelurahan + kecamatan (paling spesifik)
+    // Ini memberi Mengantar info yang cukup untuk match destination_id yang benar
+    let queryMengantar = wilayah; // fallback kalau tidak ada di lokal
+    let queryDisplay   = wilayah; // untuk ditampilkan ke Claude/customer
+
+    if (lokal) {
+      queryMengantar = formatWilayahMengantar(lokal); // kelurahan, kecamatan, kabupaten
+      queryDisplay   = formatWilayah(lokal);           // kecamatan, kabupaten, provinsi
+      console.log(`Wilayah lokal match: "${wilayah}" → kelurahan="${lokal.kelurahan}", kecamatan="${lokal.kecamatan}", kab="${lokal.kabupaten}"`);
+      console.log(`Query Mengantar: "${queryMengantar}"`);
+    }
+
+    // Step 3: Cari destination_id dari Mengantar
+    const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(queryMengantar)}`);
     const areas = searchJson.data || searchJson;
     if (!Array.isArray(areas) || !areas.length) return null;
 
-    // Scoring: pilih area yang paling mirip dengan query (bukan selalu index 0)
+    // Scoring: pilih area Mengantar yang paling cocok
+    // Prioritas: subdistrict (kelurahan) match > district (kecamatan) > city (kabupaten)
     const normStr = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const kwParts = queryWilayah.toLowerCase().split(',').map(s => s.trim());
     let bestArea = areas[0], bestScore = -1;
     for (const a of areas) {
-      const aFull = [a.subdistrict, a.district, a.city || a.regency, a.province]
-        .filter(Boolean).join(' ').toLowerCase();
       let score = 0;
-      for (const part of kwParts) {
-        if (aFull.includes(part)) score += 10;
-        if (normStr(a.city || a.regency || '') === normStr(part)) score += 20;
-        if (normStr(a.subdistrict || '') === normStr(part)) score += 30;
+      if (lokal) {
+        // Match exact kelurahan → skor tertinggi
+        if (normStr(a.subdistrict) === normStr(lokal.kelurahan)) score += 50;
+        else if ((a.subdistrict || '').toLowerCase().includes(lokal.kelurahan.toLowerCase())) score += 30;
+        // Match kecamatan
+        if (normStr(a.district) === normStr(lokal.kecamatan)) score += 30;
+        else if ((a.district || '').toLowerCase().includes(lokal.kecamatan.toLowerCase())) score += 15;
+        // Match kabupaten
+        if (normStr(a.city || a.regency || '') === normStr(lokal.kabupaten)) score += 20;
+      } else {
+        // Fallback: scoring berdasarkan keyword wilayah asli
+        const kwParts = wilayah.toLowerCase().split(',').map(s => s.trim());
+        const aFull = [a.subdistrict, a.district, a.city || a.regency, a.province].filter(Boolean).join(' ').toLowerCase();
+        for (const part of kwParts) {
+          if (aFull.includes(part)) score += 10;
+          if (normStr(a.city || a.regency || '') === normStr(part)) score += 20;
+          if (normStr(a.subdistrict || '') === normStr(part)) score += 30;
+        }
       }
       if (score > bestScore) { bestScore = score; bestArea = a; }
     }
+
+    console.log(`Mengantar best match: "${bestArea.subdistrict}, ${bestArea.district}, ${bestArea.city || bestArea.regency}" (score ${bestScore})`);
 
     const areaId   = bestArea._id || bestArea.id;
     const areaNama = bestArea.subdistrict || bestArea.name || wilayah;
@@ -664,11 +721,13 @@ async function hitungOngkir(wilayah, product) {
       harga,
       allRates,
       area: {
-        kelurahan: bestArea.subdistrict || '',
-        kecamatan: bestArea.district   || '',
-        kota:      bestArea.city       || bestArea.regency || '',
-        provinsi:  bestArea.province   || '',
-        kodePos:   bestArea.postal_code|| bestArea.zip     || '',
+        // Prioritaskan data dari tabel lokal (lebih bersih & standar)
+        // Fallback ke data Mengantar kalau lokal tidak ada
+        kelurahan: lokal?.kelurahan   || bestArea.subdistrict || '',
+        kecamatan: lokal?.kecamatan   || bestArea.district    || '',
+        kota:      lokal?.kabupaten   || bestArea.city        || bestArea.regency || '',
+        provinsi:  lokal?.provinsi    || bestArea.province    || '',
+        kodePos:   bestArea.postal_code || bestArea.zip       || '',
       },
     };
   } catch (e) {
@@ -1172,21 +1231,49 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     }
 
     // ── WEBHOOK-LEVEL: Auto-search wilayah via tabel lokal wilayah_id ──
-    // Lebih akurat dari Mengantar autocomplete karena pakai data resmi Indonesia
     const lastAiMsg = history.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
-    const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
+    const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|kelurahan|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
     if (!convState.wilayah && !convState.ongkir && aiTanyaLokasi && message.length >= 3 && message.length <= 80) {
       try {
-        const hasil = await cariWilayah(message, 4);
+        const hasil = await cariWilayah(message, 5);
         if (hasil.length > 0) {
-          const candidates = hasil.map(r => formatWilayah(r));
-          const hint = `[SISTEM] Sistem menemukan wilayah yang cocok untuk "${message}":\n`
-            + candidates.map((c, i) => `${i + 1}. ${c}`).join('\n')
-            + `\nPilih yang paling relevan dengan apa yang customer sebut, konfirmasi ke customer, lalu tulis [WILAYAH_OK:nama wilayah terpilih].`;
-          history.push({ role: 'user', content: hint });
-          console.log(`Wilayah lokal untuk "${message}": ${candidates.join(' | ')}`);
+          // Cek apakah semua hasil dari kecamatan yang sama → customer menyebut kecamatan
+          const kecamatanUnik = [...new Set(hasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
+
+          if (kecamatanUnik.length === 1) {
+            // Satu kecamatan teridentifikasi → ambil semua kelurahan untuk ditawarkan ke customer
+            const first = hasil[0];
+            const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
+
+            if (kelurahanList.length <= 1) {
+              // Hanya 1 kelurahan → langsung konfirmasi tanpa perlu tanya
+              const hint = `[SISTEM] Sistem menemukan: ${first.kelurahan}, ${formatWilayah(first)}.\n`
+                + `Konfirmasi ke customer lalu tulis [WILAYAH_OK:${first.kelurahan}, ${formatWilayah(first)}].`;
+              history.push({ role: 'user', content: hint });
+            } else {
+              // Beberapa kelurahan → tampilkan nama kelurahan sebagai pilihan (TANPA nomor)
+              // Customer harus ketik nama langsung agar Claude bisa kenali
+              const pilihanStr = kelurahanList.map(k => `- ${k}`).join('\n');
+              const hint = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten}, ${first.provinsi} ditemukan.\n`
+                + `Ada ${kelurahanList.length} kelurahan. Tanyakan ke customer dengan menyebut nama-namanya:\n`
+                + pilihanStr + `\n`
+                + `Contoh balasan: "Di ${first.kecamatan} ada beberapa kelurahan kak 😊 Yang mana kelurahannya?\n${pilihanStr}"\n`
+                + `PENTING: Jangan pakai nomor urut. Customer harus sebut nama kelurahannya langsung.\n`
+                + `Setelah customer sebut nama kelurahan, konfirmasi dan tulis [WILAYAH_OK:nama kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
+              history.push({ role: 'user', content: hint });
+              console.log(`Tawarkan ${kelurahanList.length} kelurahan di Kec. ${first.kecamatan}`);
+            }
+          } else {
+            // Beberapa kecamatan berbeda → tampilkan pilihan kecamatan dulu
+            const candidates = hasil.map(r => formatWilayah(r));
+            const hint = `[SISTEM] Sistem menemukan beberapa wilayah cocok untuk "${message}":\n`
+              + candidates.map((c, i) => `${i + 1}. ${c}`).join('\n')
+              + `\nKonfirmasi ke customer wilayah mana yang benar, lalu setelah dikonfirmasi tulis [WILAYAH_OK:nama wilayah].`;
+            history.push({ role: 'user', content: hint });
+            console.log(`Multiple kecamatan untuk "${message}": ${candidates.join(' | ')}`);
+          }
         }
-      } catch(e) { /* silent */ }
+      } catch(e) { console.error('Wilayah hint error:', e.message); }
     }
 
     // ── WEBHOOK-LEVEL: Auto-trigger ongkir jika customer konfirmasi wilayah ──
