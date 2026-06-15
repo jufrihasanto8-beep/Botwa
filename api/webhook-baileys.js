@@ -278,12 +278,21 @@ REM ETIS
 - Keluhan serius/di luar produk → sarankan periksa, jangan paksa.
 
 HANDLE KEBERATAN (jangan langsung menyerah)
-Kalau customer bilang "gak jadi", "cancel", "ga mau", "mahal", "pikir-pikir dulu", "nanti aja":
+Kalau customer bilang "gak jadi", "cancel", "ga mau", "mahal", "pikir-pikir dulu", "nanti aja", "tidak jadi kalau...", "kalau gak bisa X":
 - JANGAN langsung bilang "oke gak apa-apa" dan tutup percakapan
-- GALI dulu alasannya: "Boleh tau kenapa kak? Mungkin aku bisa bantu 😊"
-- Kalau alasannya HARGA → ingatkan value: hemat ongkir, kualitas, manfaat spesifik ke keluhan mereka
+- GALI dulu alasannya dengan hangat: "Eh sayang banget kak, kenapa? Mungkin aku bisa bantu 😊"
+- Kalau alasannya METODE BAYAR (misal "tidak jadi kalau tidak bisa COD"):
+  → Kalau ongkir BELUM dihitung: JANGAN bilang COD tidak bisa — berarti wilayah belum diketahui, bukan COD tidak ada. Respons: "COD bisa kok kak! Aku cek ongkirnya dulu ya 😊 Kecamatannya mana?"
+  → Kalau ongkir SUDAH dihitung dan COD memang tidak tersedia di wilayah itu:
+     Akui dengan jujur TAPI langsung tawarkan transfer sebagai solusi:
+     "Iya kak, untuk wilayah [X] kurir COD-nya memang belum tersedia saat ini 🙏 Tapi transfer aman banget kok kak — ada garansi dari kami, dan pengiriman tetap jalan normal. Mau aku bantu proses via transfer?"
+     Kalau customer masih ragu soal keamanan transfer → jelaskan prosesnya, tawarkan bukti/garansi dari product knowledge
+     Kalau customer bilang "malas ribet transfer" → "Tenang kak, transfernya simpel — tinggal kirim ke rekening kami, kirim bukti TF, selesai 😊 Aku pantau terus sampai barangnya sampai"
+     JANGAN langsung bilang "oke tidak apa-apa ya kak" — itu menyerah terlalu cepat
+- Kalau alasannya HARGA → ingatkan value: manfaat spesifik ke keluhan mereka, kualitas produk
 - Kalau alasannya RAGU → tawarkan garansi/testimoni jika ada di knowledge produk
 - Kalau alasannya WAKTU → beri ruang: "Gak papa kak, kalau mau tanya-tanya lagi aku siap 😊"
+- ⚠️ DILARANG bilang "lokasinya susah", "COD tidak tersedia", "tidak bisa COD di sana" kecuali sistem sudah konfirmasi tidak ada kurir COD
 - Baru lepaskan dengan ramah kalau customer sudah 2x+ tetap menolak setelah digali
 
 ESKALASI KE MANUSIA
@@ -466,12 +475,36 @@ function extractConfirmedWilayah(aiMsg) {
 /* ── SEARCH WILAYAH LOKAL (tabel wilayah_id di Supabase) ─── */
 async function cariWilayah(keyword, limit = 5) {
   try {
-    const kw = keyword.trim().toLowerCase()
-      .replace(/\bkota\b/gi, '').replace(/\bkabupaten\b/gi, '').replace(/\bkab\b/gi, '').trim();
+    const cleanPart = s => s.trim().toLowerCase()
+      .replace(/\bkota\b/gi, '').replace(/\bkabupaten\b/gi, '').replace(/\bkab\b/gi, '')
+      .replace(/\bprovinsi\b/gi, '').replace(/\bprov\b/gi, '').trim();
+
+    // Kalau input comma-separated (misal: "Kranggan, Galur, Kulonprogo"),
+    // coba match kelurahan+kecamatan agar hasil lebih tepat
+    const parts = keyword.split(',').map(cleanPart).filter(s => s.length >= 2);
+    if (parts.length >= 2) {
+      const [kel, kec, kab] = parts;
+      // Coba kelurahan + kecamatan dulu
+      const byKelKec = await sbGet('wilayah_id',
+        `?kelurahan=ilike.*${encodeURIComponent(kel)}*&kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
+      ).catch(() => []);
+      if (byKelKec.length > 0) return byKelKec;
+
+      // Fallback: kecamatan + kabupaten
+      if (kab) {
+        const byKecKab = await sbGet('wilayah_id',
+          `?kecamatan=ilike.*${encodeURIComponent(kec)}*&kabupaten=ilike.*${encodeURIComponent(kab)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
+        ).catch(() => []);
+        if (byKecKab.length > 0) return byKecKab;
+      }
+
+      // Fallback: cari part pertama saja (kemungkinan kecamatan atau kelurahan)
+    }
+
+    const kw = cleanPart(keyword);
     if (kw.length < 3) return [];
 
-    // Cari di semua level: kelurahan, kecamatan, kabupaten
-    // Prioritas: kecamatan exact match > kabupaten match > kelurahan match
+    // Cari di semua level: kecamatan, kabupaten, kelurahan
     const [byKec, byKab, byKel] = await Promise.all([
       sbGet('wilayah_id', `?kecamatan=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`).catch(() => []),
       sbGet('wilayah_id', `?kabupaten=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`).catch(() => []),
@@ -621,7 +654,7 @@ async function hitungOngkir(wilayah, product) {
 
     const areaId   = bestArea._id || bestArea.id;
     const areaNama = bestArea.subdistrict || bestArea.name || wilayah;
-    console.log(`Mengantar match: "${queryWilayah}" → "${areaNama}" (score ${bestScore})`);
+    console.log(`Mengantar match: "${queryMengantar}" → "${areaNama}" (score ${bestScore})`);
     const weight = product?.berat_gram || 1; // Mengantar public pakai satuan kg
 
     // Step 3b: Ambil estimasi semua kurir
@@ -1222,10 +1255,15 @@ Rekening di struk: ${imageAnalysis.no_rekening_tujuan || '?'}
 Rekening toko: ${userRekening || '?'}
 Nominal: ${imageAnalysis.nominal || '?'} | Bank: ${imageAnalysis.bank || '?'}
 Beritahu customer dengan sopan bahwa transfer sepertinya salah rekening, minta konfirmasi ulang atau kirim ulang ke rekening yang benar.`;
-      } else {
+      } else if (imageAnalysis.rekening_cocok === true) {
         notif = `[SISTEM] Bukti transfer VALID dan rekening COCOK ✅
 Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'} | Tanggal: ${imageAnalysis.tanggal || '?'}
 Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan estimasi pengiriman.`;
+      } else {
+        // rekening_cocok === null artinya tidak bisa dibaca — jangan anggap valid
+        notif = `[SISTEM] Customer kirim gambar yang terlihat seperti bukti transfer tapi rekening tujuan tidak bisa terbaca dengan jelas.
+Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'}
+Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRekening || '(belum diisi)'}.`;
       }
       history.push({ role: 'user', content: notif });
     }
@@ -1235,7 +1273,26 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|kelurahan|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
     if (!convState.wilayah && !convState.ongkir && aiTanyaLokasi && message.length >= 3 && message.length <= 80) {
       try {
-        const hasil = await cariWilayah(message, 5);
+        // ── Kalau bot sedang menunggu jawaban kelurahan (pending_kecamatan ada di state),
+        //    cari kelurahan di kecamatan itu saja — jangan search global (bisa salah kecamatan)
+        const pendingKec = convState.pending_kecamatan; // { kecamatan, kabupaten, provinsi }
+        let hasil;
+        if (pendingKec?.kecamatan) {
+          const kw = message.trim().toLowerCase();
+          const byKel = await sbGet('wilayah_id',
+            `?kelurahan=ilike.*${encodeURIComponent(kw)}*&kecamatan=ilike.${encodeURIComponent(pendingKec.kecamatan)}&kabupaten=ilike.${encodeURIComponent(pendingKec.kabupaten)}&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
+          ).catch(() => []);
+          hasil = byKel;
+          if (byKel.length > 0) {
+            console.log(`[pendingKec] "${message}" → ${byKel.length} kelurahan di ${pendingKec.kecamatan}`);
+          } else {
+            // Tidak ketemu di kecamatan pending → fallback global
+            hasil = await cariWilayah(message, 5);
+          }
+        } else {
+          hasil = await cariWilayah(message, 5);
+        }
+
         if (hasil.length > 0) {
           // Cek apakah semua hasil dari kecamatan yang sama → customer menyebut kecamatan
           const kecamatanUnik = [...new Set(hasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
@@ -1246,12 +1303,16 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
             const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
 
             if (kelurahanList.length <= 1) {
-              // Hanya 1 kelurahan → langsung konfirmasi tanpa perlu tanya
+              // Hanya 1 kelurahan → langsung konfirmasi, clear pending_kecamatan
+              await updateConvState(conversation.id, { pending_kecamatan: null });
               const hint = `[SISTEM] Sistem menemukan: ${first.kelurahan}, ${formatWilayah(first)}.\n`
                 + `Konfirmasi ke customer lalu tulis [WILAYAH_OK:${first.kelurahan}, ${formatWilayah(first)}].`;
               history.push({ role: 'user', content: hint });
             } else {
-              // Beberapa kelurahan → tanya natural dengan contoh 2-3 kelurahan
+              // Beberapa kelurahan → simpan pending_kecamatan supaya ronde berikutnya ingat konteks
+              await updateConvState(conversation.id, {
+                pending_kecamatan: { kecamatan: first.kecamatan, kabupaten: first.kabupaten, provinsi: first.provinsi },
+              });
               const contohKel = kelurahanList.slice(0, 3).join(', ');
               const hint = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten}, ${first.provinsi} ditemukan.\n`
                 + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
@@ -1260,12 +1321,20 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
               history.push({ role: 'user', content: hint });
               console.log(`Tawarkan ${kelurahanList.length} kelurahan di Kec. ${first.kecamatan}`);
             }
+          } else if (pendingKec?.kecamatan) {
+            // Sedang nunggu kelurahan tapi tidak ketemu → minta ulang dengan lebih jelas
+            const kelAll = await getKelurahanByKecamatan(pendingKec.kecamatan, pendingKec.kabupaten);
+            const contoh = kelAll.slice(0, 3).join(', ');
+            const hint = `[SISTEM] Kelurahan "${message}" tidak ditemukan di Kecamatan ${pendingKec.kecamatan}.\n`
+              + `Kelurahan valid di sana: ${kelAll.join(', ')}\n`
+              + `Minta customer pilih kelurahan yang ada dengan ramah, contoh: ${contoh}. Jangan tulis [WILAYAH_OK] sampai customer sebut kelurahan yang valid.`;
+            history.push({ role: 'user', content: hint });
           } else {
-            // Beberapa kecamatan berbeda → tampilkan pilihan kecamatan dulu
+            // Beberapa kecamatan berbeda → tampilkan pilihan kecamatan dulu (tanpa nomor)
             const candidates = hasil.map(r => formatWilayah(r));
             const hint = `[SISTEM] Sistem menemukan beberapa wilayah cocok untuk "${message}":\n`
-              + candidates.map((c, i) => `${i + 1}. ${c}`).join('\n')
-              + `\nKonfirmasi ke customer wilayah mana yang benar, lalu setelah dikonfirmasi tulis [WILAYAH_OK:nama wilayah].`;
+              + candidates.map(c => `- ${c}`).join('\n')
+              + `\nTanyakan ke customer kecamatannya yang mana dengan natural, lalu setelah dikonfirmasi tulis [WILAYAH_OK:nama wilayah].`;
             history.push({ role: 'user', content: hint });
             console.log(`Multiple kecamatan untuk "${message}": ${candidates.join(' | ')}`);
           }
@@ -1285,6 +1354,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
         await updateConvState(conversation.id, {
           wilayah: proposedWilayah,
           proposed_wilayah: null,
+          pending_kecamatan: null,
           ongkir: hasil,
         });
         autoOngkirResult = { wilayah: proposedWilayah, hasil };
@@ -1368,8 +1438,11 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
         const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
 
         if (kelurahanList.length > 1) {
-          // Masih perlu tanya kelurahan
+          // Masih perlu tanya kelurahan — simpan pending_kecamatan supaya ronde berikut ingat konteks
           console.log(`[WILAYAH_OK] Kec. "${first.kecamatan}" punya ${kelurahanList.length} kelurahan → tanya dulu`);
+          await updateConvState(conversation.id, {
+            pending_kecamatan: { kecamatan: first.kecamatan, kabupaten: first.kabupaten, provinsi: first.provinsi },
+          });
           const contohKel = kelurahanList.slice(0, 3).join(', ');
           const injeksi = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten} ditemukan, tapi perlu kelurahan spesifik.\n`
             + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
@@ -1384,8 +1457,8 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
           rawReply = await callClaude(systemPrompt, histTanya, chatModel, userAnthropicKey);
 
         } else {
-          // Sudah spesifik sampai kelurahan → langsung hitung ongkir
-          await updateConvState(conversation.id, { wilayah, proposed_wilayah: null });
+          // Sudah spesifik sampai kelurahan → langsung hitung ongkir, clear pending
+          await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
           const hasil = await hitungOngkir(wilayah, product);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
@@ -1403,8 +1476,8 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
         }
 
       } else {
-        // Tidak ditemukan di local DB → langsung hitung (fallback ke Mengantar)
-        await updateConvState(conversation.id, { wilayah, proposed_wilayah: null });
+        // Tidak ditemukan di local DB → langsung hitung (fallback ke Mengantar), clear pending
+        await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
         const hasil = await hitungOngkir(wilayah, product);
         if (hasil) {
           await updateConvState(conversation.id, { ongkir: hasil });
@@ -1495,6 +1568,10 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     if (alamatMatch && !convState.alamat) {
       stateUpdate.alamat = alamatMatch[1].trim();
       console.log(`Alamat tersimpan: ${stateUpdate.alamat}`);
+    }
+    if (orderDataParsed.metode && !convState.metode_bayar) {
+      stateUpdate.metode_bayar = orderDataParsed.metode;
+      console.log(`Metode bayar tersimpan: ${stateUpdate.metode_bayar}`);
     }
     if (Object.keys(stateUpdate).length) {
       await updateConvState(conversation.id, stateUpdate);
