@@ -5,12 +5,24 @@ const ANTHROPIC_KEY     = process.env.ANTHROPIC_KEY;
 const SUPABASE_URL      = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
+/* ── FETCH WITH TIMEOUT ───────────────────────────────────── */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function getUserAnthropicKey(userId) {
   if (!userId) return null;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=anthropic_key&limit=1`, {
+    const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=anthropic_key&limit=1`, {
       headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` },
-    });
+    }, 5000);
     const data = await res.json();
     return data[0]?.anthropic_key || null;
   } catch { return null; }
@@ -43,6 +55,7 @@ module.exports = async function handler(req, res) {
         .replace(/\[ORDER_CONFIRMED\]/g, '')
         .replace(/\[ORDER_DATA:[^\]]+\]/g, '')
         .replace(/\[ESCALATE\]/g, '')
+        .replace(/\[GANTI_KURIR:[^\]]+\]/g, '')
         .trim(),
     }))
     .filter(m => m.content.length > 0)                 // buang pesan kosong setelah dibersihkan
@@ -79,7 +92,7 @@ Rules:
 - Baca seluruh konteks percakapan dan buat balasan yang RELEVAN dengan pesan terakhir`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -92,7 +105,7 @@ Rules:
         system: sysPrompt,
         messages: alternating,
       }),
-    });
+    }, 20000); // 20 detik timeout
     const data = await response.json();
     if (data.error) return res.status(500).json({ error: data.error.message });
     return res.status(200).json({ reply: data.content?.[0]?.text || '' });

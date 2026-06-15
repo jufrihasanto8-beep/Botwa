@@ -13,6 +13,18 @@ const MENGANTAR_KEY      = process.env.MENGANTAR_KEY;
 const GROQ_API_KEY       = process.env.GROQ_API_KEY;
 const WA_GROUP_JID       = process.env.WA_GROUP_JID; // JID grup WA tujuan recap order
 
+/* ── FETCH WITH TIMEOUT ───────────────────────────────────── */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /* ── SUPABASE HELPERS ─────────────────────────────────────── */
 const sbH = () => ({
   'Content-Type': 'application/json',
@@ -230,7 +242,7 @@ ATURAN HARGA, ONGKIR & COD
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
   Prinsip: kalau nama itu bisa jadi kota/kab di lebih dari satu provinsi, TANYA dulu.
   Contoh respons: "Ambarawa-nya di Jateng atau Lampung ya kak? 😊" / "Batu yang di Malang atau yang lain kak?"
-  JANGAN tulis [CEK_ONGKIR:...] sebelum provinsi dipastikan oleh customer.
+  JANGAN tulis [WILAYAH_OK:...] sebelum provinsi dipastikan oleh customer.
 - Wilayah tak konsisten → konfirmasi halus, jangan asal proses.
 - Kurir dipilih SISTEM berdasarkan grade + ongkir daerah itu.
 - Fee COD 5% ke customer, dibulatkan ke terdekat.
@@ -403,7 +415,7 @@ async function callClaude(systemPrompt, messages, model = 'claude-sonnet-4-6', a
   const key = apiKey || ANTHROPIC_KEY;
   if (!key) throw new Error('ANTHROPIC_KEY belum diset');
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -416,7 +428,7 @@ async function callClaude(systemPrompt, messages, model = 'claude-sonnet-4-6', a
       system: systemPrompt,
       messages,
     }),
-  });
+  }, 30000); // 30 detik timeout untuk AI
   const data = await res.json();
   if (data.error) throw new Error(`Claude: ${data.error.message}`);
   return data.content?.[0]?.text || '';
@@ -433,11 +445,11 @@ async function transcribeAudio(base64Audio) {
     formData.append('language', 'id');
     formData.append('response_format', 'json');
 
-    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    const res = await fetchWithTimeout('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${GROQ_API_KEY}` },
       body: formData,
-    });
+    }, 15000); // 15 detik untuk transcribe audio
     const data = await res.json();
     return data.text || null;
   } catch(e) {
@@ -598,7 +610,7 @@ const MENGANTAR_HEADERS = {
 };
 
 async function mengantarFetch(path) {
-  const res = await fetch(`https://app.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS });
+  const res = await fetchWithTimeout(`https://app.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS }, 10000);
   const json = await res.json();
   return json;
 }
@@ -812,7 +824,7 @@ async function resolveGoogleMapsUrl(text) {
   // Kalau shortlink → resolve redirect untuk dapat URL panjang
   if (url.includes('goo.gl')) {
     try {
-      const res = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+      const res = await fetchWithTimeout(url, { method: 'HEAD', redirect: 'follow' }, 8000);
       url = res.url; // URL final setelah redirect
       console.log(`Resolved goo.gl → ${url.slice(0, 100)}`);
     } catch(e) {
@@ -826,9 +838,10 @@ async function resolveGoogleMapsUrl(text) {
 
 async function reverseGeocode(lat, lng) {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=id`,
-      { headers: { 'User-Agent': 'BotWA-CS/1.0 (contact@adsy.id)' } }
+      { headers: { 'User-Agent': 'BotWA-CS/1.0 (contact@adsy.id)' } },
+      8000
     );
     const data = await res.json();
     const a = data.address || {};
@@ -847,7 +860,7 @@ async function reverseGeocode(lat, lng) {
 /* ── KIRIM WA via Baileys server ──────────────────────────── */
 async function sendWA(sessionId, waNumber, message, isOutbound = false) {
   if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
-  const res = await fetch(`${BAILEYS_URL}/send`, {
+  const res = await fetchWithTimeout(`${BAILEYS_URL}/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -857,7 +870,7 @@ async function sendWA(sessionId, waNumber, message, isOutbound = false) {
       message,
       is_outbound: isOutbound,
     }),
-  });
+  }, 10000);
   if (!res.ok) throw new Error(`Baileys send error: ${await res.text()}`);
   return res.json();
 }
@@ -1062,11 +1075,31 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // ── Handle sticker, video, dokumen, dan media lain ─────────
+    if (messageType === 'sticker') {
+      message = `[SISTEM: Customer kirim sticker. Balas dengan ramah dan lanjutkan percakapan, jangan bilang tidak bisa lihat sticker.]`;
+    } else if (messageType === 'video') {
+      message = `[SISTEM: Customer kirim video. Tanya dengan ramah apa isi videonya atau minta jelaskan dalam bentuk teks/foto.]`;
+    } else if (messageType === 'document') {
+      message = `[SISTEM: Customer kirim dokumen/file. Tanya dengan ramah isi dokumennya apa, karena sistem tidak bisa baca dokumen.]`;
+    } else if (messageType === 'location') {
+      // Location biasanya sudah di-handle via Google Maps URL, tapi kalau native location:
+      if (!message || message === '[location]') {
+        message = `[SISTEM: Customer kirim lokasi. Konfirmasi nama kota/kecamatannya untuk cek ongkir.]`;
+      }
+    }
+
     // ── Analisa gambar jika ada (Claude Vision) ────────────────
     let imageAnalysis = null;
     if (messageType === 'image' && mediaUrl && mediaUrl.startsWith('data:image')) {
       try {
-        const visionRes = await fetch('https://api.anthropic.com/v1/messages', {
+        // Deteksi media type dari data URL (jpeg, png, webp, gif)
+        const mediaTypeMatch = mediaUrl.match(/^data:image\/([a-z]+);base64,/);
+        const imageFormat = mediaTypeMatch?.[1] || 'jpeg';
+        const mediaType = `image/${imageFormat}`;
+        const base64Data = mediaUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+
+        const visionRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1081,7 +1114,7 @@ module.exports = async function handler(req, res) {
               content: [
                 {
                   type: 'image',
-                  source: { type: 'base64', media_type: 'image/jpeg', data: mediaUrl.replace('data:image/jpeg;base64,', '') },
+                  source: { type: 'base64', media_type: mediaType, data: base64Data },
                 },
                 {
                   type: 'text',
@@ -1118,7 +1151,7 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
               ],
             }],
           }),
-        });
+        }, 20000); // 20 detik untuk vision analysis
         const visionData = await visionRes.json();
         const raw = visionData.content?.[0]?.text || '';
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
