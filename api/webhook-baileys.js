@@ -160,6 +160,8 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
     ? userRekening
     : '(belum diisi — jangan kasih info rekening, bilang "nanti kami kirimkan info rekeningnya ya kak 🙏")';
 
+  const asalPengiriman = product?.asal_pengiriman || null;
+
   return `IDENTITAS
 Kamu "${csNama}", CS toko ${namaToko} di WhatsApp.
 Kamu BUKAN sales. Kamu konsultan yang kebetulan punya solusi.
@@ -229,7 +231,7 @@ ATURAN HARGA, ONGKIR & COD
 - Wilayah tak konsisten → konfirmasi halus, jangan asal proses.
 - Kurir dipilih SISTEM berdasarkan grade + ongkir daerah itu.
 - Fee COD 5% ke customer, dibulatkan ke terdekat.
-- JANGAN sebutkan dari mana barang dikirim / lokasi gudang / asal pengiriman. Fokus ke estimasi tiba dan total biaya saja.
+- Kalau ditanya "pengiriman dari mana" → jawab langsung: pengiriman dari ${asalPengiriman || 'gudang kami'}. Sebutkan apa adanya, jangan bilang "tidak bisa info" atau menghindar.
 - Promo ongkir diterapkan SISTEM (berlaku COD & transfer).
 
 FORMAT TAMPIL HARGA (pakai persis ini saat tampilkan total)
