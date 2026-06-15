@@ -1251,15 +1251,12 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
                 + `Konfirmasi ke customer lalu tulis [WILAYAH_OK:${first.kelurahan}, ${formatWilayah(first)}].`;
               history.push({ role: 'user', content: hint });
             } else {
-              // Beberapa kelurahan → tampilkan nama kelurahan sebagai pilihan (TANPA nomor)
-              // Customer harus ketik nama langsung agar Claude bisa kenali
-              const pilihanStr = kelurahanList.map(k => `- ${k}`).join('\n');
+              // Beberapa kelurahan → tanya natural dengan contoh 2-3 kelurahan
+              const contohKel = kelurahanList.slice(0, 3).join(', ');
               const hint = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten}, ${first.provinsi} ditemukan.\n`
-                + `Ada ${kelurahanList.length} kelurahan. Tanyakan ke customer dengan menyebut nama-namanya:\n`
-                + pilihanStr + `\n`
-                + `Contoh balasan: "Di ${first.kecamatan} ada beberapa kelurahan kak 😊 Yang mana kelurahannya?\n${pilihanStr}"\n`
-                + `PENTING: Jangan pakai nomor urut. Customer harus sebut nama kelurahannya langsung.\n`
-                + `Setelah customer sebut nama kelurahan, konfirmasi dan tulis [WILAYAH_OK:nama kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
+                + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
+                + `Tanyakan kelurahannya dengan NATURAL — sebut 2-3 contoh (misal: ${contohKel}) supaya customer lebih mudah jawab, jangan listing semuanya. Gaya WhatsApp santai, 1-2 kalimat.\n`
+                + `Setelah customer sebut kelurahan yang valid, konfirmasi dan tulis [WILAYAH_OK:nama kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
               history.push({ role: 'user', content: hint });
               console.log(`Tawarkan ${kelurahanList.length} kelurahan di Kec. ${first.kecamatan}`);
             }
@@ -1339,27 +1336,90 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
       } catch(e) { console.error('ORDER_DATA parse error:', e.message); }
     }
 
-    // ── Handle [WILAYAH_OK:] → langsung hitung ongkir ────────
+    // ── Handle [WILAYAH_OK:] → cek spesifisitas dulu, baru hitung ongkir ────────
     if (wilayahOkMatch && !autoOngkirResult && !convState.ongkir) {
       const wilayah = wilayahOkMatch[1].trim();
       console.log(`[WILAYAH_OK] detected: ${wilayah}`);
-      await updateConvState(conversation.id, { wilayah, proposed_wilayah: null });
-      const hasil = await hitungOngkir(wilayah, product);
-      if (hasil) {
-        await updateConvState(conversation.id, { ongkir: hasil });
-        const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
 
-        const histWithOngkir = [
+      // Cek apakah wilayah sudah spesifik (minimal kecamatan level)
+      const lokalCek = await cariWilayah(wilayah, 15);
+      const kecamatanUnik = [...new Set(lokalCek.map(r => `${r.kecamatan}||${r.kabupaten}`))];
+
+      if (lokalCek.length > 0 && kecamatanUnik.length > 1) {
+        // Wilayah masih terlalu umum (kabupaten/kota) → tanya kecamatan dulu
+        console.log(`[WILAYAH_OK] "${wilayah}" terlalu umum — ${kecamatanUnik.length} kecamatan ditemukan`);
+        const kecList = [...new Set(lokalCek.map(r => r.kecamatan))];
+        const contohKec = kecList.slice(0, 3).join(', ');
+        const injeksi = `[SISTEM] "${wilayah}" masih terlalu umum, ada ${kecList.length} kecamatan di sana. JANGAN hitung ongkir dulu.\n`
+          + `Semua kecamatan valid: ${kecList.join(', ')}\n`
+          + `Tanyakan kecamatannya dengan NATURAL — sebut 2-3 contoh kecamatan (misal: ${contohKec}) supaya customer lebih mudah jawab, tapi jangan listing semuanya. Gaya WhatsApp santai, 1-2 kalimat.\n`
+          + `Setelah customer sebut kecamatan yang valid, sistem akan proses lebih lanjut.`;
+
+        const histTanya = [
           ...history,
           { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, userAnthropicKey);
+        rawReply = await callClaude(systemPrompt, histTanya, chatModel, userAnthropicKey);
+
+      } else if (lokalCek.length > 0 && kecamatanUnik.length === 1) {
+        // Satu kecamatan teridentifikasi → cek jumlah kelurahan
+        const first = lokalCek[0];
+        const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
+
+        if (kelurahanList.length > 1) {
+          // Masih perlu tanya kelurahan
+          console.log(`[WILAYAH_OK] Kec. "${first.kecamatan}" punya ${kelurahanList.length} kelurahan → tanya dulu`);
+          const contohKel = kelurahanList.slice(0, 3).join(', ');
+          const injeksi = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten} ditemukan, tapi perlu kelurahan spesifik.\n`
+            + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
+            + `Tanyakan kelurahannya dengan NATURAL — sebut 2-3 contoh kelurahan (misal: ${contohKel}) supaya customer lebih mudah jawab, tapi jangan listing semuanya. Gaya WhatsApp santai, 1-2 kalimat.\n`
+            + `Setelah customer sebut kelurahan yang valid, konfirmasi dan tulis [WILAYAH_OK:nama kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
+
+          const histTanya = [
+            ...history,
+            { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
+            { role: 'user', content: injeksi },
+          ];
+          rawReply = await callClaude(systemPrompt, histTanya, chatModel, userAnthropicKey);
+
+        } else {
+          // Sudah spesifik sampai kelurahan → langsung hitung ongkir
+          await updateConvState(conversation.id, { wilayah, proposed_wilayah: null });
+          const hasil = await hitungOngkir(wilayah, product);
+          if (hasil) {
+            await updateConvState(conversation.id, { ongkir: hasil });
+            const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
+            const histWithOngkir = [
+              ...history,
+              { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
+              { role: 'user', content: injeksi },
+            ];
+            rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, userAnthropicKey);
+          } else {
+            await updateConvState(conversation.id, { proposed_wilayah: wilayah });
+            rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim();
+          }
+        }
+
       } else {
-        console.warn(`hitungOngkir gagal untuk wilayah: ${wilayah}`);
-        // Simpan sebagai proposed_wilayah untuk retry di pesan berikutnya
-        await updateConvState(conversation.id, { proposed_wilayah: wilayah });
-        rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim();
+        // Tidak ditemukan di local DB → langsung hitung (fallback ke Mengantar)
+        await updateConvState(conversation.id, { wilayah, proposed_wilayah: null });
+        const hasil = await hitungOngkir(wilayah, product);
+        if (hasil) {
+          await updateConvState(conversation.id, { ongkir: hasil });
+          const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
+          const histWithOngkir = [
+            ...history,
+            { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
+            { role: 'user', content: injeksi },
+          ];
+          rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, userAnthropicKey);
+        } else {
+          console.warn(`hitungOngkir gagal untuk wilayah: ${wilayah}`);
+          await updateConvState(conversation.id, { proposed_wilayah: wilayah });
+          rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim();
+        }
       }
     }
 
