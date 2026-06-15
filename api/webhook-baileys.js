@@ -417,18 +417,28 @@ async function transcribeAudio(base64Audio) {
 
 /* ── DETEKSI KONFIRMASI WILAYAH (webhook-level, tidak bergantung Claude) ── */
 
-// Kata-kata yang bukan nama wilayah
-const BUKAN_WILAYAH = /^(via|pakai|dengan|pake|lewat|dari|ke|di|ya|oke|siap|baik|nanti|kalau|jika|untuk|sudah|belum|bisa|tidak|iya|tidak)\s/i;
+// Kata-kata yang bukan nama wilayah (di awal kandidat)
+const BUKAN_WILAYAH = /^(via|pakai|dengan|pake|lewat|dari|ke|di|ya|oke|siap|baik|nanti|kalau|jika|untuk|sudah|belum|bisa|tidak|iya|tidak|biar|aku|kamu|kami|tim|gak|ga|mau|minta)\s/i;
+
+// Kata kerja / kalimat aksi yang tidak mungkin ada di nama wilayah
+const KATA_KERJA_WILAYAH = /\b(eskalasi|eskalasiin|cek|tanya|tanyain|hubungi|hubungin|konfirmasi|bantu|sambung|sambungin|tunggu|kasih|kirim|bayar|proses|lanjut|info|bilang|bilang|pesan|order|transfer|cod|rekening|ambil|atur|selesai|minta)\b/i;
 
 // Ekstrak wilayah yang AI sedang konfirmasikan — pertanyaan ("Sumba NTT ya kak?")
 function extractProposedWilayah(aiMsg) {
   const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
-    const m = line.match(/(?:jadi\s+|ke\s+)?([A-Za-z][A-Za-z\s,]{2,50}?)\s+ya\s+kak[?😊🙏\s]/i);
+    // Prefix "ke" atau "jadi" WAJIB ada (tidak optional) untuk menghindari false positive
+    const m = line.match(/(?:jadi\s+ke\s+|jadi\s+|ke\s+)([A-Za-z][A-Za-z\s,]{2,40}?)\s+ya\s+kak[?😊🙏\s]/i);
     if (m) {
       const candidate = m[1].trim().replace(/,\s*$/, '');
-      if (candidate.length >= 3 && !BUKAN_WILAYAH.test(candidate)) return candidate;
+      const wordCount = candidate.split(/\s+/).length;
+      if (
+        candidate.length >= 3 &&
+        wordCount <= 5 &&                        // nama wilayah max 5 kata
+        !BUKAN_WILAYAH.test(candidate) &&        // tidak diawali kata filler
+        !KATA_KERJA_WILAYAH.test(candidate)      // tidak mengandung kata kerja
+      ) return candidate;
     }
   }
   return null;
@@ -439,13 +449,56 @@ function extractConfirmedWilayah(aiMsg) {
   const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
   for (const line of lines) {
     // "Oke kak, Ambarawa Jawa Tengah ya!" / "Siap kak, pengirimannya ke Sumba NTT ya!"
-    const m = line.match(/(?:oke|siap|dicatat|baik|noted)\s+kak[,!]?\s+(?:pengirimannya\s+ke\s+|jadi\s+ke\s+)?([A-Za-z][A-Za-z\s,]{2,50}?)\s+ya[!😊🙏\s]/i);
+    const m = line.match(/(?:oke|siap|dicatat|baik|noted)\s+kak[,!]?\s+(?:pengirimannya\s+ke\s+|jadi\s+ke\s+)?([A-Za-z][A-Za-z\s,]{2,40}?)\s+ya[!😊🙏\s]/i);
     if (m) {
       const candidate = m[1].trim().replace(/[,!]+$/, '');
-      if (candidate.length >= 3) return candidate;
+      const wordCount = candidate.split(/\s+/).length;
+      if (
+        candidate.length >= 3 &&
+        wordCount <= 5 &&
+        !KATA_KERJA_WILAYAH.test(candidate)
+      ) return candidate;
     }
   }
   return null;
+}
+
+/* ── SEARCH WILAYAH LOKAL (tabel wilayah_id di Supabase) ─── */
+async function cariWilayah(keyword, limit = 5) {
+  try {
+    const kw = keyword.trim().toLowerCase()
+      .replace(/\bkota\b/gi, '').replace(/\bkabupaten\b/gi, '').replace(/\bkab\b/gi, '').trim();
+    if (kw.length < 3) return [];
+
+    // Cari di semua level: kelurahan, kecamatan, kabupaten
+    // Prioritas: kecamatan exact match > kabupaten match > kelurahan match
+    const [byKec, byKab, byKel] = await Promise.all([
+      sbGet('wilayah_id', `?kecamatan=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`).catch(() => []),
+      sbGet('wilayah_id', `?kabupaten=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`).catch(() => []),
+      sbGet('wilayah_id', `?kelurahan=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`).catch(() => []),
+    ]);
+
+    // Gabung & deduplikasi berdasarkan kecamatan+kabupaten
+    const seen = new Set();
+    const merged = [];
+    for (const row of [...byKec, ...byKab, ...byKel]) {
+      const key = `${row.kecamatan}||${row.kabupaten}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(row);
+        if (merged.length >= limit) break;
+      }
+    }
+    return merged;
+  } catch(e) {
+    console.error('cariWilayah error:', e.message);
+    return [];
+  }
+}
+
+// Format satu baris wilayah jadi string lengkap
+function formatWilayah(row) {
+  return [row.kecamatan, row.kabupaten, row.provinsi].filter(Boolean).join(', ');
 }
 
 // Deteksi apakah pesan customer adalah konfirmasi singkat
@@ -479,13 +532,39 @@ async function mengantarFetch(path) {
 /* ── HITUNG ONGKIR: step 4–8 blueprint §4 ───────────────── */
 async function hitungOngkir(wilayah, product) {
   try {
-    // Step 3a: Cari destination_id dari nama wilayah
-    const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(wilayah)}`);
+    // Step 3a: Normalisasi nama wilayah via tabel lokal dulu
+    // Mengantar lebih akurat kalau dapat nama standar (kecamatan + kabupaten + provinsi)
+    let queryWilayah = wilayah;
+    const lokalMatch = await cariWilayah(wilayah, 1);
+    if (lokalMatch.length > 0) {
+      queryWilayah = formatWilayah(lokalMatch[0]);
+      console.log(`Wilayah normalized: "${wilayah}" → "${queryWilayah}"`);
+    }
+
+    // Step 3b: Cari destination_id dari Mengantar pakai nama yang sudah dinormalisasi
+    const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(queryWilayah)}`);
     const areas = searchJson.data || searchJson;
     if (!Array.isArray(areas) || !areas.length) return null;
 
-    const areaId   = areas[0]._id || areas[0].id;
-    const areaNama = areas[0].subdistrict || areas[0].name || wilayah;
+    // Scoring: pilih area yang paling mirip dengan query (bukan selalu index 0)
+    const normStr = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const kwParts = queryWilayah.toLowerCase().split(',').map(s => s.trim());
+    let bestArea = areas[0], bestScore = -1;
+    for (const a of areas) {
+      const aFull = [a.subdistrict, a.district, a.city || a.regency, a.province]
+        .filter(Boolean).join(' ').toLowerCase();
+      let score = 0;
+      for (const part of kwParts) {
+        if (aFull.includes(part)) score += 10;
+        if (normStr(a.city || a.regency || '') === normStr(part)) score += 20;
+        if (normStr(a.subdistrict || '') === normStr(part)) score += 30;
+      }
+      if (score > bestScore) { bestScore = score; bestArea = a; }
+    }
+
+    const areaId   = bestArea._id || bestArea.id;
+    const areaNama = bestArea.subdistrict || bestArea.name || wilayah;
+    console.log(`Mengantar match: "${queryWilayah}" → "${areaNama}" (score ${bestScore})`);
     const weight = product?.berat_gram || 1; // Mengantar public pakai satuan kg
 
     // Step 3b: Ambil estimasi semua kurir
@@ -585,11 +664,11 @@ async function hitungOngkir(wilayah, product) {
       harga,
       allRates,
       area: {
-        kelurahan: areas[0].subdistrict || '',
-        kecamatan: areas[0].district   || '',
-        kota:      areas[0].city       || areas[0].regency || '',
-        provinsi:  areas[0].province   || '',
-        kodePos:   areas[0].postal_code|| areas[0].zip     || '',
+        kelurahan: bestArea.subdistrict || '',
+        kecamatan: bestArea.district   || '',
+        kota:      bestArea.city       || bestArea.regency || '',
+        provinsi:  bestArea.province   || '',
+        kodePos:   bestArea.postal_code|| bestArea.zip     || '',
       },
     };
   } catch (e) {
@@ -682,7 +761,12 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
     return `- ${r.nama}: ongkir ${fmt(r.ongkir)}${potongan} → TF total ${fmt(r.totalTF)} | COD total ${fmt(r.totalCOD)}`;
   }).join('\n');
 
+  const areaFull = hasil.area
+    ? [hasil.area.kecamatan, hasil.area.kota, hasil.area.provinsi].filter(Boolean).join(', ')
+    : '';
+
   return `[SISTEM] ${konteks}Ongkir sudah dihitung. Rekomendasi termurah: ${hasil.ekspedisi}.
+${areaFull ? `Area yang dicocokkan sistem: ${areaFull}. Sebutkan nama area ini ke customer saat konfirmasi, contoh: "Oke kak, ongkir ke ${areaFull} ya 😊"` : ''}
 
 Tampilkan PERSIS ini ke customer (jangan ubah angka):
 
@@ -1087,28 +1171,22 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
       history.push({ role: 'user', content: notif });
     }
 
-    // ── WEBHOOK-LEVEL: Auto-search wilayah via Mengantar (bantu Claude identifikasi lokasi) ──
-    // Jika belum ada wilayah tersimpan, coba cari pesan customer di Mengantar autocomplete
-    // Hasilnya diinject ke Claude agar Claude bisa langsung konfirmasi tanpa tanya balik
-    // Hanya search Mengantar kalau AI sebelumnya lagi nanya soal lokasi/wilayah
+    // ── WEBHOOK-LEVEL: Auto-search wilayah via tabel lokal wilayah_id ──
+    // Lebih akurat dari Mengantar autocomplete karena pakai data resmi Indonesia
     const lastAiMsg = history.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
     const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
-    if (!convState.wilayah && !convState.ongkir && aiTanyaLokasi && message.length >= 4 && message.length <= 80) {
+    if (!convState.wilayah && !convState.ongkir && aiTanyaLokasi && message.length >= 3 && message.length <= 80) {
       try {
-        const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(message)}`);
-        const areas = searchJson.data || searchJson;
-        if (Array.isArray(areas) && areas.length >= 1 && areas.length <= 6) {
-          const candidates = areas.slice(0, 3).map(a => {
-            return [a.subdistrict, a.district, a.city || a.regency, a.province]
-              .filter(Boolean).join(', ');
-          });
-          const hint = `[SISTEM] Mengantar menemukan lokasi yang cocok untuk "${message}":\n`
+        const hasil = await cariWilayah(message, 4);
+        if (hasil.length > 0) {
+          const candidates = hasil.map(r => formatWilayah(r));
+          const hint = `[SISTEM] Sistem menemukan wilayah yang cocok untuk "${message}":\n`
             + candidates.map((c, i) => `${i + 1}. ${c}`).join('\n')
-            + `\nKalau ini cocok, langsung konfirmasi ke customer (jangan tanya provinsi lagi). Pilih yang paling relevan lalu tulis [WILAYAH_OK:nama wilayah].`;
+            + `\nPilih yang paling relevan dengan apa yang customer sebut, konfirmasi ke customer, lalu tulis [WILAYAH_OK:nama wilayah terpilih].`;
           history.push({ role: 'user', content: hint });
-          console.log(`Wilayah autocomplete untuk "${message}": ${candidates.join(' | ')}`);
+          console.log(`Wilayah lokal untuk "${message}": ${candidates.join(' | ')}`);
         }
-      } catch(e) { /* silent — tidak blokir flow utama */ }
+      } catch(e) { /* silent */ }
     }
 
     // ── WEBHOOK-LEVEL: Auto-trigger ongkir jika customer konfirmasi wilayah ──
