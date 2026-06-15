@@ -420,6 +420,10 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <textarea id="f-cara-pakai" rows="3" placeholder="2x sehari 1 kapsul, diminum setelah makan..."></textarea>
         </div>
         <div class="form-group">
+          <label>Asal Pengiriman</label>
+          <input type="text" id="f-asal-pengiriman" placeholder="cth: Kulon Progo, Yogyakarta">
+        </div>
+        <div class="form-group">
           <label>Product Knowledge (info lengkap untuk AI)</label>
           <textarea id="f-knowledge" rows="5" placeholder="Kandungan, manfaat, testimoni, dll..."></textarea>
         </div>
@@ -810,6 +814,7 @@ function openAdd() {
   document.getElementById('f-harga').value = '';
   document.getElementById('f-aktif').value = 'true';
   document.getElementById('f-cara-pakai').value = '';
+  document.getElementById('f-asal-pengiriman').value = '';
   document.getElementById('f-knowledge').value = '';
   document.getElementById('f-persona-nama').value = 'Sari';
   document.getElementById('f-persona-gaya').value = 'hangat, sabar, konsultatif';
@@ -833,6 +838,7 @@ async function openEdit(id) {
   document.getElementById('f-harga').value = p.harga || '';
   document.getElementById('f-aktif').value = String(p.aktif);
   document.getElementById('f-cara-pakai').value = p.cara_pakai || '';
+  document.getElementById('f-asal-pengiriman').value = p.asal_pengiriman || '';
   document.getElementById('f-knowledge').value = p.product_knowledge || '';
   document.getElementById('f-persona-nama').value = p.persona_cs_nama || 'Sari';
   document.getElementById('f-persona-gaya').value = p.persona_cs_gaya || 'hangat, sabar, konsultatif';
@@ -935,6 +941,7 @@ async function saveProduk() {
     harga,
     aktif: document.getElementById('f-aktif').value === 'true',
     cara_pakai: document.getElementById('f-cara-pakai').value.trim(),
+    asal_pengiriman: document.getElementById('f-asal-pengiriman').value.trim(),
     product_knowledge: document.getElementById('f-knowledge').value.trim(),
     keluhan_cocok: tagsData.keluhan,
     pertanyaan_diagnosa: tagsData.diagnosa,
