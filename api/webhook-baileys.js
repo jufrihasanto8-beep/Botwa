@@ -180,13 +180,14 @@ PRINSIP UTAMA
 - Kalau customer buru-buru & langsung mau beli → layani.
 
 DATA PRODUK (jangan ngarang di luar ini)
-Produk      : ${namaProduk}
-Harga       : ${harga}
-Cocok untuk : ${keluhan}
-Cara pakai  : ${product?.cara_pakai || '(lihat kemasan)'}
-Knowledge   : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
-Promo ongkir: ${promoOngkir}
-Rekening TF : ${rekeningInfo}
+Produk          : ${namaProduk}
+Harga           : ${harga}
+Cocok untuk     : ${keluhan}
+Cara pakai      : ${product?.cara_pakai || '(lihat kemasan)'}
+Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
+Promo ongkir    : ${promoOngkir}
+Rekening TF     : ${rekeningInfo}
+Asal pengiriman : ${asalPengiriman || 'gudang kami'}
 
 ALUR KONSULTASI
 1. SAMBUT hangat (sambung ke iklan), jangan langsung jualan
@@ -231,7 +232,7 @@ ATURAN HARGA, ONGKIR & COD
 - Wilayah tak konsisten → konfirmasi halus, jangan asal proses.
 - Kurir dipilih SISTEM berdasarkan grade + ongkir daerah itu.
 - Fee COD 5% ke customer, dibulatkan ke terdekat.
-- Kalau ditanya "pengiriman dari mana" → jawab langsung: pengiriman dari ${asalPengiriman || 'gudang kami'}. Sebutkan apa adanya, jangan bilang "tidak bisa info" atau menghindar.
+- Kalau ditanya "pengiriman dari mana" → jawab dari DATA PRODUK di atas (Asal pengiriman). Jangan bilang "tidak bisa info".
 - Promo ongkir diterapkan SISTEM (berlaku COD & transfer).
 
 FORMAT TAMPIL HARGA (pakai persis ini saat tampilkan total)
@@ -700,7 +701,9 @@ SETELAH tampilkan harga di atas, tanya dengan santai: "Biasanya kakak lebih suka
 DATA SEMUA KURIR TERSEDIA (untuk jawab kalau customer tanya kurir lain — jangan sebut ke customer kecuali ditanya):
 ${tabelKurir}
 
-Kalau customer tanya harga kurir lain (misal "kalau JNE berapa?"), jawab langsung dari data di atas. Jangan bilang "sistem pilih otomatis".`;
+Kalau customer tanya harga kurir lain (misal "kalau JNE berapa?"), jawab langsung dari data di atas. Jangan bilang "sistem pilih otomatis".
+Kalau customer MINTA kurir tertentu (misal "JNE aja", "pakai sicepat dong") → konfirmasi dan tampilkan total baru pakai kurir itu, lalu tulis marker [GANTI_KURIR:nama_kurir] di akhir pesan.
+Contoh: "Oke kak, pakai JNE ya! Total Transfer Rp X / COD Rp Y 😊 [GANTI_KURIR:JNE]"`;
 }
 
 /* ── UPDATE CONVERSATION STATE ───────────────────────────── */
@@ -1149,6 +1152,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
     const orderConfirmed   = rawReply.includes('[ORDER_CONFIRMED]');
     const cekOngkirMatch   = rawReply.match(/\[CEK_ONGKIR:([^\]]+)\]/);
     const wilayahOkMatch   = rawReply.match(/\[WILAYAH_OK:([^\]]+)\]/);
+    const gantiKurirMatch  = rawReply.match(/\[GANTI_KURIR:([^\]]+)\]/);
 
     // Parse ORDER_DATA sebelum rawReply mungkin di-overwrite ongkir handler
     let orderDataParsed = {};
@@ -1271,6 +1275,39 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
       await updateConvState(conversation.id, stateUpdate);
     }
 
+    // ── Handle [GANTI_KURIR:] → update ongkir state ke kurir pilihan customer ──
+    if (gantiKurirMatch && convState.ongkir?.allRates?.length) {
+      const requestedKurir = gantiKurirMatch[1].trim().toLowerCase();
+      const match = convState.ongkir.allRates.find(r =>
+        r.nama.toLowerCase().includes(requestedKurir) ||
+        requestedKurir.includes(r.nama.toLowerCase())
+      );
+      if (match) {
+        const promo = product?.promo_ongkir;
+        let ongkirPromo = match.ongkir;
+        if (promo?.tipe === 'gratis_penuh')   ongkirPromo = 0;
+        else if (promo?.tipe === 'potong')    ongkirPromo = Math.max(0, match.ongkir - (promo.nilai || 0));
+        else if (promo?.tipe === 'gratis_sd') ongkirPromo = Math.max(0, match.ongkir - (promo.nilai || 0));
+
+        const harga = product?.harga || 0;
+        const feeCOD = Math.ceil((harga + ongkirPromo) * 0.05);
+        const newOngkir = {
+          ...convState.ongkir,
+          ekspedisi:     match.nama,
+          ongkirAsli:    match.ongkir,
+          ongkirPromo:   ongkirPromo,
+          totalTransfer: bulatkan(harga + ongkirPromo),
+          totalCOD:      bulatkan(harga + ongkirPromo + feeCOD),
+          feeCOD:        bulatkan(feeCOD),
+        };
+        await updateConvState(conversation.id, { ongkir: newOngkir });
+        convState.ongkir = newOngkir;
+        console.log(`[GANTI_KURIR] switched to ${match.nama}`);
+      } else {
+        console.warn(`[GANTI_KURIR] kurir "${requestedKurir}" tidak ditemukan di allRates`);
+      }
+    }
+
     // ── Bersihkan marker dari reply final ─────────────────────
     let reply = rawReply
       .replace('[ESCALATE]', '')
@@ -1280,6 +1317,7 @@ Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan es
       .replace(/\[ALAMAT_OK:[^\]]+\]/, '')
       .replace(/\[CEK_ONGKIR:[^\]]+\]/, '')
       .replace(/\[WILAYAH_OK:[^\]]+\]/, '')
+      .replace(/\[GANTI_KURIR:[^\]]+\]/, '')
       .trim();
 
     // ── Update conversation status jika eskalasi ──────────────
