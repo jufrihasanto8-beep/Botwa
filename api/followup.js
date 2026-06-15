@@ -11,6 +11,17 @@ const WEBHOOK_SECRET      = process.env.WEBHOOK_SECRET;
 const CRON_SECRET         = process.env.CRON_SECRET;
 const ANTHROPIC_KEY       = process.env.ANTHROPIC_KEY;
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function sbH() {
   return {
     'Content-Type': 'application/json',
@@ -20,13 +31,13 @@ function sbH() {
 }
 
 async function sbGet(table, query = '') {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { headers: sbH() });
+  const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${table}${query}`, { headers: sbH() });
   if (!res.ok) throw new Error(`sbGet ${table}: ${await res.text()}`);
   return res.json();
 }
 
 async function sbPatch(table, query, body) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
+  const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
     method: 'PATCH',
     headers: { ...sbH(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(body),
@@ -35,7 +46,7 @@ async function sbPatch(table, query, body) {
 }
 
 async function sbPost(table, body) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+  const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: { ...sbH(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(body),
@@ -76,7 +87,7 @@ Buatkan SATU pesan follow-up WhatsApp yang:
 Tulis pesan follow-up saja, tanpa penjelasan.`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -88,7 +99,7 @@ Tulis pesan follow-up saja, tanpa penjelasan.`;
         max_tokens: 150,
         messages: [{ role: 'user', content: prompt }],
       }),
-    });
+    }, 20000);
     const data = await res.json();
     return data.content?.[0]?.text?.trim() || null;
   } catch(e) {
@@ -99,7 +110,7 @@ Tulis pesan follow-up saja, tanpa penjelasan.`;
 
 async function sendWA(sessionId, jid, message) {
   if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
-  const res = await fetch(`${BAILEYS_URL}/send`, {
+  const res = await fetchWithTimeout(`${BAILEYS_URL}/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

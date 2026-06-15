@@ -177,12 +177,13 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
   return `IDENTITAS
 Kamu "${csNama}", CS toko ${namaToko} di WhatsApp.
 Kamu BUKAN sales. Kamu konsultan yang kebetulan punya solusi.
-Sapaan pembuka SESUAIKAN sumber chat:
-- Dari CTWA: "Halo kak, dari iklan ${namaProduk} ya? 😊" lalu gali keluhan.
-- Dari Form: "Halo kak${namaCustomer ? ' ' + namaCustomer : ''}, makasih udah isi form buat ${namaProduk} 😊" (pakai nama kalau ada; jangan tanya ulang data yang sudah ada di form).
-- Inbound (chat duluan): "Halo kak! 😊 Ada yang bisa aku bantu?"
+Sambut customer dengan hangat dan natural — kamu yang tentukan caranya sesuai konteks percakapan, jangan kaku.
 Jangan tanya ulang dari nol kalau konteks/data sudah tersedia.
 Kalau ditanya "kamu robot/AI/bot?" → jawab santai: "Hehe bukan kak, aku ${csNama} CS-nya 😊 Ada yang bisa dibantu?" — JANGAN akui sebagai AI.
+
+PESAN PEMBUKA SINGKAT ("kak", "halo", "min", "permisi", "hai", "p", "hei", "ada?", "mau tanya"):
+⛔ JANGAN balas "Iya kak?" atau "Ya?" — itu tidak membantu sama sekali.
+Perlakukan sebagai sinyal customer mau mulai ngobrol. Sambut hangat dan natural, buka percakapan dengan cara yang paling pas sesuai situasi.
 
 PRINSIP UTAMA
 - Produk dibeli karena KELUHAN, bukan impulsif.
@@ -1098,11 +1099,11 @@ module.exports = async function handler(req, res) {
     let imageAnalysis = null;
     if (messageType === 'image' && mediaUrl && mediaUrl.startsWith('data:image')) {
       try {
-        // Deteksi media type dari data URL (jpeg, png, webp, gif)
-        const mediaTypeMatch = mediaUrl.match(/^data:image\/([a-z]+);base64,/);
-        const imageFormat = mediaTypeMatch?.[1] || 'jpeg';
+        // Deteksi media type dari data URL (jpeg, png, webp, gif) — case-insensitive
+        const mediaTypeMatch = mediaUrl.match(/^data:image\/([a-z0-9]+);base64,/i);
+        const imageFormat = (mediaTypeMatch?.[1] || 'jpeg').toLowerCase();
         const mediaType = `image/${imageFormat}`;
-        const base64Data = mediaUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+        const base64Data = mediaUrl.replace(/^data:image\/[a-z0-9]+;base64,/i, '');
 
         const visionRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -1684,16 +1685,17 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       }
     }
 
-    // ── Bersihkan marker dari reply final ─────────────────────
+    // ── Bersihkan marker dari reply final (pakai /g agar semua instance terhapus) ──
     let reply = rawReply
-      .replace('[ESCALATE]', '')
-      .replace('[ORDER_CONFIRMED]', '')
-      .replace(/\[ORDER_DATA:[^\]]+\]/, '')
-      .replace(/\[KELUHAN:[^\]]+\]/, '')
-      .replace(/\[ALAMAT_OK:[^\]]+\]/, '')
-      .replace(/\[CEK_ONGKIR:[^\]]+\]/, '')
-      .replace(/\[WILAYAH_OK:[^\]]+\]/, '')
-      .replace(/\[GANTI_KURIR:[^\]]+\]/, '')
+      .replace(/\[ESCALATE\]/g, '')
+      .replace(/\[ORDER_CONFIRMED\]/g, '')
+      .replace(/\[ORDER_DATA:[^\]]+\]/g, '')
+      .replace(/\[KELUHAN:[^\]]+\]/g, '')
+      .replace(/\[ALAMAT_OK:[^\]]+\]/g, '')
+      .replace(/\[CEK_ONGKIR:[^\]]+\]/g, '')
+      .replace(/\[WILAYAH_OK:[^\]]+\]/g, '')
+      .replace(/\[GANTI_KURIR:[^\]]+\]/g, '')
+      .replace(/\[SISTEM[^\]]*\]/g, '')
       .trim();
 
     // ── Update conversation status jika eskalasi ──────────────
@@ -1753,7 +1755,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     // ── Update ringkasan berjalan (non-blocking, setiap 5 pesan) ──
     sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`)
       .then(all => { if (all.length % 5 === 0) updateRingkasan(conversation.id); })
-      .catch(() => {});
+      .catch(e => console.error('Ringkasan fetch error:', e.message));
 
   } catch (err) {
     console.error('Webhook error:', err.message, err.stack);
