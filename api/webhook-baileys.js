@@ -1007,6 +1007,16 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
 
+    // Inject ulang allRates setiap pesan agar Claude selalu bisa jawab pertanyaan kurir
+    if (convState.ongkir?.allRates?.length) {
+      const fmt = n => `Rp ${n.toLocaleString('id-ID')}`;
+      const tabel = convState.ongkir.allRates.map(r => {
+        const potongan = r.ongkir !== r.ongkirPromo ? ` (hemat ${fmt(r.ongkir - r.ongkirPromo)})` : '';
+        return `- ${r.nama}: ongkir ${fmt(r.ongkir)}${potongan} → TF ${fmt(r.totalTF)} | COD ${fmt(r.totalCOD)}`;
+      }).join('\n');
+      systemPrompt += `\n\nDATA SEMUA KURIR TERSEDIA (selalu gunakan ini kalau customer tanya kurir lain — JANGAN bilang "ditentukan sistem"):\n${tabel}\nRekomendasi sistem: ${convState.ongkir.ekspedisi}`;
+    }
+
     // ── Ambil pesan terakhir (filter setelah re-open jika ada) ───
     const history = await getContextMessages(conversation.id, convState.reopened_at || null);
 
