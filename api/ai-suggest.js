@@ -62,7 +62,11 @@ module.exports = async function handler(req, res) {
   }
   // Harus mulai dari 'user'
   if (alternating.length && alternating[0].role === 'assistant') alternating.shift();
-  if (!alternating.length) return res.status(400).json({ error: 'Tidak ada pesan yang valid' });
+  // Harus berakhir dengan 'user' (Claude API tidak bisa generate kalau last message assistant)
+  while (alternating.length && alternating[alternating.length - 1].role === 'assistant') {
+    alternating.pop();
+  }
+  if (!alternating.length) return res.status(400).json({ error: 'Tidak ada pesan customer yang valid' });
 
   const sysPrompt = `Kamu CS toko yang membalas pesan WhatsApp customer. Nama kamu "Sari".
 Tugas: buat SATU balasan terbaik untuk melanjutkan percakapan ini.
