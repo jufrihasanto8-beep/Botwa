@@ -415,6 +415,14 @@ body.light .fu-msg-lbl{color:#94a3b8}
             </select>
           </div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label>Berat Produk (gram)</label>
+            <input type="number" id="f-berat" placeholder="500" value="500">
+            <small style="color:#64748b;font-size:10px;margin-top:2px;">Untuk kalkulasi ongkir. Default: 500g</small>
+          </div>
+          <div></div>
+        </div>
         <div class="form-group">
           <label>Cara Pakai</label>
           <textarea id="f-cara-pakai" rows="3" placeholder="2x sehari 1 kapsul, diminum setelah makan..."></textarea>
@@ -784,7 +792,7 @@ function renderGrid() {
       <div class="prod-body">
         ${keluhan.length ? `<div style="margin-bottom:10px;">${keluhan.slice(0,4).map(k=>`<span class="prod-tag">${k}</span>`).join('')}${keluhan.length>4?`<span class="prod-tag">+${keluhan.length-4}</span>`:''}</div>` : ''}
         <div class="prod-meta">Ongkir: <span>${promo}</span></div>
-        <div class="prod-meta">Persona CS: <span>${p.persona_cs_nama || 'Sari'}</span></div>
+        <div class="prod-meta">Berat: <span>${p.berat_gram || 500}g</span> · Persona CS: <span>${p.persona_cs_nama || 'Sari'}</span></div>
         ${p.cara_pakai ? `<div class="prod-meta" style="margin-top:8px;font-size:12px;">${p.cara_pakai.slice(0,80)}...</div>` : ''}
       </div>
       <div class="prod-footer">
@@ -813,6 +821,7 @@ function openAdd() {
   document.getElementById('f-nama').value = '';
   document.getElementById('f-harga').value = '';
   document.getElementById('f-aktif').value = 'true';
+  document.getElementById('f-berat').value = '500';
   document.getElementById('f-cara-pakai').value = '';
   document.getElementById('f-asal-pengiriman').value = '';
   document.getElementById('f-knowledge').value = '';
@@ -837,6 +846,7 @@ async function openEdit(id) {
   document.getElementById('f-nama').value = p.nama || '';
   document.getElementById('f-harga').value = p.harga || '';
   document.getElementById('f-aktif').value = String(p.aktif);
+  document.getElementById('f-berat').value = p.berat_gram || 500;
   document.getElementById('f-cara-pakai').value = p.cara_pakai || '';
   document.getElementById('f-asal-pengiriman').value = p.asal_pengiriman || '';
   document.getElementById('f-knowledge').value = p.product_knowledge || '';
@@ -940,6 +950,7 @@ async function saveProduk() {
     nama,
     harga,
     aktif: document.getElementById('f-aktif').value === 'true',
+    berat_gram: parseInt(document.getElementById('f-berat').value) || 500,
     cara_pakai: document.getElementById('f-cara-pakai').value.trim(),
     asal_pengiriman: document.getElementById('f-asal-pengiriman').value.trim(),
     product_knowledge: document.getElementById('f-knowledge').value.trim(),
