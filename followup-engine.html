@@ -203,15 +203,21 @@ textarea.sched-input{resize:vertical;min-height:60px}
                 <textarea id="f-pesan" class="sched-input" placeholder="Halo Kak {nama}! Ada kabar baik hari ini..." rows="3"></textarea>
               </div>
               <div id="field-image" style="display:none">
-                <label class="sched-row-label" style="display:block;margin-bottom:6px">URL Gambar</label>
-                <div style="display:flex;gap:10px;align-items:flex-start">
-                  <input type="url" id="f-image" class="sched-input" placeholder="https://..." oninput="previewImg()"
-                    style="flex:1">
-                  <img id="img-prev" class="img-preview" src="" alt="preview" onerror="this.style.display='none'">
+                <label class="sched-row-label" style="display:block;margin-bottom:6px">Gambar</label>
+                <input type="hidden" id="f-image">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <div id="fu-photo-thumb" onclick="document.getElementById('f-image-file').click()"
+                    style="width:64px;height:64px;border-radius:8px;border:1.5px dashed rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;flex-shrink:0;overflow:hidden;background:rgba(255,255,255,.03)">🖼️</div>
+                  <div>
+                    <div style="display:flex;gap:6px">
+                      <button type="button" onclick="document.getElementById('f-image-file').click()"
+                        style="padding:6px 12px;border:1px solid rgba(255,255,255,.12);background:none;color:#93c5fd;border-radius:6px;font-size:12px;cursor:pointer">Upload Gambar</button>
+                      <button type="button" id="fu-remove-photo" onclick="removeFUPhoto()" style="display:none;padding:6px 12px;border:1px solid rgba(248,113,113,.2);background:none;color:#f87171;border-radius:6px;font-size:12px;cursor:pointer">Hapus</button>
+                    </div>
+                    <div style="font-size:11px;color:#475569;margin-top:4px" id="fu-photo-name">Belum ada gambar • maks 5MB</div>
+                  </div>
                 </div>
-                <div style="font-size:11px;color:#475569;margin-top:4px">
-                  Bisa pakai Google Drive, ImgBB, atau hosting gambar lainnya
-                </div>
+                <input type="file" id="f-image-file" accept="image/*" style="display:none" onchange="handleFUPhoto(this)">
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <label class="toggle">
@@ -430,8 +436,7 @@ function openAddForm() {
   document.getElementById('f-jam').value = '09:00';
   document.getElementById('f-tipe').value = 'ai';
   document.getElementById('f-pesan').value = '';
-  document.getElementById('f-image').value = '';
-  document.getElementById('img-prev').className = 'img-preview';
+  removeFUPhoto();
   document.getElementById('f-aktif').checked = true;
   updateFormFields();
   document.getElementById('form-wrap').style.display = '';
@@ -448,10 +453,15 @@ function openEditForm(id) {
   document.getElementById('f-jam').value = s.jam_kirim?.slice(0,5) || '09:00';
   document.getElementById('f-tipe').value = s.tipe;
   document.getElementById('f-pesan').value = s.pesan_custom || '';
-  document.getElementById('f-image').value = s.image_url || '';
   document.getElementById('f-aktif').checked = s.aktif;
   updateFormFields();
-  previewImg();
+  // Load foto existing
+  if (s.image_url) {
+    document.getElementById('f-image').value = s.image_url;
+    document.getElementById('fu-photo-thumb').innerHTML = `<img src="${s.image_url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="document.getElementById('f-image-file').click()">`;
+    document.getElementById('fu-photo-name').textContent = 'Gambar tersimpan';
+    document.getElementById('fu-remove-photo').style.display = 'inline-block';
+  } else { removeFUPhoto(); }
   document.getElementById('form-wrap').style.display = '';
   document.getElementById('form-wrap').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -476,11 +486,35 @@ function updateFormFields() {
   }
 }
 
-function previewImg() {
-  const url = document.getElementById('f-image').value.trim();
-  const img = document.getElementById('img-prev');
-  if (url) { img.src = url; img.className = 'img-preview show'; }
-  else { img.className = 'img-preview'; }
+async function handleFUPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('Foto maksimal 5MB', 'error'); input.value=''; return; }
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const path = `${userId}/fu_${Date.now()}.${ext}`;
+  toast('Mengupload gambar...');
+  try {
+    const res = await fetch(`${SB_URL}/storage/v1/object/followup-media/${path}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': file.type },
+      body: file,
+    });
+    if (!res.ok) throw new Error('Upload gagal');
+    const url = `${SB_URL}/storage/v1/object/public/followup-media/${path}`;
+    document.getElementById('f-image').value = url;
+    document.getElementById('fu-photo-name').textContent = file.name;
+    document.getElementById('fu-photo-thumb').innerHTML = `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="document.getElementById('f-image-file').click()">`;
+    document.getElementById('fu-remove-photo').style.display = 'inline-block';
+    toast('Gambar berhasil diupload!');
+  } catch(e) { toast('Gagal: ' + e.message, 'error'); input.value=''; }
+}
+
+function removeFUPhoto() {
+  document.getElementById('f-image').value = '';
+  document.getElementById('f-image-file').value = '';
+  document.getElementById('fu-photo-name').textContent = 'Belum ada gambar • maks 5MB';
+  document.getElementById('fu-photo-thumb').innerHTML = '🖼️';
+  document.getElementById('fu-remove-photo').style.display = 'none';
 }
 
 async function saveSchedule() {

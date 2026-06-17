@@ -433,6 +433,23 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <input type="text" id="f-asal-pengiriman" placeholder="cth: Kulon Progo, Yogyakarta">
         </div>
         <div class="form-group">
+          <label>Foto Produk</label>
+          <input type="hidden" id="f-gambar-url">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div id="prod-photo-thumb" onclick="document.getElementById('f-gambar-file').click()"
+              style="width:64px;height:64px;border-radius:8px;border:1.5px dashed rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;flex-shrink:0;overflow:hidden;background:rgba(255,255,255,.03)">📷</div>
+            <div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button type="button" onclick="document.getElementById('f-gambar-file').click()"
+                  style="padding:6px 12px;border:1px solid rgba(255,255,255,.12);background:none;color:#93c5fd;border-radius:6px;font-size:12px;cursor:pointer">Upload Foto</button>
+                <button type="button" id="prod-remove-photo" onclick="removeProdPhoto()" style="display:none;padding:6px 12px;border:1px solid rgba(248,113,113,.2);background:none;color:#f87171;border-radius:6px;font-size:12px;cursor:pointer">Hapus</button>
+              </div>
+              <div style="font-size:11px;color:#475569;margin-top:4px" id="prod-photo-name">Belum ada foto • maks 5MB</div>
+            </div>
+          </div>
+          <input type="file" id="f-gambar-file" accept="image/*" style="display:none" onchange="handleProdPhoto(this)">
+        </div>
+        <div class="form-group">
           <label>Product Knowledge (info lengkap untuk AI)</label>
           <textarea id="f-knowledge" rows="5" placeholder="Kandungan, manfaat, testimoni, dll..."></textarea>
         </div>
@@ -830,6 +847,7 @@ function openAdd() {
   document.getElementById('f-persona-gaya').value = 'hangat, sabar, konsultatif';
   document.getElementById('f-promo-tipe').value = 'none';
   document.getElementById('f-promo-nilai').value = '';
+  removeProdPhoto();
   renderTags('keluhan'); renderTags('diagnosa');
   renderMappingList();
   togglePromoNilai();
@@ -853,6 +871,13 @@ async function openEdit(id) {
   document.getElementById('f-knowledge').value = p.product_knowledge || '';
   document.getElementById('f-persona-nama').value = p.persona_cs_nama || 'Sari';
   document.getElementById('f-persona-gaya').value = p.persona_cs_gaya || 'hangat, sabar, konsultatif';
+  // Load foto produk
+  if (p.gambar_url) {
+    document.getElementById('f-gambar-url').value = p.gambar_url;
+    document.getElementById('prod-photo-thumb').innerHTML = `<img src="${p.gambar_url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="document.getElementById('f-gambar-file').click()">`;
+    document.getElementById('prod-photo-name').textContent = 'Foto tersimpan';
+    document.getElementById('prod-remove-photo').style.display = 'inline-block';
+  } else { removeProdPhoto(); }
   const promo = p.promo_ongkir || {};
   document.getElementById('f-promo-tipe').value = promo.tipe || 'none';
   document.getElementById('f-promo-nilai').value = promo.nilai || '';
@@ -954,6 +979,7 @@ async function saveProduk() {
     berat_gram: parseInt(document.getElementById('f-berat').value) || 500,
     cara_pakai: document.getElementById('f-cara-pakai').value.trim(),
     asal_pengiriman: document.getElementById('f-asal-pengiriman').value.trim(),
+    gambar_url: document.getElementById('f-gambar-url').value || null,
     product_knowledge: document.getElementById('f-knowledge').value.trim(),
     keluhan_cocok: tagsData.keluhan,
     pertanyaan_diagnosa: tagsData.diagnosa,
@@ -1082,6 +1108,37 @@ function onSOPCatChange() {
   const cat = document.getElementById('sop-f-cat').value;
   document.getElementById('sop-photo-group').style.display =
     ['h1','h3','h7'].includes(cat) ? 'block' : 'none';
+}
+
+async function handleProdPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('❌ Foto maksimal 5MB'); input.value=''; return; }
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const path = `${currentUserId}/prod_${Date.now()}.${ext}`;
+  toast('⏳ Mengupload foto...');
+  try {
+    const res = await fetch(`${SB_URL}/storage/v1/object/followup-media/${path}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': file.type },
+      body: file,
+    });
+    if (!res.ok) throw new Error('Upload gagal');
+    const url = `${SB_URL}/storage/v1/object/public/followup-media/${path}`;
+    document.getElementById('f-gambar-url').value = url;
+    document.getElementById('prod-photo-name').textContent = file.name;
+    document.getElementById('prod-photo-thumb').innerHTML = `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="document.getElementById('f-gambar-file').click()">`;
+    document.getElementById('prod-remove-photo').style.display = 'inline-block';
+    toast('✅ Foto berhasil diupload');
+  } catch(e) { toast('❌ ' + e.message); input.value=''; }
+}
+
+function removeProdPhoto() {
+  document.getElementById('f-gambar-url').value = '';
+  document.getElementById('f-gambar-file').value = '';
+  document.getElementById('prod-photo-name').textContent = 'Belum ada foto • maks 5MB';
+  document.getElementById('prod-photo-thumb').innerHTML = '📷';
+  document.getElementById('prod-remove-photo').style.display = 'none';
 }
 
 async function handleSOPPhoto(input) {
