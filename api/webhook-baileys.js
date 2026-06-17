@@ -485,16 +485,24 @@ function extractProposedWilayah(aiMsg) {
   const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
-    // Prefix "ke" atau "jadi" WAJIB ada (tidak optional) untuk menghindari false positive
-    const m = line.match(/(?:jadi\s+ke\s+|jadi\s+|ke\s+)([A-Za-z][A-Za-z\s,]{2,40}?)\s+ya\s+kak[?😊🙏\s]/i);
+
+    // Pattern 1: "ke X ya kak?" / "jadi X ya kak?"
+    let m = line.match(/(?:jadi\s+ke\s+|jadi\s+|ke\s+)([A-Za-z][A-Za-z\s,]{2,60}?)\s+ya\s+kak[?😊🙏\s]/i);
+
+    // Pattern 2: "Berarti X ya kak?" / "Berarti X ya?"
+    if (!m) m = line.match(/berarti\s+([A-Za-z][A-Za-z\s,]{2,60}?)\s+ya[\s?😊🙏]/i);
+
+    // Pattern 3: "X ya kak?" di akhir (tanda tanya = pertanyaan)
+    if (!m) m = line.match(/([A-Za-z][A-Za-z\s,]{5,60}?)\s+ya\s+kak\s*\?/i);
+
     if (m) {
-      const candidate = m[1].trim().replace(/,\s*$/, '');
+      const candidate = m[1].trim().replace(/[,?!]+$/, '');
       const wordCount = candidate.split(/\s+/).length;
       if (
         candidate.length >= 3 &&
-        wordCount <= 5 &&                        // nama wilayah max 5 kata
-        !BUKAN_WILAYAH.test(candidate) &&        // tidak diawali kata filler
-        !KATA_KERJA_WILAYAH.test(candidate)      // tidak mengandung kata kerja
+        wordCount <= 8 &&
+        !BUKAN_WILAYAH.test(candidate) &&
+        !KATA_KERJA_WILAYAH.test(candidate)
       ) return candidate;
     }
   }
@@ -1438,16 +1446,26 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     let proposedWilayah = convState.proposed_wilayah;
 
     // PENTING: Kalau customer kirim pesan BUKAN konfirmasi, coba cari wilayah dari pesannya
-    if (!isConfirmation(message) && message.length >= 3 && message.length <= 60) {
+    // Tapi hanya proses kalau ada kata kunci intent lokasi (biar tidak terlalu agresif)
+    const intentLokasi = /\b(kirim|alamat|tujuan|lokasi|daerah|wilayah|kecamatan|kelurahan|kota|kabupaten|ganti|pindah|bukan|salah)\b/i.test(message);
+
+    if (!isConfirmation(message) && message.length >= 3 && message.length <= 60 && (intentLokasi || !convState.ongkir)) {
       // Coba cari wilayah dari pesan customer langsung
       const pesanBersih = message.replace(/[?!.,]+/g, '').trim();
       const cariHasil = await cariWilayah(pesanBersih, 20);
       const kecUnik = [...new Set(cariHasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
 
       if (cariHasil.length > 0) {
-        // ADA wilayah ditemukan → clear ongkir lama karena customer mungkin ganti tujuan
-        if (convState.ongkir) {
-          console.log(`Clear ongkir lama karena customer sebut wilayah baru: "${pesanBersih}"`);
+        // Cek apakah wilayah baru BEDA dari wilayah saat ini
+        const wilayahLama = convState.wilayah?.toLowerCase() || '';
+        const w = cariHasil[0];
+        const wilayahBaru = `${w.kecamatan}, ${w.kabupaten}, ${w.provinsi}`;
+        const wilayahBaruLower = wilayahBaru.toLowerCase();
+        const adalahWilayahBaru = !wilayahLama || !wilayahBaruLower.includes(wilayahLama.split(',')[0]?.trim());
+
+        if (adalahWilayahBaru && convState.ongkir) {
+          // Wilayah BEDA → clear ongkir lama
+          console.log(`Clear ongkir karena wilayah baru: "${wilayahBaru}" (lama: "${convState.wilayah}")`);
           await updateConvState(conversation.id, { ongkir: null, wilayah: null });
           convState.ongkir = null;
           convState.wilayah = null;
@@ -1455,8 +1473,6 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
         if (kecUnik.length === 1) {
           // Satu kecamatan ketemu → simpan sebagai proposed_wilayah
-          const w = cariHasil[0];
-          const wilayahBaru = `${w.kecamatan}, ${w.kabupaten}, ${w.provinsi}`;
           console.log(`Wilayah terdeteksi dari pesan customer: "${wilayahBaru}"`);
           await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
           convState.proposed_wilayah = wilayahBaru;
@@ -1468,8 +1484,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           convState.proposed_wilayah = null;
           proposedWilayah = null;
         }
-      } else if (proposedWilayah) {
-        // Tidak ketemu wilayah tapi ada proposed lama → clear juga
+      } else if (proposedWilayah && intentLokasi) {
+        // Tidak ketemu wilayah tapi ada intent lokasi + proposed lama → clear
         console.log(`Clear proposed_wilayah lama: "${proposedWilayah}"`);
         await updateConvState(conversation.id, { proposed_wilayah: null });
         convState.proposed_wilayah = null;
