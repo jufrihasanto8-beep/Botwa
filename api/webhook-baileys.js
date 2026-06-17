@@ -204,6 +204,7 @@ Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
+Foto produk     : ${product?.gambar_url ? 'Ada — sistem kirim otomatis kalau customer tanya foto/gambar' : 'Tidak ada'}
 Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI (WAJIB ikuti urutan, JANGAN loncat)
@@ -864,7 +865,7 @@ async function reverseGeocode(lat, lng) {
 }
 
 /* ── KIRIM WA via Baileys server ──────────────────────────── */
-async function sendWA(sessionId, waNumber, message, isOutbound = false) {
+async function sendWA(sessionId, waNumber, message, isOutbound = false, imageUrl = null, caption = null) {
   if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
   const res = await fetchWithTimeout(`${BAILEYS_URL}/send`, {
     method: 'POST',
@@ -875,8 +876,10 @@ async function sendWA(sessionId, waNumber, message, isOutbound = false) {
       wa_number: waNumber,
       message,
       is_outbound: isOutbound,
+      image_url: imageUrl || undefined,
+      caption: caption || undefined,
     }),
-  }, 10000);
+  }, 15000); // 15 detik untuk gambar
   if (!res.ok) throw new Error(`Baileys send error: ${await res.text()}`);
   return res.json();
 }
@@ -1748,7 +1751,22 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     // ── Simpan & kirim balasan ─────────────────────────────────
     await saveMessage(conversation.id, 'ai', reply);
+
+    // ── Auto-kirim gambar produk kalau customer tanya foto ────
+    const tanyaFoto = /\b(foto|gambar|pic|photo|tampilan|bentuk|wujud|lihat produk|gambarnya|fotonya)\b/i.test(message);
+    const adaGambarProduk = product?.gambar_url;
+    const sudahKirimFoto  = convState.foto_terkirim;
+
+    // Kirim teks reply dulu
     await sendWA(userId, reply_jid, reply);
+
+    // Kalau customer tanya foto dan ada gambar produk → kirim gambar juga
+    if (tanyaFoto && adaGambarProduk && !sudahKirimFoto) {
+      await new Promise(r => setTimeout(r, 800));
+      await sendWA(userId, reply_jid, null, false, product.gambar_url, product.nama);
+      await updateConvState(conversation.id, { foto_terkirim: true });
+      console.log(`Gambar produk terkirim: ${product.gambar_url}`);
+    }
 
     res.status(200).json({ ok: true });
 

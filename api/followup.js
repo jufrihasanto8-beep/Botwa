@@ -1,7 +1,8 @@
 // ══════════════════════════════════════════════════════════
-//  Follow-up Otomatis — Vercel Cron Job
-//  Jalan setiap 30 menit via Vercel Cron
-//  Kirim WA ke leads HARI INI yang diam ≥ 1 jam setelah pesan AI
+//  Follow-up Otomatis — Vercel Cron Job (tiap 30 menit via cron-job.org)
+//
+//  Hari H  : AI otomatis — 1 jam setelah AI balas terakhir
+//  Hari 2+ : Sesuai jadwal followup_schedule (ai / testimoni / promo / custom)
 // ══════════════════════════════════════════════════════════
 
 const SUPABASE_URL        = process.env.SUPABASE_URL;
@@ -11,15 +12,13 @@ const WEBHOOK_SECRET      = process.env.WEBHOOK_SECRET;
 const CRON_SECRET         = process.env.CRON_SECRET;
 const ANTHROPIC_KEY       = process.env.ANTHROPIC_KEY;
 
+// ── Helpers ───────────────────────────────────────────────
 async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    return res;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally { clearTimeout(id); }
 }
 
 function sbH() {
@@ -54,37 +53,58 @@ async function sbPost(table, body) {
   if (!res.ok) throw new Error(`sbPost ${table}: ${await res.text()}`);
 }
 
-// Generate follow-up message pakai Claude berdasarkan konteks percakapan terakhir
-async function generateFollowup(messages, namaKak, namaProduk, csNama) {
+async function sendWA(sessionId, jid, message, imageUrl = null, caption = null) {
+  if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
+  const res = await fetchWithTimeout(`${BAILEYS_URL}/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      secret: WEBHOOK_SECRET,
+      session_id: sessionId,
+      wa_number: jid,
+      message: message || '',
+      is_outbound: true,
+      image_url: imageUrl || undefined,
+      caption: caption || undefined,
+    }),
+  }, 15000);
+  if (!res.ok) throw new Error(`Baileys send error: ${await res.text()}`);
+  return res.json();
+}
+
+// ── Generate pesan AI dari konteks percakapan ─────────────
+async function generateAIFollowup(messages, namaKak, namaProduk, csNama, isLast = false) {
   if (!ANTHROPIC_KEY) return null;
 
-  // Ambil 6 pesan terakhir saja sebagai konteks
   const recent = messages.slice(-6);
   const transcript = recent.map(m =>
-    `${m.role === 'customer' ? 'Customer' : 'CS'}: ${(m.isi || '').replace(/\[SISTEM[^\]]*\]/g, '').replace(/\[.*?\]/g, '').trim()}`
+    `${m.role === 'customer' ? 'Customer' : 'CS'}: ${(m.isi || '').replace(/\[.*?\]/g, '').trim()}`
   ).filter(l => l.split(': ')[1]).join('\n');
 
-  const prompt = `Kamu ${csNama || 'Sari'}, CS WhatsApp toko yang jual ${namaProduk || 'produk herbal'}.
+  const toneNote = isLast
+    ? 'Ini follow-up TERAKHIR. Tone penutup — beri ruang, tidak maksa, pintu tetap terbuka.'
+    : 'Tone hangat, natural, sambung konteks.';
 
-Customer bernama ${namaKak || 'Kak'} tadi ngobrol tapi sekarang tiba-tiba diam selama 1 jam tanpa balas.
+  const prompt = `Kamu ${csNama || 'Sari'}, CS WhatsApp toko ${namaProduk || 'produk kami'}.
 
-Berikut akhir percakapan tadi:
+Customer ${namaKak ? 'kak ' + namaKak : 'ini'} belum balas sejak kemarin.
+
+Akhir percakapan:
 ---
 ${transcript}
 ---
 
-Buatkan SATU pesan follow-up WhatsApp yang:
-- Hangat dan natural, seperti teman yang peduli (bukan sales yang maksa)
-- Sangat pendek: 1-2 kalimat SAJA
-- Sambung dari konteks terakhir — jangan mulai dari awal, jangan sapa ulang
-- Jika customer tadi sedang tanya/cerita sesuatu, tindak-lanjuti hal itu secara spesifik
-- Jika customer tadi sudah hampir order (nanya ongkir/alamat), ingatkan pelan-pelan
-- Jika konsultasi masih di awal, tanya lanjutan ringan tentang keluhannya
-- Panggil "Kak" atau nama depannya
-- Emoji 1 saja, tidak lebay
-- DILARANG markdown, DILARANG "Halo kak" dari awal, DILARANG jual keras
+${toneNote}
 
-Tulis pesan follow-up saja, tanpa penjelasan.`;
+Buat SATU pesan follow-up WhatsApp:
+- 1-2 kalimat SAJA
+- Natural, jangan kaku
+- Sambung dari konteks terakhir
+- Panggil "Kak" atau nama depannya
+- 1 emoji saja
+- DILARANG markdown
+
+Tulis pesannya langsung tanpa penjelasan.`;
 
   try {
     const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
@@ -103,178 +123,269 @@ Tulis pesan follow-up saja, tanpa penjelasan.`;
     const data = await res.json();
     return data.content?.[0]?.text?.trim() || null;
   } catch(e) {
-    console.error('generateFollowup error:', e.message);
+    console.error('generateAIFollowup error:', e.message);
     return null;
   }
 }
 
-async function sendWA(sessionId, jid, message) {
-  if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
-  const res = await fetchWithTimeout(`${BAILEYS_URL}/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      secret: WEBHOOK_SECRET,
-      session_id: sessionId,
-      wa_number: jid,
-      message,
-      is_outbound: true,
-    }),
-  });
-  if (!res.ok) throw new Error(`Baileys send error: ${await res.text()}`);
-  return res.json();
-}
+// ── Kirim follow-up ke satu conversation ─────────────────
+async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now) {
+  const state    = conv.state || {};
+  const jid      = customer.reply_jid || customer.wa_number;
+  const namaKak  = customer.nama && customer.nama !== customer.wa_number
+    ? customer.nama.split(' ')[0] : '';
 
-module.exports = async function handler(req, res) {
-  // Verifikasi CRON_SECRET (Vercel otomatis sisipkan di header)
-  const authHeader = req.headers['authorization'] || '';
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-    // Izinkan juga manual GET/POST untuk testing
-    if (req.method === 'GET' && req.query?.secret === CRON_SECRET) {
-      // ok
-    } else {
-      console.warn('Follow-up: auth gagal');
-      return res.status(401).json({ ok: false, reason: 'unauthorized' });
+  // Ambil pesan terakhir untuk konteks AI
+  const recentMsgs = await sbGet('conv_messages',
+    `?conversation_id=eq.${conv.id}&order=created_at.desc&limit=6`
+  );
+  recentMsgs.reverse();
+
+  let message  = null;
+  let imageUrl = null;
+  let caption  = null;
+
+  const tipe = schedule?.tipe || 'ai';
+  const hariIni = schedule?.hari || 1;
+  const isLastDay = schedule?.is_last || false;
+
+  if (tipe === 'ai') {
+    message = await generateAIFollowup(recentMsgs, namaKak, namaProduk, csNama, isLastDay);
+    if (!message) {
+      message = namaKak
+        ? `Kak ${namaKak}, masih ada yang bisa aku bantu? 😊`
+        : `Masih ada yang bisa aku bantu kak? 😊`;
     }
+
+  } else if (tipe === 'testimoni') {
+    imageUrl = schedule.image_url || null;
+    caption  = schedule.pesan_custom || `Ini testimoni dari customer kami kak ${namaKak} 😊 Banyak yang sudah merasakan manfaatnya!`;
+    message  = null; // gambar + caption sudah cukup
+
+  } else if (tipe === 'promo') {
+    imageUrl = schedule.image_url || null;
+    caption  = schedule.pesan_custom || `Ada promo spesial hari ini kak ${namaKak}! 🎉 Jangan sampai kelewatan ya`;
+    message  = null;
+
+  } else if (tipe === 'custom') {
+    message  = schedule.pesan_custom
+      ? schedule.pesan_custom.replace('{nama}', namaKak || 'Kak')
+      : `Halo kak ${namaKak}! Ada yang bisa aku bantu? 😊`;
+    imageUrl = schedule.image_url || null;
+    caption  = imageUrl ? (schedule.pesan_custom || '') : null;
+    if (imageUrl) message = null; // kalau ada gambar, teks masuk ke caption
   }
 
+  // Kirim
+  if (imageUrl) {
+    await sendWA(conv.user_id, jid, null, imageUrl, caption);
+  } else if (message) {
+    await sendWA(conv.user_id, jid, message);
+  } else {
+    return null; // tidak ada yang dikirim
+  }
+
+  // Simpan ke conv_messages
+  const isiLog = imageUrl
+    ? `[Follow-up Hari ${hariIni} - ${tipe}] ${caption || ''}`
+    : `[Follow-up Hari ${hariIni} - ${tipe}] ${message}`;
+  await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: isiLog });
+
+  // Update state: tandai hari ini sudah terkirim
+  const followedDays = state.followed_up_days || [];
+  if (!followedDays.includes(hariIni)) followedDays.push(hariIni);
+
+  await sbPatch('conversations', `?id=eq.${conv.id}`, {
+    last_msg_at: now.toISOString(),
+    state: {
+      ...state,
+      followed_up: true,
+      followed_up_days: followedDays,
+      followed_up_at: now.toISOString(),
+    },
+  });
+
+  return message || caption;
+}
+
+// ── MAIN HANDLER ──────────────────────────────────────────
+module.exports = async function handler(req, res) {
+  const authHeader = req.headers['authorization'] || '';
+  const isManual   = req.method === 'GET' && req.query?.secret === CRON_SECRET;
+  const isCron     = authHeader === `Bearer ${CRON_SECRET}`;
+
+  if (CRON_SECRET && !isManual && !isCron) {
+    return res.status(401).json({ ok: false, reason: 'unauthorized' });
+  }
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
-  console.log('Follow-up job started:', new Date().toISOString());
+  const now     = new Date();
+  // Jam WIB (UTC+7)
+  const jamWIB  = now.getUTCHours() + 7 >= 24
+    ? now.getUTCHours() + 7 - 24
+    : now.getUTCHours() + 7;
+  const menitWIB = now.getUTCMinutes();
+  const jamNow  = `${String(jamWIB).padStart(2,'0')}:${String(menitWIB).padStart(2,'0')}`;
 
-  const now      = new Date();
-  const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
-  const todayStart = `${todayStr}T00:00:00.000Z`;
-  // Conversations yang sudah diam ≥ 1 jam (last_msg_at ≤ 1 jam lalu)
-  const cutoff1h = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-  // Jangan follow-up lebih dari 4 jam setelah masuk (sudah terlalu malam/lama)
-  const cutoff4h = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
+  console.log(`Follow-up job: ${now.toISOString()} (WIB ${jamNow})`);
 
-  let totalSent = 0;
-  let totalSkipped = 0;
+  let totalSent = 0, totalSkipped = 0;
   const results = [];
 
   try {
-    // Ambil semua conversation aktif yang masuk HARI INI
-    // - status baru/aktif (belum selesai/eskalasi)
-    // - created_at hari ini (lead baru)
-    // - last_msg_at sudah > 1 jam lalu (diam)
-    // - last_msg_at tidak > 4 jam (masih relevan)
-    const conversations = await sbGet('conversations',
+    // ── BAGIAN 1: Hari H — 1 jam setelah AI balas, untuk leads hari ini ──
+    const todayStart = new Date(now);
+    todayStart.setUTCHours(0, 0, 0, 0);
+    // Kurangi offset WIB: hari ini = 00:00 WIB = 17:00 UTC kemarin
+    todayStart.setTime(todayStart.getTime() - 7 * 60 * 60 * 1000);
+
+    const cutoff1h = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const cutoff4h = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
+
+    const hariHConvs = await sbGet('conversations',
       `?status=in.(baru,aktif)` +
-      `&created_at=gte.${todayStart}` +
+      `&created_at=gte.${todayStart.toISOString()}` +
       `&last_msg_at=lte.${cutoff1h}` +
       `&last_msg_at=gte.${cutoff4h}` +
-      `&select=id,user_id,customer_id,product_id,state,last_msg_at`
+      `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
     );
 
-    console.log(`Candidate conversations: ${conversations.length}`);
-
-    for (const conv of conversations) {
+    for (const conv of hariHConvs) {
       try {
         const state = conv.state || {};
+        const followedDays = state.followed_up_days || [];
 
-        // Skip jika sudah pernah di-follow-up
-        if (state.followed_up) {
-          totalSkipped++;
-          continue;
-        }
+        // Skip jika hari 1 sudah terkirim atau eskalasi
+        if (followedDays.includes(1)) { totalSkipped++; continue; }
+        if (conv.status === 'eskalasi') { totalSkipped++; continue; }
 
-        // Skip jika eskalasi
-        if (state.tahap === 'eskalasi') {
-          totalSkipped++;
-          continue;
-        }
-
-        // Cek pesan terakhir harus dari AI (bukan customer yang belum dibalas)
+        // Cek pesan terakhir harus dari AI
         const lastMsgs = await sbGet('conv_messages',
           `?conversation_id=eq.${conv.id}&order=created_at.desc&limit=1`
         );
-        if (!lastMsgs.length) { totalSkipped++; continue; }
-        const lastMsg = lastMsgs[0];
+        if (!lastMsgs.length || lastMsgs[0].role !== 'ai') { totalSkipped++; continue; }
 
-        // Hanya follow-up kalau pesan terakhir dari AI dan customer belum reply
-        if (lastMsg.role !== 'ai') {
-          totalSkipped++;
-          continue;
-        }
-
-        // Ambil data customer
         const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
         if (!customers.length) { totalSkipped++; continue; }
         const customer = customers[0];
-        const jid = customer.reply_jid || customer.wa_number;
-        if (!jid) { totalSkipped++; continue; }
+        if (!customer.reply_jid && !customer.wa_number) { totalSkipped++; continue; }
 
-        // Ambil nama produk + persona CS kalau ada
-        let namaProduk = '';
-        let csNama = 'Sari';
+        let namaProduk = '', csNama = 'Sari';
         if (conv.product_id) {
           const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama&limit=1`);
           namaProduk = prods[0]?.nama || '';
-          csNama = prods[0]?.persona_cs_nama || 'Sari';
+          csNama     = prods[0]?.persona_cs_nama || 'Sari';
         }
 
-        // Ambil 6 pesan terakhir sebagai konteks untuk AI
-        const recentMsgs = await sbGet('conv_messages',
-          `?conversation_id=eq.${conv.id}&order=created_at.desc&limit=6`
-        );
-        recentMsgs.reverse(); // urutkan dari lama ke baru
+        // Cek apakah ada schedule khusus untuk hari 1
+        const schedHari1 = await sbGet('followup_schedule',
+          `?user_id=eq.${conv.user_id}&hari=eq.1&aktif=eq.true&limit=1`
+        ).catch(() => []);
 
-        const namaKak = customer.nama && customer.nama !== customer.wa_number
-          ? customer.nama.split(' ')[0]
-          : '';
+        const schedule = schedHari1[0] || { hari: 1, tipe: 'ai' };
+        const pesan = await kirimFollowup(conv, customer, namaProduk, csNama, schedule, now);
 
-        // Generate follow-up pakai Claude berdasarkan konteks percakapan
-        let followupMsg = await generateFollowup(recentMsgs, namaKak, namaProduk, csNama);
-
-        // Fallback kalau Claude gagal / tidak ada API key
-        if (!followupMsg) {
-          followupMsg = namaKak
-            ? `Kak ${namaKak}, masih ada yang bisa aku bantu? 😊 Jangan ragu kalau mau tanya-tanya lagi ya`
-            : `Masih ada yang bisa aku bantu kak? 😊 Jangan ragu kalau mau tanya-tanya lagi ya`;
+        if (pesan !== null) {
+          totalSent++;
+          results.push({ hari: 1, conv_id: conv.id, customer: customer.nama, status: 'sent' });
+          console.log(`[Hari H] → ${customer.nama || customer.wa_number}`);
         }
 
-        // Kirim via Baileys
-        await sendWA(conv.user_id, jid, followupMsg);
-
-        // Simpan ke conv_messages
-        await sbPost('conv_messages', {
-          conversation_id: conv.id,
-          role: 'ai',
-          isi: followupMsg,
-        });
-
-        // Tandai sudah follow-up + update last_msg_at
-        await sbPatch('conversations', `?id=eq.${conv.id}`, {
-          last_msg_at: now.toISOString(),
-          state: { ...state, followed_up: true, followed_up_at: now.toISOString() },
-        });
-
-        totalSent++;
-        results.push({
-          conv_id: conv.id,
-          customer: customer.nama || jid,
-          wa: jid,
-          produk: namaProduk || '-',
-          pesan: followupMsg,
-          status: 'sent',
-        });
-
-        console.log(`Follow-up terkirim → ${customer.nama || jid}: "${followupMsg.slice(0, 60)}..."`);
-
-        // Jeda antar kirim agar tidak spam server
         await new Promise(r => setTimeout(r, 1500));
-
       } catch(e) {
-        console.error(`Error follow-up conv ${conv.id}:`, e.message);
-        results.push({ conv_id: conv.id, status: 'error', error: e.message });
+        console.error(`Error hari H conv ${conv.id}:`, e.message);
       }
     }
 
-    const summary = `Follow-up selesai: ${totalSent} terkirim, ${totalSkipped} dilewati dari ${conversations.length} kandidat`;
-    console.log(summary);
-    return res.status(200).json({ ok: true, sent: totalSent, skipped: totalSkipped, total: conversations.length, results });
+    // ── BAGIAN 2: Hari 2+ — berdasarkan followup_schedule ──
+    // Ambil semua schedule aktif per user (hari 2+)
+    const allSchedules = await sbGet('followup_schedule',
+      `?hari=gte.2&aktif=eq.true&order=hari.asc`
+    ).catch(() => []);
+
+    // Kelompokkan per user
+    const schedByUser = {};
+    for (const s of allSchedules) {
+      if (!schedByUser[s.user_id]) schedByUser[s.user_id] = [];
+      schedByUser[s.user_id].push(s);
+    }
+
+    for (const [userId, schedules] of Object.entries(schedByUser)) {
+      // Cari schedule yang jam_kirimnya cocok dengan sekarang (±30 menit)
+      const scheduleSekarang = schedules.filter(s => {
+        const [jamS, menitS] = s.jam_kirim.slice(0, 5).split(':').map(Number);
+        const totalMenitSchedule = jamS * 60 + menitS;
+        const totalMenitNow      = jamWIB * 60 + menitWIB;
+        // Window ±30 menit (cron jalan tiap 30 menit)
+        return Math.abs(totalMenitNow - totalMenitSchedule) <= 30;
+      });
+
+      if (!scheduleSekarang.length) continue;
+
+      // Cari conversations yang perlu difollow-up untuk hari ini
+      for (const sched of scheduleSekarang) {
+        const hariKe = sched.hari;
+
+        // Hitung tanggal mulai dan akhir untuk "hari ke-N"
+        // Hari ke-2 = lead masuk kemarin, hari ke-3 = 2 hari lalu, dst
+        const hariMulai = new Date(now);
+        hariMulai.setUTCDate(hariMulai.getUTCDate() - (hariKe - 1));
+        hariMulai.setUTCHours(0 - 7, 0, 0, 0); // 00:00 WIB
+
+        const hariAkhir = new Date(hariMulai);
+        hariAkhir.setUTCDate(hariAkhir.getUTCDate() + 1);
+
+        const convs = await sbGet('conversations',
+          `?user_id=eq.${userId}` +
+          `&status=in.(baru,aktif)` +
+          `&created_at=gte.${hariMulai.toISOString()}` +
+          `&created_at=lt.${hariAkhir.toISOString()}` +
+          `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
+        ).catch(() => []);
+
+        // Tandai schedule terakhir
+        const maxHari = Math.max(...schedules.map(s => s.hari));
+        sched.is_last = sched.hari === maxHari;
+
+        for (const conv of convs) {
+          try {
+            const state       = conv.state || {};
+            const followedDays = state.followed_up_days || [];
+
+            // Skip jika hari ini sudah terkirim atau eskalasi
+            if (followedDays.includes(hariKe)) { totalSkipped++; continue; }
+            if (conv.status === 'eskalasi')     { totalSkipped++; continue; }
+
+            const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
+            if (!customers.length) { totalSkipped++; continue; }
+            const customer = customers[0];
+            if (!customer.reply_jid && !customer.wa_number) { totalSkipped++; continue; }
+
+            let namaProduk = '', csNama = 'Sari';
+            if (conv.product_id) {
+              const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama&limit=1`);
+              namaProduk = prods[0]?.nama || '';
+              csNama     = prods[0]?.persona_cs_nama || 'Sari';
+            }
+
+            const pesan = await kirimFollowup(conv, customer, namaProduk, csNama, sched, now);
+
+            if (pesan !== null) {
+              totalSent++;
+              results.push({ hari: hariKe, conv_id: conv.id, customer: customer.nama, tipe: sched.tipe, status: 'sent' });
+              console.log(`[Hari ${hariKe} - ${sched.tipe}] → ${customer.nama || customer.wa_number}`);
+            }
+
+            await new Promise(r => setTimeout(r, 1500));
+          } catch(e) {
+            console.error(`Error hari ${hariKe} conv ${conv.id}:`, e.message);
+          }
+        }
+      }
+    }
+
+    console.log(`Done: ${totalSent} terkirim, ${totalSkipped} dilewati`);
+    return res.status(200).json({ ok: true, sent: totalSent, skipped: totalSkipped, results });
 
   } catch(err) {
     console.error('Follow-up job error:', err.message);
