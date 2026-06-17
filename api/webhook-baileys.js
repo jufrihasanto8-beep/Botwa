@@ -1769,7 +1769,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       try {
         const keluhanCaption = convState.keluhan ? ` — cocok untuk: ${convState.keluhan}` : '';
         const caption = `${product.nama}${keluhanCaption}`;
-        await sendWA(userId, reply_jid, null, true, product.gambar_url, caption);
+        await sendWA(userId, reply_jid, null, false, product.gambar_url, caption);
         await updateConvState(conversation.id, { foto_terkirim: true });
         console.log(`[FOTO] Gambar terkirim: ${product.gambar_url}`);
       } catch(e) {
