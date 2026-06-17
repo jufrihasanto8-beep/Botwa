@@ -1432,30 +1432,41 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     // PENTING: Kalau customer kirim pesan BUKAN konfirmasi, coba cari wilayah dari pesannya
     if (!isConfirmation(message) && message.length >= 3 && message.length <= 60) {
-      // Clear proposed_wilayah lama
-      if (proposedWilayah) {
-        console.log(`Clear proposed_wilayah lama: "${proposedWilayah}"`);
-        proposedWilayah = null;
-      }
-
       // Coba cari wilayah dari pesan customer langsung
       const pesanBersih = message.replace(/[?!.,]+/g, '').trim();
       const cariHasil = await cariWilayah(pesanBersih, 20);
       const kecUnik = [...new Set(cariHasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
 
-      if (kecUnik.length === 1 && cariHasil.length > 0) {
-        // Satu kecamatan ketemu → simpan sebagai proposed_wilayah
-        const w = cariHasil[0];
-        const wilayahBaru = `${w.kecamatan}, ${w.kabupaten}, ${w.provinsi}`;
-        console.log(`Wilayah terdeteksi dari pesan customer: "${wilayahBaru}"`);
-        await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
-        convState.proposed_wilayah = wilayahBaru;
-        proposedWilayah = wilayahBaru;
-      } else if (kecUnik.length > 1) {
-        // Banyak kecamatan → clear saja, biar AI tanya
-        console.log(`Pesan "${pesanBersih}" punya ${kecUnik.length} kecamatan, tunggu AI konfirmasi`);
+      if (cariHasil.length > 0) {
+        // ADA wilayah ditemukan → clear ongkir lama karena customer mungkin ganti tujuan
+        if (convState.ongkir) {
+          console.log(`Clear ongkir lama karena customer sebut wilayah baru: "${pesanBersih}"`);
+          await updateConvState(conversation.id, { ongkir: null, wilayah: null });
+          convState.ongkir = null;
+          convState.wilayah = null;
+        }
+
+        if (kecUnik.length === 1) {
+          // Satu kecamatan ketemu → simpan sebagai proposed_wilayah
+          const w = cariHasil[0];
+          const wilayahBaru = `${w.kecamatan}, ${w.kabupaten}, ${w.provinsi}`;
+          console.log(`Wilayah terdeteksi dari pesan customer: "${wilayahBaru}"`);
+          await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
+          convState.proposed_wilayah = wilayahBaru;
+          proposedWilayah = wilayahBaru;
+        } else {
+          // Banyak kecamatan → clear proposed, biar AI tanya
+          console.log(`Pesan "${pesanBersih}" punya ${kecUnik.length} kecamatan, tunggu AI konfirmasi`);
+          await updateConvState(conversation.id, { proposed_wilayah: null });
+          convState.proposed_wilayah = null;
+          proposedWilayah = null;
+        }
+      } else if (proposedWilayah) {
+        // Tidak ketemu wilayah tapi ada proposed lama → clear juga
+        console.log(`Clear proposed_wilayah lama: "${proposedWilayah}"`);
         await updateConvState(conversation.id, { proposed_wilayah: null });
         convState.proposed_wilayah = null;
+        proposedWilayah = null;
       }
     }
 
