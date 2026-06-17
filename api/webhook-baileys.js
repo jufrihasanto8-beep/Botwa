@@ -204,7 +204,7 @@ Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
-Foto produk     : ${product?.gambar_url ? 'Ada — sistem kirim otomatis kalau customer tanya foto/gambar' : 'Tidak ada'}
+Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya foto, cukup jawab "Ada kak!" atau sejenisnya. JANGAN tulis "(foto dikirim otomatis)" atau kalimat teknis apapun. Sistem kirim fotonya sendiri.' : 'Tidak ada — kalau ditanya foto, bilang belum ada foto tapi bisa deskripsikan produknya.'}
 Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI (WAJIB ikuti urutan, JANGAN loncat)
@@ -1758,15 +1758,21 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     const adaGambarProduk = product?.gambar_url;
     const sudahKirimFoto  = convState.foto_terkirim;
 
+    console.log(`[FOTO] tanyaFoto=${tanyaFoto} adaGambar=${!!adaGambarProduk} sudahKirim=${sudahKirimFoto} url=${adaGambarProduk||'null'}`);
+
     // Kirim teks reply dulu
     await sendWA(userId, reply_jid, reply);
 
     // Kalau customer tanya foto dan ada gambar produk → kirim gambar juga
     if (tanyaFoto && adaGambarProduk && !sudahKirimFoto) {
       await new Promise(r => setTimeout(r, 800));
-      await sendWA(userId, reply_jid, null, false, product.gambar_url, product.nama);
-      await updateConvState(conversation.id, { foto_terkirim: true });
-      console.log(`Gambar produk terkirim: ${product.gambar_url}`);
+      try {
+        await sendWA(userId, reply_jid, null, true, product.gambar_url, product.nama);
+        await updateConvState(conversation.id, { foto_terkirim: true });
+        console.log(`[FOTO] Gambar terkirim: ${product.gambar_url}`);
+      } catch(e) {
+        console.error(`[FOTO] Gagal kirim gambar:`, e.message);
+      }
     }
 
     res.status(200).json({ ok: true });
