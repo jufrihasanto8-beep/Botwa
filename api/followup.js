@@ -62,7 +62,7 @@ async function sendWA(sessionId, jid, message, imageUrl = null, caption = null) 
       secret: WEBHOOK_SECRET,
       session_id: sessionId,
       wa_number: jid,
-      message: message || '',
+      message: imageUrl ? undefined : (message || ''),
       is_outbound: true,
       image_url: imageUrl || undefined,
       caption: caption || undefined,
@@ -87,7 +87,7 @@ async function generateAIFollowup(messages, namaKak, namaProduk, csNama, isLast 
 
   const prompt = `Kamu ${csNama || 'Sari'}, CS WhatsApp toko ${namaProduk || 'produk kami'}.
 
-Customer ${namaKak ? 'kak ' + namaKak : 'ini'} belum balas sejak kemarin.
+Customer ${namaKak ? 'kak ' + namaKak : 'ini'} belum balas beberapa saat.
 
 Akhir percakapan:
 ---
@@ -361,11 +361,13 @@ module.exports = async function handler(req, res) {
         const hariAkhir = new Date(hariMulai);
         hariAkhir.setUTCDate(hariAkhir.getUTCDate() + 1);
 
+        // Hanya follow-up kalau customer diam minimal 1 jam (last_msg_at <= 1 jam lalu)
         const convs = await sbGet('conversations',
           `?user_id=eq.${userId}` +
           `&status=in.(baru,aktif)` +
           `&created_at=gte.${hariMulai.toISOString()}` +
           `&created_at=lt.${hariAkhir.toISOString()}` +
+          `&last_msg_at=lte.${cutoff1h}` +
           `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
         ).catch(() => []);
 
