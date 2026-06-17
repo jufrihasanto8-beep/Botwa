@@ -1771,11 +1771,36 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     if (tanyaFoto && adaGambarProduk) {
       await new Promise(r => setTimeout(r, 800));
       try {
-        const manfaat = Array.isArray(product.keluhan_cocok) && product.keluhan_cocok.length
-          ? product.keluhan_cocok.slice(0, 3).join(', ')
-          : convState.keluhan || '';
-        const caption = manfaat ? `${product.nama}\n✅ ${manfaat}` : product.nama;
-        console.log(`[FOTO] keluhan_cocok=${JSON.stringify(product.keluhan_cocok)} caption="${caption}"`);
+        const manfaat = (() => {
+          // Prioritas 1: keluhan_cocok array
+          if (Array.isArray(product.keluhan_cocok) && product.keluhan_cocok.length)
+            return product.keluhan_cocok.slice(0, 3).join(' • ');
+          // Prioritas 2: cari baris manfaat/kegunaan di product_knowledge
+          if (product.product_knowledge) {
+            const lines = product.product_knowledge.split('\n').map(l => l.trim()).filter(Boolean);
+            // Cari section manfaat/kegunaan/khasiat
+            let inManfaat = false;
+            const bullets = [];
+            for (const line of lines) {
+              if (/manfaat|kegunaan|khasiat|fungsi|benefit/i.test(line)) { inManfaat = true; continue; }
+              if (inManfaat && /^[-•✅*\d]/.test(line)) {
+                bullets.push(line.replace(/^[-•✅*\d.)\s]+/, '').slice(0, 50));
+                if (bullets.length >= 3) break;
+              }
+              if (inManfaat && line.length < 3) break; // baris kosong = section selesai
+            }
+            if (bullets.length) return bullets.join(' • ');
+            // Fallback: ambil semua baris yang ada bullet
+            const allBullets = lines
+              .filter(l => /^[-•✅*]/.test(l))
+              .map(l => l.replace(/^[-•✅*\s]+/, '').slice(0, 50))
+              .slice(0, 3);
+            if (allBullets.length) return allBullets.join(' • ');
+          }
+          return '';
+        })();
+        const caption = manfaat ? `${product.nama}\n\n✅ ${manfaat}` : product.nama;
+        console.log(`[FOTO] caption="${caption}"`);
         await sendWA(userId, reply_jid, null, false, product.gambar_url, caption);
         await updateConvState(conversation.id, { foto_terkirim: true });
         console.log(`[FOTO] Gambar terkirim: ${product.gambar_url}`);
