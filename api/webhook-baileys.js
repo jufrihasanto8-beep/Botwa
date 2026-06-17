@@ -204,7 +204,7 @@ Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
-Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya foto, cukup jawab "Ada kak!" atau sejenisnya. JANGAN tulis "(foto dikirim otomatis)" atau kalimat teknis apapun. Sistem kirim fotonya sendiri.' : 'Tidak ada — kalau ditanya foto, bilang belum ada foto tapi bisa deskripsikan produknya.'}
+Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya foto, balas natural + sebutkan 1-2 keunggulan utama produk yang relevan dengan keluhan mereka. Contoh gaya: "Ada kak! Ini dia 😊 [keunggulan produk]". JANGAN tulis kalimat teknis apapun tentang sistem. Fotonya dikirim otomatis oleh sistem.' : 'Tidak ada — kalau ditanya foto, bilang belum ada foto tapi langsung deskripsikan produknya dengan antusias.'}
 Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI (WAJIB ikuti urutan, JANGAN loncat)
@@ -1767,7 +1767,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     if (tanyaFoto && adaGambarProduk && !sudahKirimFoto) {
       await new Promise(r => setTimeout(r, 800));
       try {
-        await sendWA(userId, reply_jid, null, true, product.gambar_url, product.nama);
+        const keluhanCaption = convState.keluhan ? ` — cocok untuk: ${convState.keluhan}` : '';
+        const caption = `${product.nama}${keluhanCaption}`;
+        await sendWA(userId, reply_jid, null, true, product.gambar_url, caption);
         await updateConvState(conversation.id, { foto_terkirim: true });
         console.log(`[FOTO] Gambar terkirim: ${product.gambar_url}`);
       } catch(e) {
