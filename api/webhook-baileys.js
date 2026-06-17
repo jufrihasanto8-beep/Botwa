@@ -505,14 +505,21 @@ function extractProposedWilayah(aiMsg) {
 function extractConfirmedWilayah(aiMsg) {
   const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
   for (const line of lines) {
-    // "Oke kak, Ambarawa Jawa Tengah ya!" / "Siap kak, pengirimannya ke Sumba NTT ya!"
-    const m = line.match(/(?:oke|siap|dicatat|baik|noted)\s+kak[,!]?\s+(?:pengirimannya\s+ke\s+|jadi\s+ke\s+)?([A-Za-z][A-Za-z\s,]{2,40}?)\s+ya[!😊🙏\s]/i);
+    // Pattern 1: "Oke kak, X ya!" / "Siap kak, X ya!" / "Berarti X ya!"
+    let m = line.match(/(?:oke|siap|dicatat|baik|noted)\s+kak[,!]?\s+(?:pengirimannya\s+ke\s+|jadi\s+ke\s+)?([A-Za-z][A-Za-z\s,]{2,40}?)\s+ya[!?😊🙏\s]/i);
+
+    // Pattern 2: "Berarti X ya!" tanpa "kak"
+    if (!m) m = line.match(/berarti\s+([A-Za-z][A-Za-z\s,]{2,60}?)\s+ya[!?😊🙏\s]/i);
+
+    // Pattern 3: "X ya kak!" di akhir kalimat
+    if (!m) m = line.match(/([A-Za-z][A-Za-z\s,]{5,60}?)\s+ya\s+kak[!?😊🙏\s]*$/i);
+
     if (m) {
-      const candidate = m[1].trim().replace(/[,!]+$/, '');
+      const candidate = m[1].trim().replace(/[,!?]+$/, '');
       const wordCount = candidate.split(/\s+/).length;
       if (
         candidate.length >= 3 &&
-        wordCount <= 5 &&
+        wordCount <= 8 &&
         !KATA_KERJA_WILAYAH.test(candidate)
       ) return candidate;
     }
