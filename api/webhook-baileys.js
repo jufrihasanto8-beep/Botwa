@@ -204,7 +204,7 @@ Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
-Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya/minta foto, cukup balas singkat natural + 1-2 keunggulan produk. Contoh: "Ada kak, ini ya! 😊 [keunggulan]". ⛔ JANGAN sebut apapun soal pengiriman foto, loading, atau kenapa foto belum muncul.' : 'Tidak ada — kalau ditanya foto, bilang stok foto sedang disiapkan tapi deskripsikan produknya.'}
+Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya/minta foto: balas singkat natural + sebutkan 1-2 keunggulan. Contoh: "Ada kak, ini ya! 😊 [keunggulan]". Foto sudah terkirim otomatis oleh sistem. ⛔ JANGAN eskalasi hanya karena diminta foto. ⛔ JANGAN sebut soal pengiriman, loading, atau mengapa foto belum muncul. ⛔ JANGAN bilang "sambungin ke tim" untuk urusan foto.' : 'Tidak ada — kalau ditanya foto, bilang stok foto sedang disiapkan tapi deskripsikan produknya.'}
 Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI (WAJIB ikuti urutan, JANGAN loncat)
@@ -229,7 +229,7 @@ GAYA NGOBROL
 - Tanya SATU hal per balasan, jangan gabung edukasi + rekomendasi + tanya data sekaligus
 - Setelah jawab pertanyaan faktual (BPOM, halal, bahan, dll) → SELALU lanjut tanya balik yang relevan ke alur konsultasi (misal: "Kak sendiri ada keluhan apa?", "Udah berapa lama kak?"). Jangan jawab lalu diam.
 - ⚠️ KERAS: DILARANG TOTAL semua markdown — JANGAN *bold*, JANGAN **bold**, JANGAN _italic_, JANGAN ---, JANGAN > quote. Ini WhatsApp, bukan dokumen.
-- ⛔ DILARANG pakai kata: "sistem", "tim terkait", "tim kami", "diteruskan", "pihak terkait", "loading", "otomatis", "diproses sistem". Ngobrol kayak manusia, bukan robot CS.
+- ⛔ DILARANG pakai kata: "sistem", "tim terkait", "tim kami", "diteruskan", "pihak terkait", "loading", "otomatis", "diproses sistem", "sambungin ke tim", "sambungin ke admin". Ngobrol kayak manusia, bukan robot CS.
 - Angka & total tulis POLOS tanpa tanda apapun: "TOTAL Rp 142.500" BUKAN "**TOTAL Rp 142.500**"
 
 KUNCI KONTEKS PRODUK
@@ -338,15 +338,9 @@ Kalau customer bilang "gak jadi", "cancel", "ga mau", "mahal", "pikir-pikir dulu
 - ⚠️ DILARANG bilang "lokasinya susah", "COD tidak tersedia", "tidak bisa COD di sana" kecuali sistem sudah konfirmasi tidak ada kurir COD
 - Baru lepaskan dengan ramah kalau customer sudah 2x+ tetap menolak setelah digali
 
-ESKALASI KE MANUSIA
-Balas singkat dan hangat seperti "Oke kak, ditunggu sebentar ya 🙏" — lalu STOP (tulis [ESCALATE]).
-JANGAN kasih alasan apapun. Cukup tutup dengan hangat.
-Kapan eskalasi (HANYA kondisi ini):
-- Customer marah/emosi/mengancam
-- Komplain keras: barang rusak, tidak sampai, minta refund
-- Sengketa pembayaran
-⛔ JANGAN eskalasi hanya karena: customer minta foto, tanya harga, tanya ongkir, tanya stok, tanya BPOM, atau hal-hal normal yang BISA dijawab sendiri.
-⛔ Kalau ragu apakah perlu eskalasi → JANGAN eskalasi, jawab saja.
+KALAU CUSTOMER MARAH / KOMPLAIN KERAS
+Tetap tenang, empati, dan coba selesaikan sendiri. Contoh: "Aduh maaf banget kak, nanti aku bantu pastiin ya 🙏"
+Jangan panik, jangan lepas tangan. CS manusia bisa ambil alih kapanpun dari dashboard kalau dibutuhkan.
 
 TUJUAN AKHIR
 Customer merasa DIDENGAR & terbantu. Kalau cocok → order tercatat.
@@ -1455,7 +1449,6 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
 
     // ── Deteksi marker khusus ──────────────────────────────────
-    const isEscalated      = rawReply.includes('[ESCALATE]');
     const orderConfirmed   = rawReply.includes('[ORDER_CONFIRMED]');
     const cekOngkirMatch   = rawReply.match(/\[CEK_ONGKIR:([^\]]+)\]/);
     const wilayahOkMatch   = rawReply.match(/\[WILAYAH_OK:([^\]]+)\]/);
@@ -1695,7 +1688,6 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     // ── Bersihkan marker dari reply final (pakai /g agar semua instance terhapus) ──
     let reply = rawReply
-      .replace(/\[ESCALATE\]/g, '')
       .replace(/\[ORDER_CONFIRMED\]/g, '')
       .replace(/\[ORDER_DATA:[^\]]+\]/g, '')
       .replace(/\[KELUHAN:[^\]]+\]/g, '')
@@ -1706,12 +1698,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       .replace(/\[SISTEM[^\]]*\]/g, '')
       .trim();
 
-    // ── Update conversation status jika eskalasi ──────────────
-    if (isEscalated) {
-      await sbPatch('conversations', `?id=eq.${conversation.id}`, {
-        status: 'eskalasi',
-        prioritas: 'high',
-      });
+    // (auto-eskalasi dihapus — CS manusia ambil alih manual dari dashboard)
+    if (false) {
     }
 
     // ── Update state jika order confirmed → auto closing + kirim recap ke grup ──
@@ -1752,7 +1740,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     if (!reply) return res.status(200).json({ ok: true, skipped: 'empty_reply' });
 
-    console.log(`Reply untuk ${wa_number}${isEscalated?' [ESKALASI]':''}${orderConfirmed?' [ORDER]':''}: ${reply.slice(0, 80)}`);
+    console.log(`Reply untuk ${wa_number}${orderConfirmed?' [ORDER]':''}: ${reply.slice(0, 80)}`);
 
     // ── Simpan & kirim balasan ─────────────────────────────────
     await saveMessage(conversation.id, 'ai', reply);
