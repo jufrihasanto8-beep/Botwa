@@ -234,21 +234,47 @@ module.exports = async function handler(req, res) {
 
   try {
     // ── BAGIAN 1: Hari H — 1 jam setelah AI balas, untuk leads hari ini ──
+    // Termasuk customer LAMA yang chat lagi hari ini (reopened_at >= hari ini)
     const todayStart = new Date(now);
     todayStart.setUTCHours(0, 0, 0, 0);
     // Kurangi offset WIB: hari ini = 00:00 WIB = 17:00 UTC kemarin
     todayStart.setTime(todayStart.getTime() - 7 * 60 * 60 * 1000);
+    const todayStartISO = todayStart.toISOString();
 
     const cutoff1h = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
     const cutoff4h = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
 
-    const hariHConvs = await sbGet('conversations',
+    // Query 1: lead baru hari ini
+    const newConvs = await sbGet('conversations',
       `?status=in.(baru,aktif)` +
-      `&created_at=gte.${todayStart.toISOString()}` +
+      `&created_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
       `&last_msg_at=gte.${cutoff4h}` +
       `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
     );
+
+    // Query 2: customer lama yang reopen hari ini (created_at bisa kapan saja)
+    const reopenedConvs = await sbGet('conversations',
+      `?status=in.(baru,aktif)` +
+      `&created_at=lt.${todayStartISO}` +
+      `&last_msg_at=lte.${cutoff1h}` +
+      `&last_msg_at=gte.${cutoff4h}` +
+      `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
+    ).catch(() => []);
+
+    // Filter reopenedConvs: hanya yang state.reopened_at >= hari ini
+    const reopenedToday = (Array.isArray(reopenedConvs) ? reopenedConvs : []).filter(c => {
+      const reopenedAt = c.state?.reopened_at;
+      return reopenedAt && new Date(reopenedAt) >= todayStart;
+    });
+
+    // Gabung keduanya, hindari duplikat
+    const seenIds = new Set();
+    const hariHConvs = [...newConvs, ...reopenedToday].filter(c => {
+      if (seenIds.has(c.id)) return false;
+      seenIds.add(c.id);
+      return true;
+    });
 
     for (const conv of hariHConvs) {
       try {
