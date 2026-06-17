@@ -204,7 +204,7 @@ Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
-Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya/minta foto: balas singkat natural + sebutkan 1-2 keunggulan. Contoh: "Ada kak, ini ya! 😊 [keunggulan]". Foto sudah terkirim otomatis oleh sistem. ⛔ JANGAN eskalasi hanya karena diminta foto. ⛔ JANGAN sebut soal pengiriman, loading, atau mengapa foto belum muncul. ⛔ JANGAN bilang "sambungin ke tim" untuk urusan foto.' : 'Tidak ada — kalau ditanya foto, bilang stok foto sedang disiapkan tapi deskripsikan produknya.'}
+Foto produk     : ${product?.gambar_url ? 'TERSEDIA. Kalau customer minta foto → CUKUP balas "Ini fotonya kak 😊" atau "Siap kak, ini ya!" lalu lanjut tanya keluhan. Foto PASTI terkirim otomatis bersamaan. ⛔ DILARANG: bilang kendala/error/teknis, suruh cek Google, bilang tidak bisa kirim, minta maaf soal foto, atau alasan apapun. Cukup balas singkat dan natural.' : 'Tidak ada — kalau ditanya foto, bilang "Belum ada fotonya kak, tapi bisa aku deskripsikan ya" lalu jelaskan produknya.'}
 Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI (WAJIB ikuti urutan, JANGAN loncat)
@@ -229,7 +229,14 @@ GAYA NGOBROL
 - Tanya SATU hal per balasan, jangan gabung edukasi + rekomendasi + tanya data sekaligus
 - Setelah jawab pertanyaan faktual (BPOM, halal, bahan, dll) → SELALU lanjut tanya balik yang relevan ke alur konsultasi (misal: "Kak sendiri ada keluhan apa?", "Udah berapa lama kak?"). Jangan jawab lalu diam.
 - ⚠️ KERAS: DILARANG TOTAL semua markdown — JANGAN *bold*, JANGAN **bold**, JANGAN _italic_, JANGAN ---, JANGAN > quote. Ini WhatsApp, bukan dokumen.
-- ⛔ DILARANG pakai kata: "sistem", "tim terkait", "tim kami", "diteruskan", "pihak terkait", "loading", "otomatis", "diproses sistem", "sambungin ke tim", "sambungin ke admin". Ngobrol kayak manusia, bukan robot CS.
+- ⛔ BLACKLIST kata (jangan pernah pakai):
+  "sistem", "tim terkait", "tim kami", "tim CS", "pihak terkait", "pihak kami", "admin", "operator", "CS", "customer service",
+  "diteruskan", "diproses", "sedang diproses", "akan diproses", "konfirmasi ulang",
+  "loading", "otomatis", "server", "error", "kendala teknis", "maintenance",
+  "mohon maaf atas ketidaknyamanan", "mohon ditunggu", "mohon menunggu", "terima kasih atas kesabarannya",
+  "sesuai prosedur", "SOP", "akan segera ditindaklanjuti", "ditindaklanjuti",
+  "cek di Google", "foto belum bisa", "tidak dapat dikirim", "belum tersedia di sistem"
+  → Ngobrol kayak temen yang jualan, bukan robot CS.
 - Angka & total tulis POLOS tanpa tanda apapun: "TOTAL Rp 142.500" BUKAN "**TOTAL Rp 142.500**"
 
 KUNCI KONTEKS PRODUK
@@ -241,11 +248,12 @@ ATURAN HARGA, ONGKIR & COD
 - Harga/dosis/klaim HANYA dari DATA PRODUK. JANGAN ngarang.
 - Semua angka diambil dari SISTEM, bukan dihitung dari ingatan.
 - Sebelum kasih TOTAL → WAJIB konfirmasi WILAYAH dulu.
-- ⚠️ WAJIB: Setiap kali kamu menyebut/mengkonfirmasi wilayah ke customer (contoh: "Oke kak, Mariso Makassar ya!"), SELALU tulis [WILAYAH_OK:nama wilayah] di akhir pesan. Sistem pakai ini untuk hitung ongkir otomatis. Tanpa marker ini, ongkir tidak bisa dihitung.
-  Contoh: "Oke kak, Makassar, Sulawesi Selatan ya! 😊 [WILAYAH_OK:Makassar, Sulawesi Selatan]"
-  Contoh: "Siap kak, Ambarawa, Jawa Tengah ya 😊 [WILAYAH_OK:Ambarawa, Jawa Tengah]"
-- ⛔ DILARANG KERAS: Jangan pernah bilang "sebentar ya aku cek ongkir", "aku cek dulu", "tunggu aku cek", atau kalimat apapun yang minta customer menunggu. Sistem hitung ongkir OTOMATIS saat kamu tulis [WILAYAH_OK:]. Cukup tulis marker itu dan ongkir langsung tersedia — tidak perlu bilang "sebentar".
-- Sebelum [WILAYAH_OK] → WAJIB pastikan wilayah sudah spesifik sampai provinsi atau kota/kab yang tidak mungkin salah.
+- ⚠️ WAJIB: Setiap kali kamu konfirmasi wilayah ke customer, tulis [WILAYAH_OK:wilayah lengkap] di akhir pesan. Sistem pakai ini untuk hitung ongkir.
+  Contoh: "Oke kak, Medan Timur ya! 😊 [WILAYAH_OK:Medan Timur, Medan, Sumatera Utara]"
+  Contoh: "Siap kak, Mariso Makassar ya 😊 [WILAYAH_OK:Mariso, Makassar, Sulawesi Selatan]"
+- ⛔ JANGAN bilang "sebentar aku cek ongkir" — sistem hitung OTOMATIS saat kamu tulis [WILAYAH_OK:].
+- ⛔ HANYA KOTA/KABUPATEN = TANYA KECAMATAN DULU. Kalau customer cuma sebut nama kota/kabupaten tanpa kecamatan, tanya dulu: "Di kecamatan mana kak? Biar ongkirnya akurat 😊". Baru setelah dapat kecamatan, tulis [WILAYAH_OK:].
+- Sebelum [WILAYAH_OK] → wilayah HARUS sudah spesifik sampai KECAMATAN atau kelurahan.
 - Wilayah parsial (nama desa/kecamatan kecil yang unik) → tebak & konfirmasi provinsinya: "Pringsewu, Lampung ya kak?"
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
   Prinsip: kalau nama itu bisa jadi kota/kab di lebih dari satu provinsi, TANYA dulu.
@@ -513,53 +521,58 @@ function extractConfirmedWilayah(aiMsg) {
 }
 
 /* ── SEARCH WILAYAH LOKAL (tabel wilayah_id di Supabase) ─── */
-async function cariWilayah(keyword, limit = 5) {
+async function cariWilayah(keyword, limit = 50) {
   try {
     const cleanPart = s => s.trim().toLowerCase()
       .replace(/\bkota\b/gi, '').replace(/\bkabupaten\b/gi, '').replace(/\bkab\b/gi, '')
       .replace(/\bprovinsi\b/gi, '').replace(/\bprov\b/gi, '').trim();
 
-    // Kalau input comma-separated (misal: "Kranggan, Galur, Kulonprogo"),
-    // coba match kelurahan+kecamatan agar hasil lebih tepat
+    // Kalau input comma-separated (misal: "Medan Timur, Medan" atau "Kranggan, Galur, Kulonprogo")
     const parts = keyword.split(',').map(cleanPart).filter(s => s.length >= 2);
     if (parts.length >= 2) {
-      const [kel, kec, kab] = parts;
-      // Coba kelurahan + kecamatan dulu
+      const [part1, part2, part3] = parts;
+
+      // Coba: part1=kecamatan, part2=kabupaten
+      const byKecKab = await sbGet('wilayah_id',
+        `?kecamatan=ilike.*${encodeURIComponent(part1)}*&kabupaten=ilike.*${encodeURIComponent(part2)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
+      ).catch(() => []);
+      if (byKecKab.length > 0) return byKecKab;
+
+      // Coba: part1=kelurahan, part2=kecamatan
       const byKelKec = await sbGet('wilayah_id',
-        `?kelurahan=ilike.*${encodeURIComponent(kel)}*&kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
+        `?kelurahan=ilike.*${encodeURIComponent(part1)}*&kecamatan=ilike.*${encodeURIComponent(part2)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
       ).catch(() => []);
       if (byKelKec.length > 0) return byKelKec;
 
-      // Fallback: kecamatan + kabupaten
-      if (kab) {
-        const byKecKab = await sbGet('wilayah_id',
-          `?kecamatan=ilike.*${encodeURIComponent(kec)}*&kabupaten=ilike.*${encodeURIComponent(kab)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
+      // Coba dengan part3 kalau ada (kelurahan, kecamatan, kabupaten)
+      if (part3) {
+        const byAll = await sbGet('wilayah_id',
+          `?kecamatan=ilike.*${encodeURIComponent(part2)}*&kabupaten=ilike.*${encodeURIComponent(part3)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
         ).catch(() => []);
-        if (byKecKab.length > 0) return byKecKab;
+        if (byAll.length > 0) return byAll;
       }
-
-      // Fallback: cari part pertama saja (kemungkinan kecamatan atau kelurahan)
     }
 
     const kw = cleanPart(keyword);
-    if (kw.length < 3) return [];
+    if (kw.length < 2) return [];
 
-    // Cari di semua level: kecamatan, kabupaten, kelurahan
-    const [byKec, byKab, byKel] = await Promise.all([
+    // Cari di semua level dengan limit tinggi untuk kabupaten/provinsi
+    const [byKec, byKab, byKel, byProv] = await Promise.all([
       sbGet('wilayah_id', `?kecamatan=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`).catch(() => []),
-      sbGet('wilayah_id', `?kabupaten=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`).catch(() => []),
+      sbGet('wilayah_id', `?kabupaten=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=100`).catch(() => []), // limit tinggi untuk kab
       sbGet('wilayah_id', `?kelurahan=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`).catch(() => []),
+      sbGet('wilayah_id', `?provinsi=ilike.*${encodeURIComponent(kw)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=100`).catch(() => []), // limit tinggi untuk prov
     ]);
 
     // Gabung & deduplikasi berdasarkan kecamatan+kabupaten
     const seen = new Set();
     const merged = [];
-    for (const row of [...byKec, ...byKab, ...byKel]) {
+    // Prioritas: kecamatan > kelurahan > kabupaten > provinsi (dari spesifik ke umum)
+    for (const row of [...byKec, ...byKel, ...byKab, ...byProv]) {
       const key = `${row.kecamatan}||${row.kabupaten}`;
       if (!seen.has(key)) {
         seen.add(key);
         merged.push(row);
-        if (merged.length >= limit) break;
       }
     }
     return merged;
@@ -1480,7 +1493,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       console.log(`[WILAYAH_OK] detected: ${wilayah}`);
 
       // Cek apakah wilayah sudah spesifik (minimal kecamatan level)
-      const lokalCek = await cariWilayah(wilayah, 15);
+      const lokalCek = await cariWilayah(wilayah, 100);
       const kecamatanUnik = [...new Set(lokalCek.map(r => `${r.kecamatan}||${r.kabupaten}`))];
 
       if (lokalCek.length > 0 && kecamatanUnik.length > 1) {
@@ -1545,12 +1558,14 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         }
 
       } else {
-        // Tidak ditemukan di local DB → langsung hitung (fallback ke Mengantar), clear pending
+        // Tidak ditemukan di local DB — fallback ke Mengantar langsung
+        // (seharusnya jarang terjadi karena cariWilayah sudah search dengan limit tinggi)
+        console.log(`[WILAYAH_OK] "${wilayah}" tidak ditemukan di local DB — fallback Mengantar`);
         await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
         const hasil = await hitungOngkir(wilayah, product);
         if (hasil) {
           await updateConvState(conversation.id, { ongkir: hasil });
-          convState.ongkir = hasil; // update local state
+          convState.ongkir = hasil;
           const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
           const histWithOngkir = [
             ...history,
