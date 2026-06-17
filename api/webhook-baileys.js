@@ -474,11 +474,8 @@ async function transcribeAudio(base64Audio) {
 
 /* ── DETEKSI KONFIRMASI WILAYAH (webhook-level, tidak bergantung Claude) ── */
 
-// Kata-kata yang bukan nama wilayah (di awal kandidat)
-const BUKAN_WILAYAH = /^(via|pakai|dengan|pake|lewat|dari|ke|di|ya|oke|siap|baik|nanti|kalau|jika|untuk|sudah|belum|bisa|tidak|iya|tidak|biar|aku|kamu|kami|tim|gak|ga|mau|minta)\s/i;
-
-// Kata kerja / kalimat aksi yang tidak mungkin ada di nama wilayah
-const KATA_KERJA_WILAYAH = /\b(eskalasi|eskalasiin|cek|tanya|tanyain|hubungi|hubungin|konfirmasi|bantu|sambung|sambungin|tunggu|kasih|kirim|bayar|proses|lanjut|info|bilang|bilang|pesan|order|transfer|cod|rekening|ambil|atur|selesai|minta)\b/i;
+// Filter dasar untuk kata yang PASTI bukan wilayah (validasi utama tetap via Supabase)
+const BUKAN_WILAYAH = /^(ya|oke|siap|baik|iya|tidak|gak|ga|mau)\s/i;
 
 // Ekstrak wilayah yang AI sedang konfirmasikan — pertanyaan ("Sumba NTT ya kak?")
 function extractProposedWilayah(aiMsg) {
@@ -498,42 +495,16 @@ function extractProposedWilayah(aiMsg) {
     if (m) {
       const candidate = m[1].trim().replace(/[,?!]+$/, '');
       const wordCount = candidate.split(/\s+/).length;
-      if (
-        candidate.length >= 3 &&
-        wordCount <= 8 &&
-        !BUKAN_WILAYAH.test(candidate) &&
-        !KATA_KERJA_WILAYAH.test(candidate)
-      ) return candidate;
+      // Filter dasar saja, validasi utama via Supabase
+      if (candidate.length >= 3 && wordCount <= 8 && !BUKAN_WILAYAH.test(candidate)) {
+        return candidate;
+      }
     }
   }
   return null;
 }
 
-// Ekstrak wilayah dari pernyataan konfirmasi AI ("Oke kak, Ambarawa Jawa Tengah ya! 😊")
-function extractConfirmedWilayah(aiMsg) {
-  const lines = aiMsg.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
-  for (const line of lines) {
-    // Pattern 1: "Oke kak, X ya!" / "Siap kak, X ya!" / "Berarti X ya!"
-    let m = line.match(/(?:oke|siap|dicatat|baik|noted)\s+kak[,!]?\s+(?:pengirimannya\s+ke\s+|jadi\s+ke\s+)?([A-Za-z][A-Za-z\s,]{2,40}?)\s+ya[!?😊🙏\s]/i);
-
-    // Pattern 2: "Berarti X ya!" tanpa "kak"
-    if (!m) m = line.match(/berarti\s+([A-Za-z][A-Za-z\s,]{2,60}?)\s+ya[!?😊🙏\s]/i);
-
-    // Pattern 3: "X ya kak!" di akhir kalimat
-    if (!m) m = line.match(/([A-Za-z][A-Za-z\s,]{5,60}?)\s+ya\s+kak[!?😊🙏\s]*$/i);
-
-    if (m) {
-      const candidate = m[1].trim().replace(/[,!?]+$/, '');
-      const wordCount = candidate.split(/\s+/).length;
-      if (
-        candidate.length >= 3 &&
-        wordCount <= 8 &&
-        !KATA_KERJA_WILAYAH.test(candidate)
-      ) return candidate;
-    }
-  }
-  return null;
-}
+// extractConfirmedWilayah dihapus — pakai [WILAYAH_OK:] marker saja
 
 /* ── SEARCH WILAYAH LOKAL (tabel wilayah_id di Supabase) ─── */
 async function cariWilayah(keyword, limit = 50) {
@@ -1667,27 +1638,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       }
     }
 
-    // ── Jika Claude baru KONFIRMASI wilayah ("Oke kak, X ya!") → langsung hitung ongkir ──
-    // Skip kalau sudah diproses via [WILAYAH_OK:] marker
-    if (!autoOngkirResult && !cekOngkirMatch && !wilayahOkMatch) {
-      const confirmedWilayah = extractConfirmedWilayah(rawReply);
-      if (confirmedWilayah && !convState.ongkir) {
-        console.log(`Auto-trigger ongkir dari konfirmasi wilayah: ${confirmedWilayah}`);
-        const hasil = await hitungOngkir(confirmedWilayah, product);
-        if (hasil) {
-          await updateConvState(conversation.id, { wilayah: confirmedWilayah, ongkir: hasil, proposed_wilayah: null });
-          convState.ongkir = hasil; // update local state
-          const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${confirmedWilayah}. Lanjutkan balasan di atas dengan `);
-
-          const histCombined = [
-            ...history,
-            { role: 'assistant', content: rawReply.trim() },
-            { role: 'user', content: injeksi },
-          ];
-          rawReply = await callClaude(systemPrompt, histCombined, chatModel, userAnthropicKey);
-        }
-      }
-    }
+    // Auto-detection dihapus — andalkan [WILAYAH_OK:] marker dari AI saja
 
     // ── Simpan proposed_wilayah jika Claude baru tanya/sebut lokasi ──
     // Skip jika ongkir sudah ada (tidak perlu tanya wilayah lagi)
