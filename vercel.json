@@ -19,6 +19,9 @@
     "api/webhook-baileys.js": {
       "maxDuration": 60,
       "memory": 1024
+    },
+    "api/followup.js": {
+      "maxDuration": 60
     }
   },
   "crons": []

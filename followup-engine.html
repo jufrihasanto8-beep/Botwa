@@ -6,27 +6,122 @@
 <title>Follow-up Engine · Adsy CS</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
-.fu-tabs { display:flex; gap:4px; padding:0 24px; border-bottom:1px solid var(--border); background:var(--white); }
-.fu-tab  { padding:12px 16px; font-size:13px; font-weight:500; color:var(--text-2); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; }
-.fu-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
-.fu-section { display:none; padding:24px; }
-.fu-section.active { display:block; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:#0d1117;color:#e2e8f0;font-size:13px}
 
-.leads-table { width:100%; border-collapse:collapse; }
-.leads-table th, .leads-table td { padding:11px 14px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; }
-.leads-table th { font-size:11px; font-weight:600; color:var(--text-2); background:var(--bg); text-transform:uppercase; }
-.leads-table tr:hover td { background:#fafafa; }
+/* ── Sidebar (sama seperti halaman lain) ── */
+.app-layout{padding-left:0!important;display:flex!important;height:100vh!important;overflow:hidden!important}
+#sidebar{position:relative!important;left:auto!important;top:auto!important;z-index:auto!important;width:220px!important;min-width:220px!important;background:#1e293b!important;height:100vh!important;display:flex!important;flex-direction:column!important;flex-shrink:0!important;overflow:hidden!important;border-right:1px solid rgba(255,255,255,.07)!important}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sb-logo{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+.sb-subtitle{font-size:10px;color:#64748b;margin-top:1px}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0;scrollbar-width:none}
+.sb-nav::-webkit-scrollbar{display:none}
+.sb-section{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
+.sb-item{display:flex!important;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b!important;text-decoration:none!important;transition:all .12s}
+.sb-item:hover{background:rgba(255,255,255,.05)!important;color:#e2e8f0!important}
+.sb-item.active{background:rgba(59,130,246,.12)!important;color:#93c5fd!important}
+.sb-item .si{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
+.sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
 
-.sched-row { display:grid; grid-template-columns:80px 1fr 1fr auto; gap:10px; align-items:center; margin-bottom:10px; }
-.campaign-card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; margin-bottom:12px; }
-.campaign-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.badge-aktif   { background:#dcfce7; color:#166534; font-size:11px; padding:3px 8px; border-radius:20px; }
-.badge-nonaktif{ background:#f3f4f6; color:#6b7280; font-size:11px; padding:3px 8px; border-radius:20px; }
+/* ── Layout ── */
+.main-content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.page-header{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.page-header h1{font-size:18px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+.page-header p{font-size:12px;color:#64748b;margin-top:2px}
 
-.stat-row { display:flex; gap:14px; margin-bottom:24px; flex-wrap:wrap; }
-.stat-mini { flex:1; min-width:110px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; }
-.stat-mini .num { font-size:22px; font-weight:700; color:var(--primary); }
-.stat-mini .lbl { font-size:12px; color:var(--text-2); margin-top:2px; }
+/* ── Tabs ── */
+.fu-tabs{display:flex;gap:2px;padding:0 20px;background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.fu-tab{padding:12px 16px;font-size:13px;font-weight:500;color:#64748b;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .12s}
+.fu-tab:hover{color:#e2e8f0}
+.fu-tab.active{color:#93c5fd;border-bottom-color:#3b82f6}
+.fu-body{flex:1;overflow-y:auto;padding:24px;background:#0d1117}
+.fu-body::-webkit-scrollbar{width:4px}
+.fu-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px}
+.fu-section{display:none}
+.fu-section.active{display:block}
+
+/* ── Cards ── */
+.card-dark{background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:10px}
+.card-dark-header{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between}
+.card-dark-body{padding:18px}
+
+/* ── Stats row ── */
+.stat-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.stat-mini{flex:1;min-width:110px;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 18px}
+.stat-mini .num{font-size:22px;font-weight:700;color:#3b82f6}
+.stat-mini .lbl{font-size:11px;color:#64748b;margin-top:3px}
+
+/* ── Schedule rows ── */
+.sched-row{background:#1a2233;border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:14px 16px;margin-bottom:10px;display:grid;grid-template-columns:70px 90px 140px 1fr 1fr auto;gap:10px;align-items:start}
+.sched-row-label{font-size:11px;color:#64748b;margin-bottom:4px}
+.sched-input{width:100%;padding:7px 10px;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#e2e8f0;font-size:13px;outline:none;transition:border-color .15s}
+.sched-input:focus{border-color:#3b82f6}
+.sched-input::placeholder{color:#475569}
+textarea.sched-input{resize:vertical;min-height:60px}
+
+/* ── Tipe badge ── */
+.tipe-ai{background:rgba(99,102,241,.15);color:#a5b4fc;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.tipe-testimoni{background:rgba(16,185,129,.15);color:#6ee7b7;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.tipe-promo{background:rgba(245,158,11,.15);color:#fcd34d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.tipe-custom{background:rgba(59,130,246,.15);color:#93c5fd;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+
+/* ── Leads & Log table ── */
+.data-table{width:100%;border-collapse:collapse}
+.data-table th,.data-table td{padding:11px 14px;text-align:left;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
+.data-table th{font-size:11px;font-weight:600;color:#64748b;background:#161b22;text-transform:uppercase;letter-spacing:.3px}
+.data-table tr:hover td{background:rgba(255,255,255,.02)}
+.data-table td:first-child{color:#e2e8f0}
+
+/* ── Toggle aktif ── */
+.toggle-wrap{display:flex;align-items:center;gap:6px}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;top:0;left:0;right:0;bottom:0;background:#374151;border-radius:20px;cursor:pointer;transition:.2s}
+.toggle-slider:before{position:absolute;content:"";width:14px;height:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked + .toggle-slider{background:#3b82f6}
+.toggle input:checked + .toggle-slider:before{transform:translateX(16px)}
+
+/* ── Btn ── */
+.btn-blue{background:#3b82f6;color:#fff;border:none;padding:7px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn-blue:hover{background:#2563eb}
+.btn-ghost{background:none;color:#64748b;border:1px solid rgba(255,255,255,.1);padding:6px 12px;border-radius:7px;font-size:12px;cursor:pointer;transition:all .12s}
+.btn-ghost:hover{border-color:#3b82f6;color:#93c5fd}
+.btn-danger{background:none;color:#f87171;border:1px solid rgba(248,113,113,.2);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer;transition:all .12s}
+.btn-danger:hover{background:rgba(248,113,113,.1)}
+.btn-sm-icon{background:none;border:none;cursor:pointer;font-size:16px;padding:4px;color:#64748b;transition:color .12s}
+.btn-sm-icon:hover{color:#e2e8f0}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;z-index:9999;pointer-events:none}
+#toast.show{opacity:1}
+#toast.toast-success{background:#1e3a2e;color:#6ee7b7;border:1px solid rgba(110,231,183,.2)}
+#toast.toast-error{background:#3a1e1e;color:#fca5a5;border:1px solid rgba(252,165,165,.2)}
+
+/* ── Empty state ── */
+.empty-state{text-align:center;padding:48px 20px;color:#475569}
+.empty-state .ei{font-size:32px;margin-bottom:8px}
+.empty-state p{font-size:13px}
+
+/* ── Image preview ── */
+.img-preview{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.1);display:none}
+.img-preview.show{display:block}
+
+/* ── Section header ── */
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sec-title{font-size:15px;font-weight:700;color:#f1f5f9}
+.sec-desc{font-size:12px;color:#64748b;margin-top:2px}
+
+/* ── Status badges ── */
+.badge-hijau{background:rgba(16,185,129,.15);color:#6ee7b7;padding:2px 8px;border-radius:10px;font-size:11px}
+.badge-abu{background:rgba(100,116,139,.15);color:#94a3b8;padding:2px 8px;border-radius:10px;font-size:11px}
+.badge-kuning{background:rgba(245,158,11,.15);color:#fcd34d;padding:2px 8px;border-radius:10px;font-size:11px}
+
+/* ── Info box ── */
+.info-box{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.15);border-radius:8px;padding:12px 16px;font-size:12px;color:#93c5fd;margin-bottom:16px;line-height:1.7}
 </style>
 </head>
 <body>
@@ -37,472 +132,569 @@
     <div class="page-header">
       <div>
         <h1>🔔 Follow-up Engine</h1>
-        <p>Jadwal follow-up personal, kampanye momen, dan leads pending</p>
+        <p>Jadwal follow-up otomatis untuk leads yang belum balas</p>
       </div>
+      <button class="btn-blue" onclick="triggerCron()" id="btn-trigger">▶ Jalankan Sekarang</button>
     </div>
 
     <div class="fu-tabs">
-      <button class="fu-tab active" onclick="showSection('leads',this)">👥 Leads Pending</button>
-      <button class="fu-tab" onclick="showSection('jadwal',this)">📅 Jadwal Follow-up</button>
-      <button class="fu-tab" onclick="showSection('campaign',this)">🎯 Kampanye Momen</button>
-      <button class="fu-tab" onclick="showSection('monitor',this)">📊 Monitor</button>
+      <button class="fu-tab active" onclick="showTab('jadwal',this)">📅 Jadwal Follow-up</button>
+      <button class="fu-tab" onclick="showTab('leads',this)">👥 Leads Pending</button>
+      <button class="fu-tab" onclick="showTab('log',this)">📋 Log</button>
     </div>
 
-    <!-- Leads Pending -->
-    <div class="fu-section active" id="sec-leads">
-      <div class="stat-row" id="leads-stats"></div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-        <input type="text" id="search-leads" placeholder="🔍 Cari nama / WA..." oninput="renderLeads()"
-          style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:250px;">
-        <select id="filter-produk" onchange="renderLeads()"
-          style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
-          <option value="">Semua Produk</option>
-        </select>
-        <button class="btn btn-primary btn-sm" onclick="sendMomenBulk()" style="margin-left:auto;">📤 Kirim Promo Momen ke Semua</button>
-      </div>
-      <div class="card" style="overflow:hidden;">
-        <table class="leads-table">
-          <thead><tr>
-            <th>Customer</th><th>Produk</th><th>Terakhir Chat</th>
-            <th>Alasan Mandek</th><th>Follow-up Berikutnya</th><th>Aksi</th>
-          </tr></thead>
-          <tbody id="leads-tbody"></tbody>
-        </table>
-        <div id="leads-empty" style="display:none;text-align:center;padding:40px;color:var(--text-2);">🎉 Semua leads sudah ditangani!</div>
-      </div>
-    </div>
+    <div class="fu-body">
 
-    <!-- Jadwal Follow-up Personal -->
-    <div class="fu-section" id="sec-jadwal">
-      <div class="card" style="padding:24px;max-width:700px;margin-bottom:20px;">
-        <h3 style="font-size:14px;font-weight:600;margin-bottom:4px;">Tabel Ritme Follow-up Personal</h3>
-        <p style="font-size:12px;color:var(--text-2);margin-bottom:20px;">Konfigurasi kapan dan promo apa yang dikirim ke chat yang mandek.</p>
+      <!-- ════ TAB 1: JADWAL ════ -->
+      <div class="fu-section active" id="sec-jadwal">
+        <div class="info-box">
+          <strong>Cara kerja:</strong> Cron-job.org memanggil endpoint follow-up setiap 30 menit.
+          <br>• <strong>Hari 1 (H):</strong> Otomatis — AI generate pesan setelah lead diam ≥1 jam. Bisa dikustomisasi di bawah.
+          <br>• <strong>Hari 2+:</strong> Sesuai jadwal di bawah — AI, testimoni, promo, atau pesan custom.
+          <br>• Leads yang sudah balas atau eskalasi tidak akan difollow-up.
+        </div>
 
-        <div id="jadwal-rows"></div>
-        <button class="btn btn-sm" onclick="addJadwalRow()" style="margin-top:8px;">+ Tambah Tahap</button>
+        <div class="sec-head">
+          <div>
+            <div class="sec-title">Ritme Follow-up</div>
+            <div class="sec-desc">Atur kapan & apa yang dikirim ke leads yang belum balas</div>
+          </div>
+          <button class="btn-blue" onclick="openAddForm()">+ Tambah Hari</button>
+        </div>
 
-        <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
-          <button class="btn btn-primary" onclick="saveJadwal()">Simpan Jadwal</button>
+        <div id="sched-list"></div>
+        <div id="sched-empty" class="empty-state" style="display:none">
+          <div class="ei">📅</div>
+          <p>Belum ada jadwal. Tambah hari pertama untuk mulai.</p>
+        </div>
+
+        <!-- Form tambah/edit -->
+        <div id="form-wrap" style="display:none">
+          <div class="card-dark" style="max-width:600px;margin-top:16px">
+            <div class="card-dark-header">
+              <span style="font-size:14px;font-weight:600;color:#f1f5f9" id="form-title">Tambah Jadwal</span>
+              <button class="btn-sm-icon" onclick="closeForm()">✕</button>
+            </div>
+            <div class="card-dark-body" style="display:grid;gap:14px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div>
+                  <label class="sched-row-label" style="display:block;margin-bottom:6px">Hari ke- (H+N)</label>
+                  <input type="number" id="f-hari" min="1" max="30" value="2" class="sched-input" placeholder="2">
+                </div>
+                <div>
+                  <label class="sched-row-label" style="display:block;margin-bottom:6px">Jam Kirim (WIB)</label>
+                  <input type="time" id="f-jam" value="09:00" class="sched-input">
+                </div>
+              </div>
+              <div>
+                <label class="sched-row-label" style="display:block;margin-bottom:6px">Tipe Follow-up</label>
+                <select id="f-tipe" class="sched-input" onchange="updateFormFields()">
+                  <option value="ai">🤖 AI — generate pesan dari konteks percakapan</option>
+                  <option value="testimoni">⭐ Testimoni — kirim foto/testimoni customer</option>
+                  <option value="promo">🎉 Promo — kirim gambar promo/diskon</option>
+                  <option value="custom">✏️ Custom — pesan tetap (bisa + gambar)</option>
+                </select>
+              </div>
+              <div id="field-pesan" style="display:none">
+                <label class="sched-row-label" style="display:block;margin-bottom:6px">
+                  <span id="pesan-label">Pesan / Caption</span>
+                  <span style="color:#475569;font-size:11px;margin-left:6px">Gunakan {nama} untuk nama customer</span>
+                </label>
+                <textarea id="f-pesan" class="sched-input" placeholder="Halo Kak {nama}! Ada kabar baik hari ini..." rows="3"></textarea>
+              </div>
+              <div id="field-image" style="display:none">
+                <label class="sched-row-label" style="display:block;margin-bottom:6px">URL Gambar</label>
+                <div style="display:flex;gap:10px;align-items:flex-start">
+                  <input type="url" id="f-image" class="sched-input" placeholder="https://..." oninput="previewImg()"
+                    style="flex:1">
+                  <img id="img-prev" class="img-preview" src="" alt="preview" onerror="this.style.display='none'">
+                </div>
+                <div style="font-size:11px;color:#475569;margin-top:4px">
+                  Bisa pakai Google Drive, ImgBB, atau hosting gambar lainnya
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <label class="toggle">
+                  <input type="checkbox" id="f-aktif" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="font-size:13px;color:#94a3b8">Aktifkan jadwal ini</span>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+                <button class="btn-ghost" onclick="closeForm()">Batal</button>
+                <button class="btn-blue" onclick="saveSchedule()" id="btn-save">Simpan</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card" style="padding:24px;max-width:700px;">
-        <h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Preview Jadwal</h3>
-        <div id="jadwal-preview"></div>
-      </div>
-    </div>
-
-    <!-- Kampanye Momen -->
-    <div class="fu-section" id="sec-campaign">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <p style="font-size:13px;color:var(--text-2);">Trigger otomatis ke leads pending saat momen tertentu (payday, tanggal kembar, dll)</p>
-        <button class="btn btn-primary btn-sm" onclick="openAddCampaign()">+ Kampanye Baru</button>
-      </div>
-      <div id="campaign-list"></div>
-
-      <!-- Form Kampanye -->
-      <div id="campaign-form" style="display:none;" class="card">
-        <div style="padding:24px;">
-          <h4 style="font-size:14px;font-weight:600;margin-bottom:16px;" id="camp-form-title">Kampanye Baru</h4>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="form-group">
-              <label>Nama Kampanye</label>
-              <input type="text" id="c-nama" placeholder="Payday Sale Juni">
-            </div>
-            <div class="form-group">
-              <label>Tipe Trigger</label>
-              <select id="c-tipe" onchange="toggleCampRule()">
-                <option value="payday">Payday (akhir bulan)</option>
-                <option value="tanggal_kembar">Tanggal Kembar (1.1, 2.2, ...)</option>
-                <option value="tgl_spesifik">Tanggal Spesifik</option>
-              </select>
-            </div>
-          </div>
-          <div id="camp-rule-wrap" style="display:none;" class="form-group">
-            <label>Tanggal Spesifik</label>
-            <input type="date" id="c-tanggal">
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="form-group">
-              <label>Tipe Promo</label>
-              <select id="c-promo-tipe">
-                <option value="diskon_persen">Diskon %</option>
-                <option value="diskon_nominal">Diskon Rp</option>
-                <option value="gratis_ongkir">Gratis Ongkir</option>
-                <option value="info_saja">Info saja (tanpa diskon)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Nilai Promo</label>
-              <input type="text" id="c-promo-nilai" placeholder="10 (untuk 10%) atau 20000">
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Deskripsi Promo (untuk AI)</label>
-            <input type="text" id="c-promo-desc" placeholder="Flash sale akhir bulan, stok terbatas!">
-          </div>
-          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
-            <button class="btn" onclick="closeCampaignForm()">Batal</button>
-            <button class="btn btn-primary" onclick="saveCampaign()">Simpan Kampanye</button>
+      <!-- ════ TAB 2: LEADS ════ -->
+      <div class="fu-section" id="sec-leads">
+        <div class="stat-row" id="leads-stats"></div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="search-leads" placeholder="🔍 Cari nama / WA..."
+            oninput="renderLeads()"
+            style="padding:8px 12px;background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:13px;width:240px;outline:none">
+          <select id="filter-status" onchange="renderLeads()"
+            style="padding:8px 10px;background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:13px;outline:none">
+            <option value="">Semua Status</option>
+            <option value="baru">Baru</option>
+            <option value="aktif">Aktif</option>
+          </select>
+        </div>
+        <div class="card-dark" style="overflow:hidden">
+          <table class="data-table">
+            <thead><tr>
+              <th>Customer</th>
+              <th>Produk</th>
+              <th>Terakhir Chat</th>
+              <th>Diam Sejak</th>
+              <th>Follow-up Terkirim</th>
+              <th>Status</th>
+            </tr></thead>
+            <tbody id="leads-tbody"></tbody>
+          </table>
+          <div id="leads-empty" class="empty-state" style="display:none">
+            <div class="ei">🎉</div>
+            <p>Semua leads sudah aktif atau tidak ada yang pending</p>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Monitor -->
-    <div class="fu-section" id="sec-monitor">
-      <div class="stat-row" id="monitor-stats"></div>
-      <div class="card" style="overflow:hidden;">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-          <h3 style="font-size:14px;font-weight:600;">Riwayat Follow-up</h3>
-          <div style="display:flex;gap:6px;">
-            <button class="s-tab active" onclick="setMonitorFilter('semua',this)">Semua</button>
-            <button class="s-tab" onclick="setMonitorFilter('pending',this)">Terjadwal</button>
-            <button class="s-tab" onclick="setMonitorFilter('sent',this)">Terkirim</button>
-            <button class="s-tab" onclick="setMonitorFilter('stop',this)">Stop</button>
+      <!-- ════ TAB 3: LOG ════ -->
+      <div class="fu-section" id="sec-log">
+        <div class="sec-head">
+          <div>
+            <div class="sec-title">Log Follow-up Terkirim</div>
+            <div class="sec-desc">Riwayat pesan follow-up yang sudah dikirim ke customer</div>
+          </div>
+          <button class="btn-ghost" onclick="loadLog()">🔄 Refresh</button>
+        </div>
+        <div class="card-dark" style="overflow:hidden">
+          <table class="data-table">
+            <thead><tr>
+              <th>Customer</th>
+              <th>Tipe</th>
+              <th>Pesan</th>
+              <th>Waktu</th>
+            </tr></thead>
+            <tbody id="log-tbody"></tbody>
+          </table>
+          <div id="log-empty" class="empty-state" style="display:none">
+            <div class="ei">📋</div>
+            <p>Belum ada log follow-up</p>
           </div>
         </div>
-        <table class="leads-table">
-          <thead><tr>
-            <th>Customer</th><th>Tipe</th><th>Tahap</th>
-            <th>Dijadwalkan</th><th>Status</th>
-          </tr></thead>
-          <tbody id="monitor-tbody"></tbody>
-        </table>
-        <div id="monitor-empty" style="display:none;text-align:center;padding:40px;color:var(--text-2);">Belum ada riwayat follow-up</div>
       </div>
-    </div>
 
-  </div>
-</div>
+    </div><!-- /fu-body -->
+  </div><!-- /main-content -->
+</div><!-- /app-layout -->
 
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
 <script>
 const SB_URL = window.SUPABASE_URL;
 const SB_KEY = window.SUPABASE_ANON_KEY;
-let userId = null;
-let allLeads = [], allFollowups = [], allCampaigns = [], allProducts = [];
-let monitorFilter = 'semua';
-let jadwalRows = [
-  { hari: 1,  promo: 'Harga normal, tanyakan apakah masih berminat' },
-  { hari: 3,  promo: 'Promo COD, gratis ongkir untuk kota tertentu' },
-  { hari: 5,  promo: 'Penawaran terakhir, stok terbatas' },
-];
-let editCampId = null;
 
-const sbH = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
-async function sbGet(t,q='') { const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{headers:sbH}); return r.json(); }
-async function sbPost(t,b) { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)}); return r.json(); }
-async function sbPatch(t,q,b) { const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'PATCH',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)}); return r.json(); }
+let userId = null;
+let allSchedules = [];
+let allLeads     = [];
+let editId       = null; // ID row yang sedang diedit
+
+const sbH = {
+  'Content-Type': 'application/json',
+  'apikey': SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY
+};
+async function sbGet(t, q='') { const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{headers:sbH}); return r.json(); }
+async function sbPost(t,b) {
+  const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)});
+  return r.json();
+}
+async function sbPatch(t,q,b) {
+  const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'PATCH',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)});
+  return r.json();
+}
 async function sbDelete(t,q) { await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'DELETE',headers:sbH}); }
 
-function toast(msg,type='success'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast toast-${type} show`;setTimeout(()=>el.className='toast',3000);}
-function relativeTime(ts){if(!ts)return'-';const d=Math.floor((Date.now()-new Date(ts).getTime())/86400000);const h=Math.floor((Date.now()-new Date(ts).getTime())/3600000);if(d>0)return`${d} hari lalu`;if(h>0)return`${h} jam lalu`;return'Baru saja';}
-function dateStr(ts){if(!ts)return'-';return new Date(ts).toLocaleDateString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});}
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast toast-${type} show`;
+  setTimeout(() => el.className='toast', 3000);
+}
+function dateStr(ts) {
+  if (!ts) return '-';
+  return new Date(ts).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function relativeTime(ts) {
+  if (!ts) return '-';
+  const diff = Date.now() - new Date(ts).getTime();
+  const h = Math.floor(diff/3600000);
+  const d = Math.floor(diff/86400000);
+  if (d > 0) return `${d} hari lalu`;
+  if (h > 0) return `${h} jam lalu`;
+  const m = Math.floor(diff/60000);
+  return m > 0 ? `${m} menit lalu` : 'Baru saja';
+}
+function tipeLabel(t) {
+  const m = {ai:'🤖 AI',testimoni:'⭐ Testimoni',promo:'🎉 Promo',custom:'✏️ Custom'};
+  return m[t] || t;
+}
+function tipeBadge(t) {
+  return `<span class="tipe-${t}">${tipeLabel(t)}</span>`;
+}
 
 Auth.guard();
 document.getElementById('sidebar-container').innerHTML = renderSidebar('followup-engine');
 
 async function init() {
   userId = Auth.getUser()?.id;
-  await Promise.all([loadLeads(), loadFollowups(), loadCampaigns(), loadProducts()]);
-  renderJadwal();
+  if (!userId) return;
+  await Promise.all([loadSchedules(), loadLeads()]);
+  loadLog();
 }
 
-async function loadLeads() {
-  // Conversations aktif yang bukan selesai = leads pending
-  allLeads = await sbGet('conversations',
-    `?user_id=eq.${userId}&status=in.(baru,diproses)&order=last_msg_at.desc&select=*,customers(wa_number,nama),products(nama)`
+/* ══════════════════════════════════
+   TAB 1: JADWAL
+══════════════════════════════════ */
+async function loadSchedules() {
+  allSchedules = await sbGet('followup_schedule',
+    `?user_id=eq.${userId}&order=hari.asc`
   );
+  if (!Array.isArray(allSchedules)) allSchedules = [];
+  renderSchedules();
+}
+
+function renderSchedules() {
+  const el = document.getElementById('sched-list');
+  const emptyEl = document.getElementById('sched-empty');
+
+  if (!allSchedules.length) {
+    el.innerHTML = '';
+    emptyEl.style.display = '';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  el.innerHTML = allSchedules.map(s => {
+    const hariLabel = s.hari === 1 ? 'Hari H (Hari ini)' : `H+${s.hari - 1} (Hari ke-${s.hari})`;
+    const subInfo = s.tipe === 'ai'
+      ? '<span style="color:#475569;font-size:12px">AI generate pesan dari konteks</span>'
+      : s.pesan_custom
+        ? `<span style="color:#94a3b8;font-size:12px">${escHtml(s.pesan_custom.slice(0,60))}${s.pesan_custom.length>60?'…':''}</span>`
+        : (s.image_url ? '<span style="color:#475569;font-size:12px">Gambar: '+escHtml(s.image_url.split('/').pop().slice(0,30))+'</span>' : '');
+
+    return `<div class="sched-row" style="${!s.aktif?'opacity:.5':''}">
+      <div>
+        <div class="sched-row-label">Hari</div>
+        <div style="font-size:15px;font-weight:700;color:#f1f5f9">${s.hari}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">${hariLabel}</div>
+      </div>
+      <div>
+        <div class="sched-row-label">Jam (WIB)</div>
+        <div style="font-size:14px;font-weight:600;color:#e2e8f0">${s.jam_kirim?.slice(0,5)||'09:00'}</div>
+      </div>
+      <div>
+        <div class="sched-row-label">Tipe</div>
+        ${tipeBadge(s.tipe)}
+      </div>
+      <div style="grid-column:span 2">
+        <div class="sched-row-label">Info</div>
+        ${subInfo}
+        ${s.image_url && s.tipe!=='ai'?`<div style="margin-top:6px"><img src="${escHtml(s.image_url)}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;border:1px solid rgba(255,255,255,.1)" onerror="this.style.display='none'"></div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <label class="toggle" title="${s.aktif?'Nonaktifkan':'Aktifkan'}">
+          <input type="checkbox" ${s.aktif?'checked':''} onchange="toggleAktif('${s.id}',this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <button class="btn-ghost" onclick="openEditForm('${s.id}')">Edit</button>
+        <button class="btn-danger" onclick="deleteSchedule('${s.id}')">Hapus</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openAddForm() {
+  editId = null;
+  document.getElementById('form-title').textContent = 'Tambah Jadwal';
+  document.getElementById('btn-save').textContent = 'Simpan';
+  document.getElementById('f-hari').value = (Math.max(0,...allSchedules.map(s=>s.hari)) || 1) + 1;
+  document.getElementById('f-jam').value = '09:00';
+  document.getElementById('f-tipe').value = 'ai';
+  document.getElementById('f-pesan').value = '';
+  document.getElementById('f-image').value = '';
+  document.getElementById('img-prev').className = 'img-preview';
+  document.getElementById('f-aktif').checked = true;
+  updateFormFields();
+  document.getElementById('form-wrap').style.display = '';
+  document.getElementById('form-wrap').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function openEditForm(id) {
+  const s = allSchedules.find(x => x.id === id);
+  if (!s) return;
+  editId = id;
+  document.getElementById('form-title').textContent = 'Edit Jadwal';
+  document.getElementById('btn-save').textContent = 'Update';
+  document.getElementById('f-hari').value = s.hari;
+  document.getElementById('f-jam').value = s.jam_kirim?.slice(0,5) || '09:00';
+  document.getElementById('f-tipe').value = s.tipe;
+  document.getElementById('f-pesan').value = s.pesan_custom || '';
+  document.getElementById('f-image').value = s.image_url || '';
+  document.getElementById('f-aktif').checked = s.aktif;
+  updateFormFields();
+  previewImg();
+  document.getElementById('form-wrap').style.display = '';
+  document.getElementById('form-wrap').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function closeForm() {
+  document.getElementById('form-wrap').style.display = 'none';
+  editId = null;
+}
+
+function updateFormFields() {
+  const tipe = document.getElementById('f-tipe').value;
+  const showPesan = ['testimoni','promo','custom'].includes(tipe);
+  const showImage = ['testimoni','promo','custom'].includes(tipe);
+  document.getElementById('field-pesan').style.display = showPesan ? '' : 'none';
+  document.getElementById('field-image').style.display = showImage ? '' : 'none';
+  if (tipe === 'ai') {
+    document.getElementById('pesan-label').textContent = 'Pesan / Caption';
+  } else if (tipe === 'custom') {
+    document.getElementById('pesan-label').textContent = 'Pesan Teks (wajib jika tanpa gambar)';
+  } else {
+    document.getElementById('pesan-label').textContent = 'Caption Gambar';
+  }
+}
+
+function previewImg() {
+  const url = document.getElementById('f-image').value.trim();
+  const img = document.getElementById('img-prev');
+  if (url) { img.src = url; img.className = 'img-preview show'; }
+  else { img.className = 'img-preview'; }
+}
+
+async function saveSchedule() {
+  const hari   = parseInt(document.getElementById('f-hari').value);
+  const jam    = document.getElementById('f-jam').value;
+  const tipe   = document.getElementById('f-tipe').value;
+  const pesan  = document.getElementById('f-pesan').value.trim();
+  const image  = document.getElementById('f-image').value.trim();
+  const aktif  = document.getElementById('f-aktif').checked;
+
+  if (!hari || hari < 1) { toast('Hari tidak valid','error'); return; }
+  if (!jam) { toast('Jam kirim wajib diisi','error'); return; }
+
+  // Validasi: testimoni/promo wajib ada gambar
+  if ((tipe === 'testimoni' || tipe === 'promo') && !image) {
+    toast('Tipe ' + tipe + ' butuh URL gambar','error'); return;
+  }
+
+  const payload = {
+    user_id: userId,
+    hari,
+    jam_kirim: jam + ':00', // pastikan format TIME
+    tipe,
+    pesan_custom: pesan || null,
+    image_url: image || null,
+    aktif,
+  };
+
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+  try {
+    if (editId) {
+      await sbPatch('followup_schedule', `?id=eq.${editId}`, payload);
+      toast('Jadwal diperbarui!');
+    } else {
+      await sbPost('followup_schedule', payload);
+      toast('Jadwal ditambahkan!');
+    }
+    closeForm();
+    await loadSchedules();
+  } catch(e) {
+    toast('Gagal: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = editId ? 'Update' : 'Simpan';
+  }
+}
+
+async function toggleAktif(id, val) {
+  await sbPatch('followup_schedule', `?id=eq.${id}`, { aktif: val });
+  await loadSchedules();
+}
+
+async function deleteSchedule(id) {
+  if (!confirm('Hapus jadwal ini?')) return;
+  await sbDelete('followup_schedule', `?id=eq.${id}`);
+  toast('Jadwal dihapus');
+  await loadSchedules();
+}
+
+/* ══════════════════════════════════
+   TAB 2: LEADS PENDING
+══════════════════════════════════ */
+async function loadLeads() {
+  allLeads = await sbGet('conversations',
+    `?user_id=eq.${userId}&status=in.(baru,aktif)&order=last_msg_at.desc` +
+    `&select=id,status,last_msg_at,state,product_id,customer_id,customers(wa_number,nama),products(nama)`
+  );
+  if (!Array.isArray(allLeads)) allLeads = [];
   renderLeads();
   renderLeadsStats();
 }
 
-async function loadFollowups() {
-  allFollowups = await sbGet('followups',
-    `?select=*,conversations(customer_id,customers(wa_number,nama))&order=scheduled_at.desc&limit=100`
-  );
-  renderMonitor();
-  renderMonitorStats();
-}
-
-async function loadCampaigns() {
-  allCampaigns = await sbGet('campaigns', `?user_id=eq.${userId}&order=created_at.desc`);
-  renderCampaigns();
-}
-
-async function loadProducts() {
-  allProducts = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true`);
-  const sel = document.getElementById('filter-produk');
-  allProducts.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id; opt.textContent = p.nama;
-    sel.appendChild(opt);
-  });
-}
-
-function showSection(name, btn) {
-  document.querySelectorAll('.fu-tab').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.fu-section').forEach(s=>s.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('sec-'+name).classList.add('active');
-}
-
-/* ── Leads ── */
 function renderLeadsStats() {
   const total = allLeads.length;
-  const baru  = allLeads.filter(l=>l.status==='baru').length;
-  const diproses = allLeads.filter(l=>l.status==='diproses').length;
+  const belumFU = allLeads.filter(l => !l.state?.followed_up).length;
+  const sudahFU = allLeads.filter(l => l.state?.followed_up).length;
+  const maxHari = allSchedules.length ? Math.max(...allSchedules.map(s=>s.hari)) : 0;
+  const selesaiFU = allLeads.filter(l => {
+    const days = l.state?.followed_up_days || [];
+    return maxHari > 0 && days.includes(maxHari);
+  }).length;
+
   document.getElementById('leads-stats').innerHTML = `
-    <div class="stat-mini"><div class="num">${total}</div><div class="lbl">Total Leads Pending</div></div>
-    <div class="stat-mini"><div class="num">${baru}</div><div class="lbl">Belum Ditangani</div></div>
-    <div class="stat-mini"><div class="num">${diproses}</div><div class="lbl">Sedang Diproses</div></div>`;
+    <div class="stat-mini"><div class="num">${total}</div><div class="lbl">Total Leads Aktif</div></div>
+    <div class="stat-mini"><div class="num" style="color:#f59e0b">${belumFU}</div><div class="lbl">Belum Difollow-up</div></div>
+    <div class="stat-mini"><div class="num" style="color:#10b981">${sudahFU}</div><div class="lbl">Sudah Difollow-up</div></div>
+    <div class="stat-mini"><div class="num" style="color:#64748b">${selesaiFU}</div><div class="lbl">Selesai Semua Tahap</div></div>`;
 }
 
 function renderLeads() {
-  const q    = (document.getElementById('search-leads')?.value||'').toLowerCase();
-  const prod = document.getElementById('filter-produk')?.value||'';
+  const q      = (document.getElementById('search-leads')?.value || '').toLowerCase();
+  const status = document.getElementById('filter-status')?.value || '';
   let data = allLeads.filter(l => {
-    const nama = l.customers?.nama||'';
-    const wa   = l.customers?.wa_number||'';
-    const match = !q || nama.toLowerCase().includes(q) || wa.includes(q);
-    const prodMatch = !prod || l.product_id === prod;
-    return match && prodMatch;
+    const nama = (l.customers?.nama || '').toLowerCase();
+    const wa   = l.customers?.wa_number || '';
+    const matchQ = !q || nama.includes(q) || wa.includes(q);
+    const matchS = !status || l.status === status;
+    return matchQ && matchS;
   });
 
   const tbody = document.getElementById('leads-tbody');
   const empty = document.getElementById('leads-empty');
   if (!data.length) { tbody.innerHTML=''; empty.style.display=''; return; }
-  empty.style.display='none';
+  empty.style.display = 'none';
 
   tbody.innerHTML = data.map(l => {
-    const cust = l.customers;
-    const prod = l.products;
-    const hariMandek = l.last_msg_at
-      ? Math.floor((Date.now()-new Date(l.last_msg_at).getTime())/86400000)
-      : '?';
-    const alasanMandek = detectAlasanMandek(l, hariMandek);
-    const nextFU = getNextFollowup(l.id);
+    const cust  = l.customers || {};
+    const prod  = l.products  || {};
+    const state = l.state     || {};
+    const days  = state.followed_up_days || [];
+
+    const disinceH = l.last_msg_at
+      ? Math.floor((Date.now()-new Date(l.last_msg_at).getTime())/3600000)
+      : null;
+    const disinceStr = disinceH !== null
+      ? (disinceH >= 24 ? `${Math.floor(disinceH/24)} hari` : `${disinceH} jam`)
+      : '-';
+
+    const fuStr = days.length
+      ? days.map(d => `<span class="badge-hijau" style="margin-right:2px">H${d}</span>`).join('')
+      : '<span style="color:#475569">-</span>';
+
+    const statusBadge = l.status === 'baru'
+      ? '<span class="badge-kuning">Baru</span>'
+      : '<span class="badge-abu">Aktif</span>';
+
     return `<tr>
-      <td><strong>${cust?.nama||'?'}</strong><br><small style="color:var(--text-2)">${cust?.wa_number||''}</small></td>
-      <td>${prod?.nama||'-'}</td>
-      <td>${relativeTime(l.last_msg_at)}</td>
-      <td><span style="font-size:12px">${alasanMandek}</span></td>
-      <td>${nextFU ? dateStr(nextFU.scheduled_at) : '<span style="color:var(--text-3)">-</span>'}</td>
-      <td style="display:flex;gap:4px;">
-        <button class="btn btn-sm" onclick="jadwalkanFU('${l.id}','${cust?.wa_number||''}')">📅 Follow-up</button>
-        <button class="btn btn-sm" style="color:var(--danger)" onclick="stopFU('${l.id}')">🛑 Stop</button>
+      <td>
+        <div style="font-weight:600;color:#f1f5f9">${escHtml(cust.nama||'?')}</div>
+        <div style="font-size:12px;color:#64748b">${cust.wa_number||''}</div>
       </td>
+      <td style="color:#94a3b8">${escHtml(prod.nama||'-')}</td>
+      <td>${relativeTime(l.last_msg_at)}</td>
+      <td style="color:${disinceH>=24?'#f87171':'#94a3b8'}">${disinceStr}</td>
+      <td>${fuStr}</td>
+      <td>${statusBadge}</td>
     </tr>`;
   }).join('');
 }
 
-function detectAlasanMandek(conv, hari) {
-  const state = conv.state || {};
-  if (state.tahap === 'harga') return '💰 Mandek di harga';
-  if (state.tahap === 'alamat') return '📍 Mandek di alamat';
-  if (state.tahap === 'transfer') return '💳 Menunggu transfer';
-  if (hari > 5) return '🕐 Chat lama tidak aktif';
-  return '💬 Masih konsultasi';
-}
+/* ══════════════════════════════════
+   TAB 3: LOG
+══════════════════════════════════ */
+async function loadLog() {
+  // Query conv_messages yang isinya dimulai dengan [Follow-up
+  // %25 = URL-encoded % untuk LIKE wildcard
+  const logs = await sbGet('conv_messages',
+    `?isi=like.%5BFollow-up%25&order=created_at.desc&limit=50` +
+    `&select=isi,created_at,conversation_id,conversations(customer_id,customers(wa_number,nama))`
+  );
 
-function getNextFollowup(convId) {
-  return allFollowups.find(f => f.conversation_id === convId && f.status === 'pending');
-}
+  const tbody = document.getElementById('log-tbody');
+  const empty = document.getElementById('log-empty');
 
-async function jadwalkanFU(convId, waNumber) {
-  // Buat jadwal follow-up berdasarkan jadwalRows
-  for (const j of jadwalRows) {
-    const scheduledAt = new Date(Date.now() + j.hari * 86400000).toISOString();
-    await sbPost('followups', {
-      conversation_id: convId,
-      tipe: 'personal',
-      tahap: `h${j.hari}`,
-      scheduled_at: scheduledAt,
-      status: 'pending',
-      promo_applied: { deskripsi: j.promo },
-    });
-  }
-  toast('Follow-up dijadwalkan!');
-  await loadFollowups();
-  renderLeads();
-}
-
-async function stopFU(convId) {
-  await sbPatch('followups', `?conversation_id=eq.${convId}&status=eq.pending`, { status: 'stop' });
-  toast('Follow-up dihentikan');
-  await loadFollowups();
-}
-
-async function sendMomenBulk() {
-  const campaigns = allCampaigns.filter(c => c.aktif);
-  if (!campaigns.length) { toast('Belum ada kampanye aktif','error'); return; }
-  toast(`Mengirim promo momen ke ${allLeads.length} leads...`);
-  // Trigger API followup
-  try {
-    await fetch('/api/followup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({tipe:'momen'}) });
-    toast('Promo momen dikirim!');
-  } catch(e) { toast('Gagal: '+e.message,'error'); }
-}
-
-/* ── Jadwal ── */
-function addJadwalRow() {
-  jadwalRows.push({ hari: jadwalRows.length + 1, promo: '' });
-  renderJadwal();
-}
-function removeJadwalRow(idx) {
-  jadwalRows.splice(idx, 1);
-  renderJadwal();
-}
-function renderJadwal() {
-  const el = document.getElementById('jadwal-rows');
-  el.innerHTML = jadwalRows.map((j, i) => `
-    <div class="sched-row">
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:12px;color:var(--text-2)">H+</span>
-        <input type="number" value="${j.hari}" min="1" oninput="jadwalRows[${i}].hari=+this.value;updateJadwalPreview()"
-          style="width:50px;padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
-      </div>
-      <input type="text" value="${j.promo}" placeholder="Deskripsi promo / pesan..."
-        oninput="jadwalRows[${i}].promo=this.value;updateJadwalPreview()"
-        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
-      <select oninput="jadwalRows[${i}].tipe_promo=this.value"
-        style="padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
-        <option value="info">Info saja</option>
-        <option value="gratis_ongkir">Gratis ongkir</option>
-        <option value="diskon">Diskon harga</option>
-      </select>
-      <button onclick="removeJadwalRow(${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;">✕</button>
-    </div>`).join('');
-  updateJadwalPreview();
-}
-function updateJadwalPreview() {
-  const el = document.getElementById('jadwal-preview');
-  el.innerHTML = jadwalRows.map(j =>
-    `<div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
-      <span style="background:var(--primary-light);color:var(--primary-dark);padding:3px 10px;border-radius:20px;font-size:12px;white-space:nowrap;">H+${j.hari}</span>
-      <span>${j.promo || '-'}</span>
-    </div>`
-  ).join('');
-}
-async function saveJadwal() {
-  // Simpan ke localStorage untuk sekarang (bisa ke Supabase configs nanti)
-  localStorage.setItem('fu_jadwal', JSON.stringify(jadwalRows));
-  toast('Jadwal disimpan!');
-}
-
-/* ── Campaign ── */
-function renderCampaigns() {
-  const el = document.getElementById('campaign-list');
-  if (!allCampaigns.length) {
-    el.innerHTML = `<p style="color:var(--text-2);font-size:13px;">Belum ada kampanye. Tambah kampanye momen di atas.</p>`;
-    return;
-  }
-  el.innerHTML = allCampaigns.map(c => `
-    <div class="campaign-card">
-      <div class="campaign-head">
-        <div>
-          <strong style="font-size:14px;">${c.nama}</strong>
-          <span style="margin-left:8px;font-size:12px;color:var(--text-2)">${formatCampTipe(c.tipe)}</span>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span class="${c.aktif?'badge-aktif':'badge-nonaktif'}">${c.aktif?'Aktif':'Nonaktif'}</span>
-          <button class="btn btn-sm" onclick="toggleCampaign('${c.id}',${c.aktif})">${c.aktif?'Nonaktifkan':'Aktifkan'}</button>
-          <button class="btn btn-sm" style="color:var(--danger)" onclick="hapusCampaign('${c.id}')">🗑️</button>
-        </div>
-      </div>
-      <div style="font-size:13px;color:var(--text-2);">
-        Promo: <strong style="color:var(--text)">${c.promo?.deskripsi||'-'}</strong>
-      </div>
-    </div>`).join('');
-}
-function formatCampTipe(t) {
-  if(t==='payday') return '📅 Payday (akhir bulan)';
-  if(t==='tanggal_kembar') return '🔢 Tanggal kembar';
-  if(t==='tgl_spesifik') return '📌 Tanggal spesifik';
-  return t;
-}
-function openAddCampaign() {
-  editCampId = null;
-  document.getElementById('camp-form-title').textContent = 'Kampanye Baru';
-  document.getElementById('c-nama').value='';
-  document.getElementById('c-tipe').value='payday';
-  document.getElementById('c-promo-tipe').value='diskon_persen';
-  document.getElementById('c-promo-nilai').value='';
-  document.getElementById('c-promo-desc').value='';
-  toggleCampRule();
-  document.getElementById('campaign-form').style.display='';
-}
-function closeCampaignForm() { document.getElementById('campaign-form').style.display='none'; }
-function toggleCampRule() {
-  const show = document.getElementById('c-tipe').value === 'tgl_spesifik';
-  document.getElementById('camp-rule-wrap').style.display = show ? '' : 'none';
-}
-async function saveCampaign() {
-  const nama = document.getElementById('c-nama').value.trim();
-  if (!nama) { toast('Nama kampanye wajib diisi','error'); return; }
-  const payload = {
-    user_id: userId,
-    nama,
-    tipe: document.getElementById('c-tipe').value,
-    rule: document.getElementById('c-tanggal').value ? { tanggal: document.getElementById('c-tanggal').value } : {},
-    promo: {
-      tipe: document.getElementById('c-promo-tipe').value,
-      nilai: document.getElementById('c-promo-nilai').value,
-      deskripsi: document.getElementById('c-promo-desc').value,
-    },
-    target: 'leads_pending',
-    aktif: true,
-  };
-  await sbPost('campaigns', payload);
-  toast('Kampanye disimpan!');
-  closeCampaignForm();
-  await loadCampaigns();
-}
-async function toggleCampaign(id, current) {
-  await sbPatch('campaigns', `?id=eq.${id}`, { aktif: !current });
-  await loadCampaigns();
-}
-async function hapusCampaign(id) {
-  if(!confirm('Hapus kampanye ini?')) return;
-  await sbDelete('campaigns', `?id=eq.${id}`);
-  await loadCampaigns();
-}
-
-/* ── Monitor ── */
-function setMonitorFilter(f, btn) {
-  monitorFilter = f;
-  document.querySelectorAll('.s-tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  renderMonitor();
-}
-function renderMonitorStats() {
-  const pending = allFollowups.filter(f=>f.status==='pending').length;
-  const sent    = allFollowups.filter(f=>f.status==='sent').length;
-  const stop    = allFollowups.filter(f=>f.status==='stop').length;
-  document.getElementById('monitor-stats').innerHTML = `
-    <div class="stat-mini"><div class="num" style="color:var(--warning)">${pending}</div><div class="lbl">Terjadwal</div></div>
-    <div class="stat-mini"><div class="num" style="color:var(--success)">${sent}</div><div class="lbl">Terkirim</div></div>
-    <div class="stat-mini"><div class="num" style="color:var(--text-2)">${stop}</div><div class="lbl">Dihentikan</div></div>`;
-}
-function renderMonitor() {
-  let data = monitorFilter === 'semua' ? allFollowups : allFollowups.filter(f=>f.status===monitorFilter);
-  const tbody = document.getElementById('monitor-tbody');
-  const empty = document.getElementById('monitor-empty');
+  const data = Array.isArray(logs) ? logs : [];
   if (!data.length) { tbody.innerHTML=''; empty.style.display=''; return; }
-  empty.style.display='none';
-  const stMap = { pending:'🕐 Terjadwal', sent:'✅ Terkirim', stop:'🛑 Stop' };
-  tbody.innerHTML = data.map(f => {
-    const cust = f.conversations?.customers;
+  empty.style.display = 'none';
+
+  tbody.innerHTML = data.map(log => {
+    const cust   = log.conversations?.customers || {};
+    const isi    = log.isi || '';
+    // Parse tipe dari format: [Follow-up Hari N - tipe] pesan
+    const m = isi.match(/\[Follow-up Hari (\d+) - (\w+)\](.*)/);
+    const hari  = m ? m[1] : '?';
+    const tipe  = m ? m[2] : '?';
+    const pesan = m ? m[3].trim() : isi;
+
     return `<tr>
-      <td>${cust?.nama||'?'}<br><small style="color:var(--text-2)">${cust?.wa_number||''}</small></td>
-      <td>${f.tipe==='personal'?'👤 Personal':'🎯 Momen'}</td>
-      <td>${f.tahap||'-'}</td>
-      <td>${dateStr(f.scheduled_at)}</td>
-      <td>${stMap[f.status]||f.status}</td>
+      <td>
+        <div style="font-weight:600;color:#f1f5f9">${escHtml(cust.nama||'?')}</div>
+        <div style="font-size:12px;color:#64748b">${cust.wa_number||''}</div>
+      </td>
+      <td>${tipeBadge(tipe)} <span style="color:#64748b;font-size:12px">H${hari}</span></td>
+      <td style="color:#94a3b8;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(pesan||'-')}</td>
+      <td style="color:#64748b;white-space:nowrap">${dateStr(log.created_at)}</td>
     </tr>`;
   }).join('');
+}
+
+/* ══════════════════════════════════
+   TRIGGER MANUAL
+══════════════════════════════════ */
+async function triggerCron() {
+  const btn = document.getElementById('btn-trigger');
+  btn.disabled = true; btn.textContent = 'Menjalankan...';
+  try {
+    // Butuh secret — ambil dari env (tidak ada di client). Cukup ping endpoint.
+    const r = await fetch('/api/followup?secret=', {method:'GET'});
+    const d = await r.json();
+    if (d.ok) {
+      toast(`Selesai: ${d.sent} terkirim, ${d.skipped} dilewati`);
+      await loadLeads();
+      loadLog();
+    } else {
+      toast('Unauthorized — set CRON_SECRET yang benar via URL', 'error');
+    }
+  } catch(e) {
+    toast('Gagal: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '▶ Jalankan Sekarang';
+  }
+}
+
+/* ══════════════════════════════════
+   TAB SWITCH
+══════════════════════════════════ */
+function showTab(name, btn) {
+  document.querySelectorAll('.fu-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.fu-section').forEach(s => s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sec-' + name).classList.add('active');
+  if (name === 'log') loadLog();
+  if (name === 'leads') { loadLeads(); }
 }
 
 init();
