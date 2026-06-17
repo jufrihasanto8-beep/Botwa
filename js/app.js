@@ -626,46 +626,82 @@ KONTEN:
 }
 
 function renderSidebar(activePage) {
+  // ── Inject CSS overrides (once) ──────────────────────────────────
+  if (!document.getElementById('_sb_override')) {
+    const s = document.createElement('style');
+    s.id = '_sb_override';
+    s.textContent = `
+      /* Fix layout: sidebar is now in-flow, not fixed */
+      .app-layout{padding-left:0!important;display:flex!important;height:100vh!important;overflow:hidden!important}
+      #sidebar-container{display:contents!important}
+      #sidebar{position:relative!important;left:auto!important;top:auto!important;z-index:auto!important;
+        width:220px!important;min-width:220px!important;background:#1e293b!important;
+        height:100vh!important;display:flex!important;flex-direction:column!important;
+        flex-shrink:0!important;overflow:hidden!important;
+        border-right:1px solid rgba(255,255,255,.07)!important}
+      /* Sidebar item styles */
+      .sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+      .sb-logo{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+      .sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+      .sb-subtitle{font-size:10px;color:#64748b;margin-top:1px}
+      .sb-nav{flex:1;overflow-y:auto;padding:8px 0;scrollbar-width:none}
+      .sb-nav::-webkit-scrollbar{display:none}
+      .sb-section{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
+      .sb-item{display:flex!important;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b!important;cursor:pointer;text-decoration:none!important;transition:all .12s;position:relative}
+      .sb-item:hover{background:rgba(255,255,255,.05)!important;color:#e2e8f0!important;text-decoration:none!important}
+      .sb-item.active{background:rgba(59,130,246,.12)!important;color:#93c5fd!important}
+      .sb-item .si{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+      .sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
+      .sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
+      .sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+      /* Theme toggle btn */
+      ._sb_theme{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;margin-left:auto;flex-shrink:0}
+      ._sb_theme:hover{border-color:#3b82f6}
+    `;
+    document.head.appendChild(s);
+  }
+
+  // ── Apply saved theme ────────────────────────────────────────────
+  if (localStorage.getItem('cs_theme') === 'light') document.body.classList.add('light');
+
   const user = Auth.getUser();
-  const nav = [
-    { id:'dashboard', href:'dashboard.html', icon:'💬', label:'Inbox',       badge:true },
-    { id:'cases',     href:'cases.html',     icon:'📋', label:'Cases' },
-    { id:'analytics', href:'analytics.html', icon:'📊', label:'Analytics' },
-    { id:'contacts',  href:'contacts.html',  icon:'👥', label:'Kontak' },
-    { id:'orders',    href:'orders.html',    icon:'🛒', label:'Orders' },
-    { id:'broadcast', href:'broadcast.html', icon:'📣', label:'Broadcast' },
+  const pages = [
+    { id:'analytics',       href:'analytics.html',       icon:'📊', label:'Ringkasan' },
+    { id:'dashboard',       href:'dashboard.html',       icon:'💬', label:'Percakapan' },
+    { id:'orders',          href:'orders.html',          icon:'✅', label:'Closing' },
+    { id:'followup-engine', href:'followup-engine.html', icon:'🔔', label:'Follow-up' },
+    { id:'knowledge',       href:'knowledge.html',       icon:'📋', label:'Katalog & SOP' },
+    { id:'products',        href:'products.html',        icon:'🎁', label:'Skema Promo' },
   ];
-  const nav2 = [
-    { id:'products',        href:'products.html',        icon:'🏷️', label:'Produk' },
-    { id:'shipping',        href:'shipping.html',         icon:'📦', label:'Pengiriman' },
-    { id:'followup-engine', href:'followup-engine.html',  icon:'🔔', label:'Follow-up' },
-    { id:'knowledge',       href:'knowledge.html',        icon:'📚', label:'Knowledge Base' },
-    { id:'connect-wa',      href:'connect-wa.html',       icon:'📱', label:'Hubungkan WA' },
-    { id:'settings',        href:'settings.html',         icon:'⚙️', label:'Pengaturan' },
+  const pages2 = [
+    { id:'settings',         href:'settings.html',  icon:'⚙️', label:'Pengaturan' },
+    { id:'analytics-harian', href:'analytics.html', icon:'📅', label:'Ringkasan Harian' },
   ];
-  const navItem = (p) => `
-    <a class="s-btn ${activePage===p.id?'active':''}" href="${p.href}"
-       onclick="event.preventDefault();Router.go('${p.href}')">
-      <span class="s-icon">${p.icon}</span>
-      <span class="s-label">${p.label}</span>
-      ${p.badge ? '<span class="s-badge" id="unread-badge" style="display:none">0</span>' : ''}
-    </a>`;
+
+  const item = (p) =>
+    `<a class="sb-item${activePage===p.id?' active':''}" href="${p.href}"><span class="si">${p.icon}</span> ${p.label}</a>`;
+
   return `<div id="sidebar">
-    <div class="s-brand">
-      <div class="s-logo">CS</div>
-      <span class="s-brand-name">Adsy CS</span>
-    </div>
-    <div class="s-nav-wrap">
-      ${nav.map(navItem).join('')}
-      <div class="s-divider"></div>
-      ${nav2.map(navItem).join('')}
-    </div>
-    <div class="s-user">
-      <div class="s-avatar">${initials(user?.name||'?')}</div>
-      <div class="s-user-info">
-        <div class="s-user-name">${user?.name||'Admin'}</div>
-        <button class="s-logout" onclick="Auth.logout()">Logout</button>
+    <div class="sb-brand">
+      <div class="sb-logo">CS</div>
+      <div>
+        <div class="sb-title">Adsy CS</div>
+        <div class="sb-subtitle">${user?.store||'Adsy CS'}</div>
       </div>
+    </div>
+    <div class="sb-nav">
+      ${pages.map(item).join('')}
+      <div class="sb-divider"></div>
+      <div class="sb-section">Akun</div>
+      ${pages2.map(item).join('')}
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar">${initials(user?.name||'?')}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${user?.name||'Admin'}</div>
+        <button style="font-size:11px;color:#475569;border:none;background:none;cursor:pointer;padding:0" onclick="Auth.logout()">Logout</button>
+      </div>
+      <div class="_sb_theme" onclick="(function(){const l=document.body.classList.toggle('light');localStorage.setItem('cs_theme',l?'light':'dark');this.textContent=l?'☀️':'🌙'}).call(this)" title="Ganti tema">${localStorage.getItem('cs_theme')==='light'?'☀️':'🌙'}</div>
     </div>
   </div>`;
 }
