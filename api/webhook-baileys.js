@@ -875,7 +875,7 @@ async function sendWA(sessionId, waNumber, message, isOutbound = false, imageUrl
       secret: WEBHOOK_SECRET,
       session_id: sessionId,
       wa_number: waNumber,
-      message,
+      message: imageUrl ? undefined : (message || ''),
       is_outbound: isOutbound,
       image_url: imageUrl || undefined,
       caption: caption || undefined,
