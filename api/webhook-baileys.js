@@ -1428,7 +1428,37 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     // Cek apakah AI sebelumnya sedang tanya konfirmasi wilayah ("Sumba NTT ya kak?")
     // dan customer menjawab konfirmasi singkat ("iya", "yakin", "bener", dll)
     let autoOngkirResult = null;
-    const proposedWilayah = convState.proposed_wilayah;
+    let proposedWilayah = convState.proposed_wilayah;
+
+    // PENTING: Kalau customer kirim pesan BUKAN konfirmasi, coba cari wilayah dari pesannya
+    if (!isConfirmation(message) && message.length >= 3 && message.length <= 60) {
+      // Clear proposed_wilayah lama
+      if (proposedWilayah) {
+        console.log(`Clear proposed_wilayah lama: "${proposedWilayah}"`);
+        proposedWilayah = null;
+      }
+
+      // Coba cari wilayah dari pesan customer langsung
+      const pesanBersih = message.replace(/[?!.,]+/g, '').trim();
+      const cariHasil = await cariWilayah(pesanBersih, 20);
+      const kecUnik = [...new Set(cariHasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
+
+      if (kecUnik.length === 1 && cariHasil.length > 0) {
+        // Satu kecamatan ketemu → simpan sebagai proposed_wilayah
+        const w = cariHasil[0];
+        const wilayahBaru = `${w.kecamatan}, ${w.kabupaten}, ${w.provinsi}`;
+        console.log(`Wilayah terdeteksi dari pesan customer: "${wilayahBaru}"`);
+        await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
+        convState.proposed_wilayah = wilayahBaru;
+        proposedWilayah = wilayahBaru;
+      } else if (kecUnik.length > 1) {
+        // Banyak kecamatan → clear saja, biar AI tanya
+        console.log(`Pesan "${pesanBersih}" punya ${kecUnik.length} kecamatan, tunggu AI konfirmasi`);
+        await updateConvState(conversation.id, { proposed_wilayah: null });
+        convState.proposed_wilayah = null;
+      }
+    }
+
     if (proposedWilayah && isConfirmation(message) && !convState.ongkir) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
       const hasil = await hitungOngkir(proposedWilayah, product);
