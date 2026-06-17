@@ -1771,8 +1771,10 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     if (tanyaFoto && adaGambarProduk) {
       await new Promise(r => setTimeout(r, 800));
       try {
-        const keluhanCaption = convState.keluhan ? ` — cocok untuk: ${convState.keluhan}` : '';
-        const caption = `${product.nama}${keluhanCaption}`;
+        const manfaat = Array.isArray(product.keluhan_cocok) && product.keluhan_cocok.length
+          ? product.keluhan_cocok.slice(0, 3).join(', ')
+          : convState.keluhan || '';
+        const caption = manfaat ? `${product.nama}\n✅ ${manfaat}` : product.nama;
         await sendWA(userId, reply_jid, null, false, product.gambar_url, caption);
         await updateConvState(conversation.id, { foto_terkirim: true });
         console.log(`[FOTO] Gambar terkirim: ${product.gambar_url}`);
