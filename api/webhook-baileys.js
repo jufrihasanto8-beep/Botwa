@@ -204,7 +204,7 @@ Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
-Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya foto, balas natural + sebutkan 1-2 keunggulan produk sesuai keluhan mereka. Contoh: "Ada kak! Ini ya 😊 [keunggulan]". JANGAN sebut apapun tentang sistem, loading, atau proses pengiriman foto.' : 'Tidak ada — kalau ditanya foto, bilang belum ada foto tapi deskripsikan produknya dengan antusias.'}
+Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya/minta foto, cukup balas singkat natural + 1-2 keunggulan produk. Contoh: "Ada kak, ini ya! 😊 [keunggulan]". ⛔ JANGAN sebut apapun soal pengiriman foto, loading, atau kenapa foto belum muncul.' : 'Tidak ada — kalau ditanya foto, bilang stok foto sedang disiapkan tapi deskripsikan produknya.'}
 Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI (WAJIB ikuti urutan, JANGAN loncat)
@@ -229,6 +229,7 @@ GAYA NGOBROL
 - Tanya SATU hal per balasan, jangan gabung edukasi + rekomendasi + tanya data sekaligus
 - Setelah jawab pertanyaan faktual (BPOM, halal, bahan, dll) → SELALU lanjut tanya balik yang relevan ke alur konsultasi (misal: "Kak sendiri ada keluhan apa?", "Udah berapa lama kak?"). Jangan jawab lalu diam.
 - ⚠️ KERAS: DILARANG TOTAL semua markdown — JANGAN *bold*, JANGAN **bold**, JANGAN _italic_, JANGAN ---, JANGAN > quote. Ini WhatsApp, bukan dokumen.
+- ⛔ DILARANG pakai kata: "sistem", "tim terkait", "tim kami", "diteruskan", "pihak terkait", "loading", "otomatis", "diproses sistem". Ngobrol kayak manusia, bukan robot CS.
 - Angka & total tulis POLOS tanpa tanda apapun: "TOTAL Rp 142.500" BUKAN "**TOTAL Rp 142.500**"
 
 KUNCI KONTEKS PRODUK
@@ -338,7 +339,9 @@ Kalau customer bilang "gak jadi", "cancel", "ga mau", "mahal", "pikir-pikir dulu
 - Baru lepaskan dengan ramah kalau customer sudah 2x+ tetap menolak setelah digali
 
 ESKALASI KE MANUSIA
-Balas: "bentar ya kak, aku sambungin tim 🙏" lalu STOP (tulis [ESCALATE]), kalau:
+Balas singkat dan hangat seperti "Oke kak, ditunggu sebentar ya 🙏" atau "Siap kak, bentar ya 🙏" — lalu STOP (tulis [ESCALATE]).
+JANGAN kasih alasan apapun. JANGAN sebut tim, proses, atau penjelasan teknis. Cukup tutup dengan hangat.
+Kapan eskalasi:
 - Customer kesel/emosi negatif
 - Komplain berat / di luar alur normal
 - Pertanyaan di luar knowledge yang tidak yakin
@@ -1754,7 +1757,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     await saveMessage(conversation.id, 'ai', reply);
 
     // ── Auto-kirim gambar produk kalau customer tanya foto ────
-    const tanyaFoto = /\b(foto|gambar|pic|photo|tampilan|bentuk|wujud|lihat produk|gambarnya|fotonya)\b/i.test(message);
+    const tanyaFoto = /\b(foto|gambar|pic|photo|tampilan|bentuk|wujud|lihat produk|gambarnya|fotonya|kirim dong|kirimnya|mana fotonya|mana gambarnya|belum terkirim|belum muncul|kirim ulang|kirim lagi)\b/i.test(message);
     const adaGambarProduk = product?.gambar_url;
     const sudahKirimFoto  = convState.foto_terkirim;
 
