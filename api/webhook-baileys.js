@@ -1806,7 +1806,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     const adaGambarProduk = product?.gambar_url;
     const sudahKirimFoto  = convState.foto_terkirim;
 
-    console.log(`[FOTO] tanyaFoto=${tanyaFoto} adaGambar=${!!adaGambarProduk} sudahKirim=${sudahKirimFoto} url=${adaGambarProduk||'null'}`);
+    if (tanyaFoto) console.log(`[FOTO] adaGambar=${!!adaGambarProduk} url=${adaGambarProduk||'null'}`);
 
     // Kirim teks reply dulu
     await sendWA(userId, reply_jid, reply);
