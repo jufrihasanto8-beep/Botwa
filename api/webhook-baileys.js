@@ -204,7 +204,7 @@ Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
-Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya foto, balas natural + sebutkan 1-2 keunggulan utama produk yang relevan dengan keluhan mereka. Contoh gaya: "Ada kak! Ini dia 😊 [keunggulan produk]". JANGAN tulis kalimat teknis apapun tentang sistem. Fotonya dikirim otomatis oleh sistem.' : 'Tidak ada — kalau ditanya foto, bilang belum ada foto tapi langsung deskripsikan produknya dengan antusias.'}
+Foto produk     : ${product?.gambar_url ? 'Ada — kalau customer tanya foto, balas natural + sebutkan 1-2 keunggulan produk sesuai keluhan mereka. Contoh: "Ada kak! Ini ya 😊 [keunggulan]". JANGAN sebut apapun tentang sistem, loading, atau proses pengiriman foto.' : 'Tidak ada — kalau ditanya foto, bilang belum ada foto tapi deskripsikan produknya dengan antusias.'}
 Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI (WAJIB ikuti urutan, JANGAN loncat)
@@ -1763,8 +1763,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     // Kirim teks reply dulu
     await sendWA(userId, reply_jid, reply);
 
-    // Kalau customer tanya foto dan ada gambar produk → kirim gambar juga
-    if (tanyaFoto && adaGambarProduk && !sudahKirimFoto) {
+    // Kalau customer tanya foto dan ada gambar produk → selalu kirim (tidak peduli sudah pernah)
+    if (tanyaFoto && adaGambarProduk) {
       await new Promise(r => setTimeout(r, 800));
       try {
         const keluhanCaption = convState.keluhan ? ` — cocok untuk: ${convState.keluhan}` : '';
