@@ -142,7 +142,7 @@ body.light .skel{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f
         <div class="tabs2">
           <button class="tab2 active" onclick="setTab('semua',this)">Semua</button>
           <button class="tab2" onclick="setTab('aktif',this)">Bot Aktif</button>
-          <button class="tab2" onclick="setTab('ekskalasi',this)">Eskalasi</button>
+          <button class="tab2" onclick="setTab('eskalasi',this)">Eskalasi</button>
         </div>
         <div class="tc-spacer"></div>
         <div class="search2">
@@ -235,7 +235,7 @@ async function init() {
   const total  = customers.length;
   const baru   = customers.filter(c => c.created_at >= today).length;
   const aktif  = new Set(convs.filter(c => c.status==='baru'||c.status==='diproses').map(c=>c.customer_id)).size;
-  const eskal  = new Set(convs.filter(c => c.status==='ekskalasi').map(c=>c.customer_id)).size;
+  const eskal  = new Set(convs.filter(c => c.status==='eskalasi').map(c=>c.customer_id)).size;
   const pesanHariIni = convs.filter(c => c.last_msg_at >= today).length;
 
   document.getElementById('stat-row').innerHTML = `
@@ -287,7 +287,7 @@ function onSearch(v) { q = v.toLowerCase().trim(); page = 1; renderTable(); }
 function getFiltered() {
   let list = allCustomers;
   if (currentTab === 'aktif')     list = list.filter(c => { const m=convMap[c.id]; return m&&(m.status==='baru'||m.status==='diproses'); });
-  if (currentTab === 'ekskalasi') list = list.filter(c => convMap[c.id]?.status==='ekskalasi');
+  if (currentTab === 'eskalasi') list = list.filter(c => convMap[c.id]?.status==='eskalasi');
   if (q) list = list.filter(c => (c.nama||'').toLowerCase().includes(q) || (c.wa_number||'').includes(q));
   return list;
 }
@@ -317,7 +317,7 @@ function renderTable() {
     const chatUrl = m.convId ? `dashboard.html?conv=${m.convId}` : 'dashboard.html';
 
     let badge = '';
-    if (m.status === 'ekskalasi')
+    if (m.status === 'eskalasi')
       badge = `<span class="bdg bdg-yellow"><span class="dot dot-yellow"></span> Eskalasi</span>`;
     else if (m.status === 'baru' || m.status === 'diproses')
       badge = `<span class="bdg bdg-green"><span class="dot dot-green"></span> Bot aktif</span>`;

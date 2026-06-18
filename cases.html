@@ -158,7 +158,7 @@ body.light .skel{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f
       <div class="tc-toolbar">
         <div class="tabs2" id="tabs">
           <button class="tab2 active" onclick="setTab('semua',this)">Semua <span class="tc" id="cnt-semua">0</span></button>
-          <button class="tab2" onclick="setTab('ekskalasi',this)">Eskalasi <span class="tc" id="cnt-eskal">0</span></button>
+          <button class="tab2" onclick="setTab('eskalasi',this)">Eskalasi <span class="tc" id="cnt-eskal">0</span></button>
           <button class="tab2" onclick="setTab('lainnya',this)">Lainnya <span class="tc" id="cnt-lain">0</span></button>
         </div>
         <div class="search2">
@@ -237,7 +237,7 @@ async function init() {
   document.getElementById('tbody').innerHTML = `<tr><td colspan="5" class="empty-cell"><div class="e-icon">⏳</div><p>Memuat data...</p></td></tr>`;
 
   const [convs, custs] = await Promise.all([
-    sbFetch('conversations', `?user_id=eq.${uid}&status=in.(baru,diproses,ekskalasi)&select=id,customer_id,status,last_msg_at,state,created_at&order=last_msg_at.desc`),
+    sbFetch('conversations', `?user_id=eq.${uid}&status=in.(baru,diproses,eskalasi)&select=id,customer_id,status,last_msg_at,state,created_at&order=last_msg_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama`)
   ]);
 
@@ -247,7 +247,7 @@ async function init() {
   allCases = convs;
 
   /* ── STATS ── */
-  const eskal   = convs.filter(c => c.status === 'ekskalasi').length;
+  const eskal   = convs.filter(c => c.status === 'eskalasi').length;
   const proses  = convs.filter(c => c.status === 'diproses').length;
   const transfer = convs.filter(c => {
     try { const s = typeof c.state === 'string' ? JSON.parse(c.state) : (c.state||{}); return s.transfer_pending; } catch{ return false; }
@@ -304,8 +304,8 @@ function onSearch(v) { searchQ = v.toLowerCase().trim(); page = 1; renderTable()
 
 function getFiltered() {
   let list = allCases;
-  if (currentTab === 'ekskalasi') list = list.filter(c => c.status === 'ekskalasi');
-  else if (currentTab === 'lainnya') list = list.filter(c => c.status !== 'ekskalasi');
+  if (currentTab === 'eskalasi') list = list.filter(c => c.status === 'eskalasi');
+  else if (currentTab === 'lainnya') list = list.filter(c => c.status !== 'eskalasi');
   if (searchQ) {
     list = list.filter(c => {
       const cu = custMap[c.customer_id] || {};
@@ -318,8 +318,8 @@ function getFiltered() {
 /* ── RENDER ── */
 function renderTable() {
   const filtered = getFiltered();
-  const eskalCnt = allCases.filter(c => c.status === 'ekskalasi').length;
-  const lainCnt  = allCases.filter(c => c.status !== 'ekskalasi').length;
+  const eskalCnt = allCases.filter(c => c.status === 'eskalasi').length;
+  const lainCnt  = allCases.filter(c => c.status !== 'eskalasi').length;
 
   document.getElementById('cnt-semua').textContent = allCases.length;
   document.getElementById('cnt-eskal').textContent = eskalCnt;
@@ -349,7 +349,7 @@ function renderTable() {
     const chatUrl = `dashboard.html?conv=${c.id}`;
 
     let badge = '';
-    if (c.status === 'ekskalasi')
+    if (c.status === 'eskalasi')
       badge = `<span class="bdg bdg-eskal"><span style="font-size:10px">⬆</span> ESKALASI</span>`;
     else if (c.status === 'diproses')
       badge = `<span class="bdg bdg-proses">🔵 DIPROSES</span>`;

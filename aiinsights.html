@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Insights · Adsy CS</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
+.main-content{background:var(--bg);min-height:100vh;padding:0}
+
+/* ── HERO CARD ── */
+.hero-card{margin:20px 24px 16px;background:var(--white);border:1px solid var(--border);border-radius:16px;padding:32px 36px;display:flex;align-items:center;gap:40px;position:relative;overflow:hidden}
+.hero-card::before{content:'';position:absolute;top:-60px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,rgba(139,92,246,.08) 0%,transparent 70%);pointer-events:none}
+.hero-illus{width:140px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.hero-illus svg{width:120px;height:120px;opacity:.85}
+.hero-body{flex:1;min-width:0}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);color:#a78bfa;font-size:12px;font-weight:600;margin-bottom:14px}
+.hero-title{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px;margin-bottom:8px;line-height:1.2}
+.hero-desc{font-size:13px;color:var(--text-2);line-height:1.7;margin-bottom:20px;max-width:520px}
+.btn-sop{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;transition:all .15s}
+.btn-sop:hover{border-color:#8b5cf6;color:#8b5cf6;background:rgba(139,92,246,.04)}
+body.light .btn-sop{background:#f8fafc}
+.hero-count{position:absolute;top:20px;right:24px;display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);font-size:12px;font-weight:700;color:#a78bfa}
+.hero-count .dot{width:6px;height:6px;border-radius:50%;background:#a78bfa}
+
+/* ── CARA KERJA ── */
+.how-section{margin:0 24px 16px}
+.how-hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.how-hdr-icon{width:28px;height:28px;border-radius:8px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.2);display:flex;align-items:center;justify-content:center;font-size:13px}
+.how-hdr h3{font-size:14px;font-weight:700;color:var(--text)}
+.how-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:800px){.how-cards{grid-template-columns:1fr}}
+.how-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:22px 22px 22px;position:relative}
+.how-num{font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:12px}
+.how-num.c1{color:#8b5cf6}
+.how-num.c2{color:#3b82f6}
+.how-num.c3{color:#22c55e}
+.how-icon-wrap{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:14px}
+.how-icon-wrap.c1{background:rgba(139,92,246,.1)}
+.how-icon-wrap.c2{background:rgba(59,130,246,.1)}
+.how-icon-wrap.c3{background:rgba(34,197,94,.1)}
+.how-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px}
+.how-desc{font-size:12px;color:var(--text-2);line-height:1.6}
+.how-connector{display:flex;align-items:center;justify-content:center;padding-top:40px;color:var(--border)}
+
+/* ── INSIGHT TABLE ── */
+.tc{background:var(--white);border:1px solid var(--border);border-radius:16px;margin:0 24px 24px;overflow:hidden}
+.tc-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.tc-hdr-left{display:flex;align-items:center;gap:10px}
+.tc-hdr-icon{width:30px;height:30px;border-radius:8px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);display:flex;align-items:center;justify-content:center;font-size:13px}
+.tc-title{font-size:14px;font-weight:700;color:var(--text)}
+.tc-sub{font-size:11px;color:var(--text-2);margin-top:1px}
+.badge-cnt{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2)}
+
+.tc-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--bg)}
+th{padding:10px 18px;text-align:left;font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:14px 18px;border-bottom:1px solid var(--border);vertical-align:middle;font-size:13px}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(139,92,246,.02)}
+
+.cust-cell{display:flex;align-items:center;gap:10px}
+.c-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.c-name{font-size:13px;font-weight:600;color:var(--text)}
+.c-since{font-size:11px;color:var(--text-2);margin-top:1px}
+
+.bdg{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.bdg-eskal{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
+.bdg-baru{background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2)}
+
+.btn-sop-sm{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2);font-size:12px;font-weight:600;text-decoration:none;transition:opacity .15s;cursor:pointer;white-space:nowrap}
+.btn-sop-sm:hover{opacity:.8;color:#a78bfa}
+
+.empty-cell{text-align:center;padding:60px 20px;color:var(--text-2)}
+.empty-cell .e-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+.empty-cell h4{font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px}
+.empty-cell p{font-size:13px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+
+    <!-- Hero Card -->
+    <div class="hero-card">
+      <div class="hero-count"><span class="dot"></span><span id="hero-cnt">0</span> terbuka</div>
+      <div class="hero-illus">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="60" cy="60" r="50" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.2)" stroke-width="1.5"/>
+          <rect x="30" y="38" width="60" height="44" rx="10" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.4)" stroke-width="1.5"/>
+          <circle cx="45" cy="60" r="5" fill="#a78bfa"/>
+          <circle cx="60" cy="60" r="5" fill="#a78bfa" opacity=".6"/>
+          <circle cx="75" cy="60" r="5" fill="#a78bfa" opacity=".3"/>
+          <path d="M50 82 L60 92 L70 82" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.4)" stroke-width="1.5"/>
+          <circle cx="88" cy="34" r="10" fill="rgba(139,92,246,0.2)" stroke="rgba(139,92,246,0.4)" stroke-width="1.5"/>
+          <text x="84" y="38" fill="#a78bfa" font-size="11" font-weight="700">?</text>
+        </svg>
+      </div>
+      <div class="hero-body">
+        <div class="hero-badge">✨ AI Insights</div>
+        <div class="hero-title">Pertanyaan yang belum bisa<br>dijawab bot</div>
+        <div class="hero-desc">Tiap pertanyaan yang lolos dari bot dikumpulkan otomatis di sini. Kamu tinggal lengkapi jawabannya di Katalog &amp; SOP — dan bot langsung makin akurat.</div>
+        <a class="btn-sop" href="products.html">📋 Buka Katalog &amp; SOP →</a>
+      </div>
+    </div>
+
+    <!-- Cara Kerja -->
+    <div class="how-section">
+      <div class="how-hdr">
+        <div class="how-hdr-icon">🔗</div>
+        <h3>Cara kerja</h3>
+      </div>
+      <div class="how-cards">
+        <div class="how-card">
+          <div class="how-num c1">01</div>
+          <div class="how-icon-wrap c1">🔍</div>
+          <div class="how-title">Bot tidak menemukan jawaban</div>
+          <div class="how-desc">Saat Katalog &amp; SOP belum memiliki jawaban yang relevan, pertanyaan akan ditandai oleh sistem dan percakapan dieskalasi.</div>
+        </div>
+        <div class="how-card">
+          <div class="how-num c2">02</div>
+          <div class="how-icon-wrap c2">📝</div>
+          <div class="how-title">Insight dicatat otomatis</div>
+          <div class="how-desc">Percakapan yang lolos dari bot akan muncul di halaman ini sebagai bahan evaluasi untuk dilengkapi.</div>
+        </div>
+        <div class="how-card">
+          <div class="how-num c3">03</div>
+          <div class="how-icon-wrap c3">🚀</div>
+          <div class="how-title">Lengkapi pengetahuan bot</div>
+          <div class="how-desc">Tambahkan jawaban di Katalog &amp; SOP agar bot makin akurat dari waktu ke waktu. Tiap pertanyaan jadi pelajaran.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="tc">
+      <div class="tc-hdr">
+        <div class="tc-hdr-left">
+          <div class="tc-hdr-icon">⚡</div>
+          <div>
+            <div class="tc-title">Percakapan yang perlu ditinjau</div>
+            <div class="tc-sub">Eskalasi yang belum diselesaikan</div>
+          </div>
+        </div>
+        <span class="badge-cnt" id="tbl-cnt">0 case</span>
+      </div>
+      <div class="tc-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pelanggan</th>
+              <th>Aktivitas Terakhir</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="4" class="empty-cell"><div class="e-icon">⏳</div><p>Memuat data...</p></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/theme.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('aiinsights');
+
+function sbFetch(table, query) {
+  const url = window.SUPABASE_URL, key = window.SUPABASE_ANON_KEY;
+  return fetch(`${url}/rest/v1/${table}${query}`, {
+    headers: { 'Content-Type':'application/json', apikey: key, Authorization: 'Bearer ' + key }
+  }).then(r => r.ok ? r.json() : []).catch(() => []);
+}
+
+const AV_COLORS = ['#8b5cf6','#3b82f6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+function avColor(n) { let h=0; for(const c of(n||'?'))h=(h*31+c.charCodeAt(0))&0xffffffff; return AV_COLORS[Math.abs(h)%AV_COLORS.length]; }
+function avInit(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function relTime(iso) {
+  if (!iso) return '—';
+  const d = Date.now() - new Date(iso).getTime(), m = Math.floor(d/60000);
+  if (m < 1) return 'Baru saja';
+  if (m < 60) return m + ' menit lalu';
+  const h = Math.floor(m/60);
+  if (h < 24) return h + ' jam lalu';
+  return Math.floor(h/24) + ' hari lalu';
+}
+function fmtDateTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+function cleanPhone(raw) {
+  let n = String(raw||'').split('@')[0].replace(/\D/g,'');
+  if (!n) return '—';
+  if (n.startsWith('0')) n = '62' + n.slice(1);
+  if (!n.startsWith('62')) n = '62' + n;
+  const local = n.slice(2);
+  if (local.length > 12) return '—';
+  return '+62 ' + local.slice(0,3) + '-' + local.slice(3,7) + (local.length > 7 ? '-' + local.slice(7) : '');
+}
+
+const uid = Auth.getUser()?.id;
+
+async function init() {
+  const [convs, custs] = await Promise.all([
+    sbFetch('conversations', `?user_id=eq.${uid}&status=eq.eskalasi&select=id,customer_id,status,last_msg_at&order=last_msg_at.desc`),
+    sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama`)
+  ]);
+
+  const custMap = {};
+  custs.forEach(c => { custMap[c.id] = c; });
+
+  document.getElementById('hero-cnt').textContent = convs.length;
+  document.getElementById('tbl-cnt').textContent  = convs.length + ' case';
+
+  const tbody = document.getElementById('tbody');
+  if (!convs.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-cell">
+      <div class="e-icon">🎉</div>
+      <h4>Bagus — belum ada yang lolos!</h4>
+      <p>Jika bot menemukan pertanyaan di luar pengetahuannya,<br>pertanyaan itu akan muncul di sini agar kamu bisa melengkapinya<br>di Katalog &amp; SOP.</p>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = convs.map(c => {
+    const cu   = custMap[c.customer_id] || {};
+    const nama = cu.nama || cu.wa_number || 'Pelanggan';
+    const color = avColor(nama);
+    const ini   = avInit(nama);
+    return `<tr>
+      <td>
+        <div class="cust-cell">
+          <div class="c-av" style="background:${color}">${escH(ini)}</div>
+          <div>
+            <div class="c-name">${escH(nama)}</div>
+            <div class="c-since">${escH(cleanPhone(cu.wa_number))}</div>
+          </div>
+        </div>
+      </td>
+      <td style="color:var(--text-2)">
+        <div>${relTime(c.last_msg_at)}</div>
+        <div style="font-size:11px;margin-top:2px">${fmtDateTime(c.last_msg_at)}</div>
+      </td>
+      <td><span class="bdg bdg-eskal">⬆ Eskalasi</span></td>
+      <td>
+        <div style="display:flex;gap:8px;align-items:center">
+          <a class="btn-sop-sm" href="dashboard.html?conv=${c.id}">💬 Buka Console</a>
+          <a class="btn-sop-sm" href="products.html" style="background:rgba(34,197,94,.1);color:#22c55e;border-color:rgba(34,197,94,.2)">📋 Tambah ke SOP</a>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
