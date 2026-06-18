@@ -34,7 +34,72 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { messages, product, userId } = req.body || {};
+  const { action, messages, product, userId, hari, tipe } = req.body || {};
+
+  // ── ACTION: generate teks follow-up ──
+  if (action === 'followup-text') {
+    const userKey = await getUserAnthropicKey(userId);
+    const apiKey  = userKey || ANTHROPIC_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
+
+    const hariKe   = hari || 2;
+    const image_url = req.body.image_url || null;
+    const tipeLabel = { ai: 'AI natural', testimoni: 'testimoni customer', promo: 'promo/diskon', custom: 'pesan custom' }[tipe] || 'custom';
+
+    const toneGuide = hariKe === 2
+      ? 'Hari 2 — masih hangat, sambung dari konteks terakhir, jangan kaku'
+      : hariKe <= 3
+        ? `Hari ${hariKe} — agak soft, kasih value atau social proof ringan`
+        : `Hari ${hariKe} — tone penutup, beri ruang tapi pintu tetap terbuka`;
+
+    const imageNote = image_url
+      ? `\n- Ada gambar yang akan dikirim bersamaan. Buat caption yang RELEVAN dengan isi gambar tersebut. Caption harus natural, bukan deskripsi gambar.`
+      : '';
+
+    const prompt = `Kamu CS WhatsApp toko produk herbal. Buat 1 pesan follow-up untuk customer yang belum balas.
+
+Konteks:
+- Follow-up Hari ke-${hariKe} (H+${hariKe - 1} setelah lead masuk)
+- Tipe: ${tipeLabel}${imageNote}
+- Customer sudah dapat info produk sebelumnya tapi belum balas
+
+Aturan WAJIB:
+- Maksimal 2 kalimat
+- Natural, hangat, tidak memaksa
+- Pakai {nama} untuk nama customer (sistem ganti otomatis)
+- 1 emoji saja
+- DILARANG markdown (*bold*, dll) — ini WhatsApp
+- DILARANG kata: "sistem", "admin", "CS", "tim", "diproses"
+- ${toneGuide}
+
+Tulis pesannya langsung, tanpa penjelasan.`;
+
+    // Build message content — tambah gambar kalau ada
+    const userContent = image_url
+      ? [
+          { type: 'image', source: { type: 'url', url: image_url } },
+          { type: 'text', text: prompt },
+        ]
+      : prompt;
+
+    try {
+      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: image_url ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
+          max_tokens: 150,
+          messages: [{ role: 'user', content: userContent }],
+        }),
+      }, 20000);
+      const data = await response.json();
+      if (data.error) return res.status(500).json({ error: data.error.message });
+      return res.status(200).json({ text: data.content?.[0]?.text?.trim() || '' });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (!messages?.length) return res.status(400).json({ error: 'messages wajib' });
 
   const userKey = await getUserAnthropicKey(userId);
