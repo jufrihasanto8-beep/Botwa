@@ -56,7 +56,7 @@ body.light .sb-user{border-top-color:rgba(0,0,0,.07)}
 .drp-trigger:hover{border-color:#3b82f6}
 .drp-icon{color:#3b82f6;font-size:13px}
 .drp-wrap{position:relative}
-.drp-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.25);display:none;overflow:hidden;min-width:540px}
+.drp-dropdown{position:fixed;z-index:9999;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.25);display:none;overflow:hidden;min-width:540px}
 body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
 .drp-dropdown.open{display:flex}
 .drp-presets{width:160px;border-right:1px solid var(--border);padding:10px 0;flex-shrink:0}
@@ -356,46 +356,147 @@ function fmtDt(iso) {
   return new Date(iso).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 
-// Date range helpers
-let currentPeriod = 'kemarin';
+// ── DATE RANGE PICKER ──────────────────────────────────────
+let filterStart = null, filterEnd = null;
+let drpSelStart = null, drpSelEnd = null, drpPickingEnd = false;
+let drpViewYear = new Date().getFullYear(), drpViewMonth = new Date().getMonth();
+const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DAYS_ID   = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+// Default: 7 hari terakhir
+(function(){
+  filterStart = new Date(Date.now()-6*864e5); filterStart.setHours(0,0,0,0);
+  filterEnd   = new Date(); filterEnd.setHours(23,59,59,999);
+  drpSelStart = new Date(filterStart); drpSelEnd = new Date(filterEnd);
+})();
+
+function drpFmt(d) {
+  if (!d) return '—';
+  return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+}
+function drpToggle() {
+  const dd = document.getElementById('drp-dropdown');
+  const tr = document.getElementById('drp-trigger');
+  const rect = tr.getBoundingClientRect();
+  dd.style.top  = (rect.bottom + 8) + 'px';
+  dd.style.right = (window.innerWidth - rect.right) + 'px';
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) { drpRender(); drpUpdateSel(); document.addEventListener('click', drpOutside); }
+  else document.removeEventListener('click', drpOutside);
+}
+function drpClose() {
+  document.getElementById('drp-dropdown').classList.remove('open');
+  document.removeEventListener('click', drpOutside);
+}
+function drpOutside(e) {
+  const dd = document.getElementById('drp-dropdown');
+  const tr = document.getElementById('drp-trigger');
+  if (!dd.contains(e.target) && !tr.contains(e.target)) drpClose();
+}
+function drpPreset(days, label, btn) {
+  drpSelStart = new Date(Date.now()-(days-1)*864e5); drpSelStart.setHours(0,0,0,0);
+  drpSelEnd   = new Date(); drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpRender();
+}
+function drpPresetThisMonth(btn) {
+  drpSelStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  drpSelEnd   = new Date(); drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpRender();
+}
+function drpPresetLastMonth(btn) {
+  const n = new Date();
+  drpSelStart = new Date(n.getFullYear(), n.getMonth()-1, 1);
+  drpSelEnd   = new Date(n.getFullYear(), n.getMonth(), 0); drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpRender();
+}
+function drpPresetYesterday(btn) {
+  drpSelStart = new Date(Date.now()-864e5); drpSelStart.setHours(0,0,0,0);
+  drpSelEnd   = new Date(Date.now()-864e5); drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpRender();
+}
+function drpUpdateSel() {
+  document.getElementById('drp-sel-start').textContent = drpFmt(drpSelStart);
+  document.getElementById('drp-sel-end').textContent   = drpFmt(drpSelEnd);
+}
+function drpApply() {
+  if (!drpSelStart) return;
+  filterStart = new Date(drpSelStart);
+  filterEnd   = drpSelEnd ? new Date(drpSelEnd) : new Date(drpSelStart);
+  filterEnd.setHours(23,59,59,999);
+  document.getElementById('drp-label').textContent = `${drpFmt(filterStart)} — ${drpFmt(filterEnd)}`;
+  drpClose();
+  render();
+}
+function drpClickDay(y, m, d) {
+  const clicked = new Date(y, m, d);
+  if (!drpSelStart || (drpSelStart && drpSelEnd)) {
+    drpSelStart = clicked; drpSelEnd = null; drpPickingEnd = true;
+  } else {
+    if (clicked < drpSelStart) { drpSelEnd = drpSelStart; drpSelStart = clicked; }
+    else drpSelEnd = clicked;
+    drpPickingEnd = false;
+  }
+  drpUpdateSel(); drpRender();
+}
+function drpRender() {
+  const y = drpViewYear, m = drpViewMonth;
+  const firstDay = new Date(y, m, 1).getDay();
+  const startPad = firstDay === 0 ? 6 : firstDay - 1;
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const prevDays = new Date(y, m, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  let html = `<div class="drp-cal-hdr">
+    <button class="drp-nav" onclick="drpNav(-1)">‹</button>
+    <div class="drp-cal-title">${MONTHS_ID[m]} ${y}</div>
+    <button class="drp-nav" onclick="drpNav(1)">›</button>
+  </div>
+  <div class="drp-days-hdr">${DAYS_ID.map(d=>`<span>${d}</span>`).join('')}</div>
+  <div class="drp-days">`;
+  for (let i=startPad;i>0;i--) html += `<button class="drp-day other-month" onclick="drpNav(-1)">${prevDays-i+1}</button>`;
+  for (let d=1;d<=daysInMonth;d++) {
+    const cur = new Date(y,m,d);
+    const isToday = cur.getTime()===today.getTime();
+    const isStart = drpSelStart && cur.getTime()===new Date(drpSelStart.getFullYear(),drpSelStart.getMonth(),drpSelStart.getDate()).getTime();
+    const isEnd   = drpSelEnd   && cur.getTime()===new Date(drpSelEnd.getFullYear(),drpSelEnd.getMonth(),drpSelEnd.getDate()).getTime();
+    const inRange = drpSelStart && drpSelEnd && cur>drpSelStart && cur<drpSelEnd;
+    let cls = 'drp-day';
+    if (isStart && isEnd) cls += ' selected';
+    else if (isStart) cls += ' range-start';
+    else if (isEnd)   cls += ' range-end';
+    else if (inRange) cls += ' in-range';
+    if (isToday) cls += ' today';
+    html += `<button class="${cls}" onclick="drpClickDay(${y},${m},${d})">${d}</button>`;
+  }
+  const total = startPad + daysInMonth;
+  const rem = total%7===0?0:7-(total%7);
+  for (let d=1;d<=rem;d++) html += `<button class="drp-day other-month" onclick="drpNav(1)">${d}</button>`;
+  html += '</div>';
+  document.getElementById('drp-cal').innerHTML = html;
+}
+function drpNav(dir) {
+  drpViewMonth += dir;
+  if (drpViewMonth>11){drpViewMonth=0;drpViewYear++;}
+  if (drpViewMonth<0) {drpViewMonth=11;drpViewYear--;}
+  drpRender();
+}
+
+// ── DATA ──────────────────────────────────────────────────
 let allConvs = [], prodMap = {}, custMap = {};
 let donutChart = null, barChart = null;
 
-function getRange(period) {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  switch(period) {
-    case 'hari_ini': return { from: today, label: 'Hari Ini' };
-    case 'kemarin': {
-      const d = new Date(today); d.setDate(d.getDate()-1);
-      return { from: d, to: today, label: 'Kemarin' };
-    }
-    case 'minggu': {
-      const d = new Date(today); d.setDate(d.getDate() - today.getDay());
-      return { from: d, label: 'Minggu Ini' };
-    }
-    case 'bulan': {
-      return { from: new Date(today.getFullYear(), today.getMonth(), 1), label: 'Bulan Ini' };
-    }
-    default: return { from: null, label: 'Semua' };
-  }
-}
-
-function filterByPeriod(convs, period) {
-  const r = getRange(period);
-  if (!r.from) return convs;
+function filterByRange(convs) {
   return convs.filter(c => {
     const d = new Date(c.last_msg_at || c.created_at);
-    if (r.to) return d >= r.from && d < r.to;
-    return d >= r.from;
+    return d >= filterStart && d <= filterEnd;
   });
-}
-
-function setDate(period, btn) {
-  currentPeriod = period;
-  document.querySelectorAll('.dtab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  render();
 }
 
 async function init() {
@@ -417,7 +518,7 @@ async function init() {
 }
 
 function render() {
-  const list = filterByPeriod(allConvs, currentPeriod);
+  const list = filterByRange(allConvs);
   calcStats(list);
   renderCharts(list);
   renderTable(list);
@@ -448,8 +549,11 @@ function calcStats(list) {
   const avg   = total ? Math.round(gross / total) : 0;
   const dup   = calcDuplikat(list);
 
-  // Prev period comparison
-  const prevList = getPrevPeriod();
+  // Prev period comparison (same duration, shifted back)
+  const dur = filterEnd - filterStart;
+  const prevStart = new Date(filterStart - dur);
+  const prevEnd   = new Date(filterStart);
+  const prevList  = allConvs.filter(c => { const d=new Date(c.last_msg_at||c.created_at); return d>=prevStart&&d<prevEnd; });
   let prevGross = 0;
   prevList.forEach(c => {
     const st = c.state || {};
@@ -486,18 +590,6 @@ function calcDuplikat(list) {
     if (seen[c.customer_id] === 2) dup++;
   });
   return dup;
-}
-
-function getPrevPeriod() {
-  const r = getRange(currentPeriod);
-  if (!r.from) return [];
-  const dur = r.to ? r.to - r.from : Date.now() - r.from;
-  const prevFrom = new Date(r.from - dur);
-  const prevTo   = r.from;
-  return allConvs.filter(c => {
-    const d = new Date(c.last_msg_at || c.created_at);
-    return d >= prevFrom && d < prevTo;
-  });
 }
 
 function makeBadge(cur, prev, isCount) {
@@ -606,7 +698,7 @@ function renderTable(list) {
 }
 
 function exportCSV() {
-  const list = filterByPeriod(allConvs, currentPeriod);
+  const list = filterByRange(allConvs);
   if (!list.length) return alert('Tidak ada data untuk diekspor.');
 
   const rows = [['Nama','WA','Produk','Qty','Harga Produk','Ongkir','Total','Metode','Waktu Closing']];
@@ -633,7 +725,7 @@ function exportCSV() {
   const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
-  a.download = `closing_${currentPeriod}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `closing_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
 }
 
