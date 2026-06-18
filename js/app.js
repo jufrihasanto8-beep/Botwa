@@ -670,6 +670,7 @@ function renderSidebar(activePage) {
     { id:'dashboard',       href:'dashboard.html',       icon:'💬', label:'Percakapan' },
     { id:'cases',           href:'cases.html',           icon:'📋', label:'Cases' },
     { id:'contacts',        href:'contacts.html',        icon:'👥', label:'Pelanggan' },
+    { id:'aiinsights',      href:'aiinsights.html',      icon:'✨', label:'AI Insights' },
     { id:'orders',          href:'orders.html',          icon:'✅', label:'Closing' },
     { id:'followup-engine', href:'followup-engine.html', icon:'🔔', label:'Follow-up' },
     { id:'knowledge',       href:'knowledge.html',       icon:'📋', label:'Katalog & SOP' },
