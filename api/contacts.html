@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pelanggan · Adsy CS</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* ── THEME VARIABLES ── */
+:root {
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1e293b;
+  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.04);
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--text4:#475569;
+  --card-bg:#0d1117;--input-bg:#0d1117;
+}
+body.light {
+  --bg:#f1f5f9;--bg2:#ffffff;--bg3:#f8fafc;
+  --border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.04);
+  --text:#0f172a;--text2:#475569;--text3:#64748b;--text4:#94a3b8;
+  --card-bg:#ffffff;--input-bg:#f8fafc;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;height:100vh;overflow:hidden;display:flex;-webkit-font-smoothing:antialiased;transition:background .2s,color .2s}
+
+/* ── SIDEBAR ── */
+#sidebar{width:220px;background:#1e293b;border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;flex-shrink:0;height:100vh;position:relative}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sb-logo{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+.sb-subtitle{font-size:10px;color:#64748b;margin-top:1px}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-section{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;text-decoration:none;transition:all .12s;position:relative}
+.sb-item:hover{background:rgba(255,255,255,.05);color:#e2e8f0;text-decoration:none}
+.sb-item.active{background:rgba(59,130,246,.12);color:#93c5fd}
+.sb-item .si{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
+.sb-stats{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06)}
+.sb-stats-title{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.sb-stat-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;color:#94a3b8}
+.sb-stat-row span:last-child{color:#e2e8f0;font-weight:600}
+.bot-online{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#22c55e;padding:6px 10px;background:rgba(34,197,94,.08);border-radius:6px;margin:8px 14px}
+.bot-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+
+/* ── MAIN ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* ── TOP HEADER ── */
+#top-header{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+body.light #top-header{background:#fff;border-bottom-color:#e2e8f0}
+.th-left h1{font-size:18px;font-weight:700;color:#f1f5f9;letter-spacing:-.4px}
+body.light .th-left h1{color:#0f172a}
+.th-left p{font-size:11px;color:#475569;margin-top:1px}
+.th-right{display:flex;align-items:center;gap:10px}
+.th-notif{width:34px;height:34px;border-radius:8px;background:#0d1117;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:#64748b;transition:all .15s}
+.th-notif:hover{border-color:#3b82f6;color:#3b82f6}
+body.light .th-notif{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
+
+/* ── CONTENT SCROLL ── */
+#page-body{flex:1;overflow-y:auto;padding:20px 24px}
+#page-body::-webkit-scrollbar{width:4px}
+#page-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:900px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+.stat-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 18px;position:relative;overflow:hidden}
+.stat-box .s-lbl{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.stat-box .s-num{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.5px;line-height:1}
+.stat-box .s-sub{font-size:11px;color:var(--text3);margin-top:5px}
+.stat-box .s-spark{margin-top:10px;height:36px}
+.stat-box.green .s-num{color:#22c55e}
+.stat-box.yellow .s-num{color:#f59e0b}
+.stat-box.blue .s-num{color:#3b82f6}
+.stat-box.purple .s-num{color:#a78bfa}
+.stat-box.red .s-num{color:#f87171}
+
+/* ── TABLE CARD ── */
+.table-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.table-hdr{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.table-hdr h3{font-size:14px;font-weight:600;color:var(--text);margin-right:4px}
+
+/* Tabs */
+.tabs{display:flex;gap:2px;background:var(--bg3);border-radius:8px;padding:2px}
+.tab-btn{padding:5px 14px;border-radius:6px;border:none;background:none;color:var(--text3);font-size:12px;font-weight:500;cursor:pointer;transition:all .12s;white-space:nowrap}
+.tab-btn.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+body.light .tab-btn.active{box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* Search */
+.search-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:180px;max-width:300px}
+.search-wrap input{width:100%;padding:7px 12px 7px 30px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;outline:none;transition:border-color .15s}
+.search-wrap input:focus{border-color:#3b82f6}
+.search-wrap input::placeholder{color:var(--text3)}
+.search-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text4);pointer-events:none}
+.search-pos{position:relative;flex:1}
+
+/* Table */
+table{width:100%;border-collapse:collapse}
+th{padding:10px 16px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid var(--border2);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+body.light tr:hover td{background:rgba(0,0,0,.02)}
+
+/* Customer cell */
+.cust-cell{display:flex;align-items:center;gap:10px}
+.c-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.c-nm{font-size:13px;font-weight:500;color:var(--text)}
+.c-ph{font-size:11px;color:var(--text3);margin-top:1px}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-green{background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.2)}
+.badge-blue{background:rgba(59,130,246,.1);color:#3b82f6;border:1px solid rgba(59,130,246,.2)}
+.badge-yellow{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.2)}
+.badge-gray{background:rgba(100,116,139,.1);color:#94a3b8;border:1px solid rgba(100,116,139,.15)}
+
+/* Action btn */
+.act-btn{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s;text-decoration:none}
+.act-btn:hover{border-color:#3b82f6;color:#3b82f6}
+
+/* Empty */
+.empty-row td{text-align:center;padding:48px 16px;color:var(--text3);font-size:13px}
+
+/* Btn small */
+.btn-sm{padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-sm:hover{border-color:#3b82f6;color:#3b82f6}
+body.light .btn-sm{border-color:#e2e8f0;background:#f8fafc;color:#64748b}
+body.light .btn-sm:hover{border-color:#3b82f6;color:#2563eb}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#toast.show{opacity:1}
+
+/* Pagination */
+.pager{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)}
+.pager-btns{display:flex;gap:4px}
+.pager-btns button{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text3);cursor:pointer;font-size:12px;transition:all .12s}
+.pager-btns button:hover:not(:disabled){border-color:#3b82f6;color:#3b82f6}
+.pager-btns button:disabled{opacity:.35;cursor:default}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">CS</div>
+    <div>
+      <div class="sb-title">Adsy CS</div>
+      <div class="sb-subtitle" id="sb-store">Loading...</div>
+    </div>
+  </div>
+  <div class="bot-online" id="sb-bot-status">
+    <div class="bot-dot"></div> Bot online
+  </div>
+  <div class="sb-nav">
+    <a class="sb-item" href="analytics.html"><span class="si">📊</span> Ringkasan</a>
+    <a class="sb-item" href="dashboard.html"><span class="si">💬</span> Percakapan</a>
+    <a class="sb-item active" href="contacts.html"><span class="si">👥</span> Pelanggan</a>
+    <a class="sb-item" href="orders.html"><span class="si">✅</span> Closing</a>
+    <a class="sb-item" href="followup-engine.html"><span class="si">🔔</span> Follow-up</a>
+    <a class="sb-item" href="products.html"><span class="si">📋</span> Katalog & SOP</a>
+    <a class="sb-item" href="promo.html"><span class="si">🎁</span> Skema Promo</a>
+    <div class="sb-divider"></div>
+    <div class="sb-section">Akun</div>
+    <a class="sb-item" href="settings.html"><span class="si">⚙️</span> Pengaturan</a>
+  </div>
+  <div class="sb-stats">
+    <div class="sb-stats-title">Hari Ini</div>
+    <div class="sb-stat-row"><span>Pelanggan Baru</span><span id="sb-baru">—</span></div>
+    <div class="sb-stat-row"><span>Pesan Masuk</span><span id="sb-pesan">—</span></div>
+  </div>
+  <div class="sb-user">
+    <div class="sb-avatar" id="sb-av">A</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="sb-name">Admin</div>
+      <button style="font-size:11px;color:#475569;border:none;background:none;cursor:pointer;padding:0" onclick="Auth.logout()">Logout</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="top-header">
+    <div class="th-left">
+      <h1>Pelanggan</h1>
+      <p>Database pelanggan yang tumbuh otomatis tiap chat masuk</p>
+    </div>
+    <div class="th-right">
+      <button class="btn-sm" onclick="init()">↻ Refresh</button>
+      <div class="th-notif" id="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</div>
+    </div>
+  </div>
+
+  <div id="page-body">
+
+    <!-- Stat Cards -->
+    <div class="stat-grid" id="stat-grid">
+      <div class="stat-box"><div class="s-lbl">Loading...</div><div class="s-num">—</div></div>
+    </div>
+
+    <!-- Customer Table -->
+    <div class="table-card">
+      <div class="table-hdr">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1">
+          <h3>Daftar Pelanggan</h3>
+          <div class="tabs">
+            <button class="tab-btn active" onclick="setTab('semua',this)">Semua</button>
+            <button class="tab-btn" onclick="setTab('aktif',this)">Bot Aktif</button>
+            <button class="tab-btn" onclick="setTab('ekskalasi',this)">Perlu Eskalasi</button>
+          </div>
+        </div>
+        <div class="search-pos">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="Cari nama atau nomor..." oninput="onSearch(this.value)" />
+        </div>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Pelanggan</th>
+              <th>Nomor</th>
+              <th>Sesi</th>
+              <th>Aktivitas Terakhir</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="cust-tbody">
+            <tr class="empty-row"><td colspan="6">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span id="pager-info">—</span>
+        <div class="pager-btns">
+          <button id="btn-prev" onclick="prevPage()" disabled>‹ Prev</button>
+          <button id="btn-next" onclick="nextPage()" disabled>Next ›</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /page-body -->
+</div><!-- /main -->
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+
+const userId = Auth.getUser()?.id;
+const SB_URL = window.SUPABASE_URL;
+const SB_KEY = window.SUPABASE_ANON_KEY;
+const sbH    = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
+
+// ── THEME ──────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('cs_theme', isLight ? 'light' : 'dark');
+}
+(function() {
+  if (localStorage.getItem('cs_theme') === 'light') document.body.classList.add('light');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+})();
+
+// ── SIDEBAR ────────────────────────────────────────
+const user = Auth.getUser();
+document.getElementById('sb-av').textContent    = initials(user?.name||'?');
+document.getElementById('sb-name').textContent  = user?.name||'Admin';
+document.getElementById('sb-store').textContent = user?.store||'Adsy CS';
+
+function initials(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+
+function showToast(m, dur=2500) {
+  const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), dur);
+}
+
+async function sbGet(t, q='') {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, { headers: sbH });
+  if (!r.ok) { console.error('sbGet', t, await r.text()); return []; }
+  return r.json();
+}
+
+// ── AVATAR COLOR ───────────────────────────────────
+const COLORS = ['#3b82f6','#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444'];
+function avatarColor(name) {
+  let h = 0; for (let c of (name||'?')) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
+  return COLORS[Math.abs(h) % COLORS.length];
+}
+
+// ── STATE ──────────────────────────────────────────
+let allCustomers   = [];
+let convMap        = {};   // customer_id → { id, status, last_msg_at, count }
+let currentTab     = 'semua';
+let searchQuery    = '';
+let currentPage    = 1;
+const PAGE_SIZE    = 20;
+
+// Sparkline charts
+const sparkCharts = {};
+
+// ── SPARKLINE ──────────────────────────────────────
+function renderSpark(id, data, color) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  if (sparkCharts[id]) sparkCharts[id].destroy();
+  sparkCharts[id] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: data.map((_,i) => i),
+      datasets: [{ data, borderColor: color, borderWidth: 1.5, fill: true,
+        backgroundColor: color + '18', pointRadius: 0, tension: .4 }]
+    },
+    options: { plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{x:{display:false},y:{display:false}},
+      animation:{duration:400}, responsive:true, maintainAspectRatio:false }
+  });
+}
+
+// ── INIT ───────────────────────────────────────────
+async function init() {
+  document.getElementById('stat-grid').innerHTML =
+    `<div class="stat-box"><div class="s-lbl">Loading...</div><div class="s-num">—</div></div>`;
+  document.getElementById('cust-tbody').innerHTML =
+    `<tr class="empty-row"><td colspan="6">Memuat data...</td></tr>`;
+
+  const todayStr   = new Date().toISOString().split('T')[0];
+  const todayStart = todayStr + 'T00:00:00.000Z';
+
+  // Fetch semua customers
+  const customers = await sbGet('customers',
+    `?user_id=eq.${userId}&order=created_at.desc&select=id,wa_number,nama,created_at`);
+
+  // Fetch semua conversations
+  const convs = await sbGet('conversations',
+    `?user_id=eq.${userId}&select=id,customer_id,status,last_msg_at,created_at`);
+
+  // Buat map customer_id → conv info (simpan id conv terbaru per customer)
+  convMap = {};
+  for (const c of convs) {
+    if (!convMap[c.customer_id]) {
+      convMap[c.customer_id] = { id: c.id, status: c.status, last_msg_at: c.last_msg_at, count: 0 };
+    } else {
+      // Ambil conv yang paling baru
+      if ((c.last_msg_at||'') > (convMap[c.customer_id].last_msg_at||'')) {
+        convMap[c.customer_id].id = c.id;
+        convMap[c.customer_id].status = c.status;
+        convMap[c.customer_id].last_msg_at = c.last_msg_at;
+      }
+    }
+    convMap[c.customer_id].count++;
+  }
+
+  allCustomers = customers;
+
+  // ── STAT CALC ────────────────────────────────────
+  const totalPelanggan = customers.length;
+
+  const aktifSet = new Set(
+    convs.filter(c => c.status === 'baru' || c.status === 'diproses').map(c => c.customer_id)
+  );
+  const botAktif = aktifSet.size;
+  const pctAktif = totalPelanggan ? Math.round(botAktif / totalPelanggan * 100) : 0;
+
+  const eskalSet = new Set(
+    convs.filter(c => c.status === 'ekskalasi').map(c => c.customer_id)
+  );
+  const perluEskalasi = eskalSet.size;
+  const pctEskal = totalPelanggan ? ((perluEskalasi / totalPelanggan) * 100).toFixed(1) : 0;
+
+  // Pesan masuk hari ini = conversations yang last_msg_at >= todayStart
+  const pesanHariIni = convs.filter(c => c.last_msg_at && c.last_msg_at >= todayStart).length;
+
+  // Pelanggan baru hari ini
+  const baruHariIni = customers.filter(c => c.created_at >= todayStart).length;
+
+  // Sidebar
+  document.getElementById('sb-baru').textContent  = baruHariIni;
+  document.getElementById('sb-pesan').textContent = pesanHariIni;
+
+  // ── SPARKLINE DATA (7 hari) ──────────────────────
+  // Customer baru per hari (7 hari terakhir)
+  const sparkPelanggan = Array(7).fill(0);
+  const sparkAktif     = Array(7).fill(0);
+  const sparkEskal     = Array(7).fill(0);
+  const sparkPesan     = Array(7).fill(0);
+
+  customers.forEach(c => {
+    const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000);
+    if (d >= 0 && d < 7) sparkPelanggan[6 - d]++;
+  });
+  convs.forEach(c => {
+    if (!c.last_msg_at) return;
+    const d = Math.floor((Date.now() - new Date(c.last_msg_at).getTime()) / 86400000);
+    if (d < 0 || d >= 7) return;
+    sparkPesan[6 - d]++;
+    if (c.status === 'baru' || c.status === 'diproses') sparkAktif[6 - d]++;
+    if (c.status === 'ekskalasi') sparkEskal[6 - d]++;
+  });
+
+  // ── RENDER STATS ─────────────────────────────────
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-box blue">
+      <div class="s-lbl">Total Pelanggan</div>
+      <div class="s-num">${totalPelanggan}</div>
+      <div class="s-sub">+${baruHariIni} hari ini</div>
+      <div class="s-spark"><canvas id="sp-total" height="36"></canvas></div>
+    </div>
+    <div class="stat-box green">
+      <div class="s-lbl">Bot Aktif</div>
+      <div class="s-num">${botAktif}</div>
+      <div class="s-sub">${pctAktif}% dari total</div>
+      <div class="s-spark"><canvas id="sp-aktif" height="36"></canvas></div>
+    </div>
+    <div class="stat-box yellow">
+      <div class="s-lbl">Perlu Eskalasi</div>
+      <div class="s-num">${perluEskalasi}</div>
+      <div class="s-sub">${pctEskal}% dari total</div>
+      <div class="s-spark"><canvas id="sp-eskal" height="36"></canvas></div>
+    </div>
+    <div class="stat-box purple">
+      <div class="s-lbl">Pesan Masuk Hari Ini</div>
+      <div class="s-num">${pesanHariIni}</div>
+      <div class="s-sub">percakapan aktif hari ini</div>
+      <div class="s-spark"><canvas id="sp-pesan" height="36"></canvas></div>
+    </div>`;
+
+  // Render sparklines setelah DOM siap
+  setTimeout(() => {
+    renderSpark('sp-total', sparkPelanggan, '#3b82f6');
+    renderSpark('sp-aktif', sparkAktif,     '#22c55e');
+    renderSpark('sp-eskal', sparkEskal,     '#f59e0b');
+    renderSpark('sp-pesan', sparkPesan,     '#a78bfa');
+  }, 50);
+
+  // Render table
+  currentPage = 1;
+  renderTable();
+}
+
+// ── TABLE ──────────────────────────────────────────
+function setTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPage = 1;
+  renderTable();
+}
+
+function onSearch(v) {
+  searchQuery = v.toLowerCase().trim();
+  currentPage = 1;
+  renderTable();
+}
+
+function getFiltered() {
+  let list = allCustomers;
+
+  // Tab filter
+  if (currentTab === 'aktif') {
+    list = list.filter(c => {
+      const cv = convMap[c.id];
+      return cv && (cv.status === 'baru' || cv.status === 'diproses');
+    });
+  } else if (currentTab === 'ekskalasi') {
+    list = list.filter(c => convMap[c.id]?.status === 'ekskalasi');
+  }
+
+  // Search filter
+  if (searchQuery) {
+    list = list.filter(c =>
+      (c.nama||'').toLowerCase().includes(searchQuery) ||
+      (c.wa_number||'').includes(searchQuery)
+    );
+  }
+  return list;
+}
+
+function renderTable() {
+  const filtered = getFiltered();
+  const total    = filtered.length;
+  const start    = (currentPage - 1) * PAGE_SIZE;
+  const page     = filtered.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('cust-tbody');
+  if (!page.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Tidak ada pelanggan ditemukan.</td></tr>`;
+    document.getElementById('pager-info').textContent = '0 pelanggan';
+    document.getElementById('btn-prev').disabled = true;
+    document.getElementById('btn-next').disabled = true;
+    return;
+  }
+
+  tbody.innerHTML = page.map(c => {
+    const cv   = convMap[c.id] || {};
+    const nama = c.nama || c.wa_number || '—';
+    const sesi = cv.count || 0;
+    const lastAt = cv.last_msg_at ? formatRelative(cv.last_msg_at) : '—';
+    const color  = avatarColor(nama);
+    const ini    = initials(nama);
+
+    let badge = '';
+    if (cv.status === 'ekskalasi') {
+      badge = `<span class="badge badge-yellow">⚠️ Eskalasi</span>`;
+    } else if (cv.status === 'baru' || cv.status === 'diproses') {
+      badge = `<span class="badge badge-green"><span style="width:5px;height:5px;border-radius:50%;background:#22c55e;display:inline-block"></span> Bot aktif</span>`;
+    } else if (cv.status === 'selesai') {
+      badge = `<span class="badge badge-gray">Selesai</span>`;
+    } else {
+      badge = `<span class="badge badge-gray">Belum chat</span>`;
+    }
+
+    const convId = getConvId(c.id);
+    const chatHref = convId ? `dashboard.html?conv=${convId}` : `dashboard.html`;
+
+    return `<tr>
+      <td>
+        <div class="cust-cell">
+          <div class="c-av" style="background:${color}">${ini}</div>
+          <div>
+            <div class="c-nm">${escHtml(nama)}</div>
+          </div>
+        </div>
+      </td>
+      <td style="color:var(--text2);font-size:12px;font-family:monospace">+${escHtml(c.wa_number||'—')}</td>
+      <td style="color:var(--text2);font-size:12px">${sesi} sesi</td>
+      <td style="color:var(--text3);font-size:12px">${lastAt}</td>
+      <td>${badge}</td>
+      <td>
+        <a class="act-btn" href="${chatHref}" title="Lihat chat">💬</a>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Pager
+  const end = Math.min(start + PAGE_SIZE, total);
+  document.getElementById('pager-info').textContent = `${start+1}–${end} dari ${total} pelanggan`;
+  document.getElementById('btn-prev').disabled = currentPage <= 1;
+  document.getElementById('btn-next').disabled = end >= total;
+}
+
+function prevPage() { if (currentPage > 1) { currentPage--; renderTable(); } }
+function nextPage() {
+  const total = getFiltered().length;
+  if (currentPage * PAGE_SIZE < total) { currentPage++; renderTable(); }
+}
+
+// Cari conv ID untuk customer (dari convMap)
+function getConvId(customerId) {
+  return convMap[customerId]?.id || null;
+}
+
+function formatRelative(iso) {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  const min  = Math.floor(diff / 60000);
+  if (min < 1)   return 'Baru saja';
+  if (min < 60)  return `${min} menit lalu`;
+  const hr = Math.floor(min / 60);
+  if (hr  < 24)  return `${hr} jam lalu`;
+  const dy = Math.floor(hr / 24);
+  if (dy  < 7)   return `${dy} hari lalu`;
+  return new Date(iso).toLocaleDateString('id-ID', { day:'numeric', month:'short' });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── START ──────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
