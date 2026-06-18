@@ -384,7 +384,7 @@ module.exports = async function handler(req, res) {
 
             // Skip jika hari ini sudah terkirim atau eskalasi
             if (followedDays.includes(hariKe)) { totalSkipped++; continue; }
-            if (conv.status === 'eskalasi')     { totalSkipped++; continue; }
+            if (conv.status === 'ekskalasi')    { totalSkipped++; continue; }
 
             const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
             if (!customers.length) { totalSkipped++; continue; }
