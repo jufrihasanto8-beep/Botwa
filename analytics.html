@@ -173,11 +173,15 @@ body.light .badge-green{background:#dcfce7;color:#166534}
     <!-- Charts -->
     <div class="charts-row">
       <div class="chart-card">
-        <h3>Pesan 7 Hari Terakhir</h3>
+        <h3>Leads & Closing 14 Hari Terakhir</h3>
         <canvas id="msg-chart" height="100"></canvas>
+        <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--text2)">
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:3px;background:#3b82f6;border-radius:2px;display:inline-block"></span>Leads masuk</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:3px;background:#22c55e;border-radius:2px;display:inline-block"></span>Closing</span>
+        </div>
       </div>
       <div class="chart-card">
-        <h3>Cases by Status</h3>
+        <h3>Status Percakapan</h3>
         <canvas id="case-chart" height="200"></canvas>
         <div id="case-legend" style="margin-top:12px;font-size:12px;color:var(--text2)"></div>
       </div>
@@ -251,87 +255,111 @@ async function sbGet(t, q='') {
 let msgChart = null, caseChart = null;
 
 async function init() {
-  const convs = await sbGet('conversations', `?user_id=eq.${userId}`);
+  // Ambil semua conversation + 14 hari closing
+  const [convs, convs14] = await Promise.all([
+    sbGet('conversations', `?user_id=eq.${userId}&select=id,status,customer_id,product_id,state,created_at,last_msg_at`),
+    sbGet('conversations', `?user_id=eq.${userId}&created_at=gte.${new Date(Date.now()-14*864e5).toISOString()}&select=id,status,state,created_at`),
+  ]);
 
-  const open    = convs.filter(c => c.status !== 'selesai').length;
-  const esc     = convs.filter(c => c.status === 'eskalasi').length;
-  const selesai = convs.filter(c => c.status === 'selesai').length;
-  const convIds = convs.map(c=>c.id);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayISO = today.toISOString();
+
+  // Stat kalkulasi
+  const leadsHariIni   = convs.filter(c => new Date(c.created_at) >= today).length;
+  const closingAll     = convs.filter(c => c.status === 'selesai' && c.state?.order_placed);
+  const closingHariIni = closingAll.filter(c => new Date(c.last_msg_at||c.created_at) >= today).length;
+  const convRate       = leadsHariIni > 0 ? Math.round((closingHariIni/leadsHariIni)*100) : 0;
+  const esc            = convs.filter(c => c.status === 'ekskalasi').length;
+  const convIds        = convs.map(c=>c.id);
 
   document.getElementById('sb-total').textContent   = convs.length;
-  document.getElementById('sb-selesai').textContent = selesai;
+  document.getElementById('sb-selesai').textContent = closingAll.length;
 
-  // Fetch all messages
+  // Fetch messages (untuk AI rate)
   let allMsgs = [];
   if (convIds.length) {
     allMsgs = await sbGet('conv_messages',
-      `?conversation_id=in.(${convIds.join(',')})&order=created_at.desc&limit=2000`);
+      `?conversation_id=in.(${convIds.slice(0,200).join(',')})&order=created_at.desc&limit=2000`);
   }
-  const aiMsgs    = allMsgs.filter(m => m.role === 'ai');
-  const today     = new Date(); today.setHours(0,0,0,0);
-  const todayMsgs = allMsgs.filter(m => new Date(m.created_at) >= today);
-  const aiToday   = aiMsgs.filter(m => new Date(m.created_at) >= today);
-  const aiRate    = allMsgs.length ? Math.round((aiMsgs.length / allMsgs.length) * 100) : 0;
+  const aiMsgs = allMsgs.filter(m => m.role === 'ai');
+  const aiRate = allMsgs.length ? Math.round((aiMsgs.length / allMsgs.length) * 100) : 0;
 
   // Customers
   const custIds = [...new Set(convs.map(c=>c.customer_id).filter(Boolean))];
-  const custs   = custIds.length ? await sbGet('customers', `?id=in.(${custIds.join(',')})`) : [];
+  const custs   = custIds.length ? await sbGet('customers', `?id=in.(${custIds.slice(0,200).join(',')})`) : [];
 
+  // Stat boxes
   document.getElementById('stat-grid').innerHTML = `
     <div class="stat-box">
-      <div class="num">${allMsgs.length.toLocaleString('id')}</div>
-      <div class="lbl">Total Pesan</div>
-      <div class="change">📬 ${todayMsgs.length} hari ini</div>
+      <div class="num" style="color:#3b82f6">${leadsHariIni}</div>
+      <div class="lbl">Leads Hari Ini</div>
+      <div class="change neutral">Total: ${convs.length} percakapan</div>
     </div>
     <div class="stat-box">
-      <div class="num">${custs.length}</div>
-      <div class="lbl">Total Customer</div>
-      <div class="change neutral">Aktif di platform</div>
+      <div class="num" style="color:#22c55e">${closingHariIni}</div>
+      <div class="lbl">Closing Hari Ini</div>
+      <div class="change neutral">Total: ${closingAll.length} closing</div>
+    </div>
+    <div class="stat-box">
+      <div class="num" style="color:#f59e0b">${convRate}%</div>
+      <div class="lbl">Conversion Rate</div>
+      <div class="change neutral">${closingHariIni} dari ${leadsHariIni} leads</div>
     </div>
     <div class="stat-box">
       <div class="num">${aiRate}%</div>
       <div class="lbl">AI Reply Rate</div>
-      <div class="change">🤖 ${aiToday.length} balasan hari ini</div>
-    </div>
-    <div class="stat-box">
-      <div class="num">${open}</div>
-      <div class="lbl">Cases Terbuka</div>
-      <div class="change ${esc>0?'':'neutral'}">${esc > 0 ? '🚨 '+esc+' eskalasi' : 'Semua aman'}</div>
+      <div class="change ${esc>0?'':'neutral'}">${esc > 0 ? '🚨 '+esc+' ekskalasi' : '✅ Semua aman'}</div>
     </div>`;
 
-  // 7-day chart
-  const days = [], dayCounts = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(Date.now() - i*24*60*60*1000);
-    days.push(d.toLocaleDateString('id-ID', { weekday:'short', day:'numeric' }));
-    const start = new Date(d); start.setHours(0,0,0,0);
-    const end   = new Date(d); end.setHours(23,59,59,999);
-    dayCounts.push(allMsgs.filter(m => {
-      const t = new Date(m.created_at); return t >= start && t <= end;
-    }).length);
-  }
-  if (msgChart) msgChart.destroy();
+  // 14-day chart — leads masuk + closing per hari
   const isDark = !document.body.classList.contains('light');
   const gridColor = isDark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.06)';
   const tickColor = isDark ? '#475569' : '#94a3b8';
+
+  const days = [], leadCounts = [], closingCounts = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(Date.now() - i*864e5);
+    days.push(d.toLocaleDateString('id-ID', { day:'numeric', month:'short' }));
+    const start = new Date(d); start.setHours(0,0,0,0);
+    const end   = new Date(d); end.setHours(23,59,59,999);
+    leadCounts.push(convs14.filter(c => {
+      const t = new Date(c.created_at); return t >= start && t <= end;
+    }).length);
+    closingCounts.push(convs14.filter(c => {
+      const t = new Date(c.last_msg_at||c.created_at);
+      return c.status === 'selesai' && c.state?.order_placed && t >= start && t <= end;
+    }).length);
+  }
+
+  if (msgChart) msgChart.destroy();
   msgChart = new Chart(document.getElementById('msg-chart'), {
     type: 'line',
     data: {
       labels: days,
-      datasets: [{
-        label: 'Pesan',
-        data: dayCounts,
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,.1)',
-        borderWidth: 2, tension: .4, fill: true,
-        pointBackgroundColor: '#3b82f6',
-      }]
+      datasets: [
+        {
+          label: 'Leads masuk',
+          data: leadCounts,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,.08)',
+          borderWidth: 2, tension: .4, fill: true,
+          pointBackgroundColor: '#3b82f6', pointRadius: 3,
+        },
+        {
+          label: 'Closing',
+          data: closingCounts,
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,.08)',
+          borderWidth: 2, tension: .4, fill: true,
+          pointBackgroundColor: '#22c55e', pointRadius: 3,
+        },
+      ]
     },
     options: {
       plugins: { legend: { display: false } },
       scales: {
         y: { beginAtZero: true, ticks: { stepSize:1, color: tickColor }, grid: { color: gridColor } },
-        x: { grid: { display: false }, ticks: { color: tickColor } }
+        x: { grid: { display: false }, ticks: { color: tickColor, maxRotation: 0, font: { size: 11 } } }
       }
     }
   });
@@ -340,16 +368,16 @@ async function init() {
   const caseStats = {
     baru:     convs.filter(c=>c.status==='baru').length,
     diproses: convs.filter(c=>c.status==='diproses').length,
-    eskalasi: esc,
-    selesai:  selesai,
+    ekskalasi: esc,
+    selesai:  convs.filter(c=>c.status==='selesai').length,
   };
   if (caseChart) caseChart.destroy();
   caseChart = new Chart(document.getElementById('case-chart'), {
     type: 'doughnut',
     data: {
-      labels: ['Baru','Diproses','Eskalasi','Selesai'],
+      labels: ['Baru','Diproses','Ekskalasi','Selesai'],
       datasets: [{
-        data: [caseStats.baru, caseStats.diproses, caseStats.eskalasi, caseStats.selesai],
+        data: [caseStats.baru, caseStats.diproses, caseStats.ekskalasi, caseStats.selesai],
         backgroundColor: ['#3b82f6','#f59e0b','#ef4444','#22c55e'],
         borderWidth: 0,
       }]
@@ -358,11 +386,11 @@ async function init() {
   });
   document.getElementById('case-legend').innerHTML =
     [['#3b82f6','Baru',caseStats.baru],['#f59e0b','Diproses',caseStats.diproses],
-     ['#ef4444','Eskalasi',caseStats.eskalasi],['#22c55e','Selesai',caseStats.selesai]]
+     ['#ef4444','Ekskalasi',caseStats.ekskalasi],['#22c55e','Selesai',caseStats.selesai]]
     .map(([c,l,n])=>`<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 6px 2px 0"><span style="width:8px;height:8px;border-radius:50%;background:${c};display:inline-block"></span>${l} (${n})</span>`)
     .join('');
 
-  // Top customers
+  // Top customers by pesan terbanyak
   const custMsgCount = {};
   allMsgs.filter(m=>m.role==='customer').forEach(m => {
     const conv = convs.find(c=>c.id===m.conversation_id);
@@ -384,24 +412,53 @@ async function init() {
 async function generateInsights() {
   const btn  = document.getElementById('insights-btn');
   const body = document.getElementById('insights-body');
-  btn.disabled = true; btn.textContent = 'Menganalisis...';
-  body.textContent = 'AI sedang menganalisis percakapan...';
+  btn.disabled = true; btn.textContent = '⏳ Menganalisis...';
+  body.textContent = 'AI sedang membaca percakapan dan menyiapkan insights...';
+
   try {
-    // Ambil sampel pesan terakhir
-    const convs = await sbGet('conversations', `?user_id=eq.${userId}&limit=10`);
+    const convs = await sbGet('conversations', `?user_id=eq.${userId}&order=last_msg_at.desc&limit=20&select=id,status,state,created_at`);
     const convIds = convs.map(c=>c.id);
     const msgs = convIds.length ? await sbGet('conv_messages',
-      `?conversation_id=in.(${convIds.join(',')})&order=created_at.desc&limit=50`) : [];
+      `?conversation_id=in.(${convIds.join(',')})&order=created_at.desc&limit=100`) : [];
 
     if (!msgs.length) {
       body.textContent = 'Belum ada data percakapan untuk dianalisis.';
       btn.disabled = false; btn.textContent = 'Generate Insights';
       return;
     }
-    const sample = msgs.slice(0,20).map(m=>`[${m.role}]: ${m.isi}`).join('\n');
-    const r = await fetch('/api/baileys-proxy?path=%2Fnoop', {method:'GET'}).catch(()=>null);
-    // Fallback insight tanpa Claude
-    body.textContent = `Analisis dari ${msgs.length} pesan terakhir:\n\n• Sebagian besar percakapan berkaitan dengan pertanyaan produk\n• AI merespons rata-rata dalam hitungan detik\n• ${convs.filter(c=>c.status==='eskalasi').length} percakapan memerlukan penanganan CS manusia\n\nRekomendasi: Isi product_knowledge agar AI lebih akurat menjawab pertanyaan spesifik.`;
+
+    const closing   = convs.filter(c=>c.status==='selesai'&&c.state?.order_placed).length;
+    const ekskalasi = convs.filter(c=>c.status==='ekskalasi').length;
+    const keluhanList = [...new Set(convs.map(c=>c.state?.keluhan).filter(Boolean))].slice(0,10);
+    const sample    = msgs.slice(0,40).map(m=>`[${m.role}]: ${(m.isi||'').replace(/\[.*?\]/g,'').trim()}`).filter(l=>l.split(': ')[1]).join('\n');
+
+    const prompt = `Kamu analis CS WhatsApp untuk toko online Indonesia.
+
+Data 20 percakapan terbaru:
+- Total: ${convs.length} percakapan
+- Closing: ${closing}
+- Ekskalasi: ${ekskalasi}
+- Keluhan customer: ${keluhanList.join(', ')||'tidak terdeteksi'}
+
+Sampel percakapan terakhir:
+---
+${sample}
+---
+
+Buat ringkasan insights dalam Bahasa Indonesia yang singkat dan actionable:
+1. Apa keluhan/pertanyaan yang paling sering muncul?
+2. Di mana biasanya percakapan gagal closing?
+3. 2-3 rekomendasi konkret untuk meningkatkan conversion
+
+Format: poin-poin singkat, langsung ke intinya. Maksimal 150 kata.`;
+
+    const res = await fetch('/api/ai-suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'analytics-insights', prompt, userId }),
+    });
+    const data = await res.json();
+    body.textContent = data.text || data.error || 'Gagal generate insights';
     btn.textContent = '↻ Update Insights';
   } catch(e) {
     body.textContent = 'Gagal: ' + e.message;
