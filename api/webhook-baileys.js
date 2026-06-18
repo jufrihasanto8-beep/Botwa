@@ -1752,10 +1752,12 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       );
       if (match) {
         const promo = product?.promo_ongkir;
+        const provGantiKurir = convState.ongkir?.area?.provinsi || '';
         let ongkirPromo = match.ongkir;
-        if (promo?.tipe === 'gratis_penuh')   ongkirPromo = 0;
-        else if (promo?.tipe === 'potong')    ongkirPromo = Math.max(0, match.ongkir - (promo.nilai || 0));
-        else if (promo?.tipe === 'gratis_sd') ongkirPromo = Math.max(0, match.ongkir - (promo.nilai || 0));
+        if (promo?.tipe === 'gratis_penuh')        ongkirPromo = 0;
+        else if (promo?.tipe === 'potong')         ongkirPromo = Math.max(0, match.ongkir - getPromoPotongan(promo, null, match.ongkir));
+        else if (promo?.tipe === 'potong_wilayah') ongkirPromo = Math.max(0, match.ongkir - getPromoPotongan(promo, provGantiKurir, match.ongkir));
+        else if (promo?.tipe === 'gratis_sd')      ongkirPromo = Math.max(0, match.ongkir - (promo.nilai || 0));
 
         const harga = product?.harga || 0;
         const totalTransferBulat = bulatkan(harga + ongkirPromo);
