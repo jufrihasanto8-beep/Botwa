@@ -247,7 +247,7 @@ module.exports = async function handler(req, res) {
 
     // Query 1: lead baru hari ini
     const newConvs = await sbGet('conversations',
-      `?status=in.(baru,aktif)` +
+      `?status=in.(baru,diproses)` +
       `&created_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
       `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
@@ -255,7 +255,7 @@ module.exports = async function handler(req, res) {
 
     // Query 2: customer lama yang reopen hari ini (created_at bisa kapan saja)
     const reopenedConvs = await sbGet('conversations',
-      `?status=in.(baru,aktif)` +
+      `?status=in.(baru,diproses)` +
       `&created_at=lt.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
       `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
@@ -284,7 +284,7 @@ module.exports = async function handler(req, res) {
 
         // Skip jika hari 1 sudah terkirim atau eskalasi
         if (followedDays.includes(1)) { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: hari 1 sudah terkirim`); continue; }
-        if (conv.status === 'eskalasi') { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: status eskalasi`); continue; }
+        if (conv.status === 'ekskalasi') { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: status eskalasi`); continue; }
 
         // Cek pesan terakhir harus dari AI
         const lastMsgs = await sbGet('conv_messages',
@@ -369,7 +369,7 @@ module.exports = async function handler(req, res) {
         // Hanya follow-up kalau customer diam minimal 1 jam (last_msg_at <= 1 jam lalu)
         const convs = await sbGet('conversations',
           `?user_id=eq.${userId}` +
-          `&status=in.(baru,aktif)` +
+          `&status=in.(baru,diproses)` +
           `&created_at=gte.${hariMulai.toISOString()}` +
           `&created_at=lt.${hariAkhir.toISOString()}` +
           `&last_msg_at=lte.${cutoff1h}` +
