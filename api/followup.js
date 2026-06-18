@@ -241,15 +241,15 @@ module.exports = async function handler(req, res) {
     todayStart.setTime(todayStart.getTime() - 7 * 60 * 60 * 1000);
     const todayStartISO = todayStart.toISOString();
 
+    // Minimal 1 jam diam sebelum difollow-up
+    // Tidak ada batas atas (cutoff4h dihapus) — relied on followed_up_days untuk cegah duplikat
     const cutoff1h = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-    const cutoff4h = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
 
     // Query 1: lead baru hari ini
     const newConvs = await sbGet('conversations',
       `?status=in.(baru,aktif)` +
       `&created_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
-      `&last_msg_at=gte.${cutoff4h}` +
       `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
     );
 
@@ -258,7 +258,6 @@ module.exports = async function handler(req, res) {
       `?status=in.(baru,aktif)` +
       `&created_at=lt.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
-      `&last_msg_at=gte.${cutoff4h}` +
       `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
     ).catch(() => []);
 
@@ -276,20 +275,26 @@ module.exports = async function handler(req, res) {
       return true;
     });
 
+    console.log(`[DEBUG] newConvs=${newConvs.length}, reopenedToday=${reopenedToday.length}, total hariH=${hariHConvs.length}`);
+
     for (const conv of hariHConvs) {
       try {
         const state = conv.state || {};
         const followedDays = state.followed_up_days || [];
 
         // Skip jika hari 1 sudah terkirim atau eskalasi
-        if (followedDays.includes(1)) { totalSkipped++; continue; }
-        if (conv.status === 'eskalasi') { totalSkipped++; continue; }
+        if (followedDays.includes(1)) { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: hari 1 sudah terkirim`); continue; }
+        if (conv.status === 'eskalasi') { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: status eskalasi`); continue; }
 
         // Cek pesan terakhir harus dari AI
         const lastMsgs = await sbGet('conv_messages',
           `?conversation_id=eq.${conv.id}&order=created_at.desc&limit=1`
         );
-        if (!lastMsgs.length || lastMsgs[0].role !== 'ai') { totalSkipped++; continue; }
+        if (!lastMsgs.length || lastMsgs[0].role !== 'ai') {
+          totalSkipped++;
+          console.log(`[SKIP] conv ${conv.id}: pesan terakhir bukan dari AI (role=${lastMsgs[0]?.role || 'none'})`);
+          continue;
+        }
 
         const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
         if (!customers.length) { totalSkipped++; continue; }
