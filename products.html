@@ -491,14 +491,52 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <select id="f-promo-tipe" onchange="togglePromoNilai()">
             <option value="none">Tidak ada promo</option>
             <option value="gratis_penuh">Gratis Ongkir Penuh</option>
-            <option value="potong">Potongan Ongkir (Rp X)</option>
+            <option value="potong">Potongan Ongkir — Semua Wilayah</option>
+            <option value="potong_wilayah">Potongan Ongkir — Per Wilayah (Jawa / Luar Jawa)</option>
             <option value="gratis_sd">Gratis s/d Rp X</option>
           </select>
         </div>
-        <div class="form-group" id="promo-nilai-wrap" style="display:none;">
-          <label>Nilai Promo (Rp)</label>
-          <input type="number" id="f-promo-nilai" placeholder="10000">
+
+        <!-- Toggle Rp / % — muncul saat potong atau potong_wilayah -->
+        <div id="promo-unit-wrap" style="display:none;margin-bottom:14px;">
+          <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px">Satuan Potongan</label>
+          <div style="display:flex;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid rgba(255,255,255,.1);border-radius:8px;cursor:pointer;font-size:13px;transition:all .12s" id="unit-rp-label">
+              <input type="radio" name="promo-unit" id="unit-rp" value="rp" checked onchange="togglePromoNilai()"> Rupiah (Rp)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid rgba(255,255,255,.1);border-radius:8px;cursor:pointer;font-size:13px;transition:all .12s" id="unit-pct-label">
+              <input type="radio" name="promo-unit" id="unit-pct" value="persen" onchange="togglePromoNilai()"> Persentase (%)
+            </label>
+          </div>
         </div>
+
+        <!-- Semua wilayah (satu nilai) -->
+        <div class="form-group" id="promo-nilai-wrap" style="display:none;">
+          <label id="promo-nilai-label">Nilai Potongan</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" id="f-promo-nilai" placeholder="10000" style="flex:1">
+            <span id="promo-nilai-unit" style="font-size:13px;color:#64748b;width:30px">Rp</span>
+          </div>
+        </div>
+
+        <!-- Per wilayah (dua nilai) -->
+        <div id="promo-wilayah-wrap" style="display:none;">
+          <div class="form-group">
+            <label id="promo-jawa-label">Dalam Jawa</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="number" id="f-promo-jawa" placeholder="10000" style="flex:1">
+              <span id="promo-jawa-unit" style="font-size:13px;color:#64748b;width:30px">Rp</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label id="promo-luar-label">Luar Jawa</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="number" id="f-promo-luar" placeholder="15000" style="flex:1">
+              <span id="promo-luar-unit" style="font-size:13px;color:#64748b;width:30px">Rp</span>
+            </div>
+          </div>
+        </div>
+
         <div style="background:#0d1117;padding:16px;border-radius:8px;font-size:13px;color:#64748b;margin-top:8px;">
           <strong style="color:#94a3b8">Preview:</strong> <span id="promo-preview">Tidak ada promo ongkir</span>
         </div>
@@ -827,8 +865,11 @@ function renderGrid() {
 
 function formatPromo(promo) {
   if (!promo || promo.tipe === 'none') return 'Tidak ada promo';
+  const isPersen = promo.unit === 'persen';
+  const fmt = v => isPersen ? `${v}%` : rp(v);
   if (promo.tipe === 'gratis_penuh') return '✅ Gratis Ongkir';
-  if (promo.tipe === 'potong') return `Potongan ${rp(promo.nilai)}`;
+  if (promo.tipe === 'potong') return `Hemat ${fmt(promo.nilai)}`;
+  if (promo.tipe === 'potong_wilayah') return `Jawa ${fmt(promo.nilai_jawa)} · Luar ${fmt(promo.nilai_luar)}`;
   if (promo.tipe === 'gratis_sd') return `Gratis s/d ${rp(promo.nilai)}`;
   return '-';
 }
@@ -850,6 +891,8 @@ function openAdd() {
   document.getElementById('f-persona-gaya').value = 'hangat, sabar, konsultatif';
   document.getElementById('f-promo-tipe').value = 'none';
   document.getElementById('f-promo-nilai').value = '';
+  document.getElementById('f-promo-jawa').value = '';
+  document.getElementById('f-promo-luar').value = '';
   removeProdPhoto();
   renderTags('keluhan'); renderTags('diagnosa');
   renderMappingList();
@@ -884,6 +927,11 @@ async function openEdit(id) {
   const promo = p.promo_ongkir || {};
   document.getElementById('f-promo-tipe').value = promo.tipe || 'none';
   document.getElementById('f-promo-nilai').value = promo.nilai || '';
+  document.getElementById('f-promo-jawa').value = promo.nilai_jawa || '';
+  document.getElementById('f-promo-luar').value = promo.nilai_luar || '';
+  const unit = promo.unit || 'rp';
+  document.getElementById(unit === 'persen' ? 'unit-pct' : 'unit-rp').checked = true;
+  togglePromoNilai();
   const maps = await sbGet('ad_mapping', `?product_id=eq.${id}`);
   mappingRows = maps.map(m => ({ id: m.id, sumber: m.sumber, identifier: m.identifier }));
   renderTags('keluhan'); renderTags('diagnosa');
@@ -923,8 +971,31 @@ function renderTags(type) {
 }
 
 /* ── Promo toggle ── */
+function getPromoUnit() {
+  return document.querySelector('input[name="promo-unit"]:checked')?.value || 'rp';
+}
 function togglePromoNilai() {
   const tipe = document.getElementById('f-promo-tipe').value;
+  const isPotong = ['potong','potong_wilayah'].includes(tipe);
+  const unit = getPromoUnit();
+  const unitLabel = unit === 'persen' ? '%' : 'Rp';
+  const isPersen = unit === 'persen';
+
+  // Toggle unit selector
+  document.getElementById('promo-unit-wrap').style.display = isPotong ? 'block' : 'none';
+
+  // Toggle nilai fields
+  document.getElementById('promo-nilai-wrap').style.display = tipe === 'potong' ? 'flex' : 'none';
+  document.getElementById('promo-wilayah-wrap').style.display = tipe === 'potong_wilayah' ? 'block' : 'none';
+
+  // Update unit labels & placeholders
+  document.getElementById('promo-nilai-unit').textContent = unitLabel;
+  document.getElementById('promo-jawa-unit').textContent  = unitLabel;
+  document.getElementById('promo-luar-unit').textContent  = unitLabel;
+  document.getElementById('f-promo-nilai').placeholder = isPersen ? '10 (artinya 10%)' : '10000';
+  document.getElementById('f-promo-jawa').placeholder  = isPersen ? '10 (artinya 10%)' : '10000';
+  document.getElementById('f-promo-luar').placeholder  = isPersen ? '15 (artinya 15%)' : '15000';
+
   const show = ['potong','gratis_sd'].includes(tipe);
   document.getElementById('promo-nilai-wrap').style.display = show ? '' : 'none';
   updatePromoPreview();
@@ -932,10 +1003,16 @@ function togglePromoNilai() {
 function updatePromoPreview() {
   const tipe  = document.getElementById('f-promo-tipe').value;
   const nilai = parseInt(document.getElementById('f-promo-nilai').value) || 0;
+  const unit     = getPromoUnit();
+  const isPersen = unit === 'persen';
+  const nilaiJawa = parseFloat(document.getElementById('f-promo-jawa').value) || 0;
+  const nilaiLuar = parseFloat(document.getElementById('f-promo-luar').value) || 0;
+  const fmt = v => isPersen ? `${v}%` : `Rp ${v.toLocaleString('id-ID')}`;
   let text = 'Tidak ada promo ongkir';
-  if (tipe === 'gratis_penuh') text = '✅ Gratis Ongkir Penuh';
-  if (tipe === 'potong')    text = `Potongan ongkir Rp ${nilai.toLocaleString('id-ID')}`;
-  if (tipe === 'gratis_sd') text = `Gratis ongkir s/d Rp ${nilai.toLocaleString('id-ID')}`;
+  if (tipe === 'gratis_penuh')   text = '✅ Gratis Ongkir Penuh';
+  if (tipe === 'potong')         text = `Hemat ${fmt(nilai)} dari ongkir (semua wilayah)`;
+  if (tipe === 'potong_wilayah') text = `Dalam Jawa: hemat ${fmt(nilaiJawa)} · Luar Jawa: hemat ${fmt(nilaiLuar)}`;
+  if (tipe === 'gratis_sd')      text = `Gratis ongkir s/d Rp ${nilai.toLocaleString('id-ID')}`;
   document.getElementById('promo-preview').textContent = text;
 }
 
@@ -989,8 +1066,11 @@ async function saveProduk() {
     persona_cs_nama: document.getElementById('f-persona-nama').value.trim() || 'Sari',
     persona_cs_gaya: document.getElementById('f-persona-gaya').value.trim(),
     promo_ongkir: {
-      tipe: document.getElementById('f-promo-tipe').value,
-      nilai: parseInt(document.getElementById('f-promo-nilai').value) || 0,
+      tipe:       document.getElementById('f-promo-tipe').value,
+      unit:       getPromoUnit(),
+      nilai:      parseFloat(document.getElementById('f-promo-nilai').value) || 0,
+      nilai_jawa: parseFloat(document.getElementById('f-promo-jawa').value) || 0,
+      nilai_luar: parseFloat(document.getElementById('f-promo-luar').value) || 0,
     },
   };
 
@@ -1046,6 +1126,10 @@ function switchTab(name, btn) {
 
 document.getElementById('f-promo-tipe').addEventListener('change', updatePromoPreview);
 document.getElementById('f-promo-nilai').addEventListener('input', updatePromoPreview);
+document.getElementById('f-promo-jawa').addEventListener('input', updatePromoPreview);
+document.getElementById('f-promo-luar').addEventListener('input', updatePromoPreview);
+document.getElementById('unit-rp').addEventListener('change', updatePromoPreview);
+document.getElementById('unit-pct').addEventListener('change', updatePromoPreview);
 
 /* ══════════════════════════════════════
    SOP FOLLOW UP
