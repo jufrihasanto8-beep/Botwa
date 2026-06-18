@@ -668,6 +668,7 @@ function renderSidebar(activePage) {
   const pages = [
     { id:'analytics',       href:'analytics.html',       icon:'📊', label:'Ringkasan' },
     { id:'dashboard',       href:'dashboard.html',       icon:'💬', label:'Percakapan' },
+    { id:'contacts',        href:'contacts.html',        icon:'👥', label:'Pelanggan' },
     { id:'orders',          href:'orders.html',          icon:'✅', label:'Closing' },
     { id:'followup-engine', href:'followup-engine.html', icon:'🔔', label:'Follow-up' },
     { id:'knowledge',       href:'knowledge.html',       icon:'📋', label:'Katalog & SOP' },
