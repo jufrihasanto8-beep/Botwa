@@ -160,12 +160,12 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now) 
   } else if (tipe === 'testimoni') {
     imageUrl = schedule.image_url || null;
     caption  = schedule.pesan_custom || `Ini testimoni dari customer kami kak ${namaKak} 😊 Banyak yang sudah merasakan manfaatnya!`;
-    message  = null; // gambar + caption sudah cukup
+    if (!imageUrl) message = caption; // fallback teks kalau tidak ada gambar
 
   } else if (tipe === 'promo') {
     imageUrl = schedule.image_url || null;
     caption  = schedule.pesan_custom || `Ada promo spesial hari ini kak ${namaKak}! 🎉 Jangan sampai kelewatan ya`;
-    message  = null;
+    if (!imageUrl) message = caption; // fallback teks kalau tidak ada gambar
 
   } else if (tipe === 'custom') {
     message  = schedule.pesan_custom
@@ -281,7 +281,7 @@ module.exports = async function handler(req, res) {
 
         // Skip jika hari 1 sudah terkirim atau eskalasi
         if (followedDays.includes(1)) { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: hari 1 sudah terkirim`); continue; }
-        if (conv.status === 'ekskalasi') { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: status eskalasi`); continue; }
+        if (conv.status === 'eskalasi') { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: status eskalasi`); continue; }
 
         // Cek pesan terakhir harus dari AI
         const lastMsgs = await sbGet('conv_messages',
@@ -341,6 +341,7 @@ module.exports = async function handler(req, res) {
     for (const [userId, schedules] of Object.entries(schedByUser)) {
       // Cari schedule yang jam_kirimnya cocok dengan sekarang (±30 menit)
       const scheduleSekarang = schedules.filter(s => {
+        if (!s.jam_kirim) return false;
         const [jamS, menitS] = s.jam_kirim.slice(0, 5).split(':').map(Number);
         const totalMenitSchedule = jamS * 60 + menitS;
         const totalMenitNow      = jamWIB * 60 + menitWIB;
@@ -384,7 +385,7 @@ module.exports = async function handler(req, res) {
 
             // Skip jika hari ini sudah terkirim atau eskalasi
             if (followedDays.includes(hariKe)) { totalSkipped++; continue; }
-            if (conv.status === 'ekskalasi')    { totalSkipped++; continue; }
+            if (conv.status === 'eskalasi')    { totalSkipped++; continue; }
 
             const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
             if (!customers.length) { totalSkipped++; continue; }
