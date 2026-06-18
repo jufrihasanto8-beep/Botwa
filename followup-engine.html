@@ -232,11 +232,17 @@ body.light #toast.toast-error{background:#fef2f2;color:#dc2626;border-color:rgba
                 </select>
               </div>
               <div id="field-pesan" style="display:none">
-                <label class="sched-row-label" style="display:block;margin-bottom:6px">
-                  <span id="pesan-label">Pesan / Caption</span>
-                  <span style="color:#475569;font-size:11px;margin-left:6px">Gunakan {nama} untuk nama customer</span>
-                </label>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                  <label class="sched-row-label" style="margin-bottom:0">
+                    <span id="pesan-label">Pesan / Caption</span>
+                    <span style="color:#475569;font-size:11px;margin-left:6px">Gunakan {nama} untuk nama customer</span>
+                  </label>
+                  <button type="button" id="btn-ai-suggest" onclick="suggestPesan()" style="display:flex;align-items:center;gap:5px;padding:5px 11px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s">
+                    ✨ AI Suggest
+                  </button>
+                </div>
                 <textarea id="f-pesan" class="sched-input" placeholder="Halo Kak {nama}! Ada kabar baik hari ini..." rows="3"></textarea>
+                <div id="ai-suggest-loading" style="display:none;font-size:11px;color:#6366f1;margin-top:5px">⏳ AI sedang generate pesan...</div>
               </div>
               <div id="field-image" style="display:none">
                 <label class="sched-row-label" style="display:block;margin-bottom:6px">Gambar</label>
@@ -462,6 +468,39 @@ function renderSchedules() {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function suggestPesan() {
+  const hari      = parseInt(document.getElementById('f-hari').value) || 2;
+  const tipe      = document.getElementById('f-tipe').value;
+  const image_url = document.getElementById('f-image').value.trim() || null;
+  const btn       = document.getElementById('btn-ai-suggest');
+  const loading   = document.getElementById('ai-suggest-loading');
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  loading.style.display = '';
+
+  try {
+    const res = await fetch('/api/ai-suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'followup-text', hari, tipe, image_url, userId }),
+    });
+    const data = await res.json();
+    if (data.text) {
+      document.getElementById('f-pesan').value = data.text;
+      toast('Pesan berhasil digenerate ✨', 'success');
+    } else {
+      toast(data.error || 'Gagal generate pesan', 'error');
+    }
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ AI Suggest';
+    loading.style.display = 'none';
+  }
 }
 
 function openAddForm() {
