@@ -334,7 +334,7 @@ function renderTable() {
           </div>
         </div>
       </td>
-      <td><span class="phone-txt">+${escH(c.wa_number||'—')}</span></td>
+      <td><span class="phone-txt">${escH(cleanPhone(c.wa_number))}</span></td>
       <td style="color:var(--c-text2);font-size:12px">${m.count||0} sesi</td>
       <td style="color:var(--c-text3);font-size:12px">${lastAt}</td>
       <td>${badge}</td>
@@ -354,6 +354,16 @@ function prevPage() { if (page > 1) { page--; renderTable(); } }
 function nextPage() { if (page * PER_PAGE < getFiltered().length) { page++; renderTable(); } }
 
 /* ── HELPERS ── */
+function cleanPhone(raw) {
+  // Strip @s.whatsapp.net atau suffix apapun
+  let n = String(raw||'').split('@')[0].replace(/\D/g,'');
+  if (!n) return '—';
+  // Pastikan awalan 62
+  if (n.startsWith('0')) n = '62' + n.slice(1);
+  if (!n.startsWith('62')) n = '62' + n;
+  return '+' + n;
+}
+
 function relTime(iso) {
   const d = Date.now() - new Date(iso).getTime();
   const m = Math.floor(d/60000);
