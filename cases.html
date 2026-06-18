@@ -4,395 +4,412 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cases · Adsy CS</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
 <link rel="stylesheet" href="css/style.css">
 <style>
-.s-tab { padding:6px 16px; border-radius:20px; border:1px solid var(--border); background:var(--white); font-size:12px; font-weight:500; color:var(--text-2); cursor:pointer; transition:all .15s; }
-.s-tab.active { background:var(--green); color:#fff; border-color:var(--green); }
-.cases-table { width:100%; border-collapse:collapse; }
-.cases-table th, .cases-table td { padding:12px 16px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; }
-.cases-table th { font-size:11px; font-weight:600; color:var(--text-2); background:var(--bg); text-transform:uppercase; letter-spacing:.3px; }
-.cases-table tr:last-child td { border-bottom:none; }
-.cases-table tr:hover td { background:#fafafa; }
-.s-baru    { background:#dbeafe; color:#1e40af; }
-.s-diproses{ background:#fef3c7; color:#92400e; }
-.s-eskalasi{ background:#fee2e2; color:#991b1b; }
-.s-selesai { background:#dcfce7; color:#166534; }
-.p-low     { background:#f3f4f6; color:#4b5563; }
-.p-medium  { background:#fef3c7; color:#92400e; }
-.p-high    { background:#fed7aa; color:#9a3412; }
-.p-urgent  { background:#fee2e2; color:#991b1b; font-weight:700; }
-.stat-cards { display:flex; gap:14px; padding:20px 24px 0; flex-wrap:wrap; }
-.stat-c { flex:1; min-width:110px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; }
-.stat-c .num { font-size:26px; font-weight:700; }
-.stat-c .lbl { font-size:12px; color:var(--text-2); margin-top:4px; }
-.filter-bar { display:flex; align-items:center; gap:10px; padding:16px 24px; background:var(--white); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+/* ── LIGHT MODE ── */
+body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
+
+.main-content{background:var(--bg);min-height:100vh;padding:0}
+
+/* ── PAGE HEADER ── */
+.ph{padding:20px 24px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ph-left h1{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.4px}
+.ph-left p{font-size:12px;color:var(--text-2);margin-top:3px}
+.ph-right{display:flex;gap:8px}
+.icon-btn2{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.icon-btn2:hover{border-color:#3b82f6;color:#3b82f6}
+
+/* ── STAT CARDS ── */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px 24px}
+@media(max-width:900px){.stat-row{grid-template-columns:repeat(2,1fr)}}
+.sc{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:16px;transition:box-shadow .15s}
+.sc:hover{box-shadow:0 4px 20px rgba(0,0,0,.1)}
+body.light .sc:hover{box-shadow:0 4px 20px rgba(0,0,0,.05)}
+.sc-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sc-icon.blue{background:rgba(59,130,246,.12)}
+.sc-icon.purple{background:rgba(167,139,250,.12)}
+.sc-icon.green{background:rgba(34,197,94,.12)}
+.sc-icon.yellow{background:rgba(245,158,11,.12)}
+.sc-body{flex:1;min-width:0}
+.sc-label{font-size:11px;font-weight:500;color:var(--text-2);margin-bottom:4px}
+.sc-num{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.5px;line-height:1}
+.sc-sub{font-size:11px;color:var(--text-2);margin-top:4px}
+.sc-spark{width:70px;flex-shrink:0}
+.sc-spark canvas{width:70px!important;height:36px!important}
+.sc.blue .sc-num{color:#3b82f6}
+.sc.purple .sc-num{color:#a78bfa}
+.sc.green .sc-num{color:#22c55e}
+.sc.yellow .sc-num{color:#f59e0b}
+
+/* ── TABLE CARD ── */
+.tc{background:var(--white);border:1px solid var(--border);border-radius:16px;margin:0 24px 24px;overflow:hidden}
+.tc-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tc-hdr-left{display:flex;align-items:center;gap:10px}
+.tc-hdr-icon{width:32px;height:32px;border-radius:8px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);display:flex;align-items:center;justify-content:center;font-size:14px}
+.tc-hdr-title{font-size:14px;font-weight:700;color:var(--text)}
+.tc-hdr-sub{font-size:11px;color:var(--text-2);margin-top:1px}
+.btn-console{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;background:#22c55e;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;text-decoration:none;transition:opacity .15s}
+.btn-console:hover{opacity:.85;color:#fff}
+
+/* Toolbar */
+.tc-toolbar{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tabs2{display:flex;gap:6px}
+.tab2{padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:all .12s;white-space:nowrap}
+.tab2.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+body.light .tab2.active{background:#0f172a;color:#fff;border-color:#0f172a}
+.tab2 .tc{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;background:rgba(255,255,255,.15);font-size:10px;font-weight:700;padding:0 4px;margin-left:4px}
+.tab2.active .tc{background:rgba(255,255,255,.2)}
+body.light .tab2.active .tc{background:rgba(255,255,255,.3)}
+.tab2:not(.active) .tc{background:rgba(100,116,139,.15);color:var(--text-2)}
+
+.search2{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:7px 12px}
+.search2 input{border:none;background:none;color:var(--text);font-size:12px;outline:none;width:180px}
+.search2 input::placeholder{color:var(--text-2)}
+
+/* Table */
+.tc-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--bg)}
+th{padding:10px 18px;text-align:left;font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;border-bottom:1px solid var(--border)}
+td{padding:14px 18px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:rgba(59,130,246,.03)}
+
+/* Cust cell */
+.cust-cell{display:flex;align-items:center;gap:10px}
+.c-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.c-name{font-size:13px;font-weight:600;color:var(--text)}
+.c-role{font-size:11px;color:var(--text-2);margin-top:1px}
+.phone-txt{font-size:12px;color:var(--text-2);font-family:monospace}
+
+/* Badges */
+.bdg{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.bdg-eskal{background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
+.bdg-aktif{background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.2)}
+.bdg-proses{background:rgba(59,130,246,.1);color:#3b82f6;border:1px solid rgba(59,130,246,.2)}
+.bdg-lain{background:rgba(100,116,139,.08);color:var(--text-2);border:1px solid var(--border)}
+.eskal-arrow{font-size:10px}
+
+/* Aksi */
+.aksi-cell{display:flex;align-items:center;gap:6px}
+.btn-buka{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;background:#22c55e;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;text-decoration:none;transition:opacity .15s;white-space:nowrap}
+.btn-buka:hover{opacity:.85;color:#fff}
+.btn-arrow{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;transition:all .15s}
+.btn-arrow:hover{border-color:#3b82f6;color:#3b82f6}
+
+/* Empty */
+.empty-cell{text-align:center;padding:56px 20px;color:var(--text-2)}
+.empty-cell .e-icon{font-size:36px;margin-bottom:10px;opacity:.4}
+.empty-cell p{font-size:13px}
+
+/* Pager */
+.pager{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border)}
+.pager-info{font-size:12px;color:var(--text-2)}
+.pager-btns{display:flex;gap:6px}
+.pager-btn{padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;cursor:pointer;transition:all .12s}
+.pager-btn:hover:not(:disabled){border-color:#3b82f6;color:#3b82f6}
+.pager-btn:disabled{opacity:.3;cursor:default}
+
+/* Skeleton */
+.skel{background:linear-gradient(90deg,var(--border) 25%,rgba(255,255,255,.04) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px}
+body.light .skel{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 </style>
 </head>
 <body>
-<div id="toast"></div>
 <div class="app-layout">
   <div id="sidebar-container"></div>
   <div class="main-content">
 
-    <div class="page-header">
-      <div>
+    <!-- Page Header -->
+    <div class="ph">
+      <div class="ph-left">
         <h1>📋 Cases</h1>
-        <p>Kelola semua case percakapan customer</p>
+        <p>Semua yang butuh tangan manusia terkumpul rapi di sini</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="openAddCase()">+ Tambah Case</button>
-    </div>
-
-    <!-- Stats -->
-    <div class="stat-cards" id="stats-row">
-      <div class="stat-c"><div class="num">—</div><div class="lbl">Total Cases</div></div>
-    </div>
-
-    <!-- Filter -->
-    <div class="filter-bar" style="margin-top:16px;">
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="s-tab active" onclick="setStatus('semua',this)">Semua</button>
-        <button class="s-tab" onclick="setStatus('baru',this)">🔵 Baru</button>
-        <button class="s-tab" onclick="setStatus('diproses',this)">🟡 Diproses</button>
-        <button class="s-tab" onclick="setStatus('eskalasi',this)">🚨 Eskalasi</button>
-        <button class="s-tab" onclick="setStatus('selesai',this)">✅ Selesai</button>
+      <div class="ph-right">
+        <button class="icon-btn2" onclick="init()">↻ Refresh</button>
       </div>
-      <input type="text" id="search-input" placeholder="🔍 Cari case atau kontak..." oninput="renderCases()"
-        style="margin-left:auto;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:220px;">
     </div>
 
-    <!-- Table -->
-    <div style="padding:0 24px 40px;">
-      <div class="card" style="margin-top:16px;overflow:hidden;">
-        <div class="table-wrap">
-          <table class="cases-table">
-            <thead>
-              <tr>
-                <th>Kontak</th>
-                <th>Judul Case</th>
-                <th>Status</th>
-                <th>Prioritas</th>
-                <th>Dibuat</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="cases-tbody">
+    <!-- Stat Cards -->
+    <div class="stat-row" id="stat-row">
+      <div class="sc"><div class="sc-icon blue">📋</div><div class="sc-body"><div class="sc-label">Total Case Aktif</div><div class="sc-num skel" style="height:26px;width:40px;margin:4px 0"></div></div></div>
+      <div class="sc"><div class="sc-icon purple">⬆️</div><div class="sc-body"><div class="sc-label">Eskalasi</div><div class="sc-num skel" style="height:26px;width:40px;margin:4px 0"></div></div></div>
+      <div class="sc"><div class="sc-icon green">👤</div><div class="sc-body"><div class="sc-label">Sedang Ditangani</div><div class="sc-num skel" style="height:26px;width:40px;margin:4px 0"></div></div></div>
+      <div class="sc"><div class="sc-icon yellow">⏳</div><div class="sc-body"><div class="sc-label">Transfer Tertahan</div><div class="sc-num skel" style="height:26px;width:40px;margin:4px 0"></div></div></div>
+    </div>
+
+    <!-- Case Table -->
+    <div class="tc">
+      <div class="tc-hdr">
+        <div class="tc-hdr-left">
+          <div class="tc-hdr-icon">📋</div>
+          <div>
+            <div class="tc-hdr-title">Case perlu perhatian</div>
+            <div class="tc-hdr-sub" id="case-sub">Memuat data...</div>
+          </div>
+        </div>
+        <a class="btn-console" href="dashboard.html">Buka Console ↗</a>
+      </div>
+
+      <div class="tc-toolbar">
+        <div class="tabs2" id="tabs">
+          <button class="tab2 active" onclick="setTab('semua',this)">Semua <span class="tc" id="cnt-semua">0</span></button>
+          <button class="tab2" onclick="setTab('ekskalasi',this)">Eskalasi <span class="tc" id="cnt-eskal">0</span></button>
+          <button class="tab2" onclick="setTab('lainnya',this)">Lainnya <span class="tc" id="cnt-lain">0</span></button>
+        </div>
+        <div class="search2">
+          <span style="color:var(--text-2);font-size:13px">🔍</span>
+          <input type="text" placeholder="Cari pelanggan atau nomor..." oninput="onSearch(this.value)" />
+        </div>
+      </div>
+
+      <div class="tc-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pelanggan</th>
+              <th>Nomor</th>
+              <th>Aktivitas Terakhir</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="5" class="empty-cell"><div class="e-icon">⏳</div><p>Memuat data...</p></td></tr>
           </tbody>
-          </table>
-        </div>
-        <div id="cases-empty" style="display:none;text-align:center;padding:60px;color:var(--text-2);">
-          <div style="font-size:40px;margin-bottom:12px;">📋</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">Belum ada case</div>
-          <div style="font-size:13px;">Cases akan muncul otomatis saat ada percakapan masuk</div>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="pager-info" id="pager-info">—</span>
+        <div class="pager-btns">
+          <button class="pager-btn" id="btn-prev" onclick="prevPage()" disabled>‹ Prev</button>
+          <button class="pager-btn" id="btn-next" onclick="nextPage()" disabled>Next ›</button>
         </div>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- Add/Edit Modal -->
-<div class="modal-overlay" id="case-modal">
-  <div class="modal">
-    <h2 id="modal-title">Tambah Case</h2>
-    <input type="hidden" id="case-id">
-    <div class="form-group">
-      <label>Kontak *</label>
-      <select id="case-contact" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg);"></select>
-    </div>
-    <div class="form-group">
-      <label>Judul / Ringkasan *</label>
-      <input type="text" id="case-title" placeholder="Contoh: Komplain pengiriman lambat">
-    </div>
-    <div class="form-group">
-      <label>Status</label>
-      <select id="case-status">
-        <option value="baru">🔵 Baru</option>
-        <option value="diproses">🟡 Diproses</option>
-        <option value="eskalasi">🚨 Eskalasi</option>
-        <option value="selesai">✅ Selesai</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Prioritas</label>
-      <select id="case-priority">
-        <option value="low">Low</option>
-        <option value="medium">Medium</option>
-        <option value="high">High</option>
-        <option value="urgent">🔴 Urgent</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Catatan</label>
-      <textarea id="case-notes" rows="3" placeholder="Catatan internal tentang case ini..."></textarea>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveCase()">Simpan</button>
-    </div>
-  </div>
-</div>
-
-<!-- AI Saran Balasan Modal -->
-<div class="modal-overlay" id="ai-modal">
-  <div class="modal" style="width:520px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <h2 style="margin:0;">🤖 Saran Balasan AI</h2>
-      <button onclick="document.getElementById('ai-modal').classList.remove('open')" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);">✕</button>
-    </div>
-    <div id="ai-context" style="font-size:12px;color:var(--text-2);margin-bottom:12px;padding:10px;background:var(--bg);border-radius:8px;"></div>
-    <div id="ai-loading" style="text-align:center;padding:32px;color:var(--text-2);">
-      <div style="font-size:24px;margin-bottom:8px;">🤖</div>
-      <div>AI sedang menganalisis percakapan...</div>
-    </div>
-    <div id="ai-result" style="display:none;">
-      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px;">DRAFT BALASAN TERBAIK:</div>
-      <textarea id="ai-draft-text" rows="6" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;resize:vertical;line-height:1.6;"></textarea>
-      <div style="font-size:11px;color:var(--text-2);margin-top:8px;">💡 Edit sesuai kebutuhan sebelum mengirim</div>
-    </div>
-    <div class="modal-footer" id="ai-footer" style="display:none;">
-      <button class="btn btn-secondary" onclick="copyDraft()">📋 Copy</button>
-      <button class="btn btn-primary" onclick="sendDraftWA()" id="send-draft-btn">📱 Kirim ke WA</button>
-    </div>
   </div>
 </div>
 
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
+<script src="js/theme.js"></script>
 <script>
 Auth.guard();
 document.getElementById('sidebar-container').innerHTML = renderSidebar('cases');
 
-let activeDraftPhone = null;
+/* ── SUPABASE ── */
+function sbFetch(table, query) {
+  const url = window.SUPABASE_URL, key = window.SUPABASE_ANON_KEY;
+  return fetch(`${url}/rest/v1/${table}${query}`, {
+    headers: { 'Content-Type':'application/json', apikey: key, Authorization: 'Bearer ' + key }
+  }).then(r => r.ok ? r.json() : []).catch(() => []);
+}
 
-let currentStatus = 'semua';
-let allCases = [];
-let contactMap = {};
+/* ── AVATAR ── */
+const AV_COLORS = ['#3b82f6','#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444'];
+function avColor(n) { let h=0; for(const c of(n||'?'))h=(h*31+c.charCodeAt(0))&0xffffffff; return AV_COLORS[Math.abs(h)%AV_COLORS.length]; }
+function avInit(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 
+function cleanPhone(raw) {
+  let n = String(raw||'').split('@')[0].replace(/\D/g,'');
+  if (!n) return '—';
+  if (n.startsWith('0')) n = '62' + n.slice(1);
+  if (!n.startsWith('62')) n = '62' + n;
+  const local = n.slice(2);
+  if (local.length > 12) return '—';
+  if (local.length >= 9) return '+62 ' + local.slice(0,3) + '-' + local.slice(3,7) + '-' + local.slice(7);
+  return '+62 ' + local;
+}
+
+/* ── STATE ── */
+const uid = Auth.getUser()?.id;
+let allCases = [], custMap = {}, currentTab = 'semua', searchQ = '', page = 1;
+const PER_PAGE = 20;
+
+/* ── INIT ── */
 async function init() {
-  await Config.load();
-  const contacts = await Contacts.getAll();
-  contacts.forEach(c => { contactMap[c.id] = c; });
+  document.getElementById('tbody').innerHTML = `<tr><td colspan="5" class="empty-cell"><div class="e-icon">⏳</div><p>Memuat data...</p></td></tr>`;
 
-  const sel = document.getElementById('case-contact');
-  sel.innerHTML = contacts.map(c => `<option value="${c.id}">${c.name} (+${c.phone})</option>`).join('');
+  const [convs, custs] = await Promise.all([
+    sbFetch('conversations', `?user_id=eq.${uid}&status=in.(baru,diproses,ekskalasi)&select=id,customer_id,status,last_msg_at,state,created_at&order=last_msg_at.desc`),
+    sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama`)
+  ]);
 
-  await loadCases();
+  custMap = {};
+  custs.forEach(c => { custMap[c.id] = c; });
+
+  allCases = convs;
+
+  /* ── STATS ── */
+  const eskal   = convs.filter(c => c.status === 'ekskalasi').length;
+  const proses  = convs.filter(c => c.status === 'diproses').length;
+  const transfer = convs.filter(c => {
+    try { const s = typeof c.state === 'string' ? JSON.parse(c.state) : (c.state||{}); return s.transfer_pending; } catch{ return false; }
+  }).length;
+  const total = convs.length;
+
+  document.getElementById('stat-row').innerHTML = `
+    <div class="sc blue">
+      <div class="sc-icon blue">📋</div>
+      <div class="sc-body">
+        <div class="sc-label">Total Case Aktif</div>
+        <div class="sc-num">${total}</div>
+        <div class="sc-sub">butuh perhatian admin</div>
+      </div>
+    </div>
+    <div class="sc purple">
+      <div class="sc-icon purple">⬆️</div>
+      <div class="sc-body">
+        <div class="sc-label">Eskalasi</div>
+        <div class="sc-num">${eskal}</div>
+        <div class="sc-sub">pelanggan minta admin</div>
+      </div>
+    </div>
+    <div class="sc green">
+      <div class="sc-icon green">👤</div>
+      <div class="sc-body">
+        <div class="sc-label">Sedang Ditangani</div>
+        <div class="sc-num">${proses}</div>
+        <div class="sc-sub">admin sudah ambil alih</div>
+      </div>
+    </div>
+    <div class="sc yellow">
+      <div class="sc-icon yellow">⏳</div>
+      <div class="sc-body">
+        <div class="sc-label">Transfer Tertahan</div>
+        <div class="sc-num">${transfer}</div>
+        <div class="sc-sub">menunggu bukti bayar</div>
+      </div>
+    </div>`;
+
+  page = 1;
+  renderTable();
 }
 
-async function loadCases() {
-  allCases = await Cases.getAll();
-
-  const cnt = { semua: allCases.length, baru:0, diproses:0, eskalasi:0, selesai:0 };
-  allCases.forEach(c => { if (cnt[c.status] !== undefined) cnt[c.status]++; });
-
-  document.getElementById('stats-row').innerHTML = `
-    <div class="stat-c"><div class="num">${cnt.semua}</div><div class="lbl">Total Cases</div></div>
-    <div class="stat-c"><div class="num" style="color:#1e40af">${cnt.baru}</div><div class="lbl">Baru</div></div>
-    <div class="stat-c"><div class="num" style="color:#92400e">${cnt.diproses}</div><div class="lbl">Diproses</div></div>
-    <div class="stat-c"><div class="num" style="color:#991b1b">${cnt.eskalasi}</div><div class="lbl">🚨 Eskalasi</div></div>
-    <div class="stat-c"><div class="num" style="color:#166534">${cnt.selesai}</div><div class="lbl">Selesai</div></div>
-  `;
-  renderCases();
+/* ── FILTER ── */
+function setTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab2').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  page = 1; renderTable();
 }
 
-function renderCases() {
-  const search = document.getElementById('search-input').value.toLowerCase();
+function onSearch(v) { searchQ = v.toLowerCase().trim(); page = 1; renderTable(); }
+
+function getFiltered() {
   let list = allCases;
-  if (currentStatus !== 'semua') list = list.filter(c => c.status === currentStatus);
-  if (search) list = list.filter(c => {
-    const contact = contactMap[c.contact_id];
-    return (c.title||'').toLowerCase().includes(search) ||
-      (contact?.name||'').toLowerCase().includes(search) ||
-      (contact?.phone||'').includes(search);
-  });
+  if (currentTab === 'ekskalasi') list = list.filter(c => c.status === 'ekskalasi');
+  else if (currentTab === 'lainnya') list = list.filter(c => c.status !== 'ekskalasi');
+  if (searchQ) {
+    list = list.filter(c => {
+      const cu = custMap[c.customer_id] || {};
+      return (cu.nama||'').toLowerCase().includes(searchQ) || (cu.wa_number||'').includes(searchQ);
+    });
+  }
+  return list;
+}
 
-  const tbody = document.getElementById('cases-tbody');
-  const empty = document.getElementById('cases-empty');
-  if (!list.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display = 'none';
+/* ── RENDER ── */
+function renderTable() {
+  const filtered = getFiltered();
+  const eskalCnt = allCases.filter(c => c.status === 'ekskalasi').length;
+  const lainCnt  = allCases.filter(c => c.status !== 'ekskalasi').length;
 
-  const statusLabel = { baru:'🔵 Baru', diproses:'🟡 Diproses', eskalasi:'🚨 Eskalasi', selesai:'✅ Selesai' };
-  const priorityLabel = { low:'Low', medium:'Medium', high:'High', urgent:'🔴 Urgent' };
+  document.getElementById('cnt-semua').textContent = allCases.length;
+  document.getElementById('cnt-eskal').textContent = eskalCnt;
+  document.getElementById('cnt-lain').textContent  = lainCnt;
+  document.getElementById('case-sub').textContent  = filtered.length + ' case membutuhkan perhatian';
 
-  tbody.innerHTML = list.map(c => {
-    const contact = contactMap[c.contact_id] || {};
+  const total = filtered.length;
+  const start = (page - 1) * PER_PAGE;
+  const items = filtered.slice(start, start + PER_PAGE);
+  const tbody = document.getElementById('tbody');
+
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-cell"><div class="e-icon">📋</div><p>Tidak ada case ditemukan.</p></td></tr>`;
+    document.getElementById('pager-info').textContent = '0 case';
+    document.getElementById('btn-prev').disabled = true;
+    document.getElementById('btn-next').disabled = true;
+    return;
+  }
+
+  tbody.innerHTML = items.map(c => {
+    const cu   = custMap[c.customer_id] || {};
+    const nama = cu.nama || cu.wa_number || 'Pelanggan';
+    const color = avColor(nama);
+    const ini   = avInit(nama);
+    const phone = cleanPhone(cu.wa_number);
+    const lastAt = relTime(c.last_msg_at);
+    const chatUrl = `dashboard.html?conv=${c.id}`;
+
+    let badge = '';
+    if (c.status === 'ekskalasi')
+      badge = `<span class="bdg bdg-eskal"><span style="font-size:10px">⬆</span> ESKALASI</span>`;
+    else if (c.status === 'diproses')
+      badge = `<span class="bdg bdg-proses">🔵 DIPROSES</span>`;
+    else
+      badge = `<span class="bdg bdg-aktif">🟢 BARU</span>`;
+
     return `<tr>
       <td>
-        <div style="font-weight:500;">${contact.name || 'Unknown'}</div>
-        <div style="font-size:11px;color:var(--text-2);">${contact.phone ? '+'+contact.phone : ''}</div>
+        <div class="cust-cell">
+          <div class="c-av" style="background:${color}">${escH(ini)}</div>
+          <div>
+            <div class="c-name">${escH(nama)}</div>
+            <div class="c-role">Pelanggan</div>
+          </div>
+        </div>
       </td>
-      <td style="max-width:200px;">
-        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.title || 'Case Baru'}</div>
-        ${c.notes ? `<div style="font-size:11px;color:var(--text-2);margin-top:2px;">${c.notes.slice(0,40)}...</div>` : ''}
+      <td><span class="phone-txt">${escH(phone)}</span></td>
+      <td style="color:var(--text-2);font-size:12px">
+        <div>${relTimeShort(c.last_msg_at)}</div>
+        <div style="color:var(--text-2);font-size:11px;margin-top:2px">${fmtDate(c.last_msg_at)}</div>
       </td>
-      <td><span class="badge s-${c.status}">${statusLabel[c.status]||c.status}</span></td>
-      <td><span class="badge p-${c.priority}">${priorityLabel[c.priority]||c.priority}</span></td>
-      <td style="color:var(--text-2);font-size:12px;white-space:nowrap;">${timeAgo(c.created_at)}</td>
+      <td>${badge}</td>
       <td>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn btn-sm btn-secondary" onclick="editCase('${c.id}')">Edit</button>
-          <a href="dashboard.html?contact=${c.contact_id}" class="btn btn-sm btn-secondary">💬 Chat</a>
-          <button class="btn btn-sm" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;" onclick="aiDraft('${c.id}','${c.contact_id}')">🤖 Saran AI</button>
-          ${c.status !== 'selesai' ? `<button class="btn btn-sm" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0;" onclick="resolveCase('${c.id}')">✅ Selesai</button>` : ''}
+        <div class="aksi-cell">
+          <a class="btn-buka" href="${chatUrl}">Buka Console</a>
+          <a class="btn-arrow" href="${chatUrl}">→</a>
         </div>
       </td>
     </tr>`;
   }).join('');
+
+  const end = Math.min(start + PER_PAGE, total);
+  document.getElementById('pager-info').textContent = `${start+1}–${end} dari ${total} case`;
+  document.getElementById('btn-prev').disabled = page <= 1;
+  document.getElementById('btn-next').disabled = end >= total;
 }
 
-function timeAgo(ts) {
-  if (!ts) return '-';
-  const diff = Date.now() - new Date(ts).getTime();
-  const m = Math.floor(diff/60000), h = Math.floor(diff/3600000), d = Math.floor(diff/86400000);
+function prevPage() { if (page > 1) { page--; renderTable(); } }
+function nextPage() { if (page * PER_PAGE < getFiltered().length) { page++; renderTable(); } }
+
+/* ── HELPERS ── */
+function relTime(iso) {
+  if (!iso) return '—';
+  const d = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(d/60000);
   if (m < 1) return 'Baru saja';
-  if (m < 60) return `${m} mnt lalu`;
-  if (h < 24) return `${h} jam lalu`;
-  return `${d} hari lalu`;
+  if (m < 60) return m + ' menit lalu';
+  const h = Math.floor(m/60);
+  if (h < 24) return h + ' jam lalu';
+  return Math.floor(h/24) + ' hari lalu';
 }
-
-function setStatus(status, btn) {
-  currentStatus = status;
-  document.querySelectorAll('.s-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  renderCases();
+function relTimeShort(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) + ' WIB';
 }
-
-function openAddCase() {
-  document.getElementById('case-id').value = '';
-  document.getElementById('modal-title').textContent = 'Tambah Case';
-  document.getElementById('case-title').value = '';
-  document.getElementById('case-status').value = 'baru';
-  document.getElementById('case-priority').value = 'low';
-  document.getElementById('case-notes').value = '';
-  document.getElementById('case-modal').classList.add('open');
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
 }
-
-function editCase(id) {
-  const c = allCases.find(x => x.id === id);
-  if (!c) return;
-  document.getElementById('case-id').value = c.id;
-  document.getElementById('modal-title').textContent = 'Edit Case';
-  document.getElementById('case-contact').value = c.contact_id || '';
-  document.getElementById('case-title').value = c.title || '';
-  document.getElementById('case-status').value = c.status || 'baru';
-  document.getElementById('case-priority').value = c.priority || 'low';
-  document.getElementById('case-notes').value = c.notes || '';
-  document.getElementById('case-modal').classList.add('open');
-}
-
-async function resolveCase(id) {
-  await Cases.update(id, { status:'selesai', resolved_at: new Date().toISOString() });
-  showToast('✅ Case ditandai selesai');
-  await loadCases();
-}
-
-async function saveCase() {
-  const id = document.getElementById('case-id').value;
-  const status = document.getElementById('case-status').value;
-  const data = {
-    contact_id: document.getElementById('case-contact').value,
-    title: document.getElementById('case-title').value.trim() || 'Case Baru',
-    status,
-    priority: document.getElementById('case-priority').value,
-    notes: document.getElementById('case-notes').value.trim(),
-    is_escalated: status === 'eskalasi',
-    ...(status === 'selesai' ? { resolved_at: new Date().toISOString() } : {}),
-  };
-  try {
-    if (id) { await Cases.update(id, data); showToast('✅ Case diperbarui'); }
-    else { await Cases.create(data); showToast('✅ Case ditambahkan'); }
-    closeModal();
-    await loadCases();
-  } catch(e) { showToast('❌ Error: ' + e.message); }
-}
-
-function closeModal() { document.getElementById('case-modal').classList.remove('open'); }
-
-document.getElementById('case-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
-
-/* ── AI SARAN BALASAN ── */
-async function aiDraft(caseId, contactId) {
-  await Config.load();
-  const apiKey = Config.getKey('anthropic_key');
-  if (!apiKey) return showToast('⚠️ Set Anthropic API key di Pengaturan dulu');
-
-  const contact = contactMap[contactId] || {};
-  activeDraftPhone = contact.phone || null;
-
-  // Tampilkan modal loading
-  document.getElementById('ai-context').textContent =
-    `Kontak: ${contact.name || 'Unknown'} (+${contact.phone || '-'})`;
-  document.getElementById('ai-loading').style.display = 'block';
-  document.getElementById('ai-result').style.display = 'none';
-  document.getElementById('ai-footer').style.display = 'none';
-  document.getElementById('ai-modal').classList.add('open');
-
-  try {
-    // Ambil riwayat chat terakhir
-    const history = await ChatHistory.get(contactId, 10);
-    if (!history.length) {
-      document.getElementById('ai-loading').style.display = 'none';
-      document.getElementById('ai-draft-text').value = 'Belum ada riwayat percakapan untuk dianalisis.';
-      document.getElementById('ai-result').style.display = 'block';
-      document.getElementById('ai-footer').style.display = 'flex';
-      return;
-    }
-
-    const historyText = history.map(m =>
-      `${m.role === 'user' ? (contact.name||'Customer') : 'CS AI'}: ${m.content}`
-    ).join('\n');
-
-    const prompt = `Kamu adalah manajer CS berpengalaman. Analisis percakapan berikut dan buat 1 balasan terbaik untuk dikirim ke customer sekarang.
-
-RIWAYAT PERCAKAPAN:
-${historyText}
-
-Tulis HANYA balasan terbaiknya saja (tanpa penjelasan, tanpa prefix "Balasan:", langsung isi pesannya).
-Gunakan bahasa yang hangat, natural seperti chat WA, singkat 2-4 baris, dan pastikan membantu menyelesaikan masalah customer.`;
-
-    const reply = await Claude.chat(
-      [{ role: 'user', content: prompt }],
-      'Kamu adalah manajer CS yang menulis saran balasan untuk tim.'
-    );
-
-    document.getElementById('ai-draft-text').value = reply;
-    document.getElementById('ai-loading').style.display = 'none';
-    document.getElementById('ai-result').style.display = 'block';
-    document.getElementById('ai-footer').style.display = 'flex';
-
-  } catch(e) {
-    showToast('❌ Gagal generate: ' + e.message);
-    document.getElementById('ai-modal').classList.remove('open');
-  }
-}
-
-function copyDraft() {
-  const text = document.getElementById('ai-draft-text').value;
-  navigator.clipboard.writeText(text).then(() => showToast('✅ Disalin ke clipboard'));
-}
-
-async function sendDraftWA() {
-  if (!activeDraftPhone) return showToast('⚠️ Nomor WA tidak ditemukan');
-  const message = document.getElementById('ai-draft-text').value.trim();
-  if (!message) return showToast('⚠️ Draft kosong');
-  const btn = document.getElementById('send-draft-btn');
-  btn.disabled = true; btn.textContent = 'Mengirim...';
-  try {
-    const r = await Fonnte.send(activeDraftPhone, message);
-    if (r.ok) {
-      showToast('✅ Pesan terkirim ke WhatsApp');
-      document.getElementById('ai-modal').classList.remove('open');
-    } else {
-      showToast('❌ Gagal kirim: cek Fonnte token');
-    }
-  } catch(e) { showToast('❌ ' + e.message); }
-  finally { btn.disabled = false; btn.textContent = '📱 Kirim ke WA'; }
-}
-
-document.getElementById('ai-modal').addEventListener('click', function(e) {
-  if (e.target === this) this.classList.remove('open');
-});
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 init();
 </script>
