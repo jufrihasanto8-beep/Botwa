@@ -287,7 +287,17 @@ Urutan WAJIB diikuti:
 4. Yang kurang: (1) nama (2) no HP (3) alamat lengkap (jalan/gang, no rumah, RT/RW, kelurahan, kecamatan, patokan).
 5. Alamat kurang → minta yang kurang aja, jangan ulang dari nol.
 6. Ada jalan/gang → boleh proaktif tawarkan patokan dari maps.
-7. Tutup dengan KONFIRMASI ORDER (rincian+total), minta "oke".
+7. Tutup dengan KONFIRMASI ORDER ke customer pakai format ini PERSIS:
+   "Jadi konfirmasi ordernya ya:
+
+   Nama: [nama]
+   No WA: [nomor WA dari DATA CUSTOMER TERSIMPAN]
+   Alamat: [alamat lengkap]
+   Produk: [produk] [qty] [satuan]
+   Metode: [COD/Transfer]
+   TOTAL: Rp [total]
+
+   Sudah benar semua kak? 😊"
 8. Setelah customer konfirmasi order (semua data terkumpul: nama ✓, alamat ✓, metode bayar ✓) DAN kamu sudah kirim ringkasan order lengkap ke customer → BARU tulis di akhir balasan:
    [ORDER_CONFIRMED]
    [ORDER_DATA:alamat="ALAMAT LENGKAP DARI CUSTOMER" keluhan="KELUHAN UTAMA CUSTOMER" metode="COD atau Transfer" qty=1]
@@ -318,7 +328,10 @@ HANDLE PERTANYAAN UMUM
 - "Stok masih ada?" → "Masih ready kak, langsung proses aja 😊"
 - "Ada diskon/promo?" → Kalau ada promo ongkir, sebut itu. Kalau tidak ada, bilang "Untuk saat ini belum ada promo khusus kak, tapi harganya sudah yang terbaik 😊"
 - "Bisa kirim hari ini?" → "Kalau ordernya sebelum jam 12 siang biasanya bisa kirim hari ini kak 😊" (atau sesuaikan dengan knowledge produk)
-- "Estimasi sampai berapa hari?" → "Tergantung wilayahnya kak, biasanya 2-4 hari kerja 😊" (atau lihat dari kurir yang dipilih)
+- "Estimasi sampai berapa hari?" → Ada 3 kondisi:
+  1. Sudah ada data kurir (ongkir sudah dihitung) → jawab langsung pakai kurir yang sudah ada, contoh: "Via JNE biasanya 2-4 hari kerja kak 😊" — JANGAN tanya wilayah lagi.
+  2. Wilayah sudah disebut tapi ongkir belum dihitung → kasih estimasi kasar berdasarkan wilayah: Jawa 1-3 hari, Sumatera/Kalimantan/Sulawesi 3-5 hari, Papua/NTT/Maluku 5-7 hari. Sambil langsung konfirmasi wilayahnya dan tulis [WILAYAH_OK:] biar sistem hitung ongkir + total. Contoh: "Ke Medan biasanya 3-5 hari kerja kak 😊 [WILAYAH_OK:Medan, Medan, Sumatera Utara]" — tapi kalau belum tahu kecamatannya, tanya dulu kecamatan, kasih estimasi, lalu tulis [WILAYAH_OK:] setelah dapat kecamatan.
+  3. Belum ada info wilayah sama sekali → "Tergantung wilayahnya kak, dari mana kak?" lalu setelah dapat wilayah baru estimasi.
 - "Pengiriman dari mana?" → Jawab dari DATA PRODUK (Asal pengiriman)
 
 CUSTOMER LANGSUNG ORDER
@@ -398,10 +411,13 @@ Customer merasa DIDENGAR & terbantu. Kalau cocok → order tercatat.
 Customer puas balik lagi & rekomendasiin > maksa satu transaksi.`;
 }
 
-const PROVINSI_JAWA = ['DKI Jakarta','Jawa Barat','Jawa Tengah','DI Yogyakarta','Jawa Timur','Banten'];
+const PROVINSI_JAWA = ['dki jakarta','jawa barat','jawa tengah','di yogyakarta','yogyakarta','jawa timur','banten'];
 function isDalamJawa(provinsi) {
   if (!provinsi) return false;
-  return PROVINSI_JAWA.some(p => provinsi.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(provinsi.toLowerCase()));
+  const p = provinsi.toLowerCase().trim();
+  const result = PROVINSI_JAWA.some(j => p === j || p.includes(j));
+  console.log(`[PROMO] isDalamJawa("${provinsi}") = ${result}`);
+  return result;
 }
 function getPromoPotongan(promo, provinsi, ongkirAsli = 0) {
   if (!promo) return 0;
@@ -1326,7 +1342,10 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
         const potongan = r.ongkir !== r.ongkirPromo ? ` (hemat ${fmt(r.ongkir - r.ongkirPromo)})` : '';
         return `- ${r.nama}: ongkir ${fmt(r.ongkir)}${potongan} → TF ${fmt(r.totalTF)} | COD ${fmt(r.totalCOD)}`;
       }).join('\n');
-      systemPrompt += `\n\nDATA SEMUA KURIR TERSEDIA (selalu gunakan ini kalau customer tanya kurir lain — JANGAN bilang "ditentukan sistem"):\n${tabel}\nRekomendasi sistem: ${convState.ongkir.ekspedisi}`;
+      const areaOngkir = convState.ongkir.area
+        ? [convState.ongkir.area.kecamatan, convState.ongkir.area.kota, convState.ongkir.area.provinsi].filter(Boolean).join(', ')
+        : convState.wilayah || '';
+      systemPrompt += `\n\nDATA SEMUA KURIR TERSEDIA (selalu gunakan ini kalau customer tanya kurir lain — JANGAN bilang "ditentukan sistem"):\n${tabel}\nRekomendasi sistem: ${convState.ongkir.ekspedisi}${areaOngkir ? `\nWilayah tujuan: ${areaOngkir} (SUDAH DIKETAHUI — jangan tanya wilayah lagi)` : ''}`;
     }
 
     // ── Ambil pesan terakhir (filter setelah re-open jika ada) ───
