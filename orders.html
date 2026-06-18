@@ -47,13 +47,44 @@ body.light .sb-user{border-top-color:rgba(0,0,0,.07)}
 .live-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2)}
 .live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.date-tabs{display:flex;gap:4px;flex-wrap:wrap}
-.dtab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);background:none;color:var(--text-2);cursor:pointer;transition:all .12s}
-.dtab:hover{border-color:#3b82f6;color:#3b82f6}
-.dtab.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
 .btn-export{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;background:#22c55e;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-decoration:none}
 .btn-export:hover{background:#16a34a}
 .theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* Date range picker */
+.drp-trigger{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.drp-trigger:hover{border-color:#3b82f6}
+.drp-icon{color:#3b82f6;font-size:13px}
+.drp-wrap{position:relative}
+.drp-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.25);display:none;overflow:hidden;min-width:540px}
+body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.drp-dropdown.open{display:flex}
+.drp-presets{width:160px;border-right:1px solid var(--border);padding:10px 0;flex-shrink:0}
+.drp-preset{display:block;width:100%;text-align:left;padding:8px 16px;font-size:12px;color:var(--text-2);border:none;background:none;cursor:pointer;transition:all .12s}
+.drp-preset:hover{background:rgba(59,130,246,.08);color:#3b82f6}
+.drp-preset.active{color:#3b82f6;font-weight:600;background:rgba(59,130,246,.08)}
+.drp-cal{padding:16px;flex:1}
+.drp-cal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.drp-cal-title{font-size:14px;font-weight:600;color:var(--text)}
+.drp-nav{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .12s}
+.drp-nav:hover{border-color:#3b82f6;color:#3b82f6}
+.drp-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px}
+.drp-days-hdr span{text-align:center;font-size:11px;font-weight:600;color:var(--text-3);padding:4px 0}
+.drp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.drp-day{height:34px;border-radius:7px;border:none;background:none;color:var(--text);font-size:12px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
+.drp-day:hover:not(.empty){background:rgba(59,130,246,.12);color:#3b82f6}
+.drp-day.other-month{color:var(--text-3)}
+.drp-day.today{font-weight:700;color:#3b82f6}
+.drp-day.selected{background:#3b82f6!important;color:#fff!important;font-weight:600}
+.drp-day.in-range{background:rgba(59,130,246,.1);border-radius:0;color:var(--text)}
+.drp-day.range-start{border-radius:7px 0 0 7px;background:#3b82f6;color:#fff;font-weight:600}
+.drp-day.range-end{border-radius:0 7px 7px 0;background:#3b82f6;color:#fff;font-weight:600}
+.drp-day.range-start.range-end{border-radius:7px}
+.drp-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border)}
+.drp-selected-txt{font-size:11px;color:var(--text-3)}
+.drp-apply{padding:6px 16px;border-radius:7px;border:none;background:#3b82f6;color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.drp-apply:hover{background:#2563eb}
+.drp-cancel{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;cursor:pointer}
 
 /* Stat cards */
 .stat-section{padding:16px 24px;display:grid;grid-template-columns:repeat(6,1fr);gap:10px;flex-shrink:0}
@@ -143,12 +174,37 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
       <div class="page-title">Closing</div>
       <div class="live-dot" style="margin-top:2px">Data diperbarui secara real-time</div>
     </div>
-    <div class="date-tabs" id="date-tabs">
-      <button class="dtab" onclick="setDate('hari_ini',this)">Hari Ini</button>
-      <button class="dtab active" onclick="setDate('kemarin',this)">Kemarin</button>
-      <button class="dtab" onclick="setDate('minggu',this)">Minggu Ini</button>
-      <button class="dtab" onclick="setDate('bulan',this)">Bulan Ini</button>
-      <button class="dtab" onclick="setDate('semua',this)">Semua</button>
+    <div class="drp-wrap">
+      <button class="drp-trigger" onclick="drpToggle()" id="drp-trigger">
+        <span class="drp-icon">📅</span>
+        <span id="drp-label">7 hari terakhir</span>
+        <span style="color:var(--text-3)">▾</span>
+      </button>
+      <div class="drp-dropdown" id="drp-dropdown">
+        <div class="drp-presets">
+          <button class="drp-preset active" onclick="drpPreset(7,'7 hari terakhir',this)">7 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPreset(14,'14 hari terakhir',this)">14 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPreset(30,'30 hari terakhir',this)">30 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPreset(90,'90 hari terakhir',this)">90 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
+          <button class="drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
+          <hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
+          <button class="drp-preset" onclick="drpPreset(1,'Hari ini',this)">Hari Ini</button>
+          <button class="drp-preset" onclick="drpPresetYesterday(this)">Kemarin</button>
+        </div>
+        <div style="display:flex;flex-direction:column;flex:1">
+          <div class="drp-cal" id="drp-cal"></div>
+          <div class="drp-footer">
+            <div class="drp-selected-txt">
+              <span id="drp-sel-start">—</span> → <span id="drp-sel-end">—</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="drp-cancel" onclick="drpClose()">Batal</button>
+              <button class="drp-apply" onclick="drpApply()">Terapkan</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
     <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
