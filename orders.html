@@ -4,146 +4,105 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Closing · Adsy CS</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="css/style.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:#0d1117;color:#e2e8f0;font-size:13px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
 
-/* ── Sidebar ── */
-.app-layout{padding-left:0!important;display:flex!important;height:100vh!important;overflow:hidden!important}
-#sidebar{position:relative!important;left:auto!important;top:auto!important;z-index:auto!important;width:220px!important;min-width:220px!important;background:#1e293b!important;height:100vh!important;display:flex!important;flex-direction:column!important;flex-shrink:0!important;overflow:hidden!important;border-right:1px solid rgba(255,255,255,.07)!important}
+/* Sidebar */
+.app-layout{display:flex;height:100vh;overflow:hidden}
+#sidebar{width:220px;min-width:220px;background:#1e293b;height:100vh;display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid rgba(255,255,255,.07)}
+body.light #sidebar{background:#fff;border-right-color:rgba(0,0,0,.08)}
 .sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+body.light .sb-brand{border-bottom-color:rgba(0,0,0,.07)}
 .sb-logo{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
 .sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
+body.light .sb-title{color:#0f172a}
 .sb-subtitle{font-size:10px;color:#64748b;margin-top:1px}
 .sb-nav{flex:1;overflow-y:auto;padding:8px 0;scrollbar-width:none}
 .sb-nav::-webkit-scrollbar{display:none}
 .sb-section{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
+body.light .sb-section{color:#94a3b8}
 .sb-item{display:flex!important;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b!important;text-decoration:none!important;transition:all .12s}
 .sb-item:hover{background:rgba(255,255,255,.05)!important;color:#e2e8f0!important}
+body.light .sb-item:hover{background:rgba(0,0,0,.04)!important;color:#0f172a!important}
 .sb-item.active{background:rgba(59,130,246,.12)!important;color:#93c5fd!important}
+body.light .sb-item.active{background:rgba(59,130,246,.1)!important;color:#2563eb!important}
 .sb-item .si{font-size:14px;width:18px;text-align:center;flex-shrink:0}
 .sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
+body.light .sb-divider{background:rgba(0,0,0,.07)}
 .sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
+body.light .sb-user{border-top-color:rgba(0,0,0,.07)}
 .sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
 
-/* ── Layout ── */
-.main-content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
-.page-header{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.page-header h1{font-size:18px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
-.page-header p{font-size:12px;color:#64748b;margin-top:2px}
+/* Main */
+.main-content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;background:var(--bg)}
 
-/* ── Stat cards ── */
-.stat-cards{display:flex;gap:10px;padding:16px 24px;flex-wrap:wrap;flex-shrink:0;background:#0d1117}
-.stat-c{flex:1;min-width:100px;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 16px}
-.stat-c .num{font-size:22px;font-weight:700;color:#f1f5f9}
-.stat-c .lbl{font-size:11px;color:#64748b;margin-top:3px}
+/* Top bar */
+.top-bar{background:var(--white);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.page-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.4px;margin-right:4px}
+.live-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2)}
+.live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.date-tabs{display:flex;gap:4px;flex-wrap:wrap}
+.dtab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);background:none;color:var(--text-2);cursor:pointer;transition:all .12s}
+.dtab:hover{border-color:#3b82f6;color:#3b82f6}
+.dtab.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+.btn-export{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;background:#22c55e;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-decoration:none}
+.btn-export:hover{background:#16a34a}
+.theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 
-/* ── Filter bar ── */
-.filter-bar{display:flex;align-items:center;gap:8px;padding:12px 24px;background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;flex-shrink:0}
-.s-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid rgba(255,255,255,.08);background:none;color:#64748b;cursor:pointer;transition:all .12s}
-.s-tab:hover{border-color:#3b82f6;color:#93c5fd}
-.s-tab.active{background:rgba(59,130,246,.12);color:#93c5fd;border-color:rgba(59,130,246,.3)}
-.search-input{margin-left:auto;padding:6px 12px;border:1px solid rgba(255,255,255,.08);background:#0d1117;color:#e2e8f0;border-radius:8px;font-size:13px;width:210px;outline:none;transition:border-color .15s}
-.search-input:focus{border-color:rgba(59,130,246,.4)}
-.search-input::placeholder{color:#374151}
+/* Stat cards */
+.stat-section{padding:16px 24px;display:grid;grid-template-columns:repeat(6,1fr);gap:10px;flex-shrink:0}
+.stat-row2{padding:0 24px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
+.sc{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+.sc-icon{font-size:18px;margin-bottom:10px;opacity:.8}
+.sc-label{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.sc-val{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.5px;line-height:1}
+.sc-val.green{color:#22c55e}
+.sc-sub{font-size:12px;color:var(--text-3);margin-top:6px}
+.sc-sub b{color:var(--text-2)}
+.sc-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-top:6px}
+.sc-badge.up{background:rgba(34,197,94,.12);color:#22c55e}
+.sc-badge.dn{background:rgba(239,68,68,.1);color:#ef4444}
+.sc-badge.neu{background:rgba(148,163,184,.1);color:var(--text-3)}
 
-/* ── Table ── */
-.table-wrap{flex:1;overflow-y:auto;overflow-x:auto}
-.table-wrap::-webkit-scrollbar{width:4px;height:4px}
-.table-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px}
-.orders-table{width:100%;border-collapse:collapse;min-width:700px}
-.orders-table th{padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);position:sticky;top:0}
-.orders-table td{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;vertical-align:middle}
-.orders-table tr:last-child td{border-bottom:none}
-.orders-table tr:hover td{background:rgba(255,255,255,.02)}
+/* Charts row */
+.charts-row{display:grid;grid-template-columns:300px 1fr;gap:16px;padding:0 24px 16px;flex-shrink:0}
+.chart-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:20px}
+.chart-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px}
+.donut-wrap{display:flex;align-items:center;gap:20px}
+.donut-canvas{width:120px!important;height:120px!important;flex-shrink:0}
+.donut-legend{display:flex;flex-direction:column;gap:10px}
+.dl-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.dl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dl-label{color:var(--text-2)}
+.dl-val{font-weight:700;color:var(--text);margin-left:4px}
 
-/* ── Status badges ── */
-.badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:600;white-space:nowrap}
-.st-pending   {background:rgba(251,191,36,.12);color:#fde68a}
-.st-confirmed {background:rgba(59,130,246,.12);color:#93c5fd}
-.st-processing{background:rgba(139,92,246,.12);color:#c4b5fd}
-.st-shipped   {background:rgba(251,146,60,.12);color:#fdba74}
-.st-delivered {background:rgba(34,197,94,.12);color:#86efac}
-.st-cancelled {background:rgba(100,116,139,.1);color:#64748b}
-.pay-paid     {background:rgba(34,197,94,.12);color:#86efac}
-.pay-unpaid   {background:rgba(239,68,68,.12);color:#fca5a5}
+/* Table */
+.tbl-wrap{flex:1;overflow-y:auto;overflow-x:auto;margin:0 24px 24px;background:var(--white);border:1px solid var(--border);border-radius:14px}
+.tbl-wrap::-webkit-scrollbar{width:4px;height:4px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:4px}
+table{width:100%;border-collapse:collapse;min-width:700px}
+thead th{padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0}
+tbody td{padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;color:var(--text)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(59,130,246,.03)}
+.c-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.bdg{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.bdg-cod{background:rgba(251,146,60,.12);color:#fb923c}
+.bdg-tf{background:rgba(99,102,241,.12);color:#818cf8}
 
-/* ── Buttons ── */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
-.btn:hover{background:rgba(255,255,255,.07);color:#e2e8f0}
-.btn-sm{padding:4px 10px!important;font-size:11px!important}
-.btn-primary{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
-.btn-primary:hover{box-shadow:0 4px 12px rgba(59,130,246,.35)}
-.btn-secondary{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:12px;cursor:pointer;transition:all .15s}
-.btn-secondary:hover{background:rgba(255,255,255,.07);color:#e2e8f0}
-.btn-danger{display:inline-flex;align-items:center;padding:5px 9px;border-radius:7px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;font-size:12px;cursor:pointer;transition:all .15s}
-.btn-danger:hover{background:rgba(239,68,68,.18)}
-
-/* ── Forms ── */
-.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
-.form-group label{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px}
-.form-group input,.form-group textarea,.form-group select{background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 12px;font-size:13px;color:#e2e8f0;font-family:inherit;outline:none;transition:border-color .15s;resize:vertical;width:100%}
-.form-group input:focus,.form-group textarea:focus,.form-group select:focus{border-color:rgba(59,130,246,.4)}
-.form-group input::placeholder,.form-group textarea::placeholder{color:#374151}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-
-/* ── Modal ── */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
-.modal-overlay.open{display:flex}
-.modal-box{background:#1e293b;border:1px solid rgba(255,255,255,.08);border-radius:12px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.5)}
-.modal-head{padding:18px 22px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b;z-index:1}
-.modal-head h3{font-size:15px;font-weight:700;color:#f1f5f9}
-.modal-body{padding:22px}
-.modal-foot{padding:14px 22px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:#1e293b}
-
-/* ── Empty ── */
-.empty{text-align:center;padding:80px 24px;color:#64748b}
-.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
-
-/* ── Toast ── */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
-#toast.show{opacity:1}
-
-/* ── Icon button ── */
-.icon-btn{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:#64748b;transition:all .15s}
-.icon-btn:hover{border-color:#3b82f6;color:#3b82f6}
-
-/* ══ LIGHT THEME OVERRIDES ══ */
-body.light{background:#f1f5f9;color:#0f172a}
-body.light .page-header{background:#fff;border-color:#e2e8f0}
-body.light .page-header h1{color:#0f172a}
-body.light .page-header p{color:#64748b}
-body.light .icon-btn{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
-body.light .stat-cards{background:#f1f5f9}
-body.light .stat-c{background:#fff;border-color:#e2e8f0}
-body.light .stat-c .num{color:#0f172a}
-body.light .stat-c .lbl{color:#64748b}
-body.light .filter-bar{background:#fff;border-color:#e2e8f0}
-body.light .s-tab{border-color:#e2e8f0;color:#64748b}
-body.light .s-tab:hover{border-color:#3b82f6;color:#2563eb}
-body.light .s-tab.active{background:rgba(59,130,246,.1);color:#2563eb;border-color:rgba(59,130,246,.3)}
-body.light .search-input{background:#f1f5f9;border-color:#e2e8f0;color:#0f172a}
-body.light .search-input::placeholder{color:#94a3b8}
-body.light .orders-table th{background:#f8fafc;border-color:#e2e8f0;color:#64748b}
-body.light .orders-table td{border-color:#f1f5f9}
-body.light .orders-table tr:hover td{background:#f8fafc}
-body.light .btn{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
-body.light .btn:hover{background:#e2e8f0;color:#0f172a}
-body.light .btn-secondary{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
-body.light .form-group label{color:#64748b}
-body.light .form-group input,body.light .form-group textarea,body.light .form-group select{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
-body.light .form-group input::placeholder,body.light .form-group textarea::placeholder{color:#94a3b8}
-body.light .modal-box{background:#fff;border-color:#e2e8f0}
-body.light .modal-head{background:#fff;border-color:#e2e8f0}
-body.light .modal-head h3{color:#0f172a}
-body.light .modal-foot{background:#fff;border-color:#e2e8f0}
-body.light .empty{color:#64748b}
+/* Empty */
+.empty-cell{text-align:center;padding:60px 20px;color:var(--text-3)}
+.empty-cell h4{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text-2)}
+.empty-cell p{font-size:13px;line-height:1.6}
 </style>
 </head>
 <body>
-<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
-<div id="toast"></div>
 <div class="app-layout">
 
 <!-- SIDEBAR -->
@@ -165,7 +124,6 @@ body.light .empty{color:#64748b}
     <div class="sb-divider"></div>
     <div class="sb-section">Akun</div>
     <a class="sb-item" href="settings.html"><span class="si">⚙️</span> Pengaturan</a>
-    <a class="sb-item" href="analytics.html"><span class="si">📅</span> Ringkasan Harian</a>
   </div>
   <div class="sb-user">
     <div class="sb-avatar" id="sb-av">A</div>
@@ -176,135 +134,138 @@ body.light .empty{color:#64748b}
   </div>
 </div>
 
+<!-- MAIN -->
 <div class="main-content">
-  <div class="page-header">
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
     <div>
-      <h1>✅ Closing</h1>
-      <p>Manajemen pesanan dari percakapan customer</p>
+      <div class="page-title">Closing</div>
+      <div class="live-dot" style="margin-top:2px">Data diperbarui secara real-time</div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
-      <button class="btn-primary" onclick="openAdd()">+ Tambah Order</button>
+    <div class="date-tabs" id="date-tabs">
+      <button class="dtab" onclick="setDate('hari_ini',this)">Hari Ini</button>
+      <button class="dtab active" onclick="setDate('kemarin',this)">Kemarin</button>
+      <button class="dtab" onclick="setDate('minggu',this)">Minggu Ini</button>
+      <button class="dtab" onclick="setDate('bulan',this)">Bulan Ini</button>
+      <button class="dtab" onclick="setDate('semua',this)">Semua</button>
+    </div>
+    <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
+  </div>
+
+  <!-- STAT CARDS ROW 1 -->
+  <div class="stat-section">
+    <div class="sc">
+      <div class="sc-icon">🛒</div>
+      <div class="sc-label">Total Orders</div>
+      <div class="sc-val" id="s-total">—</div>
+      <div id="s-total-badge"></div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon">💰</div>
+      <div class="sc-label">Gross Sales</div>
+      <div class="sc-val green" id="s-gross">—</div>
+      <div id="s-gross-badge"></div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon">📈</div>
+      <div class="sc-label">Net Sales</div>
+      <div class="sc-val green" id="s-net">—</div>
+      <div class="sc-sub">Gross – RTS</div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon">↩️</div>
+      <div class="sc-label">RTS</div>
+      <div class="sc-val" id="s-rts">0</div>
+      <div class="sc-sub">Rp <b id="s-rts-rp">0</b></div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon">🔁</div>
+      <div class="sc-label">Duplikat</div>
+      <div class="sc-val" id="s-dup">0</div>
+      <div class="sc-sub">Rp <b id="s-dup-rp">0</b></div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon">🚚</div>
+      <div class="sc-label">COD</div>
+      <div class="sc-val" id="s-cod">0</div>
+      <div class="sc-sub">Rp <b id="s-cod-rp">0</b></div>
     </div>
   </div>
 
-  <div class="stat-cards" id="stat-cards"></div>
-
-  <div class="filter-bar">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-      <button class="s-tab active" onclick="setFilter('semua',this)">Semua</button>
-      <button class="s-tab" onclick="setFilter('pending',this)">Pending</button>
-      <button class="s-tab" onclick="setFilter('confirmed',this)">Confirmed</button>
-      <button class="s-tab" onclick="setFilter('processing',this)">Processing</button>
-      <button class="s-tab" onclick="setFilter('shipped',this)">Shipped</button>
-      <button class="s-tab" onclick="setFilter('delivered',this)">Delivered</button>
-      <button class="s-tab" onclick="setFilter('cancelled',this)">Cancelled</button>
+  <!-- STAT CARDS ROW 2 -->
+  <div class="stat-row2">
+    <div class="sc">
+      <div class="sc-icon">🏦</div>
+      <div class="sc-label">Transfer (TF)</div>
+      <div class="sc-val" id="s-tf">0</div>
+      <div class="sc-sub">Rp <b id="s-tf-rp">0</b></div>
     </div>
-    <input type="text" id="search-input" class="search-input" placeholder="🔍 Cari order / kontak..." oninput="renderOrders()">
+    <div class="sc">
+      <div class="sc-icon">📊</div>
+      <div class="sc-label">Rata-rata Order</div>
+      <div class="sc-val green" id="s-avg">—</div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon">👥</div>
+      <div class="sc-label">Pelanggan Unik</div>
+      <div class="sc-val" id="s-cust">—</div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon">📦</div>
+      <div class="sc-label">Total Produk Terjual</div>
+      <div class="sc-val" id="s-qty">—</div>
+      <div class="sc-sub">unit</div>
+    </div>
   </div>
 
-  <div class="table-wrap">
-    <table class="orders-table">
+  <!-- CHARTS -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">COD vs Transfer</div>
+      <div class="donut-wrap">
+        <canvas class="donut-canvas" id="donut-chart"></canvas>
+        <div class="donut-legend">
+          <div class="dl-item">
+            <div class="dl-dot" style="background:#fb923c"></div>
+            <div class="dl-label">COD</div>
+            <div class="dl-val" id="leg-cod">0%</div>
+          </div>
+          <div class="dl-item">
+            <div class="dl-dot" style="background:#818cf8"></div>
+            <div class="dl-label">Transfer</div>
+            <div class="dl-val" id="leg-tf">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Top Produk</div>
+      <canvas id="bar-chart" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="tbl-wrap">
+    <table>
       <thead>
         <tr>
-          <th>No. Order</th>
-          <th>Kontak</th>
-          <th>Item / Produk</th>
-          <th>Total</th>
-          <th>Status</th>
-          <th>Bayar</th>
-          <th>Resi</th>
-          <th>Aksi</th>
+          <th>Pelanggan</th>
+          <th>Produk</th>
+          <th>Metode</th>
+          <th>Nilai</th>
+          <th>Waktu Closing</th>
         </tr>
       </thead>
-      <tbody id="orders-tbody"></tbody>
+      <tbody id="tbody">
+        <tr><td colspan="5" class="empty-cell">Memuat data...</td></tr>
+      </tbody>
     </table>
-    <div id="orders-empty" style="display:none" class="empty">
-      <div class="empty-icon">🛒</div>
-      <div style="font-size:15px;font-weight:600;color:#e2e8f0;margin-bottom:6px;">Belum ada order</div>
-      <div>Klik "+ Tambah Order" untuk mencatat pesanan pertama</div>
-    </div>
   </div>
-</div>
 
-</div><!-- app-layout -->
-
-<!-- ── Modal Tambah/Edit Order ── -->
-<div class="modal-overlay" id="order-modal">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3 id="modal-title">Tambah Order</h3>
-      <button class="btn btn-sm" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="order-id">
-      <div class="form-group">
-        <label>Kontak / Customer *</label>
-        <select id="ord-contact"></select>
-      </div>
-      <div class="form-group">
-        <label>Item / Produk *</label>
-        <textarea id="ord-items" rows="2" placeholder="Nama produk, jumlah, varian..."></textarea>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Total (Rp)</label>
-          <input type="number" id="ord-total" placeholder="0" min="0">
-        </div>
-        <div class="form-group">
-          <label>Metode Bayar</label>
-          <select id="ord-payment">
-            <option value="transfer">Transfer Bank</option>
-            <option value="cod">COD</option>
-            <option value="ewallet">E-Wallet</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Alamat Pengiriman</label>
-        <textarea id="ord-address" rows="2" placeholder="Alamat lengkap..."></textarea>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Status Order</label>
-          <select id="ord-status">
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Status Bayar</label>
-          <select id="ord-paystatus">
-            <option value="unpaid">Belum Bayar</option>
-            <option value="paid">Sudah Bayar</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Kurir</label>
-          <input type="text" id="ord-courier" placeholder="JNE, Sicepat, Gojek...">
-        </div>
-        <div class="form-group">
-          <label>No. Resi</label>
-          <input type="text" id="ord-resi" placeholder="000000000000">
-        </div>
-      </div>
-      <div class="form-group" style="margin-bottom:0">
-        <label>Catatan</label>
-        <input type="text" id="ord-notes" placeholder="Catatan internal...">
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn-secondary" onclick="closeModal()">Batal</button>
-      <button class="btn-primary" onclick="saveOrder()">Simpan</button>
-    </div>
-  </div>
-</div>
+</div><!-- /main-content -->
+</div><!-- /app-layout -->
 
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
@@ -320,161 +281,305 @@ Auth.guard();
   }
 })();
 
-let currentFilter = 'semua';
-let allOrders = [];
-let contactMap = {};
+const uid = Auth.getUser()?.id;
+const SB_URL = window._SB_URL || '';
+const SB_KEY = window._SB_KEY || '';
 
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'show';
-  setTimeout(() => el.className = '', 3000);
+function sbFetch(table, query) {
+  return fetch(`${SB_URL}/rest/v1/${table}${query}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' }
+  }).then(r => r.json()).catch(() => []);
+}
+
+function rp(n) { return 'Rp ' + (n||0).toLocaleString('id-ID'); }
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function avColor(n) { const c=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4']; let h=0; for(let i=0;i<(n||'').length;i++) h=(h*31+n.charCodeAt(i))%c.length; return c[h]; }
+function avInit(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function fmtDt(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+// Date range helpers
+let currentPeriod = 'kemarin';
+let allConvs = [], prodMap = {}, custMap = {};
+let donutChart = null, barChart = null;
+
+function getRange(period) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  switch(period) {
+    case 'hari_ini': return { from: today, label: 'Hari Ini' };
+    case 'kemarin': {
+      const d = new Date(today); d.setDate(d.getDate()-1);
+      return { from: d, to: today, label: 'Kemarin' };
+    }
+    case 'minggu': {
+      const d = new Date(today); d.setDate(d.getDate() - today.getDay());
+      return { from: d, label: 'Minggu Ini' };
+    }
+    case 'bulan': {
+      return { from: new Date(today.getFullYear(), today.getMonth(), 1), label: 'Bulan Ini' };
+    }
+    default: return { from: null, label: 'Semua' };
+  }
+}
+
+function filterByPeriod(convs, period) {
+  const r = getRange(period);
+  if (!r.from) return convs;
+  return convs.filter(c => {
+    const d = new Date(c.last_msg_at || c.created_at);
+    if (r.to) return d >= r.from && d < r.to;
+    return d >= r.from;
+  });
+}
+
+function setDate(period, btn) {
+  currentPeriod = period;
+  document.querySelectorAll('.dtab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  render();
 }
 
 async function init() {
-  await Config.load();
-  const contacts = await Contacts.getAll();
-  contacts.forEach(c => { contactMap[c.id] = c; });
+  const [convs, custs, prods] = await Promise.all([
+    sbFetch('conversations', `?user_id=eq.${uid}&select=id,customer_id,product_id,status,state,last_msg_at,created_at&order=last_msg_at.desc`),
+    sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama`),
+    sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`)
+  ]);
 
-  const sel = document.getElementById('ord-contact');
-  sel.innerHTML = `<option value="">— Pilih Kontak —</option>` +
-    contacts.map(c => `<option value="${c.id}">${c.name} (+${c.phone})</option>`).join('');
+  custs.forEach(c => { custMap[c.id] = c; });
+  prods.forEach(p => { prodMap[p.id] = p; });
 
-  await loadOrders();
-}
-
-async function loadOrders() {
-  allOrders = await Orders.getAll();
-
-  const cnt = { semua: allOrders.length };
-  ['pending','confirmed','processing','shipped','delivered','cancelled'].forEach(s => {
-    cnt[s] = allOrders.filter(o => o.status === s).length;
-  });
-  const totalRevenue = allOrders.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + (o.total||0), 0);
-
-  document.getElementById('stat-cards').innerHTML = `
-    <div class="stat-c"><div class="num">${cnt.semua}</div><div class="lbl">Total Orders</div></div>
-    <div class="stat-c"><div class="num" style="color:#fde68a">${cnt.pending}</div><div class="lbl">Pending</div></div>
-    <div class="stat-c"><div class="num" style="color:#fdba74">${cnt.shipped}</div><div class="lbl">Shipped</div></div>
-    <div class="stat-c"><div class="num" style="color:#86efac">${cnt.delivered}</div><div class="lbl">Delivered</div></div>
-    <div class="stat-c"><div class="num" style="color:#86efac;font-size:18px;">Rp ${totalRevenue.toLocaleString('id')}</div><div class="lbl">Revenue (paid)</div></div>
-  `;
-  renderOrders();
-}
-
-function renderOrders() {
-  const search = document.getElementById('search-input').value.toLowerCase();
-  let list = allOrders;
-  if (currentFilter !== 'semua') list = list.filter(o => o.status === currentFilter);
-  if (search) list = list.filter(o => {
-    const c = contactMap[o.contact_id];
-    return (o.order_number||'').toLowerCase().includes(search) ||
-      (c?.name||'').toLowerCase().includes(search) ||
-      (o.items||'').toLowerCase().includes(search);
+  // Filter hanya yang ada order (order_placed=true di state)
+  allConvs = (convs||[]).filter(c => {
+    try { return c.state?.order_placed === true; } catch { return false; }
   });
 
-  const tbody = document.getElementById('orders-tbody');
-  const empty = document.getElementById('orders-empty');
-  if (!list.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
+  render();
+}
 
-  const stLabel = { pending:'Pending', confirmed:'Confirmed', processing:'Processing', shipped:'Shipped', delivered:'Delivered', cancelled:'Cancelled' };
+function render() {
+  const list = filterByPeriod(allConvs, currentPeriod);
+  calcStats(list);
+  renderCharts(list);
+  renderTable(list);
+}
 
-  tbody.innerHTML = list.map(o => {
-    const c = contactMap[o.contact_id] || {};
+function calcStats(list) {
+  let gross = 0, codCount = 0, codRp = 0, tfCount = 0, tfRp = 0, totalQty = 0;
+  const custSet = new Set();
+
+  list.forEach(c => {
+    const st = c.state || {};
+    const prod = prodMap[c.product_id] || {};
+    const qty = parseInt(st.qty || 1);
+    const harga = prod.harga || 0;
+    const ongkir = st.ongkir?.total || 0;
+    const nilai = (harga * qty) + ongkir;
+    gross += nilai;
+    totalQty += qty;
+    custSet.add(c.customer_id);
+
+    const metode = (st.metode_bayar || 'cod').toLowerCase();
+    if (metode === 'transfer') { tfCount++; tfRp += nilai; }
+    else { codCount++; codRp += nilai; }
+  });
+
+  const total = list.length;
+  const net   = gross; // RTS = 0 for now
+  const avg   = total ? Math.round(gross / total) : 0;
+  const dup   = calcDuplikat(list);
+
+  // Prev period comparison
+  const prevList = getPrevPeriod();
+  let prevGross = 0;
+  prevList.forEach(c => {
+    const st = c.state || {};
+    const prod = prodMap[c.product_id] || {};
+    const qty = parseInt(st.qty || 1);
+    const ongkir = st.ongkir?.total || 0;
+    prevGross += ((prod.harga||0) * qty) + ongkir;
+  });
+  const prevTotal = prevList.length;
+
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-total-badge').innerHTML = makeBadge(total, prevTotal, true);
+  document.getElementById('s-gross').textContent = rp(gross);
+  document.getElementById('s-gross-badge').innerHTML = makeBadge(gross, prevGross, false);
+  document.getElementById('s-net').textContent = rp(net);
+  document.getElementById('s-rts').textContent = '0';
+  document.getElementById('s-rts-rp').textContent = '0';
+  document.getElementById('s-dup').textContent = dup;
+  document.getElementById('s-dup-rp').textContent = '0';
+  document.getElementById('s-cod').textContent = codCount;
+  document.getElementById('s-cod-rp').textContent = codRp.toLocaleString('id-ID');
+  document.getElementById('s-tf').textContent = tfCount;
+  document.getElementById('s-tf-rp').textContent = tfRp.toLocaleString('id-ID');
+  document.getElementById('s-avg').textContent = avg ? rp(avg) : '—';
+  document.getElementById('s-cust').textContent = custSet.size;
+  document.getElementById('s-qty').textContent = totalQty;
+}
+
+function calcDuplikat(list) {
+  const seen = {};
+  let dup = 0;
+  list.forEach(c => {
+    seen[c.customer_id] = (seen[c.customer_id] || 0) + 1;
+    if (seen[c.customer_id] === 2) dup++;
+  });
+  return dup;
+}
+
+function getPrevPeriod() {
+  const r = getRange(currentPeriod);
+  if (!r.from) return [];
+  const dur = r.to ? r.to - r.from : Date.now() - r.from;
+  const prevFrom = new Date(r.from - dur);
+  const prevTo   = r.from;
+  return allConvs.filter(c => {
+    const d = new Date(c.last_msg_at || c.created_at);
+    return d >= prevFrom && d < prevTo;
+  });
+}
+
+function makeBadge(cur, prev, isCount) {
+  if (!prev || prev === 0) return `<div class="sc-badge neu">— vs lalu</div>`;
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  const cls = pct >= 0 ? 'up' : 'dn';
+  const arrow = pct >= 0 ? '▲' : '▼';
+  return `<div class="sc-badge ${cls}">${arrow} ${Math.abs(pct)}% vs lalu</div>`;
+}
+
+function renderCharts(list) {
+  // Donut COD vs TF
+  let cod = 0, tf = 0;
+  list.forEach(c => {
+    const m = (c.state?.metode_bayar || 'cod').toLowerCase();
+    if (m === 'transfer') tf++; else cod++;
+  });
+  const total = cod + tf || 1;
+  document.getElementById('leg-cod').textContent = Math.round(cod/total*100) + '%';
+  document.getElementById('leg-tf').textContent  = Math.round(tf/total*100) + '%';
+
+  if (donutChart) donutChart.destroy();
+  donutChart = new Chart(document.getElementById('donut-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['COD','Transfer'],
+      datasets: [{ data: [cod||0.001, tf||0.001], backgroundColor: ['#fb923c','#818cf8'], borderWidth: 0, hoverOffset: 4 }]
+    },
+    options: {
+      cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: {
+        label: ctx => ` ${ctx.label}: ${ctx.raw} order`
+      }}},
+      animation: { duration: 400 }
+    }
+  });
+
+  // Bar chart top produk
+  const prodCount = {};
+  list.forEach(c => {
+    const pname = prodMap[c.product_id]?.nama || 'Produk Lain';
+    prodCount[pname] = (prodCount[pname] || 0) + 1;
+  });
+  const sorted = Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  if (barChart) barChart.destroy();
+  barChart = new Chart(document.getElementById('bar-chart'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([n])=>n),
+      datasets: [{ data: sorted.map(([,v])=>v), backgroundColor: '#22c55e', borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw} order` }}},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#64748b', font: { size: 11 } } },
+        y: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }
+      },
+      animation: { duration: 400 }
+    }
+  });
+}
+
+function renderTable(list) {
+  const tbody = document.getElementById('tbody');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-cell">
+      <div style="font-size:32px;margin-bottom:12px">📭</div>
+      <h4>Belum ada closing di periode ini</h4>
+      <p>Order yang dikonfirmasi bot akan muncul di sini secara otomatis.</p>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(c => {
+    const cu   = custMap[c.customer_id] || {};
+    const nama = cu.nama || cu.wa_number || 'Pelanggan';
+    const prod = prodMap[c.product_id] || {};
+    const st   = c.state || {};
+    const qty  = parseInt(st.qty || 1);
+    const ongkir = st.ongkir?.total || 0;
+    const nilai = ((prod.harga||0) * qty) + ongkir;
+    const metode = (st.metode_bayar || 'cod').toLowerCase();
+    const color = avColor(nama);
+    const ini   = avInit(nama);
+
     return `<tr>
-      <td style="font-family:monospace;font-size:11px;color:#64748b">${o.order_number||'—'}</td>
       <td>
-        <div style="font-weight:500;color:#e2e8f0">${c.name||'—'}</div>
-        <div style="font-size:11px;color:#64748b">${c.phone ? '+'+c.phone : ''}</div>
-      </td>
-      <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#94a3b8">${o.items||'—'}</td>
-      <td style="font-weight:600;color:#f1f5f9">Rp ${(o.total||0).toLocaleString('id')}</td>
-      <td><span class="badge st-${o.status}">${stLabel[o.status]||o.status}</span></td>
-      <td><span class="badge ${o.payment_status==='paid'?'pay-paid':'pay-unpaid'}">${o.payment_status==='paid'?'✅ Lunas':'⏳ Belum'}</span></td>
-      <td style="font-size:11px;font-family:monospace;color:#64748b">${o.resi||'—'}</td>
-      <td>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-sm" onclick="editOrder('${o.id}')">Edit</button>
-          <button class="btn-danger btn-sm" onclick="deleteOrder('${o.id}')">🗑</button>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="c-av" style="background:${color};width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">${escH(ini)}</div>
+          <div>
+            <div style="font-weight:600">${escH(nama)}</div>
+            <div style="font-size:11px;color:var(--text-3)">${escH(cu.wa_number ? cu.wa_number.split('@')[0] : '—')}</div>
+          </div>
         </div>
       </td>
+      <td>
+        <div style="font-weight:500">${escH(prod.nama || '—')}</div>
+        <div style="font-size:11px;color:var(--text-3)">×${qty} · ongkir ${rp(ongkir)}</div>
+      </td>
+      <td><span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'Transfer':'COD'}</span></td>
+      <td style="font-weight:700;color:var(--text)">${rp(nilai)}</td>
+      <td style="color:var(--text-3);font-size:12px">${fmtDt(c.last_msg_at)}</td>
     </tr>`;
   }).join('');
 }
 
-function setFilter(f, btn) {
-  currentFilter = f;
-  document.querySelectorAll('.s-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  renderOrders();
+function exportCSV() {
+  const list = filterByPeriod(allConvs, currentPeriod);
+  if (!list.length) return alert('Tidak ada data untuk diekspor.');
+
+  const rows = [['Nama','WA','Produk','Qty','Harga Produk','Ongkir','Total','Metode','Waktu Closing']];
+  list.forEach(c => {
+    const cu = custMap[c.customer_id] || {};
+    const prod = prodMap[c.product_id] || {};
+    const st = c.state || {};
+    const qty = parseInt(st.qty || 1);
+    const ongkir = st.ongkir?.total || 0;
+    const nilai = ((prod.harga||0)*qty)+ongkir;
+    rows.push([
+      cu.nama || '—',
+      cu.wa_number?.split('@')[0] || '—',
+      prod.nama || '—',
+      qty,
+      prod.harga || 0,
+      ongkir,
+      nilai,
+      (st.metode_bayar || 'COD').toUpperCase(),
+      fmtDt(c.last_msg_at)
+    ]);
+  });
+
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = `closing_${currentPeriod}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
 }
-
-function openAdd() {
-  document.getElementById('order-id').value = '';
-  document.getElementById('modal-title').textContent = 'Tambah Order';
-  ['ord-items','ord-address','ord-courier','ord-resi','ord-notes'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('ord-total').value = '';
-  document.getElementById('ord-contact').value = '';
-  document.getElementById('ord-status').value = 'pending';
-  document.getElementById('ord-paystatus').value = 'unpaid';
-  document.getElementById('ord-payment').value = 'transfer';
-  document.getElementById('order-modal').classList.add('open');
-}
-
-async function editOrder(id) {
-  const o = allOrders.find(x => x.id === id);
-  if (!o) return;
-  document.getElementById('order-id').value = o.id;
-  document.getElementById('modal-title').textContent = 'Edit Order';
-  document.getElementById('ord-contact').value = o.contact_id || '';
-  document.getElementById('ord-items').value = o.items || '';
-  document.getElementById('ord-total').value = o.total || '';
-  document.getElementById('ord-payment').value = o.payment_method || 'transfer';
-  document.getElementById('ord-address').value = o.shipping_address || '';
-  document.getElementById('ord-status').value = o.status || 'pending';
-  document.getElementById('ord-paystatus').value = o.payment_status || 'unpaid';
-  document.getElementById('ord-courier').value = o.courier || '';
-  document.getElementById('ord-resi').value = o.resi || '';
-  document.getElementById('ord-notes').value = o.notes || '';
-  document.getElementById('order-modal').classList.add('open');
-}
-
-async function saveOrder() {
-  const id = document.getElementById('order-id').value;
-  const data = {
-    contact_id: document.getElementById('ord-contact').value || null,
-    items: document.getElementById('ord-items').value.trim(),
-    total: parseInt(document.getElementById('ord-total').value) || 0,
-    payment_method: document.getElementById('ord-payment').value,
-    shipping_address: document.getElementById('ord-address').value.trim(),
-    status: document.getElementById('ord-status').value,
-    payment_status: document.getElementById('ord-paystatus').value,
-    courier: document.getElementById('ord-courier').value.trim(),
-    resi: document.getElementById('ord-resi').value.trim(),
-    notes: document.getElementById('ord-notes').value.trim(),
-  };
-  if (!data.items) { toast('⚠️ Item/produk wajib diisi'); return; }
-  try {
-    if (id) { await Orders.update(id, data); toast('✅ Order diperbarui'); }
-    else { await Orders.create(data); toast('✅ Order ditambahkan'); }
-    closeModal();
-    await loadOrders();
-  } catch(e) { toast('❌ ' + e.message); }
-}
-
-async function deleteOrder(id) {
-  if (!confirm('Hapus order ini?')) return;
-  await Orders.delete(id);
-  toast('🗑 Order dihapus');
-  await loadOrders();
-}
-
-function closeModal() { document.getElementById('order-modal').classList.remove('open'); }
-
-document.getElementById('order-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
 
 init();
 </script>
