@@ -398,10 +398,27 @@ Customer merasa DIDENGAR & terbantu. Kalau cocok → order tercatat.
 Customer puas balik lagi & rekomendasiin > maksa satu transaksi.`;
 }
 
+const PROVINSI_JAWA = ['DKI Jakarta','Jawa Barat','Jawa Tengah','DI Yogyakarta','Jawa Timur','Banten'];
+function isDalamJawa(provinsi) {
+  if (!provinsi) return false;
+  return PROVINSI_JAWA.some(p => provinsi.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(provinsi.toLowerCase()));
+}
+function getPromoPotongan(promo, provinsi, ongkirAsli = 0) {
+  if (!promo) return 0;
+  const isPersen = promo.unit === 'persen';
+  const calc = (nilai) => isPersen ? Math.round(ongkirAsli * (nilai / 100)) : (nilai || 0);
+  if (promo.tipe === 'potong') return calc(promo.nilai);
+  if (promo.tipe === 'potong_wilayah') return isDalamJawa(provinsi) ? calc(promo.nilai_jawa) : calc(promo.nilai_luar);
+  return 0;
+}
+
 function formatPromoOngkir(promo) {
   if (!promo || promo.tipe === 'none') return 'tidak ada';
+  const isPersen = promo.unit === 'persen';
+  const fmt = (v) => isPersen ? `${v}%` : `Rp ${(v||0).toLocaleString('id-ID')}`;
   if (promo.tipe === 'gratis_penuh') return 'GRATIS ongkir';
-  if (promo.tipe === 'potong') return `Potongan ongkir Rp ${promo.nilai?.toLocaleString('id-ID')}`;
+  if (promo.tipe === 'potong') return `Hemat ${fmt(promo.nilai)} dari ongkir (semua wilayah)`;
+  if (promo.tipe === 'potong_wilayah') return `Dalam Jawa hemat ${fmt(promo.nilai_jawa)} · Luar Jawa hemat ${fmt(promo.nilai_luar)}`;
   if (promo.tipe === 'gratis_sd') return `Gratis ongkir s/d Rp ${promo.nilai?.toLocaleString('id-ID')}`;
   return 'ada promo';
 }
@@ -795,12 +812,14 @@ async function hitungOngkir(wilayah, product) {
     const ongkirAsli = best.price;
 
     // Step 6: Terapkan promo ongkir produk
-    const promo = product?.promo_ongkir;
-    console.log(`promo_ongkir product: ${JSON.stringify(promo)}`);
+    const promo    = product?.promo_ongkir;
+    const provinsi = lokal?.provinsi || bestArea.province || '';
+    console.log(`promo_ongkir product: ${JSON.stringify(promo)} | provinsi: ${provinsi}`);
     let ongkirPromo = ongkirAsli;
-    if (promo?.tipe === 'gratis_penuh')   ongkirPromo = 0;
-    else if (promo?.tipe === 'potong')    ongkirPromo = Math.max(0, ongkirAsli - (promo.nilai || 0));
-    else if (promo?.tipe === 'gratis_sd') ongkirPromo = Math.max(0, ongkirAsli - (promo.nilai || 0));
+    if (promo?.tipe === 'gratis_penuh')     ongkirPromo = 0;
+    else if (promo?.tipe === 'potong')      ongkirPromo = Math.max(0, ongkirAsli - getPromoPotongan(promo, null, ongkirAsli));
+    else if (promo?.tipe === 'potong_wilayah') ongkirPromo = Math.max(0, ongkirAsli - getPromoPotongan(promo, provinsi, ongkirAsli));
+    else if (promo?.tipe === 'gratis_sd')   ongkirPromo = Math.max(0, ongkirAsli - (promo.nilai || 0));
 
     const harga = product?.harga || 0;
 
@@ -817,9 +836,10 @@ async function hitungOngkir(wilayah, product) {
     // Hitung total untuk semua kurir (untuk ditampilkan ke Claude)
     const allRates = rates.map(r => {
       let rPromo = r.price;
-      if (promo?.tipe === 'gratis_penuh')   rPromo = 0;
-      else if (promo?.tipe === 'potong')    rPromo = Math.max(0, r.price - (promo.nilai || 0));
-      else if (promo?.tipe === 'gratis_sd') rPromo = Math.max(0, r.price - (promo.nilai || 0));
+      if (promo?.tipe === 'gratis_penuh')        rPromo = 0;
+      else if (promo?.tipe === 'potong')         rPromo = Math.max(0, r.price - getPromoPotongan(promo, null, r.price));
+      else if (promo?.tipe === 'potong_wilayah') rPromo = Math.max(0, r.price - getPromoPotongan(promo, provinsi, r.price));
+      else if (promo?.tipe === 'gratis_sd')      rPromo = Math.max(0, r.price - (promo.nilai || 0));
       const rFeeCOD  = Math.ceil((harga + rPromo) * 0.05);
       const rTotalTF = bulatkan(harga + rPromo);
       const rTotalCOD= bulatkan(harga + rPromo + rFeeCOD);
