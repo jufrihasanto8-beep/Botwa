@@ -34,7 +34,11 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { action, messages, product, userId, hari, tipe } = req.body || {};
+  // Fallback parse kalau body belum di-parse Vercel
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) {} }
+  const { action, messages, product, userId, hari, tipe } = body || {};
+  console.log('[ai-suggest] action:', action, 'hari:', hari, 'body_type:', typeof req.body);
 
   // ── ACTION: generate teks follow-up ──
   if (action === 'followup-text') {
@@ -43,7 +47,7 @@ module.exports = async function handler(req, res) {
     if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
 
     const hariKe   = hari || 2;
-    const image_url = req.body.image_url || null;
+    const image_url = body.image_url || null;
     const tipeLabel = { ai: 'AI natural', testimoni: 'testimoni customer', promo: 'promo/diskon', custom: 'pesan custom' }[tipe] || 'custom';
 
     const toneGuide = hariKe === 2
