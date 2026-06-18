@@ -253,19 +253,16 @@ module.exports = async function handler(req, res) {
       `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
     );
 
-    // Query 2: customer lama yang reopen hari ini (created_at bisa kapan saja)
+    // Query 2: customer lama yang chat lagi hari ini (last_msg_at >= hari ini)
     const reopenedConvs = await sbGet('conversations',
       `?status=in.(baru,diproses)` +
       `&created_at=lt.${todayStartISO}` +
+      `&last_msg_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
       `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
     ).catch(() => []);
 
-    // Filter reopenedConvs: hanya yang state.reopened_at >= hari ini
-    const reopenedToday = (Array.isArray(reopenedConvs) ? reopenedConvs : []).filter(c => {
-      const reopenedAt = c.state?.reopened_at;
-      return reopenedAt && new Date(reopenedAt) >= todayStart;
-    });
+    const reopenedToday = Array.isArray(reopenedConvs) ? reopenedConvs : [];
 
     // Gabung keduanya, hindari duplikat
     const seenIds = new Set();
