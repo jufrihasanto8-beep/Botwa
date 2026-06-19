@@ -533,7 +533,7 @@ function calcStats(list) {
     const prod = prodMap[c.product_id] || {};
     const qty = parseInt(st.qty || 1);
     const harga = prod.harga || 0;
-    const ongkir = st.ongkir?.total || 0;
+    const ongkir = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
     const nilai = (harga * qty) + ongkir;
     gross += nilai;
     totalQty += qty;
@@ -559,7 +559,7 @@ function calcStats(list) {
     const st = c.state || {};
     const prod = prodMap[c.product_id] || {};
     const qty = parseInt(st.qty || 1);
-    const ongkir = st.ongkir?.total || 0;
+    const ongkir = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
     prevGross += ((prod.harga||0) * qty) + ongkir;
   });
   const prevTotal = prevList.length;
@@ -670,7 +670,7 @@ function renderTable(list) {
     const prod = prodMap[c.product_id] || {};
     const st   = c.state || {};
     const qty  = parseInt(st.qty || 1);
-    const ongkir = st.ongkir?.total || 0;
+    const ongkir = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
     const nilai = ((prod.harga||0) * qty) + ongkir;
     const metode = (st.metode_bayar || 'cod').toLowerCase();
     const color = avColor(nama);
@@ -707,7 +707,7 @@ function exportCSV() {
     const prod = prodMap[c.product_id] || {};
     const st = c.state || {};
     const qty = parseInt(st.qty || 1);
-    const ongkir = st.ongkir?.total || 0;
+    const ongkir = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
     const nilai = ((prod.harga||0)*qty)+ongkir;
     rows.push([
       cu.nama || '—',

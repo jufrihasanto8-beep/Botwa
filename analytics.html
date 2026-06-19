@@ -516,7 +516,7 @@ async function init() {
   const closingAll     = convsRange.filter(c => c.status === 'selesai' && c.state?.order_placed);
   const closingHariIni = closingAll.filter(c => new Date(c.last_msg_at||c.created_at) >= today).length;
   const convRate       = leadsHariIni > 0 ? Math.round((closingHariIni/leadsHariIni)*100) : 0;
-  const esc            = convs.filter(c => c.status === 'ekskalasi').length;
+  const esc            = convs.filter(c => c.status === 'eskalasi').length;
   const convIds        = convs.map(c=>c.id);
 
   document.getElementById('sb-total').textContent   = convs.length;

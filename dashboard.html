@@ -767,6 +767,7 @@ function avatarColor(n) {
   let h=0; for(let c of (n||'')) h=(h*31+c.charCodeAt(0))%colors.length;
   return colors[Math.abs(h)];
 }
+function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function timeStr(ts) {
   if (!ts) return '';
   const d=new Date(ts), now=new Date();
@@ -866,10 +867,10 @@ async function renderInbox() {
       <div class="conv-av" style="background:${color}">${initials(nama)}</div>
       <div class="conv-info">
         <div class="conv-name-row">
-          <div class="conv-name">${nama}</div>
+          <div class="conv-name">${esc(nama)}</div>
           <div class="conv-time">${last ? timeStr(last.created_at) : ''}</div>
         </div>
-        <div class="conv-preview">${preview}</div>
+        <div class="conv-preview">${esc(preview)}</div>
         <div class="conv-tags">${tags}</div>
       </div>
       ${unreadDot}
