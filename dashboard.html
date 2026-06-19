@@ -841,10 +841,7 @@ async function loadStats() {
   document.getElementById('st-ai-sub').textContent    = (aiMsgs.length||0) + ' balasan AI hari ini';
   document.getElementById('st-aktif-sub').textContent = aktif + ' aktif dalam 24 jam';
   document.getElementById('st-unik-sub').textContent  = custIds.length + ' pelanggan hari ini';
-  document.getElementById('sb-total').textContent    = convs.length;
-  document.getElementById('sb-selesai').textContent  = selesai;
   const lancar = convs.length > 0 ? Math.round(((convs.length-esc)/convs.length)*100)+'%' : '—';
-  document.getElementById('sb-lancar').textContent   = lancar;
 
   // Filter counts
   document.getElementById('fn-all').textContent     = convs.length;
