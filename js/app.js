@@ -673,12 +673,11 @@ function renderSidebar(activePage) {
     { id:'aiinsights',      href:'aiinsights.html',      icon:'✨', label:'AI Insights' },
     { id:'orders',          href:'orders.html',          icon:'✅', label:'Closing' },
     { id:'followup-engine', href:'followup-engine.html', icon:'🔔', label:'Follow-up' },
-    { id:'knowledge',       href:'knowledge.html',       icon:'📋', label:'Katalog & SOP' },
-    { id:'products',        href:'products.html',        icon:'🎁', label:'Skema Promo' },
+    { id:'products',        href:'products.html',        icon:'📋', label:'Katalog & SOP' },
+    { id:'promo',           href:'promo.html',           icon:'🎁', label:'Skema Promo' },
   ];
   const pages2 = [
     { id:'settings',         href:'settings.html',  icon:'⚙️', label:'Pengaturan' },
-    { id:'analytics-harian', href:'analytics.html', icon:'📅', label:'Ringkasan Harian' },
   ];
 
   const item = (p) =>
