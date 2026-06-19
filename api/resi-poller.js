@@ -14,7 +14,8 @@ const BAILEYS_URL          = process.env.BAILEYS_URL;
 const WEBHOOK_SECRET       = process.env.WEBHOOK_SECRET;
 const VALIDASI_URL         = process.env.VALIDASI_SUPABASE_URL;
 const VALIDASI_KEY         = process.env.VALIDASI_SUPABASE_KEY;
-const CRON_SECRET          = process.env.CRON_SECRET; // tambah ke env Vercel
+const CRON_SECRET          = process.env.CRON_SECRET;
+const ANTHROPIC_KEY        = process.env.ANTHROPIC_KEY;
 
 const sbH = {
   'Content-Type': 'application/json',
@@ -111,24 +112,52 @@ async function processOrder(order) {
   if (!conv) return { skip: 'tidak ada order aktif tanpa resi' };
 
   const urlLacak = trackingUrl(kurir, noResi);
+  const namaKak  = (nama || '').split(' ')[0];
 
   // Simpan resi ke conversation state
   const currentState = conv.state || {};
   await sbPatch('conversations', `?id=eq.${conv.id}`, {
-    state: { ...currentState, no_resi: noResi, kurir_resi: kurir },
+    state: { ...currentState, no_resi: noResi, kurir_resi: kurir, tracking_status: 'dikirim' },
   });
 
-  // Kirim WA ke customer
-  const pesanResi =
-`Halo kak ${nama ? nama.split(' ')[0] : ''}! 😊
+  // Generate pesan AI
+  let pesanResi = null;
+  if (ANTHROPIC_KEY) {
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 200,
+          messages: [{ role: 'user', content:
+            `Kamu CS toko online Indonesia yang ramah. Buat notifikasi WhatsApp bahwa pesanan customer sudah dikirim.
 
-Pesanan kakak sudah dikirim nih!
+Customer: ${namaKak ? 'kak ' + namaKak : 'kak'}
+Kurir: ${kurir || 'ekspedisi'}
+No. Resi: ${noResi}
+Link tracking: ${urlLacak}
 
-🚚 Kurir: ${kurir || 'Ekspedisi'}
-📦 No. Resi: ${noResi}
-🔍 Lacak di: ${urlLacak}
+Ketentuan:
+- 2-3 kalimat natural, tidak kaku
+- Sertakan no resi dan link tracking
+- 1-2 emoji saja
+- JANGAN markdown (*, _, dll)
 
-Estimasi tiba 2-3 hari kerja ya kak. Kalau ada pertanyaan, kami siap bantu 🙏`.trim();
+Tulis pesannya langsung tanpa penjelasan.` }],
+        }),
+      });
+      const d = await r.json();
+      pesanResi = d.content?.[0]?.text?.trim() || null;
+    } catch (e) {
+      console.error('[resi-poller] AI msg error:', e.message);
+    }
+  }
+
+  // Fallback kalau AI gagal
+  if (!pesanResi) {
+    pesanResi = `Halo ${namaKak ? 'kak ' + namaKak : 'kak'}! Pesanan kakak sudah kami kirim nih 📦\n\nKurir: ${kurir || 'ekspedisi'}\nNo. Resi: ${noResi}\nLacak di: ${urlLacak}\n\nEstimasi tiba 2-3 hari kerja. Ada pertanyaan? Kami siap bantu 🙏`;
+  }
 
   await sendWA(conv.user_id, waNumber, pesanResi);
   console.log(`[resi-poller] Resi ${noResi} terkirim ke ${waNumber}`);
