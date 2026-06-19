@@ -15,27 +15,33 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
 /* Sidebar */
 .app-layout{display:flex;height:100vh;overflow:hidden}
 #sidebar{width:220px;min-width:220px;background:#1e293b;height:100vh;display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid rgba(255,255,255,.07)}
-body.light #sidebar{background:#fff;border-right-color:rgba(0,0,0,.08)}
 .sb-brand{display:flex;align-items:center;gap:10px;padding:16px 14px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
-body.light .sb-brand{border-bottom-color:rgba(0,0,0,.07)}
 .sb-logo{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
 .sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
-body.light .sb-title{color:#0f172a}
 .sb-subtitle{font-size:10px;color:#64748b;margin-top:1px}
 .sb-nav{flex:1;overflow-y:auto;padding:8px 0;scrollbar-width:none}
 .sb-nav::-webkit-scrollbar{display:none}
-.sb-section{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
-body.light .sb-section{color:#94a3b8}
-.sb-item{display:flex!important;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b!important;text-decoration:none!important;transition:all .12s}
+.sb-section{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
+.bot-online{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#22c55e;padding:6px 10px;background:rgba(34,197,94,.08);border-radius:6px;margin:8px 14px}
+.bot-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
+.sb-item{display:flex!important;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#cbd5e1!important;text-decoration:none!important;transition:all .12s}
 .sb-item:hover{background:rgba(255,255,255,.05)!important;color:#e2e8f0!important}
-body.light .sb-item:hover{background:rgba(0,0,0,.04)!important;color:#0f172a!important}
 .sb-item.active{background:rgba(59,130,246,.12)!important;color:#93c5fd!important}
+body.light #sidebar{background:#f8fafc;border-right-color:rgba(0,0,0,.08)}
+body.light .sb-brand{border-bottom-color:rgba(0,0,0,.07)}
+body.light .sb-logo{background:linear-gradient(135deg,#1e293b,#334155)}
+body.light .sb-title{color:#0f172a}
+body.light .sb-subtitle{color:#64748b}
+body.light .sb-section{color:#94a3b8}
+body.light .sb-item{color:#475569!important}
+body.light .sb-item:hover{background:rgba(0,0,0,.04)!important;color:#0f172a!important}
 body.light .sb-item.active{background:rgba(59,130,246,.1)!important;color:#2563eb!important}
+body.light .sb-divider{background:rgba(0,0,0,.07)}
+body.light .sb-user{border-top-color:rgba(0,0,0,.07)}
+body.light .bot-online{background:rgba(34,197,94,.06)}
 .sb-item .si{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.sb-item .si svg{width:16px;height:16px;display:block}
 .sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
-body.light .sb-divider{background:rgba(0,0,0,.07)}
 .sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
-body.light .sb-user{border-top-color:rgba(0,0,0,.07)}
 .sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
 
 /* Main */
@@ -126,6 +132,10 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
 .bdg{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
 .bdg-cod{background:rgba(251,146,60,.12);color:#fb923c}
 .bdg-tf{background:rgba(99,102,241,.12);color:#818cf8}
+.bdg-menunggu{background:rgba(148,163,184,.12);color:#94a3b8}
+.bdg-dikirim{background:rgba(59,130,246,.12);color:#60a5fa}
+.bdg-transit{background:rgba(251,191,36,.12);color:#fbbf24}
+.bdg-sampai{background:rgba(34,197,94,.12);color:#22c55e}
 
 /* Empty */
 .empty-cell{text-align:center;padding:60px 20px;color:var(--text-3)}
@@ -142,6 +152,7 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
     <div class="sb-logo">CS</div>
     <div><div class="sb-title">Adsy CS</div><div class="sb-subtitle" id="sb-store">—</div></div>
   </div>
+  <div class="bot-online" id="sb-bot-status"><div class="bot-dot"></div> Bot online</div>
   <div class="sb-nav">
     <a class="sb-item" href="analytics.html"><span class="si"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg></span> Ringkasan</a>
     <a class="sb-item" href="dashboard.html"><span class="si"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/></svg></span> Percakapan</a>
@@ -309,6 +320,8 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
         <tr>
           <th>Pelanggan</th>
           <th>Produk</th>
+          <th>Status</th>
+          <th>No Resi</th>
           <th>Metode</th>
           <th>Nilai</th>
           <th>Waktu Closing</th>
@@ -656,7 +669,7 @@ function renderCharts(list) {
 function renderTable(list) {
   const tbody = document.getElementById('tbody');
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-cell">
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">
       <div style="font-size:32px;margin-bottom:12px">📭</div>
       <h4>Belum ada closing di periode ini</h4>
       <p>Order yang dikonfirmasi bot akan muncul di sini secara otomatis.</p>
@@ -676,6 +689,24 @@ function renderTable(list) {
     const color = avColor(nama);
     const ini   = avInit(nama);
 
+    // Status tracking
+    let statusBdg = '';
+    if (st.tracking_sampai) {
+      statusBdg = `<span class="bdg bdg-sampai">✅ Sampai</span>`;
+    } else if (st.tracking_status) {
+      const lok = st.tracking_lokasi ? `<div style="font-size:10px;color:var(--text-3);margin-top:3px">${escH(st.tracking_lokasi)}</div>` : '';
+      statusBdg = `<span class="bdg bdg-transit">🚚 ${escH(st.tracking_status.slice(0,22))}</span>${lok}`;
+    } else if (st.no_resi) {
+      statusBdg = `<span class="bdg bdg-dikirim">📦 Dikirim</span>`;
+    } else {
+      statusBdg = `<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>`;
+    }
+
+    // Resi
+    const resiCell = st.no_resi
+      ? `<div style="font-weight:600;font-size:12px">${escH(st.no_resi)}</div><div style="font-size:10px;color:var(--text-3)">${escH((st.kurir_resi||'').toUpperCase())}</div>`
+      : `<span style="color:var(--text-3)">—</span>`;
+
     return `<tr>
       <td>
         <div style="display:flex;align-items:center;gap:10px">
@@ -690,6 +721,8 @@ function renderTable(list) {
         <div style="font-weight:500">${escH(prod.nama || '—')}</div>
         <div style="font-size:11px;color:var(--text-3)">×${qty} · ongkir ${rp(ongkir)}</div>
       </td>
+      <td>${statusBdg}</td>
+      <td>${resiCell}</td>
       <td><span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'Transfer':'COD'}</span></td>
       <td style="font-weight:700;color:var(--text)">${rp(nilai)}</td>
       <td style="color:var(--text-3);font-size:12px">${fmtDt(c.last_msg_at)}</td>
@@ -730,6 +763,27 @@ function exportCSV() {
 }
 
 init();
+
+async function checkBotStatus() {
+  const sbBot = document.getElementById('sb-bot-status');
+  const uid = (typeof userId !== 'undefined') ? userId : (window.Auth?.getUser()?.id);
+  if (!sbBot || !uid) return;
+  try {
+    const res = await fetch('/api/baileys-proxy?path=' + encodeURIComponent('/session/status/' + uid));
+    const s = await res.json();
+    if (s.status === 'connected') {
+      sbBot.innerHTML = '<div class="bot-dot"></div> Bot online';
+      sbBot.style.color = '#22c55e';
+    } else {
+      sbBot.innerHTML = '⚠️ Bot offline';
+      sbBot.style.color = '#f59e0b';
+    }
+  } catch(e) {
+    sbBot.innerHTML = '⚠️ Bot offline';
+    sbBot.style.color = '#f59e0b';
+  }
+}
+checkBotStatus();
 </script>
 </body>
 </html>
