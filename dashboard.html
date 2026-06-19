@@ -991,8 +991,10 @@ async function renderChat() {
     document.getElementById('cm-nama').textContent  = esc(activeCustomer.nama || '—');
     document.getElementById('cm-phone').textContent = formatPhone(activeCustomer.wa_number);
 
-    // Produk dari tabel products milik user ini
-    const prods = await sbGet('products', `?user_id=eq.${userId}&order=created_at.asc&limit=1`);
+    // Produk dari conversation (product_id), fallback ke produk pertama user
+    const prodId = activeConv?.product_id;
+    const prodQ  = prodId ? `?id=eq.${prodId}&limit=1` : `?user_id=eq.${userId}&order=created_at.asc&limit=1`;
+    const prods  = await sbGet('products', prodQ);
     document.getElementById('cm-produk').textContent = prods[0]?.nama ? esc(prods[0].nama) : '—';
 
     // First chat = created_at customer

@@ -108,7 +108,7 @@ async function init() {
   const sel = document.getElementById('bc-target');
   sel.innerHTML = `<option value="">Semua Kontak (${allContacts.length})</option>` +
     [...labels].map(l => {
-      const count = allContacts.filter(c=>(c.label||'').includes(l)).length;
+      const count = allContacts.filter(c=>(c.label||'').split(',').map(x=>x.trim()).includes(l)).length;
       return `<option value="${l}">${l} (${count} kontak)</option>`;
     }).join('');
 
@@ -119,7 +119,7 @@ async function init() {
 function getTargetContacts() {
   const label = document.getElementById('bc-target').value;
   if (!label) return allContacts;
-  return allContacts.filter(c => (c.label||'').includes(label));
+  return allContacts.filter(c => (c.label||'').split(',').map(x=>x.trim()).includes(label));
 }
 
 function updatePreview() {

@@ -776,17 +776,20 @@ async function loadLog() {
 ══════════════════════════════════ */
 async function triggerCron() {
   const btn = document.getElementById('btn-trigger');
+  const secret = localStorage.getItem('cron_secret') || prompt('Masukkan CRON_SECRET:');
+  if (!secret) return;
+  localStorage.setItem('cron_secret', secret);
   btn.disabled = true; btn.textContent = 'Menjalankan...';
   try {
-    // Butuh secret — ambil dari env (tidak ada di client). Cukup ping endpoint.
-    const r = await fetch('/api/followup?secret=', {method:'GET'});
+    const r = await fetch(`/api/followup?secret=${encodeURIComponent(secret)}`, {method:'GET'});
     const d = await r.json();
     if (d.ok) {
       toast(`Selesai: ${d.sent} terkirim, ${d.skipped} dilewati`);
       await loadLeads();
       loadLog();
     } else {
-      toast('Unauthorized — set CRON_SECRET yang benar via URL', 'error');
+      localStorage.removeItem('cron_secret');
+      toast('Secret salah — coba lagi', 'error');
     }
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');

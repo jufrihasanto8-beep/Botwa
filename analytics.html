@@ -665,7 +665,7 @@ async function generateInsights() {
     }
 
     const closing   = convs.filter(c=>c.status==='selesai'&&c.state?.order_placed).length;
-    const ekskalasi = convs.filter(c=>c.status==='ekskalasi').length;
+    const ekskalasi = convs.filter(c=>c.status==='eskalasi').length;
     const keluhanList = [...new Set(convs.map(c=>c.state?.keluhan).filter(Boolean))].slice(0,10);
     const sample    = msgs.slice(0,40).map(m=>`[${m.role}]: ${(m.isi||'').replace(/\[.*?\]/g,'').trim()}`).filter(l=>l.split(': ')[1]).join('\n');
 
