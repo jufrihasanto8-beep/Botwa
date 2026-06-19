@@ -1505,6 +1505,11 @@ Isi field yang berubah saja, sisanya null.` }],
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
 
+    // Inject konteks awaiting_order_confirm agar Claude tidak trigger ORDER_CONFIRMED lagi
+    if (convState.awaiting_order_confirm || convState.awaiting_order_correction) {
+      systemPrompt += `\n\n[SISTEM - PENTING] Order customer ini SUDAH DIKONFIRMASI sebelumnya. Kamu sudah mengirim ringkasan pesanan dan menunggu customer membalas. JANGAN generate marker [ORDER_CONFIRMED] lagi. Jika customer bertanya tentang status pesanan, beritahu bahwa pesanan sudah dicatat dan sedang diproses. Jika customer ingin mengubah sesuatu, bantu dengan ramah.`;
+    }
+
     // Inject ulang allRates setiap pesan agar Claude selalu bisa jawab pertanyaan kurir
     if (convState.ongkir?.allRates?.length) {
       const fmt = n => `Rp ${n.toLocaleString('id-ID')}`;

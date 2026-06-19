@@ -361,9 +361,10 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         const state = conv.state || {};
         const followedDays = state.followed_up_days || [];
 
-        // Skip jika hari 1 sudah terkirim atau eskalasi
+        // Skip jika hari 1 sudah terkirim, eskalasi, atau sedang menunggu konfirmasi order
         if (followedDays.includes(1)) { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: hari 1 sudah terkirim`); continue; }
         if (conv.status === 'eskalasi') { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: status eskalasi`); continue; }
+        if (state.awaiting_order_confirm || state.awaiting_order_correction) { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: menunggu konfirmasi order`); continue; }
 
         // Cek pesan terakhir harus dari AI
         const lastMsgs = await sbGet('conv_messages',
@@ -465,9 +466,10 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
             const state       = conv.state || {};
             const followedDays = state.followed_up_days || [];
 
-            // Skip jika hari ini sudah terkirim atau eskalasi
+            // Skip jika hari ini sudah terkirim, eskalasi, atau sedang menunggu konfirmasi order
             if (followedDays.includes(hariKe)) { totalSkipped++; continue; }
             if (conv.status === 'eskalasi')    { totalSkipped++; continue; }
+            if (state.awaiting_order_confirm || state.awaiting_order_correction) { totalSkipped++; continue; }
 
             const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
             if (!customers.length) { totalSkipped++; continue; }
