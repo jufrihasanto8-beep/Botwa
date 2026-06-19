@@ -72,10 +72,29 @@ function normalizeWA(num) {
 }
 
 /* ── FIND / CREATE CUSTOMER ───────────────────────────────── */
-async function findOrCreateCustomer(userId, waNumber, nama) {
+async function findOrCreateCustomer(userId, waNumber, nama, replyJid = null) {
   const normalized = normalizeWA(waNumber);
-  const existing = await sbGet('customers', `?user_id=eq.${userId}&wa_number=eq.${normalized}`);
+
+  // Cari by wa_number dulu
+  let existing = await sbGet('customers', `?user_id=eq.${userId}&wa_number=eq.${normalized}`);
   if (existing.length) return existing[0];
+
+  // Kalau tidak ketemu, cari by reply_jid (handle LID yang sudah tersimpan sebelumnya)
+  if (replyJid) {
+    const byJid = await sbGet('customers', `?user_id=eq.${userId}&reply_jid=eq.${encodeURIComponent(replyJid)}`);
+    if (byJid.length) {
+      // Ketemu by LID — update wa_number ke nomor asli yang sudah resolve
+      const old = byJid[0];
+      if (old.wa_number !== normalized) {
+        await sbPatch('customers', `?id=eq.${old.id}`, { wa_number: normalized }).catch(() => {});
+        old.wa_number = normalized;
+        console.log(`[customer] Update wa_number LID → ${normalized} untuk id=${old.id}`);
+      }
+      return old;
+    }
+  }
+
+  // Benar-benar customer baru
   const rows = await sbPost('customers', {
     user_id: userId,
     wa_number: normalized,
@@ -1152,7 +1171,7 @@ module.exports = async function handler(req, res) {
     const chatModel = sumber === 'ctwa' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6';
 
     // ── Find/create customer & conversation ───────────────────
-    const customer = await findOrCreateCustomer(userId, wa_number, pushName);
+    const customer = await findOrCreateCustomer(userId, wa_number, pushName, reply_jid);
 
     // Simpan reply_jid (bisa berupa LID format seperti 224029940129807@lid)
     // supaya CS dari dashboard bisa kirim ke JID yang benar
