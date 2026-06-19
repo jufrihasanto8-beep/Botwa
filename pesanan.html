@@ -66,7 +66,7 @@
         <h1>📦 Pesanan</h1>
         <p>Monitor status pengiriman semua order</p>
       </div>
-      <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema" style="margin-left:auto">🌙</button>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Ganti tema" style="margin-left:auto">🌙</button>
     </div>
 
     <div class="ps-layout">
@@ -91,6 +91,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
+<script src="js/theme.js"></script>
 <script>
 Auth.guard();
 document.getElementById('sidebar-container').innerHTML = renderSidebar('pesanan');
@@ -124,11 +125,10 @@ function setTab(tab, btn) {
 }
 
 async function init() {
-  await Config.load();
   const [convs, custs, prods] = await Promise.all([
-    sbGet('conversations', `?user_id=eq.${uid}&order=last_msg_at.desc&limit=500`),
-    sbGet('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,reply_jid`),
-    sbGet('products',  `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
+    SB.get('conversations', `?user_id=eq.${uid}&order=last_msg_at.desc&limit=500`),
+    SB.get('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,reply_jid`),
+    SB.get('products',  `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
   ]);
 
   custs.forEach(c => custMap[c.id] = c);
