@@ -126,8 +126,11 @@ function setTab(tab, btn) {
 }
 
 async function init() {
-  const [convs, custs, prods] = await Promise.all([
-    SB.get('conversations', `?user_id=eq.${uid}&order=last_msg_at.desc&limit=500`),
+  // Query hanya conversation yang sudah ada order (status selesai atau masih proses tapi order_placed)
+  // Gunakan 2 query terpisah untuk cover semua status
+  const [convsDone, convsProses, custs, prods] = await Promise.all([
+    SB.get('conversations', `?user_id=eq.${uid}&status=eq.selesai&order=last_msg_at.desc&limit=1000`),
+    SB.get('conversations', `?user_id=eq.${uid}&status=in.(baru,diproses)&order=last_msg_at.desc&limit=200`),
     SB.get('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,reply_jid`),
     SB.get('products',  `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
   ]);
@@ -135,7 +138,9 @@ async function init() {
   custs.forEach(c => custMap[c.id] = c);
   prods.forEach(p => prodMap[p.id] = p);
 
-  allConvs = (convs||[]).filter(c => c.state?.order_placed === true);
+  // Gabung + filter order_placed
+  const all = [...(convsDone||[]), ...(convsProses||[])];
+  allConvs = all.filter(c => c.state?.order_placed === true);
   render();
 }
 
