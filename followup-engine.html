@@ -397,6 +397,7 @@ function tipeBadge(t) {
 
 Auth.guard();
 document.getElementById('sidebar-container').innerHTML = renderSidebar('followup-engine');
+checkBotStatus();
 
 async function init() {
   userId = Auth.getUser()?.id;
