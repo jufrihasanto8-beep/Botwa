@@ -668,14 +668,19 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
         <button class="nba-btn" onclick="getAISuggest()">✨ Gunakan Saran Ini</button>
       </div>
 
-      <!-- WA Status -->
+      <!-- WA Customer -->
       <div class="wa-section">
-        <div class="cb-title">📱 WhatsApp</div>
-        <div class="wa-badge-dark disconnected" id="wa-badge">
-          <div class="wa-dot-d off" id="wa-dot"></div>
-          <span id="wa-txt">Belum dicek</span>
+        <div class="cb-title">📱 WhatsApp Customer</div>
+        <div class="wa-badge-dark connected" id="wa-cust-badge" style="display:none">
+          <div class="wa-dot-d on"></div>
+          <span id="wa-cust-num">—</span>
         </div>
-        <button class="wa-cek-btn" onclick="checkWA()">Cek koneksi</button>
+        <div id="wa-cust-empty" style="font-size:12px;color:#475569">Pilih percakapan</div>
+        <div class="wa-badge-dark disconnected" id="wa-badge" style="margin-top:8px">
+          <div class="wa-dot-d off" id="wa-dot"></div>
+          <span id="wa-txt">Bot: belum dicek</span>
+        </div>
+        <button class="wa-cek-btn" onclick="checkWA()">Cek koneksi bot</button>
       </div>
 
       <!-- Timeline -->
@@ -950,6 +955,19 @@ async function renderChat() {
   document.getElementById('ae-av').style.background = color;
   document.getElementById('ae-name').textContent = nama;
   document.getElementById('ae-num').textContent  = formatPhone(activeCustomer?.wa_number);
+
+  // WA Customer section
+  const waNum = activeCustomer?.wa_number;
+  const waCustBadge = document.getElementById('wa-cust-badge');
+  const waCustEmpty = document.getElementById('wa-cust-empty');
+  if (waNum) {
+    document.getElementById('wa-cust-num').textContent = formatPhone(waNum);
+    waCustBadge.style.display = 'flex';
+    waCustEmpty.style.display = 'none';
+  } else {
+    waCustBadge.style.display = 'none';
+    waCustEmpty.style.display = 'block';
+  }
 
   const msgs = await sbGet('conv_messages',
     `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=200`);
@@ -1262,7 +1280,7 @@ async function checkWA() {
     if (status.status === 'connected') {
       badge.className = 'wa-badge-dark connected';
       dot.className   = 'wa-dot-d on';
-      txt.textContent = '+'+status.waNumber;
+      txt.textContent = formatPhone(status.waNumber);
       sbBot.innerHTML = '<div class="bot-dot"></div> Bot online';
       sbBot.style.color = '#22c55e';
     } else {
