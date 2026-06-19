@@ -380,26 +380,21 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .sla-fill.danger{background:#ef4444}
 .sla-time{font-size:11px;color:#64748b}
 
-/* Next Best Action */
-.nba-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
-.nba-text{font-size:12px;color:#94a3b8;line-height:1.5;margin-bottom:8px}
-.nba-btn{width:100%;padding:8px;border-radius:8px;background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(139,92,246,.15));border:1px solid rgba(99,102,241,.3);color:#a5b4fc;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
-.nba-btn:hover{background:linear-gradient(135deg,rgba(99,102,241,.3),rgba(139,92,246,.25))}
-
-/* WA Status */
-.wa-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
-.wa-badge-dark{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:500;border:1px solid}
-.wa-badge-dark.connected{background:rgba(34,197,94,.06);color:#86efac;border-color:rgba(34,197,94,.15)}
-.wa-badge-dark.disconnected{background:rgba(239,68,68,.06);color:#fca5a5;border-color:rgba(239,68,68,.15)}
-.wa-dot-d{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.wa-dot-d.on{background:#22c55e;animation:pulse 2s infinite}
-.wa-dot-d.off{background:#ef4444}
-.wa-cek-btn{width:100%;margin-top:7px;padding:6px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);color:#64748b;font-size:12px;cursor:pointer;transition:all .15s}
-.wa-cek-btn:hover{border-color:rgba(59,130,246,.3);color:#93c5fd}
-
-/* Timeline */
-.timeline-section{padding:12px 14px}
-.timeline-empty{font-size:12px;color:#374151;text-align:center;padding:8px 0}
+/* Customer Memory */
+.cm-section{padding:12px 14px}
+.cm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cm-manage-btn{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc;cursor:pointer;transition:all .15s}
+.cm-manage-btn:hover{background:rgba(99,102,241,.25)}
+.cm-card{background:#0d1117;border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden}
+.cm-empty{padding:20px;font-size:12px;color:#475569;text-align:center}
+.cm-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.cm-row:last-child{border-bottom:none}
+.cm-icon{font-size:15px;width:22px;text-align:center;flex-shrink:0}
+.cm-label{font-size:12px;color:#64748b;flex:1}
+.cm-value{font-size:12px;color:#e2e8f0;font-weight:500;text-align:right;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-status-live{color:#22c55e;font-weight:600}
+.cm-status-eskalasi{color:#f59e0b;font-weight:600}
+.cm-status-selesai{color:#64748b;font-weight:600}
 
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 #toast.show{opacity:1}
@@ -661,32 +656,52 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
         <div class="sla-time" id="sla-time">Pilih percakapan</div>
       </div>
 
-      <!-- Next Best Action -->
-      <div class="nba-section">
-        <div class="cb-title">⚡ Next Best Action</div>
-        <div class="nba-text" id="nba-text">Pilih percakapan untuk melihat rekomendasi AI.</div>
-        <button class="nba-btn" onclick="getAISuggest()">✨ Gunakan Saran Ini</button>
-      </div>
-
-      <!-- WA Customer -->
-      <div class="wa-section">
-        <div class="cb-title">📱 WhatsApp Customer</div>
-        <div class="wa-badge-dark connected" id="wa-cust-badge" style="display:none">
-          <div class="wa-dot-d on"></div>
-          <span id="wa-cust-num">—</span>
+      <!-- Customer Memory -->
+      <div class="cm-section">
+        <div class="cm-header">
+          <div class="cb-title" style="margin-bottom:0">👤 Customer Memory</div>
+          <button class="cm-manage-btn" onclick="window.location.href='contacts.html'">Manage</button>
         </div>
-        <div id="wa-cust-empty" style="font-size:12px;color:#475569">Pilih percakapan</div>
-        <div class="wa-badge-dark disconnected" id="wa-badge" style="margin-top:8px">
-          <div class="wa-dot-d off" id="wa-dot"></div>
-          <span id="wa-txt">Bot: belum dicek</span>
+        <div class="cm-card">
+          <div class="cm-empty" id="cm-empty">Pilih percakapan</div>
+          <div id="cm-rows" style="display:none">
+            <div class="cm-row">
+              <span class="cm-icon">🪪</span>
+              <span class="cm-label">Nama</span>
+              <span class="cm-value" id="cm-nama">—</span>
+            </div>
+            <div class="cm-row">
+              <span class="cm-icon">📞</span>
+              <span class="cm-label">Phone</span>
+              <span class="cm-value" id="cm-phone">—</span>
+            </div>
+            <div class="cm-row">
+              <span class="cm-icon">📦</span>
+              <span class="cm-label">Produk</span>
+              <span class="cm-value" id="cm-produk">—</span>
+            </div>
+            <div class="cm-row">
+              <span class="cm-icon">📅</span>
+              <span class="cm-label">First chat</span>
+              <span class="cm-value" id="cm-first">—</span>
+            </div>
+            <div class="cm-row">
+              <span class="cm-icon">🕐</span>
+              <span class="cm-label">Last active</span>
+              <span class="cm-value" id="cm-last">—</span>
+            </div>
+            <div class="cm-row">
+              <span class="cm-icon">💬</span>
+              <span class="cm-label">Total messages</span>
+              <span class="cm-value" id="cm-total">—</span>
+            </div>
+            <div class="cm-row">
+              <span class="cm-icon">🚩</span>
+              <span class="cm-label">Status</span>
+              <span class="cm-value" id="cm-status">—</span>
+            </div>
+          </div>
         </div>
-        <button class="wa-cek-btn" onclick="checkWA()">Cek koneksi bot</button>
-      </div>
-
-      <!-- Timeline -->
-      <div class="timeline-section">
-        <div class="cb-title">🕐 Timeline Pesanan</div>
-        <div id="cb-timeline" class="timeline-empty">Belum ada pesanan tercatat.</div>
       </div>
 
     </div><!-- /case-board -->
@@ -956,19 +971,6 @@ async function renderChat() {
   document.getElementById('ae-name').textContent = nama;
   document.getElementById('ae-num').textContent  = formatPhone(activeCustomer?.wa_number);
 
-  // WA Customer section
-  const waNum = activeCustomer?.wa_number;
-  const waCustBadge = document.getElementById('wa-cust-badge');
-  const waCustEmpty = document.getElementById('wa-cust-empty');
-  if (waNum) {
-    document.getElementById('wa-cust-num').textContent = formatPhone(waNum);
-    waCustBadge.style.display = 'flex';
-    waCustEmpty.style.display = 'none';
-  } else {
-    waCustBadge.style.display = 'none';
-    waCustEmpty.style.display = 'block';
-  }
-
   const msgs = await sbGet('conv_messages',
     `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=200`);
   lastMsgCount = msgs.length;
@@ -977,6 +979,46 @@ async function renderChat() {
   area.innerHTML = '<div class="day-divider">Hari ini</div>';
   msgs.forEach(m => appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, false, m.created_at, m.role));
   area.scrollTop = area.scrollHeight;
+
+  // Customer Memory card
+  const cmEmpty = document.getElementById('cm-empty');
+  const cmRows  = document.getElementById('cm-rows');
+  if (activeCustomer) {
+    document.getElementById('cm-nama').textContent  = esc(activeCustomer.nama || '—');
+    document.getElementById('cm-phone').textContent = formatPhone(activeCustomer.wa_number);
+
+    // Produk dari tabel products milik user ini
+    const prods = await sbGet('products', `?user_id=eq.${userId}&order=created_at.asc&limit=1`);
+    document.getElementById('cm-produk').textContent = prods[0]?.nama ? esc(prods[0].nama) : '—';
+
+    // First chat = created_at customer
+    const fmt = (d, short=false) => {
+      if (!d) return '—';
+      const opt = short
+        ? {day:'2-digit',month:'short',year:'numeric',timeZone:'Asia/Jakarta'}
+        : {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'};
+      return new Date(d).toLocaleDateString('id-ID', opt);
+    };
+    document.getElementById('cm-first').textContent = fmt(activeCustomer.created_at, true);
+
+    // Last active = last message or conv updated_at
+    const lastTs = lastMsgTimestamp || activeConv.updated_at;
+    document.getElementById('cm-last').textContent  = fmt(lastTs);
+
+    document.getElementById('cm-total').textContent = msgs.length;
+
+    const st = activeConv.status;
+    const stEl = document.getElementById('cm-status');
+    if (st === 'eskalasi') { stEl.textContent = 'Eskalasi'; stEl.className = 'cm-value cm-status-eskalasi'; }
+    else if (st === 'selesai') { stEl.textContent = 'Selesai'; stEl.className = 'cm-value cm-status-selesai'; }
+    else { stEl.textContent = 'Live'; stEl.className = 'cm-value cm-status-live'; }
+
+    cmEmpty.style.display = 'none';
+    cmRows.style.display  = 'block';
+  } else {
+    cmEmpty.style.display = 'block';
+    cmRows.style.display  = 'none';
+  }
 }
 
 function appendBubble(type, text, scroll=true, ts=null, role=null) {
@@ -1061,7 +1103,6 @@ Rules: pendek (1-2 kalimat), hangat, natural, tidak formal, tidak markdown.`;
     aiSuggestText = reply;
     txt.textContent = reply;
     document.getElementById('ai-conf').textContent = 'Claude Haiku';
-    document.getElementById('nba-text').textContent = reply.slice(0,120)+'...';
   } catch(e) {
     txt.textContent = 'Gagal generate saran: '+e.message;
   }
@@ -1102,13 +1143,6 @@ async function updateCaseBoard() {
     <span class="ai-chip intent">Status: ${activeConv.status === 'eskalasi' ? 'Eskalasi' : activeConv.status === 'selesai' ? 'Selesai' : 'Aktif'}</span>
     <span class="ai-chip sentiment">Sentiment: Positif</span>
     <span class="ai-chip prob">AI: Aktif</span>`;
-
-  // NBA
-  if (activeConv.status === 'eskalasi') {
-    document.getElementById('nba-text').textContent = 'Percakapan perlu ditangani CS manusia. Balas dengan empati.';
-  } else {
-    document.getElementById('nba-text').textContent = 'Klik "Saran AI" untuk mendapatkan rekomendasi balasan terbaik dari AI.';
-  }
 
   // Reset ke loading state
   document.getElementById('det-rts-value').textContent = 'Mengecek...';
@@ -1269,31 +1303,20 @@ async function clearChat() {
 
 /* ── WA STATUS ── */
 async function checkWA() {
-  const badge = document.getElementById('wa-badge');
-  const dot   = document.getElementById('wa-dot');
-  const txt   = document.getElementById('wa-txt');
   const sbBot = document.getElementById('sb-bot-status');
-  txt.textContent = 'Mengecek...';
   try {
     const res    = await fetch(`${PROXY}?path=${encodeURIComponent('/session/status/'+userId)}`);
     const status = await res.json();
     if (status.status === 'connected') {
-      badge.className = 'wa-badge-dark connected';
-      dot.className   = 'wa-dot-d on';
-      txt.textContent = formatPhone(status.waNumber);
-      sbBot.innerHTML = '<div class="bot-dot"></div> Bot online';
+      sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
       sbBot.style.color = '#22c55e';
     } else {
-      badge.className = 'wa-badge-dark disconnected';
-      dot.className   = 'wa-dot-d off';
-      txt.textContent = status.status||'Tidak terhubung';
-      sbBot.innerHTML = '⚠️ Bot offline';
+      sbBot.innerHTML   = '⚠️ Bot offline';
       sbBot.style.color = '#f59e0b';
     }
   } catch(e) {
-    badge.className = 'wa-badge-dark disconnected';
-    dot.className   = 'wa-dot-d off';
-    txt.textContent = 'Tidak terhubung';
+    sbBot.innerHTML   = '⚠️ Bot offline';
+    sbBot.style.color = '#f59e0b';
   }
 }
 
