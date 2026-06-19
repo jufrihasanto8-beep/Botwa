@@ -281,12 +281,12 @@ tr:hover td { background: rgba(255,255,255,.02); }
 /* ── Page header ── */
 .page-header {
   padding: 14px 24px;
-  background: #161b22;
+  background: var(--white);
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
   position: sticky; top: 0; z-index: 10;
 }
-.page-header h1 { font-size: 17px; font-weight: 700; color: #f1f5f9; letter-spacing: -.3px; }
+.page-header h1 { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
 .page-header p { font-size: 12px; color: var(--text-2); margin-top: 2px; }
 
 /* ── Filter bar ── */
