@@ -777,10 +777,10 @@ function formatPhone(raw) {
   if (!raw) return '—';
   const n = String(raw).split('@')[0].replace(/\D/g,'');
   if (!n) return '—';
-  // LID: lebih dari 13 digit dan bukan awalan 62 = bukan nomor HP
-  if (n.length > 13 && !n.startsWith('62')) return '(WA ID)';
+  // Nomor HP Indonesia valid maksimal 13 digit (628xxxxxxxxxx)
+  // Lebih dari itu = LID WhatsApp, bukan nomor asli
+  if (n.length > 13) return '(WA ID)';
   const local = n.startsWith('62') ? n.slice(2) : n;
-  // Format +62 8xx-xxxx-xxxx
   if (local.length >= 9) {
     return '+62 ' + local.slice(0,3) + '-' + local.slice(3,7) + '-' + local.slice(7);
   }
