@@ -406,6 +406,7 @@ function toast(msg, type='success') {
 
 function rp(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
 function fmtDate(d) { if (!d) return ''; return new Date(d).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
+function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 Auth.guard();
 (function(){
@@ -471,7 +472,7 @@ function cardHTML(p) {
   if (p.tipe === 'voucher') {
     const nilaiStr = p.tipe_nilai === 'persen' ? `${p.nilai}%` : rp(p.nilai);
     details = `
-      <div class="promo-row"><span class="promo-lbl">Kode</span><span class="kode-badge">${p.kode || '-'}</span></div>
+      <div class="promo-row"><span class="promo-lbl">Kode</span><span class="kode-badge">${esc(p.kode) || '-'}</span></div>
       <div class="promo-row"><span class="promo-lbl">Diskon</span><span class="promo-val" style="color:#c4b5fd;font-weight:700">${nilaiStr}</span></div>
       ${p.min_belanja ? `<div class="promo-row"><span class="promo-lbl">Min. Beli</span><span class="promo-val">${rp(p.min_belanja)}</span></div>` : ''}`;
     if (p.periode_selesai) periodeText = `Berlaku s/d ${fmtDate(p.periode_selesai)}`;
@@ -479,30 +480,30 @@ function cardHTML(p) {
 
   if (p.tipe === 'bundling') {
     details = `
-      <div class="promo-row"><span class="promo-lbl">Syarat</span><span class="promo-val">${p.syarat || '-'}</span></div>
-      <div class="promo-row"><span class="promo-lbl">Benefit</span><span class="promo-val" style="color:#6ee7b7">${p.benefit || '-'}</span></div>`;
+      <div class="promo-row"><span class="promo-lbl">Syarat</span><span class="promo-val">${esc(p.syarat) || '-'}</span></div>
+      <div class="promo-row"><span class="promo-lbl">Benefit</span><span class="promo-val" style="color:#6ee7b7">${esc(p.benefit) || '-'}</span></div>`;
     if (p.periode_mulai || p.periode_selesai) periodeText = `${fmtDate(p.periode_mulai)} – ${fmtDate(p.periode_selesai)}`;
   }
 
   if (p.tipe === 'ongkir') {
     details = `
-      <div class="promo-row"><span class="promo-lbl">Benefit</span><span class="promo-val" style="color:#7dd3fc">${p.benefit || '-'}</span></div>
+      <div class="promo-row"><span class="promo-lbl">Benefit</span><span class="promo-val" style="color:#7dd3fc">${esc(p.benefit) || '-'}</span></div>
       ${p.min_belanja ? `<div class="promo-row"><span class="promo-lbl">Min. Beli</span><span class="promo-val">${rp(p.min_belanja)}</span></div>` : ''}
-      ${p.wilayah ? `<div class="promo-row"><span class="promo-lbl">Wilayah</span><span class="promo-val">${p.wilayah}</span></div>` : ''}`;
+      ${p.wilayah ? `<div class="promo-row"><span class="promo-lbl">Wilayah</span><span class="promo-val">${esc(p.wilayah)}</span></div>` : ''}`;
     if (p.periode_mulai || p.periode_selesai) periodeText = `${fmtDate(p.periode_mulai)} – ${fmtDate(p.periode_selesai)}`;
   }
 
   return `<div class="promo-card">
     <div class="promo-card-head">
       <div>
-        <div class="promo-nama">${p.nama}</div>
-        <span class="promo-badge ${badgeClass}">${TIPE_LABEL[p.tipe] || p.tipe}</span>
+        <div class="promo-nama">${esc(p.nama)}</div>
+        <span class="promo-badge ${badgeClass}">${esc(TIPE_LABEL[p.tipe] || p.tipe)}</span>
       </div>
       ${statusBadge}
     </div>
     <div class="promo-card-body">
       ${details}
-      ${p.deskripsi ? `<div class="promo-desc" style="margin-top:4px">${p.deskripsi}</div>` : ''}
+      ${p.deskripsi ? `<div class="promo-desc" style="margin-top:4px">${esc(p.deskripsi)}</div>` : ''}
     </div>
     <div class="promo-foot">
       <span class="promo-periode-text">${periodeText}</span>

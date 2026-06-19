@@ -650,6 +650,7 @@ async function sbDelete(t, q) {
   if (!r.ok) { const d = await r.json(); throw new Error(d?.message || JSON.stringify(d)); }
 }
 
+function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(msg, type='success') {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -1037,7 +1038,7 @@ function renderMappingList() {
         <option value="form" ${m.sumber==='form'?'selected':''}>Form</option>
         <option value="inbound" ${m.sumber==='inbound'?'selected':''}>Keyword</option>
       </select>
-      <input type="text" value="${m.identifier}" oninput="mappingRows[${i}].identifier=this.value"
+      <input type="text" value="${esc(m.identifier)}" oninput="mappingRows[${i}].identifier=this.value"
         placeholder="ad_id / headline / keyword..."
         style="padding:7px 10px;border:1px solid rgba(255,255,255,.08);background:#0d1117;color:#e2e8f0;border-radius:6px;font-size:13px;outline:none;">
       <button onclick="removeMappingRow(${i})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;">✕</button>
