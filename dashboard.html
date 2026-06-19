@@ -986,15 +986,14 @@ async function sendMsg() {
   input.value = ''; autoResize(input);
   document.getElementById('ai-suggest-box').style.display = 'none';
 
-  await sbPost('conv_messages', { conversation_id: activeConvId, role: 'cs', isi: text });
-  appendBubble('bot', text, true, new Date().toISOString(), 'cs');
-
   try {
+    await sbPost('conv_messages', { conversation_id: activeConvId, role: 'cs', isi: text });
+    appendBubble('bot', text, true, new Date().toISOString(), 'cs');
     await fetch(`${PROXY}?path=${encodeURIComponent('/send')}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: userId, wa_number: activeCustomer.reply_jid || activeCustomer.wa_number, message: text, is_outbound: true }),
     });
-  } catch(e) { showToast('Gagal kirim WA: '+e.message); }
+  } catch(e) { showToast('Gagal kirim pesan: '+e.message); }
   finally { _sending = false; }
 }
 
