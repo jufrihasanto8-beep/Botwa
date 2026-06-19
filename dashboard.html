@@ -768,6 +768,19 @@ function avatarColor(n) {
   return colors[Math.abs(h)];
 }
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function formatPhone(raw) {
+  if (!raw) return '—';
+  const n = String(raw).split('@')[0].replace(/\D/g,'');
+  if (!n) return '—';
+  // LID: lebih dari 13 digit dan bukan awalan 62 = bukan nomor HP
+  if (n.length > 13 && !n.startsWith('62')) return '(WA ID)';
+  const local = n.startsWith('62') ? n.slice(2) : n;
+  // Format +62 8xx-xxxx-xxxx
+  if (local.length >= 9) {
+    return '+62 ' + local.slice(0,3) + '-' + local.slice(3,7) + '-' + local.slice(7);
+  }
+  return '+62' + local;
+}
 function timeStr(ts) {
   if (!ts) return '';
   const d=new Date(ts), now=new Date();
@@ -920,7 +933,7 @@ async function renderChat() {
   document.getElementById('ch-av').textContent   = initials(nama);
   document.getElementById('ch-av').style.background = color;
   document.getElementById('ch-name').textContent = nama;
-  document.getElementById('ch-sub').innerHTML    = `<span class="ch-live"></span> WhatsApp &middot; +${activeCustomer?.wa_number||''}`;
+  document.getElementById('ch-sub').innerHTML    = `<span class="ch-live"></span> WhatsApp &middot; ${formatPhone(activeCustomer?.wa_number)}`;
 
   // Status badge
   const statusArea = document.getElementById('ch-status-area');
@@ -936,7 +949,7 @@ async function renderChat() {
   document.getElementById('ae-av').textContent  = initials(nama);
   document.getElementById('ae-av').style.background = color;
   document.getElementById('ae-name').textContent = nama;
-  document.getElementById('ae-num').textContent  = activeCustomer?.wa_number ? '+'+activeCustomer.wa_number : '—';
+  document.getElementById('ae-num').textContent  = formatPhone(activeCustomer?.wa_number);
 
   const msgs = await sbGet('conv_messages',
     `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=200`);
