@@ -30,16 +30,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .sb-title{font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px}
 .sb-subtitle{font-size:10px;color:#64748b;margin-top:1px}
 .sb-nav{flex:1;overflow-y:auto;padding:8px 0}
-.sb-section{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
-.sb-item{display:flex;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;text-decoration:none;transition:all .12s;position:relative}
+.sb-section{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px 4px;margin-top:4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:#cbd5e1;cursor:pointer;text-decoration:none;transition:all .12s;position:relative}
 .sb-item:hover{background:rgba(255,255,255,.05);color:#e2e8f0;text-decoration:none}
 .sb-item.active{background:rgba(59,130,246,.12);color:#93c5fd}
+body.light #sidebar{background:#f8fafc;border-right-color:rgba(0,0,0,.08)}
+body.light .sb-brand{border-bottom-color:rgba(0,0,0,.07)}
+body.light .sb-logo{background:linear-gradient(135deg,#1e293b,#334155)}
+body.light .sb-title{color:#0f172a}
+body.light .sb-subtitle{color:#64748b}
+body.light .sb-section{color:#94a3b8}
+body.light .sb-item{color:#475569!important}
+body.light .sb-item:hover{background:rgba(0,0,0,.04)!important;color:#0f172a!important}
+body.light .sb-item.active{background:rgba(59,130,246,.1)!important;color:#2563eb!important}
+body.light .sb-divider{background:rgba(0,0,0,.07)}
+body.light .sb-user{border-top-color:rgba(0,0,0,.07)}
+body.light .bot-online{background:rgba(34,197,94,.06)}
 .sb-item .si{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.sb-item .si svg{width:16px;height:16px;display:block}
 .sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
-.sb-stats{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06)}
-.sb-stats-title{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
-.sb-stat-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;color:#94a3b8}
-.sb-stat-row span:last-child{color:#e2e8f0;font-weight:600}
 .bot-online{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#22c55e;padding:6px 10px;background:rgba(34,197,94,.08);border-radius:6px;margin:8px 14px}
 .bot-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -176,11 +184,6 @@ body.light .btn-sm:hover{border-color:#22c55e;color:#16a34a}
     <div class="sb-divider"></div>
     <div class="sb-section">Akun</div>
     <a class="sb-item" href="settings.html"><span class="si"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/><circle cx='12' cy='12' r='3'/></svg></span> Pengaturan</a>
-  </div>
-  <div class="sb-stats">
-    <div class="sb-stats-title">Hari Ini</div>
-    <div class="sb-stat-row"><span>Total Percakapan</span><span id="sb-total">—</span></div>
-    <div class="sb-stat-row"><span>Selesai</span><span id="sb-selesai">—</span></div>
   </div>
   <div class="sb-user">
     <div class="sb-avatar" id="sb-av">A</div>
