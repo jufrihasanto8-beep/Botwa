@@ -1113,10 +1113,6 @@ KELUHAN: ${keluhan || 'tidak disebutkan'}`.trim();
 }
 
 /* ── MAIN HANDLER ─────────────────────────────────────────── */
-module.exports.config = {
-  api: { bodyParser: { sizeLimit: '10mb' } },
-};
-
 module.exports = async function handler(req, res) {
   // Vercel body size config
   if (req.method === 'POST' && !req.body) {
@@ -1966,4 +1962,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     console.error('Webhook error:', err.message, err.stack);
     if (!res.headersSent) res.status(200).json({ ok: true, error: err.message });
   }
+};
+
+module.exports.config = {
+  api: { bodyParser: { sizeLimit: '10mb' } },
 };
