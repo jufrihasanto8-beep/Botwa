@@ -233,6 +233,88 @@ module.exports = async function handler(req, res) {
   const results = [];
 
   try {
+    // ── BAGIAN 0: Reminder konfirmasi order — customer belum balas konfirmasi pesanan ──
+    // Cek conversation dengan awaiting_order_confirm = true + diam minimal 2 jam
+    const cutoff2h = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+    const awaitingConvs = await sbGet('conversations',
+      `?status=in.(baru,diproses,selesai)` +
+      `&last_msg_at=lte.${cutoff2h}` +
+      `&select=id,user_id,customer_id,product_id,state,last_msg_at`
+    ).catch(() => []);
+
+    for (const conv of awaitingConvs) {
+      const state = conv.state || {};
+      if (!state.awaiting_order_confirm) continue;
+
+      // Cek pesan terakhir harus dari AI (konfirmasi order) — bukan customer
+      const lastMsgs = await sbGet('conv_messages',
+        `?conversation_id=eq.${conv.id}&order=created_at.desc&limit=1`
+      ).catch(() => []);
+      if (!lastMsgs.length || lastMsgs[0].role !== 'ai') continue;
+
+      // Cek sudah pernah kirim reminder hari ini (max 1x per hari)
+      const todayISO = new Date(now).toISOString().slice(0, 10);
+      if (state.confirm_reminder_sent_at?.startsWith(todayISO)) continue;
+
+      try {
+        const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`).catch(() => []);
+        if (!customers.length) continue;
+        const customer = customers[0];
+        const jid = customer.reply_jid || customer.wa_number;
+        if (!jid) continue;
+
+        let productNama = '', csNama = 'Sari';
+        if (conv.product_id) {
+          const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama&limit=1`).catch(() => []);
+          productNama = prods[0]?.nama || '';
+          csNama      = prods[0]?.persona_cs_nama || 'Sari';
+        }
+
+        const snap      = state.order_snapshot || {};
+        const area      = snap.area || {};
+        const isCOD     = (snap.metode || 'COD').toLowerCase() !== 'transfer';
+        const ekspLabel = (snap.ekspedisi || 'KURIR').toUpperCase();
+        const total     = isCOD
+          ? (snap.harga || 0) + (snap.ongkirPromo || 0) + (snap.feeCOD || 0)
+          : (snap.harga || 0) + (snap.ongkirPromo || 0);
+
+        const reminderMsg =
+`⏰ *Pengingat Konfirmasi Order ${productNama || 'Produk'}*
+
+Kak, kami ingin memastikan pesanan berikut:
+
+*Nama:* ${customer.nama || '-'}
+*No HP:* ${customer.wa_number || '-'}
+*Alamat Lengkap:* ${snap.alamat || '-'}
+
+*Kelurahan/Desa:* ${area.kelurahan || '-'}
+*Kecamatan:* ${area.kecamatan || '-'}
+*Kabupaten:* ${area.kota || '-'}
+*Provinsi:* ${area.provinsi || '-'}
+*Kode Pos:* ${area.kodePos || '-'}
+
+*Produk:* ${productNama || '-'}
+*Jumlah Pesanan:* ${snap.qty || 1} pcs
+*Pembayaran:* ${isCOD ? `COD via ${ekspLabel}` : `Transfer via ${ekspLabel}`}
+*Total Pembayaran:* Rp ${total.toLocaleString('id-ID')}
+
+Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
+
+        await sendWA(conv.user_id, jid, reminderMsg);
+        await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: `[Reminder konfirmasi order] ${reminderMsg}` });
+        await sbPatch('conversations', `?id=eq.${conv.id}`, {
+          state: { ...state, confirm_reminder_sent_at: now.toISOString() },
+        });
+
+        totalSent++;
+        results.push({ type: 'order_reminder', conv_id: conv.id, customer: customer.nama, status: 'sent' });
+        console.log(`[Order Reminder] → ${customer.nama || customer.wa_number}`);
+        await new Promise(r => setTimeout(r, 1500));
+      } catch(e) {
+        console.error(`Error order reminder conv ${conv.id}:`, e.message);
+      }
+    }
+
     // ── BAGIAN 1: Hari H — 1 jam setelah AI balas, untuk leads hari ini ──
     // Termasuk customer LAMA yang chat lagi hari ini (reopened_at >= hari ini)
     const todayStart = new Date(now);

@@ -1112,6 +1112,27 @@ ${(product?.nama || 'PRODUK').toUpperCase()} ${qty} CS ${cs}
 KELUHAN: ${keluhan || 'tidak disebutkan'}`.trim();
 }
 
+function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, isCOD, ekspLabel, total }) {
+  return `✅ *Konfirmasi Order ${productNama || 'Produk'}*
+
+*Nama:* ${customer?.nama || '-'}
+*No HP:* ${customer?.wa_number || '-'}
+*Alamat Lengkap:* ${alamat || '-'}
+
+*Kelurahan/Desa:* ${area?.kelurahan || '-'}
+*Kecamatan:* ${area?.kecamatan || '-'}
+*Kabupaten:* ${area?.kota || '-'}
+*Provinsi:* ${area?.provinsi || '-'}
+*Kode Pos:* ${area?.kodePos || '-'}
+
+*Produk:* ${productNama || '-'}
+*Jumlah Pesanan:* ${qty} pcs
+*Pembayaran:* ${isCOD ? `COD via ${ekspLabel}` : `Transfer via ${ekspLabel}`}
+*Total Pembayaran:* Rp ${total.toLocaleString('id-ID')}
+
+Sudah bener kak? Agar bisa kami proses pengiriman 🙏`;
+}
+
 /* ── MAIN HANDLER ─────────────────────────────────────────── */
 module.exports = async function handler(req, res) {
   // Vercel body size config
@@ -1318,6 +1339,115 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
 
     // ── State conversation ────────────────────────────────────
     const convState = conversation.state || {};
+
+    // ── Handle konfirmasi / koreksi order ─────────────────────
+    if (convState.awaiting_order_confirm || convState.awaiting_order_correction) {
+      const msgLower = message.toLowerCase().trim();
+      const snap     = convState.order_snapshot || {};
+      const area     = snap.area || {};
+      const isCOD    = (snap.metode || 'COD').toLowerCase() !== 'transfer';
+      const ekspLabel= (snap.ekspedisi || 'KURIR').toUpperCase();
+      const total    = isCOD
+        ? (snap.harga || 0) + (snap.ongkirPromo || 0) + (snap.feeCOD || 0)
+        : (snap.harga || 0) + (snap.ongkirPromo || 0);
+
+      if (convState.awaiting_order_correction) {
+        // ── Customer kirim koreksi — extract via Claude Haiku ──
+        try {
+          const extractRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': userAnthropicKey, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 200,
+              messages: [{ role: 'user', content:
+                `Dari pesan koreksi berikut, extract perubahan data pesanan. Jawab JSON saja, tanpa penjelasan.
+
+Pesan customer: "${message}"
+
+Data saat ini:
+- Nama: ${customer?.nama || '-'}
+- Alamat: ${snap.alamat || '-'}
+- Kelurahan: ${area.kelurahan || '-'}
+- Kecamatan: ${area.kecamatan || '-'}
+- Kabupaten: ${area.kota || '-'}
+- Provinsi: ${area.provinsi || '-'}
+- Kode Pos: ${area.kodePos || '-'}
+- Qty: ${snap.qty || 1}
+
+Format JSON:
+{"nama":null,"alamat":null,"kelurahan":null,"kecamatan":null,"kota":null,"provinsi":null,"kodePos":null,"qty":null}
+
+Isi field yang berubah saja, sisanya null.` }],
+            }),
+          }, 15000);
+          const extractData = await extractRes.json();
+          const raw = extractData.content?.[0]?.text || '';
+          const jsonMatch = raw.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const koreksi = JSON.parse(jsonMatch[0]);
+            // Update order_snapshot
+            if (koreksi.alamat)    snap.alamat          = koreksi.alamat;
+            if (koreksi.qty)       snap.qty             = koreksi.qty;
+            if (koreksi.kelurahan) area.kelurahan       = koreksi.kelurahan;
+            if (koreksi.kecamatan) area.kecamatan       = koreksi.kecamatan;
+            if (koreksi.kota)      area.kota            = koreksi.kota;
+            if (koreksi.provinsi)  area.provinsi        = koreksi.provinsi;
+            if (koreksi.kodePos)   area.kodePos         = koreksi.kodePos;
+            if (koreksi.nama)      customer.nama        = koreksi.nama;
+            snap.area = area;
+          }
+        } catch(e) {
+          console.error('Koreksi extract error:', e.message);
+        }
+
+        // Kirim ulang konfirmasi dengan data yang sudah dikoreksi
+        const totalBaru = isCOD
+          ? (snap.harga || 0) + (snap.ongkirPromo || 0) + (snap.feeCOD || 0)
+          : (snap.harga || 0) + (snap.ongkirPromo || 0);
+        const confirmUlang = buildCustomerConfirmMsg({
+          customer, alamat: snap.alamat, area, qty: snap.qty || 1,
+          productNama: product?.nama, isCOD, ekspLabel, total: totalBaru,
+        });
+
+        await updateConvState(conversation.id, {
+          awaiting_order_confirm: true,
+          awaiting_order_correction: false,
+          order_snapshot: snap,
+        });
+        await saveMessage(conversation.id, 'ai', confirmUlang);
+        await sendWA(userId, reply_jid, confirmUlang);
+        return res.status(200).json({ ok: true, action: 'confirm_resent' });
+
+      } else {
+        // ── Awaiting confirm — cek jawaban customer ────────────
+        const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|udah|siap|fix|setuju|benar|yap|yep|mantap|jadi|boleh|lanjut|gas|benar|okey)\b/i.test(msgLower);
+        const isDeny    = /\b(belum|salah|ganti|ubah|bukan|kurang|koreksi|ralat|perbaiki|enggak|nggak|ngga|tidak|gak|ga |wrong|no |nope)\b/i.test(msgLower);
+
+        if (isConfirm) {
+          // ✅ Closing!
+          await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
+          await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
+          const closingCustomer = `Siap kak! Pesanan sedang kami proses 🚀\n\nNanti kami kabarin kalau barang udah dikirim ya kak.\nTerima kasih sudah belanja! 🙏`;
+          await saveMessage(conversation.id, 'ai', closingCustomer);
+          await sendWA(userId, reply_jid, closingCustomer);
+          console.log(`Order confirmed oleh customer ${wa_number} — percakapan ditutup`);
+          return res.status(200).json({ ok: true, action: 'order_closed' });
+
+        } else if (isDeny) {
+          // ❌ Ada yang salah — minta koreksi
+          await updateConvState(conversation.id, {
+            awaiting_order_confirm: false,
+            awaiting_order_correction: true,
+          });
+          const tanyaKoreksi = `Maaf kak! 🙏 Bagian mana yang perlu diperbaiki?\nSilakan sebutkan ya kak (misal: alamatnya, nama, jumlah pesanan, dll).`;
+          await saveMessage(conversation.id, 'ai', tanyaKoreksi);
+          await sendWA(userId, reply_jid, tanyaKoreksi);
+          return res.status(200).json({ ok: true, action: 'awaiting_correction' });
+        }
+        // Kalau ambigu (tidak jelas iya/tidak) → lanjut ke Claude biasa
+      }
+    }
 
     // ── Deteksi Google Maps URL di pesan ──────────────────────
     if (messageType === 'text' && !convState.ongkir && /goo\.gl|google\.com\/maps|maps\.app/i.test(message)) {
@@ -1856,40 +1986,64 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     if (false) {
     }
 
-    // ── Update state jika order confirmed → auto closing + kirim recap ke grup ──
+    // ── Update state jika order confirmed → kirim recap grup + konfirmasi customer ──
     // (dijalankan SEBELUM cek reply kosong agar tidak terlewat meski Claude hanya tulis marker)
     if (orderConfirmed) {
-      await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
-      // Tandai bahwa conversation ini punya order — dipakai resi webhook untuk filter
-      await updateConvState(conversation.id, { order_placed: true });
+      // Ambil state terbaru
+      const convFull    = await sbGet('conversations', `?id=eq.${conversation.id}&limit=1`);
+      const latestState = convFull[0]?.state || {};
+      const ongkirData  = latestState.ongkir || convState.ongkir;
+      const area        = ongkirData?.area || {};
+      const metode      = orderDataParsed.metode  || latestState.metode_bayar || 'COD';
+      const qty         = orderDataParsed.qty     || latestState.qty          || 1;
+      const alamat      = orderDataParsed.alamat  || latestState.alamat       || '-';
+      const isCOD       = metode.toLowerCase() !== 'transfer';
+      const ekspLabel   = (ongkirData?.ekspedisi || 'KURIR').toUpperCase();
+      const harga       = ongkirData?.harga       || 0;
+      const ongkirPromo = ongkirData?.ongkirPromo || 0;
+      const feeCOD      = ongkirData?.feeCOD      || 0;
+      const total       = isCOD ? (harga + ongkirPromo + feeCOD) : (harga + ongkirPromo);
 
+      // Simpan snapshot order di state untuk dipakai di konfirmasi loop & follow-up reminder
+      const orderSnapshot = { alamat, area, qty, metode, ekspedisi: ongkirData?.ekspedisi || 'KURIR', harga, ongkirPromo, feeCOD };
+      await updateConvState(conversation.id, {
+        order_placed: true,
+        awaiting_order_confirm: true,
+        order_snapshot: orderSnapshot,
+      });
+
+      // ── Kirim recap ke grup WA ─────────────────────────────
       if (WA_GROUP_JID) {
         try {
-          // Ambil state terbaru (ongkir + area sudah tersimpan di state)
-          const convFull = await sbGet('conversations', `?id=eq.${conversation.id}&limit=1`);
-          const latestState = convFull[0]?.state || {};
-          const ongkirData  = latestState.ongkir || convState.ongkir;
-          const csNama      = product?.persona_cs_nama || 'CS';
-          const nomorUrut   = await getOrderNumber(userId);
-
+          const csNama    = product?.persona_cs_nama || 'CS';
+          const nomorUrut = await getOrderNumber(userId);
           const closingMsg = buildClosingMessage({
-            nomorUrut,
-            customer,
-            alamat:  orderDataParsed.alamat  || latestState.alamat  || '-',
-            ongkir:  ongkirData,
-            product,
+            nomorUrut, customer,
+            alamat, ongkir: ongkirData, product,
             keluhan: orderDataParsed.keluhan || latestState.keluhan || '-',
-            metode:  orderDataParsed.metode  || latestState.metode_bayar || 'COD',
-            qty:     orderDataParsed.qty     || latestState.qty     || 1,
-            csNama,
+            metode, qty, csNama,
           });
-
           await sendWA(userId, WA_GROUP_JID, closingMsg, true);
           console.log(`Recap order #${nomorUrut} terkirim ke grup`);
         } catch(e) {
           console.error('Send recap ke grup error:', e.message);
         }
       }
+
+      // ── Kirim konfirmasi ke customer (belum tutup — tunggu customer konfirmasi) ──
+      try {
+        const confirmMsg = buildCustomerConfirmMsg({
+          customer, alamat, area, qty, productNama: product?.nama, isCOD, ekspLabel, total,
+        });
+        await saveMessage(conversation.id, 'ai', confirmMsg);
+        await sendWA(userId, reply_jid, confirmMsg);
+        console.log(`Konfirmasi pesanan terkirim ke customer ${wa_number} — menunggu konfirmasi`);
+      } catch(e) {
+        console.error('Send konfirmasi ke customer error:', e.message);
+      }
+
+      // Jangan lanjut kirim reply Claude — pesan konfirmasi sudah cukup
+      return res.status(200).json({ ok: true, action: 'order_confirm_sent' });
     }
 
     if (!reply) return res.status(200).json({ ok: true, skipped: 'empty_reply' });
