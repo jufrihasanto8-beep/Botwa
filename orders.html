@@ -132,10 +132,6 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
 .bdg{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
 .bdg-cod{background:rgba(251,146,60,.12);color:#fb923c}
 .bdg-tf{background:rgba(99,102,241,.12);color:#818cf8}
-.bdg-menunggu{background:rgba(148,163,184,.12);color:#94a3b8}
-.bdg-dikirim{background:rgba(59,130,246,.12);color:#60a5fa}
-.bdg-transit{background:rgba(251,191,36,.12);color:#fbbf24}
-.bdg-sampai{background:rgba(34,197,94,.12);color:#22c55e}
 
 /* Empty */
 .empty-cell{text-align:center;padding:60px 20px;color:var(--text-3)}
@@ -320,8 +316,6 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
         <tr>
           <th>Pelanggan</th>
           <th>Produk</th>
-          <th>Status</th>
-          <th>No Resi</th>
           <th>Metode</th>
           <th>Nilai</th>
           <th>Waktu Closing</th>
@@ -669,7 +663,7 @@ function renderCharts(list) {
 function renderTable(list) {
   const tbody = document.getElementById('tbody');
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-cell">
       <div style="font-size:32px;margin-bottom:12px">📭</div>
       <h4>Belum ada closing di periode ini</h4>
       <p>Order yang dikonfirmasi bot akan muncul di sini secara otomatis.</p>
@@ -689,24 +683,6 @@ function renderTable(list) {
     const color = avColor(nama);
     const ini   = avInit(nama);
 
-    // Status tracking
-    let statusBdg = '';
-    if (st.tracking_sampai) {
-      statusBdg = `<span class="bdg bdg-sampai">✅ Sampai</span>`;
-    } else if (st.tracking_status) {
-      const lok = st.tracking_lokasi ? `<div style="font-size:10px;color:var(--text-3);margin-top:3px">${escH(st.tracking_lokasi)}</div>` : '';
-      statusBdg = `<span class="bdg bdg-transit">🚚 ${escH(st.tracking_status.slice(0,22))}</span>${lok}`;
-    } else if (st.no_resi) {
-      statusBdg = `<span class="bdg bdg-dikirim">📦 Dikirim</span>`;
-    } else {
-      statusBdg = `<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>`;
-    }
-
-    // Resi
-    const resiCell = st.no_resi
-      ? `<div style="font-weight:600;font-size:12px">${escH(st.no_resi)}</div><div style="font-size:10px;color:var(--text-3)">${escH((st.kurir_resi||'').toUpperCase())}</div>`
-      : `<span style="color:var(--text-3)">—</span>`;
-
     return `<tr>
       <td>
         <div style="display:flex;align-items:center;gap:10px">
@@ -721,8 +697,6 @@ function renderTable(list) {
         <div style="font-weight:500">${escH(prod.nama || '—')}</div>
         <div style="font-size:11px;color:var(--text-3)">×${qty} · ongkir ${rp(ongkir)}</div>
       </td>
-      <td>${statusBdg}</td>
-      <td>${resiCell}</td>
       <td><span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'Transfer':'COD'}</span></td>
       <td style="font-weight:700;color:var(--text)">${rp(nilai)}</td>
       <td style="color:var(--text-3);font-size:12px">${fmtDt(c.last_msg_at)}</td>

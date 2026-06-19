@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pesanan · Adsy CS</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.ps-layout{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.ps-toolbar{padding:12px 20px;border-bottom:1px solid var(--border);background:var(--white);display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.ps-tabs{display:flex;gap:4px}
+.ps-tab{padding:6px 16px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.ps-tab.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+.ps-search{flex:1;max-width:260px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px}
+.ps-search:focus{outline:none;border-color:#3b82f6}
+.ps-count{margin-left:auto;font-size:12px;color:var(--text-2)}
+.ps-list{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.ps-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;transition:box-shadow .15s}
+.ps-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.ps-card-left{display:flex;flex-direction:column;gap:6px}
+.ps-card-top{display:flex;align-items:center;gap:10px}
+.ps-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.ps-nama{font-size:13px;font-weight:700;color:var(--text)}
+.ps-phone{font-size:11px;color:var(--text-2)}
+.ps-produk{font-size:12px;color:var(--text-2);margin-top:2px}
+.ps-resi{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);margin-top:2px}
+.ps-resi span{font-weight:600;color:var(--text);font-family:monospace}
+.ps-pipeline{display:flex;align-items:center;gap:0;margin-top:10px}
+.ps-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative}
+.ps-step-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:9px;z-index:1;flex-shrink:0;transition:all .2s}
+.ps-step-dot.done{background:#22c55e;border-color:#22c55e;color:#fff}
+.ps-step-dot.active{background:#3b82f6;border-color:#3b82f6;color:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+.ps-step-label{font-size:9px;color:var(--text-3);white-space:nowrap;font-weight:500}
+.ps-step-label.done{color:#22c55e}
+.ps-step-label.active{color:#3b82f6;font-weight:700}
+.ps-connector{height:2px;background:var(--border);flex:1;margin-top:-10px;z-index:0;transition:background .2s}
+.ps-connector.done{background:#22c55e}
+.ps-card-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}
+.ps-nilai{font-size:14px;font-weight:800;color:var(--text)}
+.ps-date{font-size:10px;color:var(--text-3)}
+.ps-tracking-info{font-size:11px;color:var(--text-2);background:var(--bg);border-radius:7px;padding:5px 9px;max-width:200px;text-align:right;line-height:1.4}
+.ps-tracking-info b{color:var(--text)}
+
+/* Badges */
+.bdg{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.bdg-menunggu{background:rgba(148,163,184,.12);color:#94a3b8}
+.bdg-dikirim{background:rgba(59,130,246,.12);color:#60a5fa}
+.bdg-transit{background:rgba(251,191,36,.12);color:#d97706}
+.bdg-sampai{background:rgba(34,197,94,.12);color:#16a34a}
+.bdg-cod{background:rgba(251,146,60,.12);color:#fb923c}
+.bdg-tf{background:rgba(99,102,241,.12);color:#818cf8}
+
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-2)}
+.empty-state div:first-child{font-size:40px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content" style="overflow:hidden;display:flex;flex-direction:column;">
+
+    <div class="page-header">
+      <div>
+        <h1>📦 Pesanan</h1>
+        <p>Monitor status pengiriman semua order</p>
+      </div>
+      <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema" style="margin-left:auto">🌙</button>
+    </div>
+
+    <div class="ps-layout">
+      <div class="ps-toolbar">
+        <div class="ps-tabs">
+          <button class="ps-tab active" onclick="setTab('semua',this)">Semua</button>
+          <button class="ps-tab" onclick="setTab('menunggu',this)">⏳ Menunggu Resi</button>
+          <button class="ps-tab" onclick="setTab('dikirim',this)">📦 Dikirim</button>
+          <button class="ps-tab" onclick="setTab('transit',this)">🚚 Transit</button>
+          <button class="ps-tab" onclick="setTab('sampai',this)">✅ Sampai</button>
+        </div>
+        <input class="ps-search" type="text" placeholder="Cari nama / resi / produk..." oninput="render()" id="ps-search">
+        <div class="ps-count" id="ps-count"></div>
+      </div>
+      <div class="ps-list" id="ps-list">
+        <div class="empty-state"><div>📦</div>Memuat pesanan...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('pesanan');
+checkBotStatus();
+
+const uid = Auth.getUser()?.id;
+let allConvs = [], custMap = {}, prodMap = {};
+let activeTab = 'semua';
+
+function rp(n) { return 'Rp ' + (n||0).toLocaleString('id-ID'); }
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function avColor(n) { const c=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4']; let h=0; for(let i=0;i<(n||'').length;i++) h=(h*31+n.charCodeAt(i))%c.length; return c[h]; }
+function avInit(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function fmtDt(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function getStatus(st) {
+  if (st.tracking_sampai)  return 'sampai';
+  if (st.tracking_status)  return 'transit';
+  if (st.no_resi)          return 'dikirim';
+  return 'menunggu';
+}
+
+function setTab(tab, btn) {
+  activeTab = tab;
+  document.querySelectorAll('.ps-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+async function init() {
+  await Config.load();
+  const [convs, custs, prods] = await Promise.all([
+    sbGet('conversations', `?user_id=eq.${uid}&order=last_msg_at.desc&limit=500`),
+    sbGet('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,reply_jid`),
+    sbGet('products',  `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
+  ]);
+
+  custs.forEach(c => custMap[c.id] = c);
+  prods.forEach(p => prodMap[p.id] = p);
+
+  allConvs = (convs||[]).filter(c => c.state?.order_placed === true);
+  render();
+}
+
+function render() {
+  const q = document.getElementById('ps-search').value.toLowerCase();
+  let list = allConvs;
+
+  // Filter tab
+  if (activeTab !== 'semua') {
+    list = list.filter(c => getStatus(c.state || {}) === activeTab);
+  }
+
+  // Filter search
+  if (q) {
+    list = list.filter(c => {
+      const cu = custMap[c.customer_id] || {};
+      const pr = prodMap[c.product_id] || {};
+      const st = c.state || {};
+      return (cu.nama||'').toLowerCase().includes(q)
+        || (cu.wa_number||'').includes(q)
+        || (pr.nama||'').toLowerCase().includes(q)
+        || (st.no_resi||'').toLowerCase().includes(q);
+    });
+  }
+
+  document.getElementById('ps-count').textContent = `${list.length} pesanan`;
+
+  const container = document.getElementById('ps-list');
+  if (!list.length) {
+    container.innerHTML = `<div class="empty-state"><div>📭</div><div style="font-weight:600;margin-bottom:6px">Tidak ada pesanan</div><div style="font-size:12px">Coba ganti filter atau cari dengan kata lain</div></div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(c => {
+    const cu    = custMap[c.customer_id] || {};
+    const pr    = prodMap[c.product_id]  || {};
+    const st    = c.state || {};
+    const nama  = cu.nama || cu.wa_number || 'Pelanggan';
+    const color = avColor(nama);
+    const qty   = parseInt(st.qty || 1);
+    const ongkir= st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const nilai = ((pr.harga||0) * qty) + ongkir;
+    const metode= (st.metode_bayar || 'cod').toLowerCase();
+    const status= getStatus(st);
+
+    // Pipeline steps: confirmed → dikirim → transit → sampai
+    const steps = [
+      { key:'confirmed', label:'Konfirmasi' },
+      { key:'dikirim',   label:'Dikirim' },
+      { key:'transit',   label:'Transit' },
+      { key:'sampai',    label:'Sampai' },
+    ];
+    const stepOrder = ['confirmed','dikirim','transit','sampai'];
+    const currentIdx = status === 'menunggu' ? 0
+      : status === 'dikirim' ? 1
+      : status === 'transit' ? 2
+      : 3;
+
+    const pipelineHtml = steps.map((s, i) => {
+      const isDone   = i < currentIdx;
+      const isActive = i === currentIdx;
+      const dotClass = isDone ? 'done' : isActive ? 'active' : '';
+      const lblClass = isDone ? 'done' : isActive ? 'active' : '';
+      const connector = i < steps.length - 1
+        ? `<div class="ps-connector${isDone ? ' done' : ''}"></div>`
+        : '';
+      return `<div class="ps-step">
+        <div class="ps-step-dot ${dotClass}">${isDone ? '✓' : i+1}</div>
+        <div class="ps-step-label ${lblClass}">${s.label}</div>
+      </div>${connector}`;
+    }).join('');
+
+    // Status badge
+    const statusMap = {
+      menunggu: `<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>`,
+      dikirim:  `<span class="bdg bdg-dikirim">📦 Dikirim</span>`,
+      transit:  `<span class="bdg bdg-transit">🚚 ${escH((st.tracking_status||'').slice(0,25))}</span>`,
+      sampai:   `<span class="bdg bdg-sampai">✅ Sampai</span>`,
+    };
+
+    // Tracking info
+    let trackingInfo = '';
+    if (st.no_resi) {
+      trackingInfo = `<div class="ps-tracking-info"><b>${escH(st.no_resi)}</b> · ${escH((st.kurir_resi||'').toUpperCase())}${st.tracking_lokasi ? `<br>${escH(st.tracking_lokasi)}` : ''}</div>`;
+    }
+
+    return `<div class="ps-card">
+      <div class="ps-card-left">
+        <div class="ps-card-top">
+          <div class="ps-av" style="background:${color}">${escH(avInit(nama))}</div>
+          <div>
+            <div class="ps-nama">${escH(nama)}</div>
+            <div class="ps-phone">${escH((cu.wa_number||'').replace('@s.whatsapp.net',''))}</div>
+          </div>
+          <div style="margin-left:8px">${statusMap[status]}</div>
+          <span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}" style="margin-left:4px">${metode==='transfer'?'TF':'COD'}</span>
+        </div>
+        <div class="ps-produk">
+          ${escH(pr.nama || '—')} × ${qty}
+          ${st.ongkir?.ekspedisi ? `· <b>${escH(st.ongkir.ekspedisi.toUpperCase())}</b>` : ''}
+        </div>
+        <div class="ps-pipeline">${pipelineHtml}</div>
+      </div>
+      <div class="ps-card-right">
+        <div class="ps-nilai">${rp(nilai)}</div>
+        <div class="ps-date">${fmtDt(c.last_msg_at)}</div>
+        ${trackingInfo}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
