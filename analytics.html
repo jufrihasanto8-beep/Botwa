@@ -504,6 +504,7 @@ async function init() {
   const rangeStart = getRangeStart();
   const rangeEnd   = getRangeEnd();
   const sinceISO   = rangeStart.toISOString();
+  const today      = new Date(); today.setHours(0,0,0,0);
 
   // Update subtitle
   const fmt = d => d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
@@ -521,9 +522,6 @@ async function init() {
   const convRate       = leadsHariIni > 0 ? Math.round((closingHariIni/leadsHariIni)*100) : 0;
   const esc            = convs.filter(c => c.status === 'eskalasi').length;
   const convIds        = convs.map(c=>c.id);
-
-  document.getElementById('sb-total').textContent   = convs.length;
-  document.getElementById('sb-selesai').textContent = closingAll.length;
 
   // Fetch messages (untuk AI rate)
   let allMsgs = [];
@@ -646,8 +644,6 @@ async function init() {
 
   // Update resolusi badge
   document.getElementById('resolusi-badge').textContent = `✓ ${closingAll.length} selesai`;
-  document.getElementById('sb-total').textContent   = convs.length;
-  document.getElementById('sb-selesai').textContent = closingAll.length;
 }
 
 async function generateInsights() {
