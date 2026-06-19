@@ -60,9 +60,14 @@ async function sbPatch(table, query, body) {
 
 /* ── NORMALISASI NOMOR WA ─────────────────────────────────── */
 function normalizeWA(num) {
-  let n = String(num).replace(/\D/g, '');
-  if (n.startsWith('0'))  n = '62' + n.slice(1);
+  // Strip @s.whatsapp.net / @lid / @g.us suffix dulu
+  const raw = String(num).split('@')[0];
+  let n = raw.replace(/\D/g, '');
+  if (n.startsWith('0')) n = '62' + n.slice(1);
   if (!n.startsWith('62')) n = '62' + n;
+  // LID format: hasil normalisasi lebih dari 13 digit = bukan nomor HP asli
+  // Kembalikan digit asli tanpa prefix 62 supaya lookup konsisten
+  if (n.length > 13) return raw.replace(/\D/g, '');
   return n;
 }
 
@@ -92,13 +97,33 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
     if (conv.status === 'selesai') {
       console.log(`Re-open conversation ${conv.id}`);
       const reopenedAt = new Date().toISOString();
+      const prevState = conv.state || {};
+      const newState = {
+        tahap: 'sambut',
+        produk_locked: !!prevState.produk_locked,
+        reopened_at: reopenedAt,
+        // Preserve konteks penting agar bot ingat data customer
+        wilayah:      prevState.wilayah      || null,
+        ongkir:       prevState.ongkir       || null,
+        keluhan:      prevState.keluhan       || null,
+        alamat:       prevState.alamat        || null,
+        metode_bayar: prevState.metode_bayar  || null,
+        qty:          prevState.qty           || null,
+        // Clear state transient agar tidak salah konteks
+        proposed_wilayah:  null,
+        pending_kecamatan: null,
+        followed_up:       false,
+        followed_up_days:  [],
+        order_placed:      false,
+        foto_terkirim:     false,
+      };
       const updated = await sbPatch('conversations', `?id=eq.${conv.id}`, {
         status: 'baru',
         last_msg_at: reopenedAt,
         ringkasan: null,
-        state: { tahap: 'sambut', produk_locked: !!conv.state?.produk_locked, reopened_at: reopenedAt },
+        state: newState,
       });
-      return updated[0] || { ...conv, status: 'baru', state: { tahap: 'sambut', reopened_at: reopenedAt } };
+      return updated[0] || { ...conv, status: 'baru', state: newState };
     }
     return conv;
   }
@@ -1348,8 +1373,8 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
       systemPrompt += `\n\nDATA SEMUA KURIR TERSEDIA (selalu gunakan ini kalau customer tanya kurir lain — JANGAN bilang "ditentukan sistem"):\n${tabel}\nRekomendasi sistem: ${convState.ongkir.ekspedisi}${areaOngkir ? `\nWilayah tujuan: ${areaOngkir} (SUDAH DIKETAHUI — jangan tanya wilayah lagi)` : ''}`;
     }
 
-    // ── Ambil pesan terakhir (filter setelah re-open jika ada) ───
-    const history = await getContextMessages(conversation.id, convState.reopened_at || null);
+    // ── Ambil pesan terakhir (tanpa filter timestamp agar bot ingat history lama) ───
+    const history = await getContextMessages(conversation.id, null);
 
     // ── Inject hasil analisa gambar ke history ─────────────────
     if (imageAnalysis) {
