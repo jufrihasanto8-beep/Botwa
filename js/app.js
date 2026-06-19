@@ -652,6 +652,10 @@ function renderSidebar(activePage) {
       .sb-item.active{background:rgba(59,130,246,.12)!important;color:#93c5fd!important}
       .sb-item .si{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
       .sb-item .si svg{width:16px;height:16px;display:block}
+      .bot-online{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#22c55e;padding:6px 10px;background:rgba(34,197,94,.08);border-radius:6px;margin:8px 14px}
+      .bot-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
+      @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+      body.light .bot-online{background:rgba(34,197,94,.06)}
       .sb-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 8px}
       .sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
       .sb-avatar{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
@@ -684,6 +688,7 @@ function renderSidebar(activePage) {
     contacts:         ic(`<path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M22 21v-2a4 4 0 0 0-3-3.87'/><path d='M16 3.13a4 4 0 0 1 0 7.75'/>`),
     aiinsights:       ic(`<path d='m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z'/>`),
     orders:           ic(`<polyline points='22 7 13.5 15.5 8.5 10.5 2 17'/><polyline points='16 7 22 7 22 13'/>`),
+    pesanan:          ic(`<path d='M11 21H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5'/><path d='M22 13V6a2 2 0 0 0-2-2h-5'/><rect x='9' y='11' width='6' height='11' rx='1'/><path d='M9 7h6'/>`),
     'followup-engine':ic(`<path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'/><path d='M10.3 21a1.94 1.94 0 0 0 3.4 0'/>`),
     products:         ic(`<path d='m7.5 4.27 9 5.15'/><path d='M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z'/><path d='m3.3 7 8.7 5 8.7-5'/><path d='M12 22V12'/>`),
     promo:            ic(`<path d='M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42Z'/><circle cx='7.5' cy='7.5' r='.5' fill='currentColor'/>`),
@@ -698,6 +703,7 @@ function renderSidebar(activePage) {
     { id:'contacts',        href:'contacts.html',        icon:ICONS.contacts,         label:'Pelanggan' },
     { id:'aiinsights',      href:'aiinsights.html',      icon:ICONS.aiinsights,       label:'AI Insights' },
     { id:'orders',          href:'orders.html',          icon:ICONS.orders,           label:'Closing' },
+    { id:'pesanan',         href:'pesanan.html',         icon:ICONS.pesanan,          label:'Pesanan' },
     { id:'followup-engine', href:'followup-engine.html', icon:ICONS['followup-engine'],label:'Follow-up' },
     { id:'products',        href:'products.html',        icon:ICONS.products,         label:'Katalog & SOP' },
     { id:'promo',           href:'promo.html',           icon:ICONS.promo,            label:'Skema Promo' },
@@ -717,6 +723,7 @@ function renderSidebar(activePage) {
         <div class="sb-subtitle">${user?.store||'Adsy CS'}</div>
       </div>
     </div>
+    <div class="bot-online" id="sb-bot-status"><div class="bot-dot"></div> Bot online</div>
     <div class="sb-nav">
       ${pages.map(item).join('')}
       <div class="sb-divider"></div>
@@ -732,4 +739,24 @@ function renderSidebar(activePage) {
       <div class="_sb_theme" onclick="(function(){const l=document.body.classList.toggle('light');localStorage.setItem('cs_theme',l?'light':'dark');this.textContent=l?'☀️':'🌙'}).call(this)" title="Ganti tema">${localStorage.getItem('cs_theme')==='light'?'☀️':'🌙'}</div>
     </div>
   </div>`;
+}
+
+async function checkBotStatus() {
+  const sbBot = document.getElementById('sb-bot-status');
+  const uid   = Auth.getUser()?.id;
+  if (!sbBot || !uid) return;
+  try {
+    const res = await fetch('/api/baileys-proxy?path=' + encodeURIComponent('/session/status/' + uid));
+    const s   = await res.json();
+    if (s.status === 'connected') {
+      sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
+      sbBot.style.color = '#22c55e';
+    } else {
+      sbBot.innerHTML   = '⚠️ Bot offline';
+      sbBot.style.color = '#f59e0b';
+    }
+  } catch(e) {
+    sbBot.innerHTML   = '⚠️ Bot offline';
+    sbBot.style.color = '#f59e0b';
+  }
 }
