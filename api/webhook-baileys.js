@@ -1923,15 +1923,15 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         convState.pending_kecamatan = null;
         autoOngkirResult = { wilayah: proposedWilayah, hasil };
 
-        // Simpan ke customers.alamat
-        if (customer?.id && hasil.area?.kecamatan) {
+        // Simpan ke customers.alamat (hanya overwrite field non-null dari API)
+        if (customer?.id) {
           const alamatBaru = {
             ...(customer.alamat || {}),
-            kelurahan:   hasil.area.kelurahan,
-            kecamatan:   hasil.area.kecamatan,
-            kabupaten:   hasil.area.kota,
-            provinsi:    hasil.area.provinsi,
-            kodepos:     hasil.area.kodePos,
+            ...(hasil.area?.kelurahan ? { kelurahan: hasil.area.kelurahan } : {}),
+            ...(hasil.area?.kecamatan ? { kecamatan: hasil.area.kecamatan } : {}),
+            ...(hasil.area?.kota      ? { kabupaten: hasil.area.kota }      : {}),
+            ...(hasil.area?.provinsi  ? { provinsi:  hasil.area.provinsi }  : {}),
+            ...(hasil.area?.kodePos   ? { kodepos:   hasil.area.kodePos }   : {}),
             ekspedisi:   hasil.ekspedisi,
             ongkirAsli:  hasil.ongkirAsli,
             ongkirPromo: hasil.ongkirPromo,
@@ -2084,8 +2084,10 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
               kabupaten: first.kabupaten,
               provinsi:  first.provinsi,
             };
-            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatArea })
-              .catch(e => console.error('[WILAYAH_OK] Gagal save area awal:', e.message));
+            console.log(`[WILAYAH_OK] Coba save customers.alamat, customer.id=${customer?.id}, alamat=`, JSON.stringify(alamatArea));
+            const patchRes = await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatArea })
+              .catch(e => { console.error('[WILAYAH_OK] Gagal save area awal:', e.message); return null; });
+            console.log(`[WILAYAH_OK] Patch result:`, JSON.stringify(patchRes));
             customer.alamat = alamatArea;
           }
           if (!convState.alamat) {
@@ -2099,15 +2101,15 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             await updateConvState(conversation.id, { ongkir: hasil });
             convState.ongkir = hasil;
 
-            // Step 2: Update customers.alamat dengan data ongkir lengkap
-            if (customer?.id && hasil.area?.kecamatan) {
+            // Step 2: Update customers.alamat dengan data ongkir (hanya overwrite field non-null dari API)
+            if (customer?.id) {
               const alamatBaru = {
                 ...(customer.alamat || {}),
-                kelurahan:   hasil.area.kelurahan,
-                kecamatan:   hasil.area.kecamatan,
-                kabupaten:   hasil.area.kota,
-                provinsi:    hasil.area.provinsi,
-                kodepos:     hasil.area.kodePos,
+                ...(hasil.area?.kelurahan ? { kelurahan: hasil.area.kelurahan } : {}),
+                ...(hasil.area?.kecamatan ? { kecamatan: hasil.area.kecamatan } : {}),
+                ...(hasil.area?.kota      ? { kabupaten: hasil.area.kota }      : {}),
+                ...(hasil.area?.provinsi  ? { provinsi:  hasil.area.provinsi }  : {}),
+                ...(hasil.area?.kodePos   ? { kodepos:   hasil.area.kodePos }   : {}),
                 ekspedisi:   hasil.ekspedisi,
                 ongkirAsli:  hasil.ongkirAsli,
                 ongkirPromo: hasil.ongkirPromo,
@@ -2181,15 +2183,15 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           await updateConvState(conversation.id, { ongkir: hasil });
           convState.ongkir = hasil;
 
-          // Simpan ke customers.alamat juga (sama seperti branch kelurahanUnik)
-          if (customer?.id && hasil.area?.kecamatan) {
+          // Simpan ke customers.alamat juga (hanya overwrite field non-null dari API)
+          if (customer?.id) {
             const alamatBaru = {
               ...(customer.alamat || {}),
-              kelurahan:   hasil.area.kelurahan,
-              kecamatan:   hasil.area.kecamatan,
-              kabupaten:   hasil.area.kota,
-              provinsi:    hasil.area.provinsi,
-              kodepos:     hasil.area.kodePos,
+              ...(hasil.area?.kelurahan ? { kelurahan: hasil.area.kelurahan } : {}),
+              ...(hasil.area?.kecamatan ? { kecamatan: hasil.area.kecamatan } : {}),
+              ...(hasil.area?.kota      ? { kabupaten: hasil.area.kota }      : {}),
+              ...(hasil.area?.provinsi  ? { provinsi:  hasil.area.provinsi }  : {}),
+              ...(hasil.area?.kodePos   ? { kodepos:   hasil.area.kodePos }   : {}),
               ekspedisi:   hasil.ekspedisi,
               ongkirAsli:  hasil.ongkirAsli,
               ongkirPromo: hasil.ongkirPromo,
@@ -2225,15 +2227,15 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         await updateConvState(conversation.id, { ongkir: hasil });
         convState.ongkir = hasil; // update local state
 
-        // Simpan ke customers.alamat
-        if (customer?.id && hasil.area?.kecamatan) {
+        // Simpan ke customers.alamat (hanya overwrite field non-null dari API)
+        if (customer?.id) {
           const alamatBaru = {
             ...(customer.alamat || {}),
-            kelurahan:   hasil.area.kelurahan,
-            kecamatan:   hasil.area.kecamatan,
-            kabupaten:   hasil.area.kota,
-            provinsi:    hasil.area.provinsi,
-            kodepos:     hasil.area.kodePos,
+            ...(hasil.area?.kelurahan ? { kelurahan: hasil.area.kelurahan } : {}),
+            ...(hasil.area?.kecamatan ? { kecamatan: hasil.area.kecamatan } : {}),
+            ...(hasil.area?.kota      ? { kabupaten: hasil.area.kota }      : {}),
+            ...(hasil.area?.provinsi  ? { provinsi:  hasil.area.provinsi }  : {}),
+            ...(hasil.area?.kodePos   ? { kodepos:   hasil.area.kodePos }   : {}),
             ekspedisi:   hasil.ekspedisi,
             ongkirAsli:  hasil.ongkirAsli,
             ongkirPromo: hasil.ongkirPromo,
