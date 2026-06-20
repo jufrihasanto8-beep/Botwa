@@ -148,14 +148,16 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
   }
 
   // Customer baru sama sekali → buat conversation baru
+  // Form lead = prioritas high, inbound/ctwa = low
+  const prioritas = sumber === 'form' ? 'high' : 'low';
   const rows = await sbPost('conversations', {
     user_id: userId,
     customer_id: customerId,
     sumber,
     product_id: productId || null,
     status: 'baru',
-    prioritas: 'low',
-    state: { tahap: 'sambut', produk_locked: !!productId },
+    prioritas,
+    state: { tahap: 'sambut', produk_locked: !!productId, is_form_lead: sumber === 'form' },
   });
   return rows[0];
 }
@@ -239,7 +241,15 @@ PRINSIP UTAMA
 - Kalau customer buru-buru & EKSPLISIT minta beli → baru layani langsung.
 
 DATA CHAT & PRODUK
-Sumber chat     : ${sumber === 'ctwa' ? 'CTWA (dari iklan)' : sumber === 'form' ? 'Form (isi formulir)' : 'Inbound (customer chat duluan)'}
+Sumber chat     : ${sumber === 'ctwa' ? 'CTWA (dari iklan)' : sumber === 'form' ? 'Form (isi formulir)' : 'Inbound (customer chat duluan)'}${sumber === 'form' ? `
+
+⚡ LEADS FORM — PERLAKUAN KHUSUS:
+- Customer sudah KENAL produk & sudah niat beli (warm lead) — langsung sapa dengan namanya, jangan tanya nama lagi
+- Jawab pertanyaan mereka dulu (misal soal promo/stok), baru lanjut
+- Gali keluhan TETAP PERLU tapi lebih singkat & santai — 1-2 pertanyaan saja, fokus pada kondisi spesifik mereka (bukan untuk edukasi dari nol)
+- Edukasi TETAP PERLU tapi lebih ringkas — tidak perlu panjang, cukup konfirmasi produk cocok untuk keluhannya + 1-2 poin manfaat utama
+- Setelah keluhan tergali & edukasi singkat → langsung tanya wilayah & proses order
+- Alur: jawab pertanyaan → gali keluhan singkat → edukasi ringkas → wilayah → order` : ''}
 Produk          : ${namaProduk}
 Harga           : ${harga}
 Cocok untuk     : ${keluhan}
@@ -1224,8 +1234,29 @@ module.exports = async function handler(req, res) {
     // CTWA → Haiku (volume tinggi, hemat biaya), Form/Inbound → Sonnet (lebih pintar)
     const chatModel = sumber === 'ctwa' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6';
 
+    // ── Deteksi leads dari form web (pesan mengandung "isi form" + nama) ───
+    let suumberFinal = sumber;
+    const isFormLead = /isi form|sudah isi|formulir|form pemesanan|form order/i.test(message);
+    let namaFromForm = null;
+    if (isFormLead) {
+      suumberFinal = 'form';
+      // Extract nama: "atas nama X", "nama saya X", "nama: X"
+      const namaMatch = message.match(/atas nama\s+([A-Za-z\s]+?)(?:[,.\n]|$)/i)
+        || message.match(/nama saya\s+([A-Za-z\s]+?)(?:[,.\n]|$)/i)
+        || message.match(/nama\s*[:=]\s*([A-Za-z\s]+?)(?:[,.\n]|$)/i);
+      if (namaMatch) namaFromForm = namaMatch[1].trim();
+      console.log(`[form lead] detected — nama: ${namaFromForm || '(tidak terdeteksi)'}`);
+    }
+
     // ── Find/create customer & conversation ───────────────────
-    const customer = await findOrCreateCustomer(userId, wa_number, pushName, reply_jid);
+    const customer = await findOrCreateCustomer(userId, wa_number, namaFromForm || pushName, reply_jid);
+
+    // Update nama dari form kalau lebih lengkap dari push_name
+    if (namaFromForm && namaFromForm !== customer.nama) {
+      await sbPatch('customers', `?id=eq.${customer.id}`, { nama: namaFromForm }).catch(() => {});
+      customer.nama = namaFromForm;
+      console.log(`[form lead] Update nama customer: ${namaFromForm}`);
+    }
 
     // Simpan reply_jid (bisa berupa LID format seperti 224029940129807@lid)
     // supaya CS dari dashboard bisa kirim ke JID yang benar
@@ -1234,7 +1265,7 @@ module.exports = async function handler(req, res) {
       customer.reply_jid = reply_jid;
     }
 
-    const conversation = await findOrCreateConversation(userId, customer.id, sumber, product?.id);
+    const conversation = await findOrCreateConversation(userId, customer.id, suumberFinal, product?.id);
 
     // Update produk ke conversation jika baru ketemu
     if (product?.id && !conversation.product_id) {

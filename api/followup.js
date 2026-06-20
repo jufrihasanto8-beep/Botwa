@@ -73,7 +73,7 @@ async function sendWA(sessionId, jid, message, imageUrl = null, caption = null) 
 }
 
 // ── Generate pesan AI dari konteks percakapan ─────────────
-async function generateAIFollowup(messages, namaKak, namaProduk, csNama, isLast = false) {
+async function generateAIFollowup(messages, namaKak, namaProduk, csNama, isLast = false, isFormLead = false) {
   if (!ANTHROPIC_KEY) return null;
 
   const recent = messages.slice(-6);
@@ -83,7 +83,9 @@ async function generateAIFollowup(messages, namaKak, namaProduk, csNama, isLast 
 
   const toneNote = isLast
     ? 'Ini follow-up TERAKHIR. Tone penutup — beri ruang, tidak maksa, pintu tetap terbuka.'
-    : 'Tone hangat, natural, sambung konteks.';
+    : isFormLead
+      ? 'Customer ini sudah isi form & niat beli (warm lead). Tone antusias, bantu segera, tunjukkan kamu prioritaskan mereka.'
+      : 'Tone hangat, natural, sambung konteks.';
 
   const prompt = `Kamu ${csNama || 'Sari'}, CS WhatsApp toko ${namaProduk || 'produk kami'}.
 
@@ -130,8 +132,9 @@ Tulis pesannya langsung tanpa penjelasan.`;
 
 // ── Kirim follow-up ke satu conversation ─────────────────
 async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now) {
-  const state    = conv.state || {};
-  const jid      = customer.reply_jid || customer.wa_number;
+  const state       = conv.state || {};
+  const isFormLead  = conv.sumber === 'form' || state.is_form_lead === true;
+  const jid         = customer.reply_jid || customer.wa_number;
   const namaKak  = customer.nama && customer.nama !== customer.wa_number
     ? customer.nama.split(' ')[0] : '';
 
@@ -150,7 +153,7 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now) 
   const isLastDay = schedule?.is_last || false;
 
   if (tipe === 'ai') {
-    message = await generateAIFollowup(recentMsgs, namaKak, namaProduk, csNama, isLastDay);
+    message = await generateAIFollowup(recentMsgs, namaKak, namaProduk, csNama, isLastDay, isFormLead);
     if (!message) {
       message = namaKak
         ? `Kak ${namaKak}, masih ada yang bisa aku bantu? 😊`
@@ -323,16 +326,26 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
     todayStart.setTime(todayStart.getTime() - 7 * 60 * 60 * 1000);
     const todayStartISO = todayStart.toISOString();
 
-    // Minimal 1 jam diam sebelum difollow-up
-    // Tidak ada batas atas (cutoff4h dihapus) — relied on followed_up_days untuk cegah duplikat
-    const cutoff1h = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    // Minimal 1 jam diam sebelum difollow-up (form lead: 30 menit)
+    const cutoff1h  = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const cutoff30m = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
 
-    // Query 1: lead baru hari ini
+    // Query 1a: form leads baru hari ini (cutoff 30 menit)
+    const formConvs = await sbGet('conversations',
+      `?status=in.(baru,diproses)` +
+      `&sumber=eq.form` +
+      `&created_at=gte.${todayStartISO}` +
+      `&last_msg_at=lte.${cutoff30m}` +
+      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at`
+    ).catch(() => []);
+
+    // Query 1b: lead biasa baru hari ini (cutoff 1 jam)
     const newConvs = await sbGet('conversations',
       `?status=in.(baru,diproses)` +
+      `&sumber=neq.form` +
       `&created_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
-      `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
+      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at`
     );
 
     // Query 2: customer lama yang chat lagi hari ini (last_msg_at >= hari ini)
@@ -341,14 +354,14 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
       `&created_at=lt.${todayStartISO}` +
       `&last_msg_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
-      `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
+      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at`
     ).catch(() => []);
 
     const reopenedToday = Array.isArray(reopenedConvs) ? reopenedConvs : [];
 
     // Gabung keduanya, hindari duplikat
     const seenIds = new Set();
-    const hariHConvs = [...newConvs, ...reopenedToday].filter(c => {
+    const hariHConvs = [...(Array.isArray(formConvs) ? formConvs : []), ...newConvs, ...reopenedToday].filter(c => {
       if (seenIds.has(c.id)) return false;
       seenIds.add(c.id);
       return true;
