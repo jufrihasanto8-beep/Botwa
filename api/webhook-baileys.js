@@ -297,7 +297,8 @@ ATURAN HARGA, ONGKIR & COD
   Contoh: "Siap kak, Mariso Makassar ya 😊 [WILAYAH_OK:Mariso, Makassar, Sulawesi Selatan]"
 - ⛔ JANGAN bilang "sebentar aku cek ongkir" — sistem hitung OTOMATIS saat kamu tulis [WILAYAH_OK:].
 - ⛔ HANYA KOTA/KABUPATEN = TANYA KECAMATAN DULU. Kalau customer cuma sebut nama kota/kabupaten tanpa kecamatan, tanya dulu: "Di kecamatan mana kak? Biar ongkirnya akurat 😊". Baru setelah dapat kecamatan, tulis [WILAYAH_OK:].
-- Sebelum [WILAYAH_OK] → wilayah HARUS sudah spesifik sampai KECAMATAN atau kelurahan.
+- ⛔ KECAMATAN SAJA = TANYA KELURAHAN/DESA DULU. Kalau customer sebut kecamatan tapi belum menyebut kelurahan/desa, tanya dulu: "Di desa/kelurahan mana kak? 😊". Baru setelah dapat kelurahan, tulis [WILAYAH_OK:kelurahan, kecamatan, kabupaten, provinsi].
+- Sebelum [WILAYAH_OK] → wilayah HARUS sudah spesifik sampai KELURAHAN/DESA.
 - Wilayah parsial (nama desa/kecamatan kecil yang unik) → tebak & konfirmasi provinsinya: "Pringsewu, Lampung ya kak?"
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
   Prinsip: kalau nama itu bisa jadi kota/kab di lebih dari satu provinsi, TANYA dulu.
@@ -1595,8 +1596,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     // ── WEBHOOK-LEVEL: Auto-search wilayah via tabel lokal wilayah_id ──
     const lastAiMsg = history.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
-    const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|kelurahan|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
-    if (!convState.wilayah && !convState.ongkir && aiTanyaLokasi && message.length >= 3 && message.length <= 80) {
+    const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|kelurahan|desa|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
+    const kelurahanBelumTerisi = !convState.ongkir?.area?.kelurahan || convState.pending_kecamatan;
+    if ((!convState.wilayah || kelurahanBelumTerisi) && aiTanyaLokasi && message.length >= 3 && message.length <= 80) {
       try {
         // ── Kalau bot sedang menunggu jawaban kelurahan (pending_kecamatan ada di state),
         //    cari kelurahan di kecamatan itu saja — jangan search global (bisa salah kecamatan)
@@ -1997,23 +1999,36 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       // Ambil state terbaru
       const convFull    = await sbGet('conversations', `?id=eq.${conversation.id}&limit=1`);
       const latestState = convFull[0]?.state || {};
-      const ongkirData  = latestState.ongkir || convState.ongkir;
+      let   ongkirData  = latestState.ongkir || convState.ongkir;
+
+      // Kalau area kosong, re-fetch ongkir dari wilayah tersimpan agar data lengkap
+      if (!ongkirData?.area?.kecamatan) {
+        const wilayahSaved = latestState.wilayah || convState.wilayah;
+        if (wilayahSaved) {
+          const fresh = await hitungOngkir(wilayahSaved, product).catch(() => null);
+          if (fresh?.area?.kecamatan) ongkirData = { ...ongkirData, ...fresh };
+        }
+      }
+
       const area        = ongkirData?.area || {};
       const metode      = orderDataParsed.metode  || latestState.metode_bayar || 'COD';
       const qty         = orderDataParsed.qty     || latestState.qty          || 1;
       const alamat      = orderDataParsed.alamat  || latestState.alamat       || '-';
       const isCOD       = metode.toLowerCase() !== 'transfer';
-      const ekspLabel   = (ongkirData?.ekspedisi || 'KURIR').toUpperCase();
-      const harga       = ongkirData?.harga       || 0;
+      const ekspedisi   = ongkirData?.ekspedisi   || 'KURIR';
+      const ekspLabel   = ekspedisi.toUpperCase();
+      const harga       = ongkirData?.harga       || product?.harga || 0;
+      const ongkirAsli  = ongkirData?.ongkirAsli  || ongkirData?.ongkirPromo || 0;
       const ongkirPromo = ongkirData?.ongkirPromo || 0;
       const feeCOD      = ongkirData?.feeCOD      || 0;
-      const total       = isCOD ? (harga + ongkirPromo + feeCOD) : (harga + ongkirPromo);
 
-      // Simpan snapshot order di state untuk dipakai di konfirmasi loop & follow-up reminder
-      const orderSnapshot = { alamat, area, qty, metode, ekspedisi: ongkirData?.ekspedisi || 'KURIR', harga, ongkirPromo, feeCOD };
+      // Simpan area & ekspedisi yang sudah confirmed ke ongkir state agar tersimpan permanen di Supabase
+      const confirmedOngkir = { ...ongkirData, area, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD };
+      const orderSnapshot   = { alamat, area, qty, metode, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD };
       await updateConvState(conversation.id, {
         order_placed: true,
         awaiting_order_confirm: true,
+        ongkir: confirmedOngkir,
         order_snapshot: orderSnapshot,
       });
 
@@ -2042,10 +2057,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           productNama: product?.nama,
           satuan: product?.satuan,
           isCOD, ekspLabel,
-          harga:       ongkirData?.harga       || product?.harga || 0,
-          ongkirAsli:  ongkirData?.ongkirAsli  || 0,
-          ongkirPromo: ongkirData?.ongkirPromo || 0,
-          feeCOD:      ongkirData?.feeCOD      || 0,
+          harga, ongkirAsli, ongkirPromo, feeCOD,
         });
         await saveMessage(conversation.id, 'ai', confirmMsg);
         await sendWA(userId, reply_jid, confirmMsg);
