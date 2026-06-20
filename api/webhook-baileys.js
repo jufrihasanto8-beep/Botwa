@@ -684,9 +684,10 @@ function formatWilayah(row) {
   return [row.kecamatan, row.kabupaten, row.provinsi].filter(Boolean).join(', ');
 }
 
-// Format wilayah untuk query ke Mengantar — pakai kelurahan + kecamatan agar dapat destination_id yang tepat
+// Format wilayah untuk query ke Mengantar — strip prefix Kabupaten/Kota agar Mengantar bisa match
 function formatWilayahMengantar(row) {
-  return [row.kelurahan, row.kecamatan, row.kabupaten].filter(Boolean).join(', ');
+  const stripKab = s => (s || '').replace(/^(kabupaten|kota|kab\.?)\s*/i, '').trim();
+  return [row.kelurahan, row.kecamatan, stripKab(row.kabupaten)].filter(Boolean).join(', ');
 }
 
 // Ambil semua kelurahan di satu kecamatan (untuk ditawarkan ke customer sebagai pilihan)
@@ -775,13 +776,32 @@ async function hitungOngkir(wilayah, product) {
       console.log(`Query Mengantar: "${queryMengantar}"`);
     }
 
-    // Step 3: Cari destination_id dari Mengantar
-    const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(queryMengantar)}`);
-    const areas = searchJson.data || searchJson;
-    console.log(`[hitungOngkir] autofill "${queryMengantar}" → ${Array.isArray(areas) ? areas.length : 'non-array'} results`);
-    if (Array.isArray(areas) && areas.length) console.log(`[hitungOngkir] area[0]: ${JSON.stringify(areas[0])}`);
-    if (!Array.isArray(areas) || !areas.length) {
-      console.error(`[hitungOngkir] autofill GAGAL — tidak ada hasil untuk "${queryMengantar}". Raw: ${JSON.stringify(searchJson).slice(0, 200)}`);
+    // Step 3: Cari destination_id dari Mengantar — dengan fallback query bertahap
+    const stripKab = s => (s || '').replace(/^(kabupaten|kota|kab\.?)\s*/i, '').trim();
+    const queryFallbacks = lokal ? [
+      queryMengantar,                                                          // "Pendowoharjo, Sewon, Bantul"
+      [lokal.kelurahan, lokal.kecamatan].filter(Boolean).join(', '),          // "Pendowoharjo, Sewon"
+      [lokal.kecamatan, stripKab(lokal.kabupaten)].filter(Boolean).join(', '),// "Sewon, Bantul"
+      lokal.kecamatan,                                                         // "Sewon"
+    ] : [queryMengantar];
+
+    let areas = [];
+    let usedQuery = queryMengantar;
+    for (const q of queryFallbacks) {
+      const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(q)}`);
+      const res = searchJson.data || searchJson;
+      console.log(`[hitungOngkir] autofill "${q}" → ${Array.isArray(res) ? res.length : 'non-array'} results`);
+      if (Array.isArray(res) && res.length) {
+        areas = res;
+        usedQuery = q;
+        console.log(`[hitungOngkir] area[0]: ${JSON.stringify(res[0])}`);
+        break;
+      }
+      console.warn(`[hitungOngkir] autofill GAGAL untuk "${q}", coba fallback...`);
+    }
+
+    if (!areas.length) {
+      console.error(`[hitungOngkir] Semua fallback gagal untuk "${queryMengantar}"`);
       return null;
     }
 
@@ -2014,7 +2034,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         ...history,
         { role: 'assistant', content: rawReply },
         { role: 'user', content: buildOngkirInjeksi(precomputedOngkir, product,
-            `Wilayah customer: ${precomputedFirst?.kelurahan}, ${precomputedFirst?.kecamatan}, ${precomputedFirst?.kabupaten}. `) },
+            `Lanjutkan balasan di atas dan langsung tampilkan total harga ke customer sekarang juga. Wilayah customer: ${precomputedFirst?.kelurahan}, ${precomputedFirst?.kecamatan}, ${precomputedFirst?.kabupaten}. `) },
       ];
       const ongkirReply = await callClaude(systemPrompt, histWithPrecomputed, chatModel, userAnthropicKey);
       if (ongkirReply) rawReply = ongkirReply;
