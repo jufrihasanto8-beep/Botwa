@@ -1655,22 +1655,58 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           .replace(/\s+/g, ' ').trim();
 
         if (pendingKec?.kecamatan) {
-          const kwRaw = message.trim().toLowerCase();
           const kwClean = cleanKelInput(message);
-          // Coba dengan keyword bersih dulu, fallback ke raw
-          const kwArr = [...new Set([kwClean, kwRaw].filter(s => s.length >= 3))];
-          let byKel = [];
-          for (const kw of kwArr) {
-            byKel = await sbGet('wilayah_id',
+
+          // Helper search di kecamatan pending
+          const searchDiKec = async (kw) => {
+            if (!kw || kw.length < 2) return [];
+            return sbGet('wilayah_id',
               `?kelurahan=ilike.*${encodeURIComponent(kw)}*&kecamatan=ilike.${encodeURIComponent(pendingKec.kecamatan)}&kabupaten=ilike.${encodeURIComponent(pendingKec.kabupaten)}&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
             ).catch(() => []);
-            if (byKel.length > 0) break;
+          };
+
+          // 1. Coba exact substring dari keyword bersih (misal "pendoharjo")
+          let byKel = await searchDiKec(kwClean);
+
+          // 2. Kalau gagal, coba prefix 5 karakter (menangkap typo/singkatan)
+          //    "pendoharjo" → "pendo" → match "Pendowoharjo"
+          if (!byKel.length && kwClean.length >= 5) {
+            byKel = await searchDiKec(kwClean.slice(0, 5));
           }
+
+          // 3. Kalau masih gagal, coba prefix 4 karakter
+          if (!byKel.length && kwClean.length >= 4) {
+            byKel = await searchDiKec(kwClean.slice(0, 4));
+          }
+
+          // 4. Fuzzy: match via subsequence — "pendoharjo" ⊆ "pendowoharjo"
+          if (!byKel.length && kwClean.length >= 4) {
+            const allKel = await getKelurahanByKecamatan(pendingKec.kecamatan, pendingKec.kabupaten);
+            const inp = kwClean.replace(/[^a-z0-9]/g, '');
+            const isSubseq = (needle, hay) => {
+              let ni = 0;
+              for (let hi = 0; hi < hay.length && ni < needle.length; hi++) {
+                if (needle[ni] === hay[hi]) ni++;
+              }
+              return ni === needle.length;
+            };
+            const match = allKel.find(kel => {
+              const k = kel.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return isSubseq(inp, k) || k.startsWith(inp.slice(0, 4));
+            });
+            if (match) {
+              byKel = await sbGet('wilayah_id',
+                `?kelurahan=ilike.${encodeURIComponent(match)}&kecamatan=ilike.${encodeURIComponent(pendingKec.kecamatan)}&kabupaten=ilike.${encodeURIComponent(pendingKec.kabupaten)}&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
+              ).catch(() => []);
+              console.log(`[pendingKec] Fuzzy match: "${kwClean}" → "${match}"`);
+            }
+          }
+
           hasil = byKel;
           if (byKel.length > 0) {
-            console.log(`[pendingKec] "${message}" (clean: "${kwClean}") → ${byKel.length} kelurahan di ${pendingKec.kecamatan}`);
+            console.log(`[pendingKec] "${message}" (clean:"${kwClean}") → ${byKel.length} hasil di ${pendingKec.kecamatan}`);
           } else {
-            // Tidak ketemu di kecamatan pending → fallback global dengan keyword bersih
+            // Masih tidak ketemu → fallback global
             hasil = await cariWilayah(kwClean || message, 5);
           }
         } else {
@@ -1682,45 +1718,15 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
           if (pendingKec?.kecamatan && hasil.length >= 1 && kecamatanUnik.length === 1) {
             // ── Customer sudah sebut kelurahan spesifik saat pending_kecamatan aktif
-            // → langsung hitung ongkir DI SINI, jangan tunggu Claude tulis [WILAYAH_OK:]
             const first = hasil[0];
             const wilayahKonfirm = `${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}`;
-            await updateConvState(conversation.id, { wilayah: wilayahKonfirm, pending_kecamatan: null, proposed_wilayah: null });
+            await updateConvState(conversation.id, { pending_kecamatan: null });
             convState.pending_kecamatan = null;
-            convState.wilayah = wilayahKonfirm;
-
-            // Hitung ongkir langsung — jangan mengandalkan marker dari Claude
-            const hasilOngkir = await hitungOngkir(wilayahKonfirm, product).catch(() => null);
-            if (hasilOngkir) {
-              await updateConvState(conversation.id, { ongkir: hasilOngkir });
-              convState.ongkir = hasilOngkir;
-              // Simpan ke customers.alamat
-              if (customer?.id && hasilOngkir.area?.kecamatan) {
-                const alamatBaru = {
-                  ...(customer.alamat || {}),
-                  kelurahan: hasilOngkir.area.kelurahan, kecamatan: hasilOngkir.area.kecamatan,
-                  kabupaten: hasilOngkir.area.kota, provinsi: hasilOngkir.area.provinsi,
-                  kodepos: hasilOngkir.area.kodePos, ekspedisi: hasilOngkir.ekspedisi,
-                  ongkirAsli: hasilOngkir.ongkirAsli, ongkirPromo: hasilOngkir.ongkirPromo,
-                  feeCOD: hasilOngkir.feeCOD, harga: hasilOngkir.harga,
-                };
-                await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
-                  .catch(e => console.error('[pendingKec] Gagal save customer.alamat:', e.message));
-                customer.alamat = alamatBaru;
-              }
-              const injOngkir = buildOngkirInjeksi(hasilOngkir, product,
-                `Kelurahan customer: ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}. `
-                + `Konfirmasi wilayah ke customer dengan natural (misal: "Siap kak, ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten} ya 😊") `
-                + `lalu langsung tampilkan total dan `);
-              history.push({ role: 'user', content: injOngkir });
-              console.log(`[pendingKec] Ongkir langsung dihitung: ${first.kelurahan} → ${hasilOngkir.ekspedisi} Rp${hasilOngkir.ongkirPromo}`);
-            } else {
-              // Ongkir gagal → minta Claude konfirmasi saja dulu
-              const hint = `[SISTEM] Kelurahan ditemukan: ${wilayahKonfirm}.\n`
-                + `Konfirmasi ke customer dengan natural (misal: "Siap kak, ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten} ya 😊") `
-                + `lalu tulis [WILAYAH_OK:${wilayahKonfirm}] di akhir pesan.`;
-              history.push({ role: 'user', content: hint });
-            }
+            const hint = `[SISTEM] Kelurahan ditemukan: ${wilayahKonfirm}.\n`
+              + `Konfirmasi ke customer dengan natural (misal: "Siap kak, ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten} ya 😊") `
+              + `dan WAJIB tulis tepat di akhir pesanmu: [WILAYAH_OK:${wilayahKonfirm}]\n`
+              + `JANGAN lupa marker ini — sistem pakai ini untuk hitung ongkir otomatis.`;
+            history.push({ role: 'user', content: hint });
             console.log(`[pendingKec] Kelurahan confirmed: ${first.kelurahan}, ${first.kecamatan}`);
 
           } else if (kecamatanUnik.length === 1) {
@@ -1729,37 +1735,13 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
 
             if (kelurahanList.length <= 1) {
-              // Hanya 1 kelurahan di kecamatan ini → langsung hitung ongkir, jangan tunggu marker
-              const wilayahKonfirm = `${first.kelurahan}, ${formatWilayah(first)}`;
-              await updateConvState(conversation.id, { wilayah: wilayahKonfirm, pending_kecamatan: null, proposed_wilayah: null });
+              // Hanya 1 kelurahan di kecamatan ini → langsung confirm + paksa [WILAYAH_OK:]
+              await updateConvState(conversation.id, { pending_kecamatan: null });
               convState.pending_kecamatan = null;
-              convState.wilayah = wilayahKonfirm;
-              const hasilOngkir1 = await hitungOngkir(wilayahKonfirm, product).catch(() => null);
-              if (hasilOngkir1) {
-                await updateConvState(conversation.id, { ongkir: hasilOngkir1 });
-                convState.ongkir = hasilOngkir1;
-                if (customer?.id && hasilOngkir1.area?.kecamatan) {
-                  const al1 = {
-                    ...(customer.alamat || {}),
-                    kelurahan: hasilOngkir1.area.kelurahan, kecamatan: hasilOngkir1.area.kecamatan,
-                    kabupaten: hasilOngkir1.area.kota, provinsi: hasilOngkir1.area.provinsi,
-                    kodepos: hasilOngkir1.area.kodePos, ekspedisi: hasilOngkir1.ekspedisi,
-                    ongkirAsli: hasilOngkir1.ongkirAsli, ongkirPromo: hasilOngkir1.ongkirPromo,
-                    feeCOD: hasilOngkir1.feeCOD, harga: hasilOngkir1.harga,
-                  };
-                  await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: al1 })
-                    .catch(e => console.error('[singleKel] Gagal save customer.alamat:', e.message));
-                  customer.alamat = al1;
-                }
-                const inj1 = buildOngkirInjeksi(hasilOngkir1, product,
-                  `Kelurahan customer: ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}. `
-                  + `Konfirmasi wilayah ke customer dengan natural lalu langsung tampilkan total dan `);
-                history.push({ role: 'user', content: inj1 });
-              } else {
-                const hint = `[SISTEM] Sistem menemukan: ${first.kelurahan}, ${formatWilayah(first)}.\n`
-                  + `Konfirmasi ke customer lalu tulis [WILAYAH_OK:${first.kelurahan}, ${formatWilayah(first)}].`;
-                history.push({ role: 'user', content: hint });
-              }
+              const hint = `[SISTEM] Sistem menemukan: ${first.kelurahan}, ${formatWilayah(first)}.\n`
+                + `Konfirmasi ke customer dengan natural dan WAJIB tulis tepat di akhir pesanmu: [WILAYAH_OK:${first.kelurahan}, ${formatWilayah(first)}]\n`
+                + `JANGAN lupa marker ini — sistem pakai ini untuk hitung ongkir otomatis.`;
+              history.push({ role: 'user', content: hint });
             } else {
               // Banyak kelurahan → simpan pending dan tanya kelurahan
               await updateConvState(conversation.id, {
