@@ -703,6 +703,14 @@ async function getKelurahanByKecamatan(kecamatan, kabupaten) {
   }
 }
 
+// Bersihkan kata sopan/filler dari pesan sebelum search wilayah
+// Contoh: "sewon kak" → "sewon", "pendowoharjo ya" → "pendowoharjo"
+function cleanKelInput(msg) {
+  return msg.trim().toLowerCase()
+    .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis)\b/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
 // Deteksi apakah pesan customer adalah konfirmasi singkat
 function isConfirmation(msg) {
   const lower = msg.toLowerCase().trim().replace(/[.!]+$/, '');
@@ -1661,12 +1669,6 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         //    cari kelurahan di kecamatan itu saja — jangan search global (bisa salah kecamatan)
         const pendingKec = convState.pending_kecamatan; // { kecamatan, kabupaten, provinsi }
         let hasil;
-
-        // Bersihkan kata sopan/filler dari pesan sebelum search kelurahan
-        // Contoh: "pendoharjo kak" → "pendoharjo", "sewon ya" → "sewon"
-        const cleanKelInput = (msg) => msg.trim().toLowerCase()
-          .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis)\b/g, '')
-          .replace(/\s+/g, ' ').trim();
 
         if (pendingKec?.kecamatan) {
           const kwClean = cleanKelInput(message);
