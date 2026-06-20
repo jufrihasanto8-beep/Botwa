@@ -1154,6 +1154,7 @@ function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, sat
   return `✅ *Konfirmasi Order ${productNama || 'Produk'}*
 
 *Nama:* ${customer?.nama || '-'}
+*No. HP:* ${customer?.wa_number || '-'}
 *Alamat:* ${alamat || '-'}
 
 *Kelurahan/Desa:* ${area?.kelurahan || '-'}
@@ -1467,7 +1468,37 @@ Isi field yang berubah saja, sisanya null.` }],
           // ✅ Closing!
           await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
           await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
-          const closingCustomer = `Siap kak! Pesanan sedang kami proses 🚀\n\nNanti kami kabarin kalau barang udah dikirim ya kak.\nTerima kasih sudah belanja! 🙏`;
+
+          // Generate closing personal berdasarkan keluhan customer
+          const keluhanSnap = convState.order_snapshot?.keluhan || convState.keluhan || '';
+          const namaSnap    = customer?.nama || 'kak';
+          const closingPrompt = `Buat pesan penutup WhatsApp yang hangat dan personal untuk customer yang baru saja order.
+Nama customer: ${namaSnap}
+Keluhan/kondisi customer: ${keluhanSnap || 'tidak diketahui'}
+
+Isi pesan:
+1. Konfirmasi pesanan sedang diproses
+2. Doakan kesembuhan customer sesuai keluhannya (natural, tidak lebay)
+3. Bilang akan dikabari kalau sudah dikirim
+4. Ucapan terima kasih
+
+Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet point.`;
+
+          let closingCustomer;
+          try {
+            closingCustomer = await callClaude(
+              'Kamu CS herbal yang hangat dan peduli. Balas singkat, natural, gaya WA.',
+              [{ role: 'user', content: closingPrompt }],
+              'claude-haiku-4-5-20251001',
+              userAnthropicKey
+            );
+          } catch(e) {
+            closingCustomer = null;
+          }
+          if (!closingCustomer) {
+            closingCustomer = `Siap kak! Pesanan sedang kami proses 🚀\n\nNanti kami kabarin kalau barang udah dikirim ya kak.\nTerima kasih sudah belanja! 🙏`;
+          }
+
           await saveMessage(conversation.id, 'ai', closingCustomer);
           await sendWA(userId, reply_jid, closingCustomer);
           console.log(`Order confirmed oleh customer ${wa_number} — percakapan ditutup`);
