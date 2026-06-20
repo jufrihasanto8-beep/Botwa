@@ -296,9 +296,10 @@ ATURAN HARGA, ONGKIR & COD
   Contoh: "Oke kak, Medan Timur ya! 😊 [WILAYAH_OK:Medan Timur, Medan, Sumatera Utara]"
   Contoh: "Siap kak, Mariso Makassar ya 😊 [WILAYAH_OK:Mariso, Makassar, Sulawesi Selatan]"
 - ⛔ JANGAN bilang "sebentar aku cek ongkir" — sistem hitung OTOMATIS saat kamu tulis [WILAYAH_OK:].
-- ⛔ HANYA KOTA/KABUPATEN = TANYA KECAMATAN DULU. Kalau customer cuma sebut nama kota/kabupaten tanpa kecamatan, tanya dulu: "Di kecamatan mana kak? Biar ongkirnya akurat 😊". Baru setelah dapat kecamatan, tulis [WILAYAH_OK:].
-- ⛔ KECAMATAN SAJA = TANYA KELURAHAN/DESA DULU. Kalau customer sebut kecamatan tapi belum menyebut kelurahan/desa, tanya dulu: "Di desa/kelurahan mana kak? 😊". Baru setelah dapat kelurahan, tulis [WILAYAH_OK:kelurahan, kecamatan, kabupaten, provinsi].
+- ⛔ HANYA KOTA/KABUPATEN = TANYA KECAMATAN DULU dengan natural, sebut 2-3 kecamatan sebagai contoh. Misal: "Bantulnya di Sewon, Kasihan, atau kecamatan mana kak? 😊". Sistem akan bantu deteksi otomatis.
+- ⛔ KECAMATAN SAJA = TANYA KELURAHAN/DESA DULU dengan natural, sebut 2-3 contoh kelurahan. Misal: "Di desa mana kak? Pendowoharjo, Bangunharjo, atau yang lain? 😊". Sistem akan inject pilihan kelurahan yang valid.
 - Sebelum [WILAYAH_OK] → wilayah HARUS sudah spesifik sampai KELURAHAN/DESA.
+- Setelah customer sebut kelurahan → langsung confirm + tulis [WILAYAH_OK] di pesan yang sama → sistem otomatis hitung ongkir + tampilkan total.
 - Wilayah parsial (nama desa/kecamatan kecil yang unik) → tebak & konfirmasi provinsinya: "Pringsewu, Lampung ya kak?"
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
   Prinsip: kalau nama itu bisa jadi kota/kab di lebih dari satu provinsi, TANYA dulu.
@@ -1621,49 +1622,61 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         }
 
         if (hasil.length > 0) {
-          // Cek apakah semua hasil dari kecamatan yang sama → customer menyebut kecamatan
           const kecamatanUnik = [...new Set(hasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
 
-          if (kecamatanUnik.length === 1) {
-            // Satu kecamatan teridentifikasi → ambil semua kelurahan untuk ditawarkan ke customer
+          if (pendingKec?.kecamatan && hasil.length >= 1 && kecamatanUnik.length === 1) {
+            // ── Customer sudah sebut kelurahan spesifik saat pending_kecamatan aktif → langsung confirm
+            const first = hasil[0];
+            await updateConvState(conversation.id, { pending_kecamatan: null });
+            const hint = `[SISTEM] Kelurahan ditemukan: ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}.\n`
+              + `Konfirmasi ke customer dengan natural (misal: "Siap kak, ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten} ya 😊") `
+              + `lalu tulis [WILAYAH_OK:${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}] di akhir pesan. `
+              + `Sistem akan otomatis hitung ongkir dan tampilkan total.`;
+            history.push({ role: 'user', content: hint });
+            console.log(`[pendingKec] Kelurahan confirmed: ${first.kelurahan}, ${first.kecamatan}`);
+
+          } else if (kecamatanUnik.length === 1) {
+            // Satu kecamatan teridentifikasi → cek apakah perlu tanya kelurahan
             const first = hasil[0];
             const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
 
             if (kelurahanList.length <= 1) {
-              // Hanya 1 kelurahan → langsung konfirmasi, clear pending_kecamatan
+              // Hanya 1 kelurahan di kecamatan ini → langsung confirm
               await updateConvState(conversation.id, { pending_kecamatan: null });
               const hint = `[SISTEM] Sistem menemukan: ${first.kelurahan}, ${formatWilayah(first)}.\n`
                 + `Konfirmasi ke customer lalu tulis [WILAYAH_OK:${first.kelurahan}, ${formatWilayah(first)}].`;
               history.push({ role: 'user', content: hint });
             } else {
-              // Beberapa kelurahan → simpan pending_kecamatan supaya ronde berikutnya ingat konteks
+              // Banyak kelurahan → simpan pending dan tanya kelurahan
               await updateConvState(conversation.id, {
                 pending_kecamatan: { kecamatan: first.kecamatan, kabupaten: first.kabupaten, provinsi: first.provinsi },
               });
               const contohKel = kelurahanList.slice(0, 3).join(', ');
               const hint = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten}, ${first.provinsi} ditemukan.\n`
                 + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
-                + `Tanyakan kelurahannya dengan NATURAL — sebut 2-3 contoh (misal: ${contohKel}) supaya customer lebih mudah jawab, jangan listing semuanya. Gaya WhatsApp santai, 1-2 kalimat.\n`
-                + `Setelah customer sebut kelurahan yang valid, konfirmasi dan tulis [WILAYAH_OK:nama kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
+                + `Tanyakan kelurahannya dengan NATURAL — sebut 2-3 contoh (misal: ${contohKel}). Gaya WA santai, 1-2 kalimat.\n`
+                + `Setelah customer sebut kelurahan yang valid, tulis [WILAYAH_OK:kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
               history.push({ role: 'user', content: hint });
               console.log(`Tawarkan ${kelurahanList.length} kelurahan di Kec. ${first.kecamatan}`);
             }
+
           } else if (pendingKec?.kecamatan) {
-            // Sedang nunggu kelurahan tapi tidak ketemu → minta ulang dengan lebih jelas
+            // Sedang nunggu kelurahan tapi tidak ketemu → minta ulang
             const kelAll = await getKelurahanByKecamatan(pendingKec.kecamatan, pendingKec.kabupaten);
             const contoh = kelAll.slice(0, 3).join(', ');
             const hint = `[SISTEM] Kelurahan "${message}" tidak ditemukan di Kecamatan ${pendingKec.kecamatan}.\n`
               + `Kelurahan valid di sana: ${kelAll.join(', ')}\n`
               + `Minta customer pilih kelurahan yang ada dengan ramah, contoh: ${contoh}. Jangan tulis [WILAYAH_OK] sampai customer sebut kelurahan yang valid.`;
             history.push({ role: 'user', content: hint });
+
           } else {
-            // Beberapa kecamatan berbeda → tampilkan pilihan kecamatan dulu (tanpa nomor)
-            const candidates = hasil.map(r => formatWilayah(r));
-            const hint = `[SISTEM] Sistem menemukan beberapa wilayah cocok untuk "${message}":\n`
-              + candidates.map(c => `- ${c}`).join('\n')
-              + `\nTanyakan ke customer kecamatannya yang mana dengan natural, lalu setelah dikonfirmasi tulis [WILAYAH_OK:nama wilayah].`;
+            // Banyak kecamatan berbeda → suggest beberapa opsi kecamatan secara natural
+            const kecList = [...new Set(hasil.map(r => r.kecamatan))].slice(0, 4);
+            const hint = `[SISTEM] Sistem menemukan beberapa kecamatan untuk "${message}": ${kecList.join(', ')}, dll.\n`
+              + `Tanyakan kecamatannya dengan NATURAL — sebut 2-3 pilihan sebagai contoh (misal: "${kecList[0]}, ${kecList[1] || kecList[0]}, atau kecamatan lain?"). `
+              + `Jangan kaku, gaya WA santai. Setelah dapat kecamatan, sistem akan bantu cari kelurahannya.`;
             history.push({ role: 'user', content: hint });
-            console.log(`Multiple kecamatan untuk "${message}": ${candidates.join(' | ')}`);
+            console.log(`Multiple kecamatan untuk "${message}": ${kecList.join(' | ')}`);
           }
         }
       } catch(e) { console.error('Wilayah hint error:', e.message); }
