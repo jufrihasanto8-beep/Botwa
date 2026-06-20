@@ -1502,6 +1502,52 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
           await saveMessage(conversation.id, 'ai', closingCustomer);
           await sendWA(userId, reply_jid, closingCustomer);
 
+          // ── Update total_order & last_order_at di customers ──
+          await sbPatch('customers', `?id=eq.${customer.id}`, {
+            total_order:   (customer.total_order || 0) + 1,
+            last_order_at: new Date().toISOString(),
+          }).catch(e => console.error('[closing] Gagal update total_order:', e.message));
+
+          // ── Generate & simpan catatan customer ──
+          try {
+            const snap        = convState.order_snapshot || {};
+            const keluhan     = snap.keluhan  || convState.keluhan  || '-';
+            const metode      = snap.metode   || convState.metode_bayar || '-';
+            const wilayah     = convState.wilayah || '-';
+            const kurir       = snap.ekspedisi || convState.ongkir?.ekspedisi || '-';
+            const catatanLama = customer.catatan || '';
+            const orderKe     = (customer.total_order || 0) + 1;
+
+            const catatanPrompt = `Buat catatan singkat (1-2 kalimat, max 150 karakter) untuk database CRM customer herbal.
+Data order:
+- Keluhan: ${keluhan}
+- Metode bayar: ${metode}
+- Kurir: ${kurir}
+- Wilayah: ${wilayah}
+- Order ke: ${orderKe}
+${catatanLama ? `- Catatan sebelumnya: ${catatanLama}` : ''}
+
+Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi kurir/bayar, dan info unik yang berguna untuk order berikutnya.`;
+
+            const catatanBaru = await callClaude(
+              'Kamu asisten CRM. Buat catatan singkat dan padat.',
+              [{ role: 'user', content: catatanPrompt }],
+              'claude-haiku-4-5-20251001',
+              userAnthropicKey
+            );
+
+            if (catatanBaru) {
+              const catatanFinal = catatanLama
+                ? `[Order ${orderKe}] ${catatanBaru.trim()}\n---\n${catatanLama}`
+                : `[Order ${orderKe}] ${catatanBaru.trim()}`;
+
+              await sbPatch('customers', `?id=eq.${customer.id}`, { catatan: catatanFinal })
+                .catch(e => console.error('[closing] Gagal save catatan:', e.message));
+            }
+          } catch(e) {
+            console.error('[closing] Generate catatan error:', e.message);
+          }
+
           // ── Kirim recap ke grup WA setelah customer konfirmasi ──
           if (WA_GROUP_JID) {
             try {
