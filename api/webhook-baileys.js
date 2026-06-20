@@ -703,6 +703,14 @@ async function getKelurahanByKecamatan(kecamatan, kabupaten) {
   }
 }
 
+// Bersihkan kata sopan/filler dari pesan sebelum search wilayah
+// Contoh: "sewon kak" → "sewon", "pendowoharjo ya" → "pendowoharjo"
+function cleanKelInput(msg) {
+  return msg.trim().toLowerCase()
+    .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis)\b/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
 // Deteksi apakah pesan customer adalah konfirmasi singkat
 function isConfirmation(msg) {
   const lower = msg.toLowerCase().trim().replace(/[.!]+$/, '');
@@ -770,7 +778,12 @@ async function hitungOngkir(wilayah, product) {
     // Step 3: Cari destination_id dari Mengantar
     const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(queryMengantar)}`);
     const areas = searchJson.data || searchJson;
-    if (!Array.isArray(areas) || !areas.length) return null;
+    console.log(`[hitungOngkir] autofill "${queryMengantar}" → ${Array.isArray(areas) ? areas.length : 'non-array'} results`);
+    if (Array.isArray(areas) && areas.length) console.log(`[hitungOngkir] area[0]: ${JSON.stringify(areas[0])}`);
+    if (!Array.isArray(areas) || !areas.length) {
+      console.error(`[hitungOngkir] autofill GAGAL — tidak ada hasil untuk "${queryMengantar}". Raw: ${JSON.stringify(searchJson).slice(0, 200)}`);
+      return null;
+    }
 
     // Scoring: pilih area Mengantar yang paling cocok
     // Prioritas: subdistrict (kelurahan) match > district (kecamatan) > city (kabupaten)
@@ -811,7 +824,11 @@ async function hitungOngkir(wilayah, product) {
     const ratesJson = await mengantarFetch(
       `order/allEstimatePublic?origin_id=${MENGANTAR_ORIGIN_ID}&destination_id=${areaId}&weight=${weight}`
     );
-    if (!ratesJson.success) return null;
+    console.log(`[hitungOngkir] rates success=${ratesJson.success}, keys=${Object.keys(ratesJson.data||{}).join(',').slice(0,100)}`);
+    if (!ratesJson.success) {
+      console.error(`[hitungOngkir] allEstimatePublic GAGAL — success=false. areaId=${areaId}, raw: ${JSON.stringify(ratesJson).slice(0,200)}`);
+      return null;
+    }
 
     // Response Mengantar adalah object { "JNE": {...}, "SAP": {...} }, bukan array
     const rawData = ratesJson.data || {};
@@ -1653,12 +1670,6 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         const pendingKec = convState.pending_kecamatan; // { kecamatan, kabupaten, provinsi }
         let hasil;
 
-        // Bersihkan kata sopan/filler dari pesan sebelum search kelurahan
-        // Contoh: "pendoharjo kak" → "pendoharjo", "sewon ya" → "sewon"
-        const cleanKelInput = (msg) => msg.trim().toLowerCase()
-          .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis)\b/g, '')
-          .replace(/\s+/g, ' ').trim();
-
         if (pendingKec?.kecamatan) {
           const kwClean = cleanKelInput(message);
 
@@ -1715,7 +1726,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             hasil = await cariWilayah(kwClean || message, 5);
           }
         } else {
-          hasil = await cariWilayah(message, 5);
+          // Bersihkan "kak", "ya", dll sebelum search global juga
+          const kwGlobal = cleanKelInput(message);
+          hasil = await cariWilayah(kwGlobal || message, 5);
         }
 
         if (hasil.length > 0) {
@@ -1765,7 +1778,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
                 customer.alamat = alamatLengkap;
               }
 
-              // 4. Simpan untuk two-step Claude call di bawah (hindari consecutive user messages)
+              // 4. Simpan untuk two-step Claude call (hindari consecutive user messages)
               precomputedOngkir = hasilOngkir;
               precomputedFirst  = first;
             } else {
@@ -1855,7 +1868,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     if (!isConfirmation(message) && message.length >= 3 && message.length <= 60 && (intentLokasi || !convState.ongkir)) {
       // Coba cari wilayah dari pesan customer langsung
-      const pesanBersih = message.replace(/[?!.,]+/g, '').trim();
+      const pesanBersih = cleanKelInput(message) || message.replace(/[?!.,]+/g, '').trim();
       const cariHasil = await cariWilayah(pesanBersih, 20);
       const kecUnik = [...new Set(cariHasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
 
@@ -1981,9 +1994,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
 
-    // ── Two-step: kelurahan resolved via pendingKec → konfirmasi dulu, lalu inject ongkir ──
-    // Pola sama dengan [WILAYAH_OK:] handler: rawReply (konfirmasi) jadi assistant context,
-    // lalu call kedua inject ongkir → hasilnya yang dikirim ke customer (include harga).
+    // ── Two-step: kelurahan resolved via pendingKec → call 1 konfirmasi, call 2 inject ongkir ──
     if (precomputedOngkir && !autoOngkirResult) {
       const histWithPrecomputed = [
         ...history,
@@ -2063,12 +2074,32 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           console.log(`[WILAYAH_OK] Kelurahan spesifik: ${first.kelurahan}, ${first.kecamatan} → hitung ongkir`);
           await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
           convState.pending_kecamatan = null;
+
+          // Step 1: Simpan area ke customers.alamat & conv state segera (sebelum hitung ongkir)
+          if (customer?.id) {
+            const alamatArea = {
+              ...(customer.alamat || {}),
+              kelurahan: first.kelurahan,
+              kecamatan: first.kecamatan,
+              kabupaten: first.kabupaten,
+              provinsi:  first.provinsi,
+            };
+            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatArea })
+              .catch(e => console.error('[WILAYAH_OK] Gagal save area awal:', e.message));
+            customer.alamat = alamatArea;
+          }
+          if (!convState.alamat) {
+            const alamatStr = [first.kelurahan, first.kecamatan, first.kabupaten, first.provinsi].filter(Boolean).join(', ');
+            await updateConvState(conversation.id, { alamat: alamatStr });
+            convState.alamat = alamatStr;
+          }
+
           const hasil = await hitungOngkir(wilayah, product);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
             convState.ongkir = hasil;
 
-            // Simpan area + ongkir ke customers.alamat (JSONB) agar tersedia di ORDER_CONFIRMED
+            // Step 2: Update customers.alamat dengan data ongkir lengkap
             if (customer?.id && hasil.area?.kecamatan) {
               const alamatBaru = {
                 ...(customer.alamat || {}),
@@ -2107,6 +2138,24 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           await updateConvState(conversation.id, {
             pending_kecamatan: { kecamatan: first.kecamatan, kabupaten: first.kabupaten, provinsi: first.provinsi },
           });
+
+          // Step 1: Simpan kecamatan yang sudah diketahui ke customers.alamat & conv state
+          if (customer?.id) {
+            const alamatKec = {
+              ...(customer.alamat || {}),
+              kecamatan: first.kecamatan,
+              kabupaten: first.kabupaten,
+              provinsi:  first.provinsi,
+            };
+            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatKec })
+              .catch(e => console.error('[WILAYAH_OK pendingKel] Gagal save kecamatan:', e.message));
+            customer.alamat = alamatKec;
+          }
+          if (!convState.alamat) {
+            const alamatStr = [first.kecamatan, first.kabupaten, first.provinsi].filter(Boolean).join(', ');
+            await updateConvState(conversation.id, { alamat: alamatStr });
+            convState.alamat = alamatStr;
+          }
           const contohKel = kelurahanList.slice(0, 3).join(', ');
           const injeksi = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten} ditemukan, tapi perlu kelurahan spesifik.\n`
             + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
@@ -2243,6 +2292,16 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     if (alamatMatch && !convState.alamat) {
       stateUpdate.alamat = alamatMatch[1].trim();
       console.log(`Alamat tersimpan: ${stateUpdate.alamat}`);
+      // Simpan jalan ke customers.alamat (merge, tidak overwrite wilayah/ongkir)
+      if (customer?.id) {
+        const alamatBaru = {
+          ...(customer.alamat || {}),
+          jalan: alamatMatch[1].trim(),
+        };
+        await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
+          .catch(e => console.error('[ALAMAT_OK] Gagal save customer.alamat:', e.message));
+        customer.alamat = alamatBaru;
+      }
     }
     if (orderDataParsed.metode && !convState.metode_bayar) {
       stateUpdate.metode_bayar = orderDataParsed.metode;
@@ -2351,21 +2410,19 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       const custAlamat  = customer?.alamat || {};
 
       // Fallback: kalau ongkirData kosong tapi wilayah ada di state → hitung ulang on-the-fly
-      // PENTING: area terstruktur diambil dari tabel LOKAL wilayah_id (cariWilayah),
-      // TERPISAH dari hitungOngkir (Mengantar). Jadi walau Mengantar down, breakdown
-      // kelurahan/kecamatan/kabupaten/provinsi tetap terisi di konfirmasi customer.
-      let localAreaFallback = null; // row wilayah_id hasil resolve lokal
+      // PENTING: area lokal (wilayah_id) di-resolve TERPISAH dari hitungOngkir (Mengantar)
+      // Jadi walau Mengantar down, breakdown kelurahan/kecamatan/kab/prov tetap terisi
+      let localAreaFallback = null;
       if (!ongkirData?.area?.kecamatan && !custAlamat?.kecamatan) {
         let wilayahFallback = latestState.wilayah || convState.wilayah;
 
-        // 1. Resolve area lokal dari wilayah yang sudah ada di state
+        // 1. Resolve area lokal dari wilayah yang ada di state
         if (wilayahFallback) {
           const cek = await cariWilayah(wilayahFallback, 5).catch(() => []);
           if (cek.length > 0) localAreaFallback = cek[0];
         }
 
         // 2. Kalau belum ketemu, parse dari alamat ORDER_DATA (selalu dicoba, tidak di-gate state)
-        //    Mulai dari ~4 bagian terakhir agar menangkap kelurahan (mis. "Pendowoharjo, Sewon, Bantul, DIY")
         if (!localAreaFallback && orderDataParsed.alamat) {
           const alamatParts = orderDataParsed.alamat.split(',').map(s => s.trim()).filter(Boolean);
           for (let i = Math.max(0, alamatParts.length - 4); i < alamatParts.length; i++) {
@@ -2374,13 +2431,14 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             if (cek.length > 0) {
               localAreaFallback = cek[0];
               if (!wilayahFallback) wilayahFallback = `${cek[0].kelurahan}, ${cek[0].kecamatan}, ${cek[0].kabupaten}`;
-              console.log(`[ORDER_CONFIRMED] Area lokal dari alamat: "${combined}" → ${cek[0].kelurahan}, ${cek[0].kecamatan}, ${cek[0].kabupaten}`);
+              console.log(`[ORDER_CONFIRMED] Area lokal dari alamat: "${combined}" → ${cek[0].kelurahan}, ${cek[0].kecamatan}`);
               break;
             }
           }
         }
+
         if (localAreaFallback) {
-          console.log(`[ORDER_CONFIRMED] Area lokal terpakai: ${localAreaFallback.kelurahan}, ${localAreaFallback.kecamatan}, ${localAreaFallback.kabupaten}, ${localAreaFallback.provinsi}`);
+          console.log(`[ORDER_CONFIRMED] Area lokal terpakai: ${localAreaFallback.kelurahan}, ${localAreaFallback.kecamatan}, ${localAreaFallback.kabupaten}`);
         }
 
         // 3. Hitung ongkir (Mengantar) — kalau gagal, area lokal di atas tetap dipakai
@@ -2390,7 +2448,6 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           if (rekalkulasi) {
             ongkirData = rekalkulasi;
             await updateConvState(conversation.id, { ongkir: rekalkulasi }).catch(() => {});
-            // Simpan ke customers.alamat sekalian
             if (customer?.id && rekalkulasi.area?.kecamatan) {
               const al = {
                 ...(customer.alamat || {}),
@@ -2410,7 +2467,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
               customer.alamat = al;
             }
           } else {
-            console.warn(`[ORDER_CONFIRMED] ⚠️ hitungOngkir gagal (Mengantar?) untuk "${wilayahFallback}" — area lokal dipakai, ongkir tetap 0`);
+            console.warn(`[ORDER_CONFIRMED] ⚠️ hitungOngkir gagal untuk "${wilayahFallback}" — area lokal dipakai, ongkir tetap 0`);
           }
         }
       }
