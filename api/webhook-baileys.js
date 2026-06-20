@@ -1795,7 +1795,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     }
 
     // ── Handle [WILAYAH_OK:] → cek spesifisitas dulu, baru hitung ongkir ────────
-    if (wilayahOkMatch && !autoOngkirResult && !convState.ongkir) {
+    if (wilayahOkMatch && !autoOngkirResult) {
       const wilayah = wilayahOkMatch[1].trim();
       console.log(`[WILAYAH_OK] detected: ${wilayah}`);
 
@@ -1821,36 +1821,18 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         rawReply = await callClaude(systemPrompt, histTanya, chatModel, userAnthropicKey);
 
       } else if (lokalCek.length > 0 && kecamatanUnik.length === 1) {
-        // Satu kecamatan teridentifikasi → cek jumlah kelurahan
         const first = lokalCek[0];
-        const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
+        // Cek apakah kelurahan sudah spesifik dari hasil pencarian
+        const kelurahanUnik = [...new Set(lokalCek.map(r => r.kelurahan))];
 
-        if (kelurahanList.length > 1) {
-          // Masih perlu tanya kelurahan — simpan pending_kecamatan supaya ronde berikut ingat konteks
-          console.log(`[WILAYAH_OK] Kec. "${first.kecamatan}" punya ${kelurahanList.length} kelurahan → tanya dulu`);
-          await updateConvState(conversation.id, {
-            pending_kecamatan: { kecamatan: first.kecamatan, kabupaten: first.kabupaten, provinsi: first.provinsi },
-          });
-          const contohKel = kelurahanList.slice(0, 3).join(', ');
-          const injeksi = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten} ditemukan, tapi perlu kelurahan spesifik.\n`
-            + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
-            + `Tanyakan kelurahannya dengan NATURAL — sebut 2-3 contoh kelurahan (misal: ${contohKel}) supaya customer lebih mudah jawab, tapi jangan listing semuanya. Gaya WhatsApp santai, 1-2 kalimat.\n`
-            + `Setelah customer sebut kelurahan yang valid, konfirmasi dan tulis [WILAYAH_OK:nama kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
-
-          const histTanya = [
-            ...history,
-            { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
-            { role: 'user', content: injeksi },
-          ];
-          rawReply = await callClaude(systemPrompt, histTanya, chatModel, userAnthropicKey);
-
-        } else {
+        if (kelurahanUnik.length === 1) {
           // Sudah spesifik sampai kelurahan → langsung hitung ongkir, clear pending
+          console.log(`[WILAYAH_OK] Kelurahan spesifik: ${first.kelurahan}, ${first.kecamatan} → hitung ongkir`);
           await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
           const hasil = await hitungOngkir(wilayah, product);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
-            convState.ongkir = hasil; // update local state
+            convState.ongkir = hasil;
             const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
             const histWithOngkir = [
               ...history,
@@ -1862,6 +1844,26 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             await updateConvState(conversation.id, { proposed_wilayah: wilayah });
             rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim();
           }
+
+        } else {
+          // Kelurahan belum spesifik (hanya kecamatan) → tanya kelurahan dulu
+          const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
+          console.log(`[WILAYAH_OK] Kec. "${first.kecamatan}" punya ${kelurahanList.length} kelurahan → tanya dulu`);
+          await updateConvState(conversation.id, {
+            pending_kecamatan: { kecamatan: first.kecamatan, kabupaten: first.kabupaten, provinsi: first.provinsi },
+          });
+          const contohKel = kelurahanList.slice(0, 3).join(', ');
+          const injeksi = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten} ditemukan, tapi perlu kelurahan spesifik.\n`
+            + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
+            + `Tanyakan kelurahannya dengan NATURAL — sebut 2-3 contoh kelurahan (misal: ${contohKel}) supaya customer lebih mudah jawab. Gaya WhatsApp santai, 1-2 kalimat.\n`
+            + `Setelah customer sebut kelurahan yang valid, konfirmasi dan tulis [WILAYAH_OK:nama kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
+
+          const histTanya = [
+            ...history,
+            { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
+            { role: 'user', content: injeksi },
+          ];
+          rawReply = await callClaude(systemPrompt, histTanya, chatModel, userAnthropicKey);
         }
 
       } else {
