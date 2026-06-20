@@ -1638,6 +1638,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     }
 
     // ── WEBHOOK-LEVEL: Auto-search wilayah via tabel lokal wilayah_id ──
+    let pendingKecResolvedWilayah = null; // diset saat kelurahan berhasil ditemukan via pendingKec
     const lastAiMsg = history.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
     const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|kelurahan|desa|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
     const kelurahanBelumTerisi = !convState.ongkir?.area?.kelurahan || convState.pending_kecamatan;
@@ -1719,17 +1720,62 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           const kecamatanUnik = [...new Set(hasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
 
           if (pendingKec?.kecamatan && hasil.length >= 1 && kecamatanUnik.length === 1) {
-            // ── Customer sudah sebut kelurahan spesifik saat pending_kecamatan aktif
             const first = hasil[0];
             const wilayahKonfirm = `${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}`;
-            await updateConvState(conversation.id, { pending_kecamatan: null });
+
+            // 1. Simpan area ke customers.alamat dulu
+            if (customer?.id) {
+              const alamatArea = {
+                ...(customer.alamat || {}),
+                kelurahan: first.kelurahan,
+                kecamatan: first.kecamatan,
+                kabupaten: first.kabupaten,
+                provinsi:  first.provinsi,
+              };
+              await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatArea })
+                .catch(e => console.error('[pendingKec] Gagal save area:', e.message));
+              customer.alamat = alamatArea;
+            }
+
+            // 2. Hitung ongkir
+            await updateConvState(conversation.id, { wilayah: wilayahKonfirm, pending_kecamatan: null, proposed_wilayah: null });
+            convState.wilayah = wilayahKonfirm;
             convState.pending_kecamatan = null;
-            const hint = `[SISTEM] Kelurahan ditemukan: ${wilayahKonfirm}.\n`
-              + `Konfirmasi ke customer dengan natural (misal: "Siap kak, ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten} ya 😊") `
-              + `dan WAJIB tulis tepat di akhir pesanmu: [WILAYAH_OK:${wilayahKonfirm}]\n`
-              + `JANGAN lupa marker ini — sistem pakai ini untuk hitung ongkir otomatis.`;
-            history.push({ role: 'user', content: hint });
-            console.log(`[pendingKec] Kelurahan confirmed: ${first.kelurahan}, ${first.kecamatan}`);
+
+            const hasilOngkir = await hitungOngkir(wilayahKonfirm, product).catch(() => null);
+            if (hasilOngkir) {
+              await updateConvState(conversation.id, { ongkir: hasilOngkir });
+              convState.ongkir = hasilOngkir;
+
+              // 3. Update customers.alamat dengan data ongkir lengkap
+              if (customer?.id) {
+                const alamatLengkap = {
+                  ...(customer.alamat || {}),
+                  kodepos:     hasilOngkir.area?.kodePos || '',
+                  ekspedisi:   hasilOngkir.ekspedisi,
+                  ongkirAsli:  hasilOngkir.ongkirAsli,
+                  ongkirPromo: hasilOngkir.ongkirPromo,
+                  feeCOD:      hasilOngkir.feeCOD,
+                  harga:       hasilOngkir.harga,
+                };
+                await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatLengkap })
+                  .catch(e => console.error('[pendingKec] Gagal save ongkir:', e.message));
+                customer.alamat = alamatLengkap;
+              }
+
+              // 4. Inject ke Claude — tampilkan konfirmasi wilayah + total sekaligus
+              history.push({ role: 'user', content:
+                buildOngkirInjeksi(hasilOngkir, product,
+                  `Wilayah customer: ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}. `
+                  + `Konfirmasi wilayah dengan natural lalu langsung tampilkan total dan `)
+              });
+            } else {
+              pendingKecResolvedWilayah = wilayahKonfirm; // fallback: append [WILAYAH_OK:] nanti
+              history.push({ role: 'user', content:
+                `[SISTEM] Kelurahan: ${wilayahKonfirm}. Konfirmasi ke customer dan tulis [WILAYAH_OK:${wilayahKonfirm}] di akhir pesan.`
+              });
+            }
+            console.log(`[pendingKec] Kelurahan confirmed & saved: ${first.kelurahan}, ${first.kecamatan}`);
 
           } else if (kecamatanUnik.length === 1) {
             // Satu kecamatan teridentifikasi → cek apakah perlu tanya kelurahan
@@ -1737,13 +1783,30 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             const kelurahanList = await getKelurahanByKecamatan(first.kecamatan, first.kabupaten);
 
             if (kelurahanList.length <= 1) {
-              // Hanya 1 kelurahan di kecamatan ini → langsung confirm + paksa [WILAYAH_OK:]
-              await updateConvState(conversation.id, { pending_kecamatan: null });
+              // Hanya 1 kelurahan → simpan & hitung ongkir langsung
+              const wKonfirm = `${first.kelurahan}, ${formatWilayah(first)}`;
+              if (customer?.id) {
+                const alamatArea = { ...(customer.alamat||{}), kelurahan:first.kelurahan, kecamatan:first.kecamatan, kabupaten:first.kabupaten, provinsi:first.provinsi };
+                await sbPatch('customers',`?id=eq.${customer.id}`,{alamat:alamatArea}).catch(()=>{});
+                customer.alamat = alamatArea;
+              }
+              await updateConvState(conversation.id, { wilayah: wKonfirm, pending_kecamatan: null, proposed_wilayah: null });
+              convState.wilayah = wKonfirm;
               convState.pending_kecamatan = null;
-              const hint = `[SISTEM] Sistem menemukan: ${first.kelurahan}, ${formatWilayah(first)}.\n`
-                + `Konfirmasi ke customer dengan natural dan WAJIB tulis tepat di akhir pesanmu: [WILAYAH_OK:${first.kelurahan}, ${formatWilayah(first)}]\n`
-                + `JANGAN lupa marker ini — sistem pakai ini untuk hitung ongkir otomatis.`;
-              history.push({ role: 'user', content: hint });
+              const ho = await hitungOngkir(wKonfirm, product).catch(()=>null);
+              if (ho) {
+                await updateConvState(conversation.id, { ongkir: ho });
+                convState.ongkir = ho;
+                if (customer?.id) {
+                  const al = { ...(customer.alamat||{}), kodepos:ho.area?.kodePos||'', ekspedisi:ho.ekspedisi, ongkirAsli:ho.ongkirAsli, ongkirPromo:ho.ongkirPromo, feeCOD:ho.feeCOD, harga:ho.harga };
+                  await sbPatch('customers',`?id=eq.${customer.id}`,{alamat:al}).catch(()=>{});
+                  customer.alamat = al;
+                }
+                history.push({ role:'user', content: buildOngkirInjeksi(ho, product, `Wilayah: ${first.kelurahan}, ${first.kecamatan}. Konfirmasi lalu tampilkan total dan `) });
+              } else {
+                pendingKecResolvedWilayah = wKonfirm;
+                history.push({ role:'user', content: `[SISTEM] Wilayah: ${wKonfirm}. Konfirmasi ke customer dan tulis [WILAYAH_OK:${wKonfirm}] di akhir pesan.` });
+              }
             } else {
               // Banyak kelurahan → simpan pending dan tanya kelurahan
               await updateConvState(conversation.id, {
@@ -1917,6 +1980,12 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     }
 
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
+
+    // ── Kalau Claude lupa nulis [WILAYAH_OK:] padahal kelurahan sudah resolved → append otomatis
+    if (pendingKecResolvedWilayah && !rawReply.includes('[WILAYAH_OK:')) {
+      rawReply += ` [WILAYAH_OK:${pendingKecResolvedWilayah}]`;
+      console.log(`[pendingKec] Auto-append [WILAYAH_OK:${pendingKecResolvedWilayah}] karena Claude lupa`);
+    }
 
     // ── Deteksi marker khusus ──────────────────────────────────
     const orderConfirmed   = rawReply.includes('[ORDER_CONFIRMED]');
