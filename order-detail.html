@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Detail Order · Adsy CS</title>
 <script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="css/style.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -254,7 +255,7 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
     </div>
     <div style="display:flex;gap:8px;margin-left:auto">
       <button class="btn-export btn-csv" onclick="exportCSV()">⬇ CSV</button>
-      <button class="btn-export btn-xlsx" onclick="exportExcel()">⬇ Excel</button>
+      <button class="btn-export btn-xlsx" onclick="exportExcel()">⬇ Excel (.xlsx)</button>
     </div>
     <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
   </div>
@@ -614,42 +615,76 @@ function getExportRows() {
 function exportCSV() {
   const rows = getExportRows();
   if (!rows.length) { alert('Tidak ada data untuk diekspor.'); return; }
+
   const all = [HEADERS, ...rows];
-  const csv = all.map(r => r.map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  // BOM + CSV dengan separator koma, nilai di-quote
+  const csv = '\uFEFF' + all.map(r =>
+    r.map(v => {
+      const s = String(v ?? '');
+      // Quote jika ada koma, newline, atau tanda kutip
+      return (s.includes(',') || s.includes('\n') || s.includes('"'))
+        ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(',')
+  ).join('\r\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
   a.download = `detail_order_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function exportExcel() {
   const rows = getExportRows();
   if (!rows.length) { alert('Tidak ada data untuk diekspor.'); return; }
 
-  // Build HTML table (Excel dapat buka .xls dengan format HTML table)
-  let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Detail Order</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
-<body><table><thead><tr>`;
-  HEADERS.forEach(h => { html += `<th style="background:#1e293b;color:#fff;font-weight:bold;border:1px solid #ccc;padding:6px 10px">${h}</th>`; });
-  html += '</tr></thead><tbody>';
-  rows.forEach((r, i) => {
-    html += `<tr style="background:${i%2===0?'#fff':'#f8fafc'}">`;
-    r.forEach((v, ci) => {
-      // Kolom "Total Pembayaran" (index 13) dan "Quantity" (index 11) sebagai angka
-      const isNum = ci === 11 || ci === 13;
-      html += `<td style="border:1px solid #e2e8f0;padding:5px 10px;${isNum?'text-align:right':''}${ci===0?';text-align:center;color:#64748b':''}">${v??''}</td>`;
-    });
-    html += '</tr>';
-  });
-  html += '</tbody></table></body></html>';
+  if (typeof XLSX === 'undefined') {
+    alert('Library Excel belum dimuat. Coba refresh halaman dulu.');
+    return;
+  }
 
-  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `detail_order_${new Date().toISOString().slice(0,10)}.xls`;
-  a.click();
-  URL.revokeObjectURL(url);
+  // Gabung header + data
+  const sheetData = [HEADERS, ...rows];
+
+  // Buat worksheet dari array of arrays
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+  // Style header (baris 0) — bold, background
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+    if (cell) {
+      cell.s = {
+        font:    { bold: true, color: { rgb: 'FFFFFF' } },
+        fill:    { fgColor: { rgb: '1E293B' } },
+        alignment: { horizontal: 'center' },
+      };
+    }
+  }
+
+  // Set lebar kolom otomatis berdasarkan isi
+  const colWidths = HEADERS.map((h, ci) => {
+    const maxLen = sheetData.reduce((max, row) => {
+      const len = String(row[ci] ?? '').length;
+      return len > max ? len : max;
+    }, h.length);
+    return { wch: Math.min(maxLen + 2, 40) }; // max 40 karakter
+  });
+  ws['!cols'] = colWidths;
+
+  // Freeze baris header
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  // Buat workbook
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Detail Order');
+
+  // Download sebagai .xlsx
+  XLSX.writeFile(wb, `detail_order_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 init();
