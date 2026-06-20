@@ -95,65 +95,84 @@ body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
 .sum-item{font-size:12px;color:var(--text-2)}
 .sum-item b{color:var(--text);font-weight:700}
 
+/* ── CSS Variables dark (default) ── */
+:root {
+  --tbl-bg:       #0f172a;
+  --tbl-head-bg:  #0f172a;
+  --tbl-border:   rgba(255,255,255,.05);
+  --tbl-row-bdr:  rgba(255,255,255,.04);
+  --tbl-hover:    rgba(255,255,255,.03);
+  --tbl-text:     #cbd5e1;
+  --tbl-text-2:   #94a3b8;
+  --tbl-text-3:   #475569;
+  --tbl-bold:     #e2e8f0;
+  --tbl-head-txt: #64748b;
+  --sb-thumb:     rgba(255,255,255,.1);
+}
+/* light mode overrides */
+body.light {
+  --tbl-bg:       #ffffff;
+  --tbl-head-bg:  #f8fafc;
+  --tbl-border:   rgba(0,0,0,.07);
+  --tbl-row-bdr:  rgba(0,0,0,.05);
+  --tbl-hover:    rgba(59,130,246,.03);
+  --tbl-text:     #334155;
+  --tbl-text-2:   #475569;
+  --tbl-text-3:   #94a3b8;
+  --tbl-bold:     #0f172a;
+  --tbl-head-txt: #94a3b8;
+  --sb-thumb:     rgba(0,0,0,.1);
+}
+
 /* Table */
-.tbl-wrap{flex:1;overflow:auto;margin:16px 24px 24px;background:#0f172a;border:1px solid rgba(255,255,255,.06);border-radius:14px}
-body.light .tbl-wrap{background:var(--white);border-color:var(--border)}
+.tbl-wrap{flex:1;overflow:auto;margin:16px 24px 24px;background:var(--tbl-bg);border:1px solid var(--tbl-border);border-radius:14px}
 .tbl-wrap::-webkit-scrollbar{width:4px;height:6px}
-.tbl-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
-body.light .tbl-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1)}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:4px}
 
 table{width:100%;border-collapse:collapse;min-width:1600px}
 
 thead th{
   padding:12px 16px;text-align:left;
-  font-size:10px;font-weight:700;color:#475569;
+  font-size:10px;font-weight:700;color:var(--tbl-head-txt);
   text-transform:uppercase;letter-spacing:.8px;
-  background:#0f172a;border-bottom:1px solid rgba(255,255,255,.05);
+  background:var(--tbl-head-bg);border-bottom:1px solid var(--tbl-border);
   position:sticky;top:0;white-space:nowrap;z-index:2;
 }
-body.light thead th{background:#f8fafc;color:#94a3b8;border-bottom-color:var(--border)}
 thead th.th-cb{width:44px;padding-left:20px}
 
-tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s}
-body.light tbody tr{border-bottom-color:var(--border)}
+tbody tr{border-bottom:1px solid var(--tbl-row-bdr);transition:background .1s}
 tbody tr:last-child{border-bottom:none}
-tbody tr:hover td{background:rgba(255,255,255,.03)}
-body.light tbody tr:hover td{background:rgba(59,130,246,.03)}
+tbody tr:hover td{background:var(--tbl-hover)}
 
 tbody td{
-  padding:16px 16px;
-  font-size:12.5px;vertical-align:middle;
-  color:#cbd5e1;
+  padding:16px;font-size:12.5px;
+  vertical-align:middle;color:var(--tbl-text);
 }
-body.light tbody td{color:var(--text)}
 
 .td-cb{padding-left:20px;width:44px}
 .td-cb input[type=checkbox]{width:15px;height:15px;accent-color:#3b82f6;cursor:pointer}
-.td-no{font-size:11px;font-weight:700;color:#475569;white-space:nowrap}
-.td-name{font-weight:600;color:#e2e8f0;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
-body.light .td-name{color:var(--text)}
-.td-wrap{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8}
-body.light .td-wrap{color:var(--text-2)}
-.td-wrap-sm{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8}
-body.light .td-wrap-sm{color:var(--text-2)}
-.td-phone{font-family:monospace;font-size:12px;color:#64748b;white-space:nowrap}
-.td-num{font-weight:700;color:#e2e8f0;text-align:right}
-body.light .td-num{color:var(--text)}
+.td-no{font-size:11px;font-weight:600;color:var(--tbl-text-3);white-space:nowrap}
+.td-name{font-weight:600;color:var(--tbl-bold);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.td-wrap{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tbl-text-2)}
+.td-wrap-sm{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tbl-text-2)}
+.td-bold{font-weight:500;color:var(--tbl-bold)}
+.td-phone{font-family:monospace;font-size:12px;color:var(--tbl-text-2);white-space:nowrap}
+.td-num{font-weight:700;color:var(--tbl-bold);text-align:right;white-space:nowrap}
 
 /* Badges */
 .bdg{display:inline-flex;align-items:center;justify-content:center;
   font-size:10px;font-weight:800;letter-spacing:.5px;
   padding:4px 10px;border-radius:20px;white-space:nowrap}
-.bdg-cod{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25)}
-.bdg-tf{background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.25)}
-body.light .bdg-cod{background:rgba(34,197,94,.1);color:#16a34a}
-body.light .bdg-tf{background:rgba(99,102,241,.1);color:#6366f1}
+.bdg-cod{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+.bdg-tf{background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.3)}
+body.light .bdg-cod{background:rgba(34,197,94,.1);color:#16a34a;border-color:rgba(34,197,94,.25)}
+body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgba(99,102,241,.25)}
 
 /* Select all checkbox */
 #cb-all{width:15px;height:15px;accent-color:#3b82f6;cursor:pointer}
 
-.empty-cell{text-align:center;padding:80px 20px;color:#475569}
-.empty-cell h4{font-size:15px;font-weight:700;margin-bottom:8px;color:#64748b}
+.empty-cell{text-align:center;padding:80px 20px;color:var(--tbl-text-3)}
+.empty-cell h4{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--tbl-text-2)}
 .empty-cell p{font-size:13px;line-height:1.6}
 </style>
 </head>
@@ -531,8 +550,8 @@ function renderTable(rows) {
 
   tbody.innerHTML = rows.map((r, i) => `<tr>
     <td class="td-cb"><input type="checkbox" class="row-cb" value="${i}" onchange="updateSelectAll()"></td>
-    <td class="td-no" style="white-space:nowrap">${fmtDt(r.tanggal)}</td>
-    <td><div class="td-wrap-sm" style="color:#e2e8f0;font-weight:500" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
+    <td class="td-no">${fmtDt(r.tanggal)}</td>
+    <td><div class="td-wrap-sm td-bold" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
     <td><div class="td-name" title="${escH(r.nama)}">${escH(r.nama)}</div></td>
     <td class="td-phone">${fmtWA(r.notelp)}</td>
     <td><div class="td-wrap" title="${escH(r.alamat)}">${escH(r.alamat)||'—'}</div></td>
@@ -540,12 +559,12 @@ function renderTable(rows) {
     <td><div class="td-wrap-sm">${escH(r.kecamatan)||'—'}</div></td>
     <td><div class="td-wrap-sm">${escH(r.kabupaten)||'—'}</div></td>
     <td><div class="td-wrap-sm">${escH(r.provinsi)||'—'}</div></td>
-    <td style="white-space:nowrap;color:#64748b">${escH(r.kodepos)||'—'}</td>
-    <td style="text-align:center;font-weight:700;color:#e2e8f0">${r.qty}</td>
+    <td class="td-wrap-sm">${escH(r.kodepos)||'—'}</td>
+    <td style="text-align:center;font-weight:700">${r.qty}</td>
     <td><span class="bdg ${r.isCOD?'bdg-cod':'bdg-tf'}">${r.isCOD?'COD':'TF'}</span></td>
-    <td class="td-num" style="white-space:nowrap">${rp(r.total)}</td>
-    <td style="white-space:nowrap;font-size:11px;color:#64748b">${escH(r.instruksi)}</td>
-    <td style="font-size:11px;white-space:nowrap;color:#475569">${escH(r.rincian)}</td>
+    <td class="td-num">${rp(r.total)}</td>
+    <td class="td-wrap-sm" style="font-size:11px">${escH(r.instruksi)}</td>
+    <td class="td-wrap" style="font-size:11px">${escH(r.rincian)}</td>
     <td><div class="td-wrap" title="${escH(r.keluhan)}">${escH(r.keluhan)||'—'}</div></td>
     <td><div class="td-wrap" title="${escH(r.keterangan)}">${escH(r.keterangan)||'—'}</div></td>
   </tr>`).join('');
