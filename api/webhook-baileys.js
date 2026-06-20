@@ -1466,6 +1466,20 @@ Isi field yang berubah saja, sisanya null.` }],
             await updateConvState(conversation.id, { wilayah: wilayahGeo, ongkir: hasilGeo, alamat: alamatGeo });
             convState.ongkir  = hasilGeo;
             convState.wilayah = wilayahGeo;
+            // Simpan ke customers.alamat
+            if (customer?.id && hasilGeo.area?.kecamatan) {
+              const alamatBaru = {
+                ...(customer.alamat || {}),
+                kelurahan: hasilGeo.area.kelurahan, kecamatan: hasilGeo.area.kecamatan,
+                kabupaten: hasilGeo.area.kota, provinsi: hasilGeo.area.provinsi,
+                kodepos: hasilGeo.area.kodePos, ekspedisi: hasilGeo.ekspedisi,
+                ongkirAsli: hasilGeo.ongkirAsli, ongkirPromo: hasilGeo.ongkirPromo,
+                feeCOD: hasilGeo.feeCOD, harga: hasilGeo.harga,
+              };
+              await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
+                .catch(e => console.error('[GoogleMaps] Gagal save customer.alamat:', e.message));
+              customer.alamat = alamatBaru;
+            }
             message = `[SISTEM] Customer kirim lokasi Google Maps.\nHasil geocoding: ${alamatGeo}\n${buildOngkirInjeksi(hasilGeo, product, `Ongkir ke ${wilayahGeo} sudah dihitung. `)}\nKonfirmasi lokasi ke customer dan tampilkan total harga.`;
           } else {
             message = `[SISTEM] Customer kirim lokasi Google Maps → ${wilayahGeo}, tapi ongkir tidak ditemukan. Konfirmasi lokasi ke customer dan minta sebutkan nama kota/kabupatennya.`;
@@ -1482,6 +1496,20 @@ Isi field yang berubah saja, sisanya null.` }],
           await updateConvState(conversation.id, { ongkir: freshOngkir });
           convState.ongkir = freshOngkir;
           console.log(`Ongkir di-refresh: ${convState.wilayah} → asli ${freshOngkir.ongkirAsli} promo ${freshOngkir.ongkirPromo}`);
+          // Update customers.alamat juga (biar selalu sinkron)
+          if (customer?.id && freshOngkir.area?.kecamatan) {
+            const alamatBaru = {
+              ...(customer.alamat || {}),
+              kelurahan: freshOngkir.area.kelurahan, kecamatan: freshOngkir.area.kecamatan,
+              kabupaten: freshOngkir.area.kota, provinsi: freshOngkir.area.provinsi,
+              kodepos: freshOngkir.area.kodePos, ekspedisi: freshOngkir.ekspedisi,
+              ongkirAsli: freshOngkir.ongkirAsli, ongkirPromo: freshOngkir.ongkirPromo,
+              feeCOD: freshOngkir.feeCOD, harga: freshOngkir.harga,
+            };
+            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
+              .catch(e => console.error('[Refresh] Gagal save customer.alamat:', e.message));
+            customer.alamat = alamatBaru;
+          }
         }
       } catch(e) {
         console.error('Refresh ongkir error:', e.message);
@@ -1554,6 +1582,20 @@ Isi field yang berubah saja, sisanya null.` }],
             stateKTP.ongkir  = hasilKTP;
             convState.ongkir  = hasilKTP;
             convState.wilayah = wilayahKTP;
+            // Simpan ke customers.alamat
+            if (customer?.id && hasilKTP.area?.kecamatan) {
+              const alamatBaru = {
+                ...(customer.alamat || {}),
+                kelurahan: hasilKTP.area.kelurahan, kecamatan: hasilKTP.area.kecamatan,
+                kabupaten: hasilKTP.area.kota, provinsi: hasilKTP.area.provinsi,
+                kodepos: hasilKTP.area.kodePos, ekspedisi: hasilKTP.ekspedisi,
+                ongkirAsli: hasilKTP.ongkirAsli, ongkirPromo: hasilKTP.ongkirPromo,
+                feeCOD: hasilKTP.feeCOD, harga: hasilKTP.harga,
+              };
+              await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
+                .catch(e => console.error('[KTP] Gagal save customer.alamat:', e.message));
+              customer.alamat = alamatBaru;
+            }
           }
         }
         if (Object.keys(stateKTP).length) await updateConvState(conversation.id, stateKTP);
@@ -1628,6 +1670,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             // ── Customer sudah sebut kelurahan spesifik saat pending_kecamatan aktif → langsung confirm
             const first = hasil[0];
             await updateConvState(conversation.id, { pending_kecamatan: null });
+            convState.pending_kecamatan = null; // clear lokal juga agar guard ORDER_CONFIRMED tidak salah block
             const hint = `[SISTEM] Kelurahan ditemukan: ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}.\n`
               + `Konfirmasi ke customer dengan natural (misal: "Siap kak, ${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten} ya 😊") `
               + `lalu tulis [WILAYAH_OK:${first.kelurahan}, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}] di akhir pesan. `
@@ -1746,7 +1789,59 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           pending_kecamatan: null,
           ongkir: hasil,
         });
+        convState.pending_kecamatan = null;
         autoOngkirResult = { wilayah: proposedWilayah, hasil };
+
+        // Simpan ke customers.alamat
+        if (customer?.id && hasil.area?.kecamatan) {
+          const alamatBaru = {
+            ...(customer.alamat || {}),
+            kelurahan:   hasil.area.kelurahan,
+            kecamatan:   hasil.area.kecamatan,
+            kabupaten:   hasil.area.kota,
+            provinsi:    hasil.area.provinsi,
+            kodepos:     hasil.area.kodePos,
+            ekspedisi:   hasil.ekspedisi,
+            ongkirAsli:  hasil.ongkirAsli,
+            ongkirPromo: hasil.ongkirPromo,
+            feeCOD:      hasil.feeCOD,
+            harga:       hasil.harga,
+          };
+          await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
+            .catch(e => console.error('[autoOngkir] Gagal save customer.alamat:', e.message));
+          customer.alamat = alamatBaru;
+        }
+      }
+    }
+
+    // ── HINT: Customer pilih metode bayar → inject total reminder ke Claude ──
+    if (convState.ongkir && !autoOngkirResult) {
+      const pilihCOD = /\bcod\b/i.test(message);
+      const pilihTF  = /\btransfer\b|\btf\b|\bbank\b/i.test(message);
+      if (pilihCOD || pilihTF) {
+        const fmt = n => `Rp ${n.toLocaleString('id-ID')}`;
+        const d = convState.ongkir;
+        const ongkirDisplay = d.ongkirAsli !== d.ongkirPromo
+          ? `~${fmt(d.ongkirAsli)}~ ${fmt(d.ongkirPromo)}`
+          : fmt(d.ongkirPromo);
+        const ekspLabel = d.ekspedisi || 'KURIR';
+        let hint;
+        if (pilihCOD) {
+          hint = `[SISTEM] Customer memilih COD. WAJIB tampilkan ULANG total lengkap ke customer PERSIS seperti ini:\n\n`
+            + `📦 COD\n`
+            + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(d.feeCOD)} = TOTAL ${fmt(d.totalCOD)}\n`
+            + `Via ${ekspLabel} ya kak 🚗\n\n`
+            + `Setelah tampilkan total di atas, minta data yang BELUM ADA saja (nama, nomor HP, alamat lengkap). `
+            + `Cek dulu dari data customer yang sudah diketahui — jangan tanya ulang yang sudah ada. JANGAN hanya bilang "Siap kak" tanpa total.`;
+        } else {
+          hint = `[SISTEM] Customer memilih Transfer. WAJIB tampilkan ULANG total lengkap ke customer PERSIS seperti ini:\n\n`
+            + `💳 Transfer\n`
+            + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(d.totalTransfer)}\n`
+            + `Via ${ekspLabel} ya kak 🚗\n\n`
+            + `Setelah tampilkan total di atas, langsung kasih info rekening lalu minta data yang BELUM ADA saja (nama, nomor HP, alamat lengkap). JANGAN hanya bilang "Siap kak" tanpa total.`;
+        }
+        history.push({ role: 'user', content: hint });
+        console.log(`[metode-hint] ${pilihCOD ? 'COD' : 'Transfer'} — inject total reminder`);
       }
     }
 
@@ -1829,6 +1924,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           // Sudah spesifik sampai kelurahan → langsung hitung ongkir, clear pending
           console.log(`[WILAYAH_OK] Kelurahan spesifik: ${first.kelurahan}, ${first.kecamatan} → hitung ongkir`);
           await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
+          convState.pending_kecamatan = null;
           const hasil = await hitungOngkir(wilayah, product);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
@@ -1849,7 +1945,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
                 feeCOD:      hasil.feeCOD,
                 harga:       hasil.harga,
               };
-              await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru }).catch(() => {});
+              await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
+                .catch(e => console.error('[WILAYAH_OK] Gagal save customer.alamat:', e.message));
               customer.alamat = alamatBaru;
             }
 
@@ -1891,10 +1988,32 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         // (seharusnya jarang terjadi karena cariWilayah sudah search dengan limit tinggi)
         console.log(`[WILAYAH_OK] "${wilayah}" tidak ditemukan di local DB — fallback Mengantar`);
         await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
+        convState.pending_kecamatan = null;
         const hasil = await hitungOngkir(wilayah, product);
         if (hasil) {
           await updateConvState(conversation.id, { ongkir: hasil });
           convState.ongkir = hasil;
+
+          // Simpan ke customers.alamat juga (sama seperti branch kelurahanUnik)
+          if (customer?.id && hasil.area?.kecamatan) {
+            const alamatBaru = {
+              ...(customer.alamat || {}),
+              kelurahan:   hasil.area.kelurahan,
+              kecamatan:   hasil.area.kecamatan,
+              kabupaten:   hasil.area.kota,
+              provinsi:    hasil.area.provinsi,
+              kodepos:     hasil.area.kodePos,
+              ekspedisi:   hasil.ekspedisi,
+              ongkirAsli:  hasil.ongkirAsli,
+              ongkirPromo: hasil.ongkirPromo,
+              feeCOD:      hasil.feeCOD,
+              harga:       hasil.harga,
+            };
+            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
+              .catch(e => console.error('[WILAYAH_OK fallback] Gagal save customer.alamat:', e.message));
+            customer.alamat = alamatBaru;
+          }
+
           const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
           const histWithOngkir = [
             ...history,
@@ -1918,6 +2037,27 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       if (hasil) {
         await updateConvState(conversation.id, { ongkir: hasil });
         convState.ongkir = hasil; // update local state
+
+        // Simpan ke customers.alamat
+        if (customer?.id && hasil.area?.kecamatan) {
+          const alamatBaru = {
+            ...(customer.alamat || {}),
+            kelurahan:   hasil.area.kelurahan,
+            kecamatan:   hasil.area.kecamatan,
+            kabupaten:   hasil.area.kota,
+            provinsi:    hasil.area.provinsi,
+            kodepos:     hasil.area.kodePos,
+            ekspedisi:   hasil.ekspedisi,
+            ongkirAsli:  hasil.ongkirAsli,
+            ongkirPromo: hasil.ongkirPromo,
+            feeCOD:      hasil.feeCOD,
+            harga:       hasil.harga,
+          };
+          await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
+            .catch(e => console.error('[CEK_ONGKIR] Gagal save customer.alamat:', e.message));
+          customer.alamat = alamatBaru;
+        }
+
         const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. `);
 
         const historyWithOngkir = [
@@ -2018,7 +2158,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             feeCOD:      feeCODBulat,
             harga:       harga,
           };
-          await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatUpdate }).catch(() => {});
+          await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatUpdate })
+            .catch(e => console.error('[GANTI_KURIR] Gagal save customer.alamat:', e.message));
           customer.alamat = alamatUpdate;
         }
       } else {
@@ -2070,6 +2211,38 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       const latestState = convFull[0]?.state || {};
       let   ongkirData  = latestState.ongkir || convState.ongkir;
       const custAlamat  = customer?.alamat || {};
+
+      // Fallback: kalau ongkirData kosong tapi wilayah ada di state → hitung ulang on-the-fly
+      if (!ongkirData?.area?.kecamatan && !custAlamat?.kecamatan) {
+        const wilayahFallback = latestState.wilayah || convState.wilayah;
+        if (wilayahFallback && product) {
+          console.log(`[ORDER_CONFIRMED] ongkir kosong, re-hitung dari wilayah: ${wilayahFallback}`);
+          const rekalkulasi = await hitungOngkir(wilayahFallback, product).catch(() => null);
+          if (rekalkulasi) {
+            ongkirData = rekalkulasi;
+            await updateConvState(conversation.id, { ongkir: rekalkulasi }).catch(() => {});
+            // Simpan ke customers.alamat sekalian
+            if (customer?.id && rekalkulasi.area?.kecamatan) {
+              const al = {
+                ...(customer.alamat || {}),
+                kelurahan:   rekalkulasi.area.kelurahan,
+                kecamatan:   rekalkulasi.area.kecamatan,
+                kabupaten:   rekalkulasi.area.kota,
+                provinsi:    rekalkulasi.area.provinsi,
+                kodepos:     rekalkulasi.area.kodePos,
+                ekspedisi:   rekalkulasi.ekspedisi,
+                ongkirAsli:  rekalkulasi.ongkirAsli,
+                ongkirPromo: rekalkulasi.ongkirPromo,
+                feeCOD:      rekalkulasi.feeCOD,
+                harga:       rekalkulasi.harga,
+              };
+              await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: al })
+                .catch(e => console.error('[ORDER_CONFIRMED] Gagal save customer.alamat fallback:', e.message));
+              customer.alamat = al;
+            }
+          }
+        }
+      }
 
       // Fallback area dari customers.alamat kalau ongkir state kosong
       const area = ongkirData?.area?.kecamatan ? ongkirData.area
