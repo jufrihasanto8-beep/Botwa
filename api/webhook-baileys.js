@@ -1833,6 +1833,26 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
             convState.ongkir = hasil;
+
+            // Simpan area + ongkir ke customers.alamat (JSONB) agar tersedia di ORDER_CONFIRMED
+            if (customer?.id && hasil.area?.kecamatan) {
+              const alamatBaru = {
+                ...(customer.alamat || {}),
+                kelurahan:   hasil.area.kelurahan,
+                kecamatan:   hasil.area.kecamatan,
+                kabupaten:   hasil.area.kota,
+                provinsi:    hasil.area.provinsi,
+                kodepos:     hasil.area.kodePos,
+                ekspedisi:   hasil.ekspedisi,
+                ongkirAsli:  hasil.ongkirAsli,
+                ongkirPromo: hasil.ongkirPromo,
+                feeCOD:      hasil.feeCOD,
+                harga:       hasil.harga,
+              };
+              await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru }).catch(() => {});
+              customer.alamat = alamatBaru;
+            }
+
             const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
             const histWithOngkir = [
               ...history,
@@ -1987,6 +2007,20 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         await updateConvState(conversation.id, { ongkir: newOngkir });
         convState.ongkir = newOngkir;
         console.log(`[GANTI_KURIR] switched to ${match.nama}`);
+
+        // Update ekspedisi + ongkir di customers.alamat
+        if (customer?.id) {
+          const alamatUpdate = {
+            ...(customer.alamat || {}),
+            ekspedisi:   match.nama,
+            ongkirAsli:  match.ongkir,
+            ongkirPromo: ongkirPromo,
+            feeCOD:      feeCODBulat,
+            harga:       harga,
+          };
+          await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatUpdate }).catch(() => {});
+          customer.alamat = alamatUpdate;
+        }
       } else {
         console.warn(`[GANTI_KURIR] kurir "${requestedKurir}" tidak ditemukan di allRates`);
       }
@@ -2010,32 +2044,56 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     // ── Update state jika order confirmed → kirim recap grup + konfirmasi customer ──
     // (dijalankan SEBELUM cek reply kosong agar tidak terlewat meski Claude hanya tulis marker)
+    if (orderConfirmed && convState.pending_kecamatan?.kecamatan) {
+      // Guard: kelurahan belum resolved — block ORDER_CONFIRMED, paksa tanya kelurahan dulu
+      const pendingKecGuard = convState.pending_kecamatan;
+      const kelAll = await getKelurahanByKecamatan(pendingKecGuard.kecamatan, pendingKecGuard.kabupaten).catch(() => []);
+      const contoh = kelAll.slice(0, 3).join(', ');
+      const injeksi = `[SISTEM] ⚠️ ORDER BELUM BISA DIPROSES — kelurahan/desa belum dikonfirmasi.\n`
+        + `Kecamatan yang diketahui: ${pendingKecGuard.kecamatan}, ${pendingKecGuard.kabupaten}.\n`
+        + `Kelurahan valid di sana: ${kelAll.join(', ') || 'tidak ditemukan'}.\n`
+        + `Tanyakan kelurahan customer dulu dengan ramah (contoh: ${contoh}). `
+        + `Setelah customer sebut kelurahan, tulis [WILAYAH_OK:kelurahan, ${pendingKecGuard.kecamatan}, ${pendingKecGuard.kabupaten}, ${pendingKecGuard.provinsi}].`;
+      const histGuard = [...history, { role: 'user', content: injeksi }];
+      const replyGuard = await callClaude(systemPrompt, histGuard, chatModel, userAnthropicKey);
+      if (replyGuard) {
+        const replyClean = replyGuard.replace(/\[ORDER_CONFIRMED\]/g, '').replace(/\[ORDER_DATA:[^\]]+\]/g, '').trim();
+        await saveMessage(conversation.id, 'ai', replyClean);
+        await sendWA(userId, reply_jid, replyClean);
+      }
+      return res.status(200).json({ ok: true, action: 'blocked_pending_kecamatan' });
+    }
+
     if (orderConfirmed) {
       // Ambil state terbaru
       const convFull    = await sbGet('conversations', `?id=eq.${conversation.id}&limit=1`);
       const latestState = convFull[0]?.state || {};
       let   ongkirData  = latestState.ongkir || convState.ongkir;
+      const custAlamat  = customer?.alamat || {};
 
-      // Kalau area kosong, re-fetch ongkir dari wilayah tersimpan agar data lengkap
-      if (!ongkirData?.area?.kecamatan) {
-        const wilayahSaved = latestState.wilayah || convState.wilayah;
-        if (wilayahSaved) {
-          const fresh = await hitungOngkir(wilayahSaved, product).catch(() => null);
-          if (fresh?.area?.kecamatan) ongkirData = { ...ongkirData, ...fresh };
-        }
-      }
+      // Fallback area dari customers.alamat kalau ongkir state kosong
+      const area = ongkirData?.area?.kecamatan ? ongkirData.area
+                 : custAlamat?.kecamatan ? {
+                     kelurahan: custAlamat.kelurahan,
+                     kecamatan: custAlamat.kecamatan,
+                     kota:      custAlamat.kabupaten,
+                     provinsi:  custAlamat.provinsi,
+                     kodePos:   custAlamat.kodepos,
+                   }
+                 : {};
 
-      const area        = ongkirData?.area || {};
       const metode      = orderDataParsed.metode  || latestState.metode_bayar || 'COD';
       const qty         = orderDataParsed.qty     || latestState.qty          || 1;
       const alamat      = orderDataParsed.alamat  || latestState.alamat       || '-';
       const isCOD       = metode.toLowerCase() !== 'transfer';
-      const ekspedisi   = ongkirData?.ekspedisi   || 'KURIR';
+
+      // Fallback ongkir detail dari customers.alamat kalau state kosong
+      const ekspedisi   = ongkirData?.ekspedisi   || custAlamat?.ekspedisi   || 'KURIR';
       const ekspLabel   = ekspedisi.toUpperCase();
-      const harga       = ongkirData?.harga       || product?.harga || 0;
-      const ongkirAsli  = ongkirData?.ongkirAsli  || ongkirData?.ongkirPromo || 0;
-      const ongkirPromo = ongkirData?.ongkirPromo || 0;
-      const feeCOD      = ongkirData?.feeCOD      || 0;
+      const harga       = ongkirData?.harga       || custAlamat?.harga       || product?.harga || 0;
+      const ongkirAsli  = ongkirData?.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
+      const ongkirPromo = ongkirData?.ongkirPromo || custAlamat?.ongkirPromo || 0;
+      const feeCOD      = ongkirData?.feeCOD      || custAlamat?.feeCOD      || 0;
 
       // Simpan area & ekspedisi yang sudah confirmed ke ongkir state agar tersimpan permanen di Supabase
       const confirmedOngkir = { ...ongkirData, area, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD };
