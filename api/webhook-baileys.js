@@ -1235,11 +1235,11 @@ module.exports = async function handler(req, res) {
     const chatModel = sumber === 'ctwa' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6';
 
     // ── Deteksi leads dari form web (pesan mengandung "isi form" + nama) ───
-    let suumberFinal = sumber;
+    let sumberFinal = sumber;
     const isFormLead = /isi form|sudah isi|formulir|form pemesanan|form order/i.test(message);
     let namaFromForm = null;
     if (isFormLead) {
-      suumberFinal = 'form';
+      sumberFinal = 'form';
       // Extract nama: "atas nama X", "nama saya X", "nama: X"
       const namaMatch = message.match(/atas nama\s+([A-Za-z\s]+?)(?:[,.\n]|$)/i)
         || message.match(/nama saya\s+([A-Za-z\s]+?)(?:[,.\n]|$)/i)
@@ -1265,7 +1265,7 @@ module.exports = async function handler(req, res) {
       customer.reply_jid = reply_jid;
     }
 
-    const conversation = await findOrCreateConversation(userId, customer.id, suumberFinal, product?.id);
+    const conversation = await findOrCreateConversation(userId, customer.id, sumberFinal, product?.id);
 
     // Update produk ke conversation jika baru ketemu
     if (product?.id && !conversation.product_id) {
@@ -2077,7 +2077,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       }
     }
 
-    if (proposedWilayah && isConfirmation(message) && !convState.ongkir) {
+    if (proposedWilayah && isConfirmation(message) && !convState.ongkir && !convState.pending_kecamatan) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
       const hasil = await hitungOngkir(proposedWilayah, product);
       if (hasil) {
@@ -2644,17 +2644,17 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       // Fallback area: ongkir state → customers.alamat → area lokal (wilayah_id)
       const area = ongkirData?.area?.kecamatan ? ongkirData.area
                  : custAlamat?.kecamatan ? {
-                     kelurahan: custAlamat.kelurahan,
-                     kecamatan: custAlamat.kecamatan,
-                     kota:      custAlamat.kabupaten,
-                     provinsi:  custAlamat.provinsi,
-                     kodePos:   custAlamat.kodepos,
+                     kelurahan: custAlamat.kelurahan || '',
+                     kecamatan: custAlamat.kecamatan || '',
+                     kota:      custAlamat.kabupaten || '',
+                     provinsi:  custAlamat.provinsi  || '',
+                     kodePos:   custAlamat.kodepos   || '',
                    }
                  : localAreaFallback ? {
-                     kelurahan: localAreaFallback.kelurahan,
-                     kecamatan: localAreaFallback.kecamatan,
-                     kota:      localAreaFallback.kabupaten,
-                     provinsi:  localAreaFallback.provinsi,
+                     kelurahan: localAreaFallback.kelurahan || '',
+                     kecamatan: localAreaFallback.kecamatan || '',
+                     kota:      localAreaFallback.kabupaten || '',
+                     provinsi:  localAreaFallback.provinsi  || '',
                      kodePos:   '',
                    }
                  : {};
@@ -2674,7 +2674,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
       // Simpan area & ekspedisi yang sudah confirmed ke ongkir state agar tersimpan permanen di Supabase
       const confirmedOngkir = { ...ongkirData, area, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD };
-      const orderSnapshot   = { alamat, area, qty, metode, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD };
+      const orderSnapshot   = { alamat, area, qty, metode, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD, keluhan: orderDataParsed.keluhan || latestState.keluhan || '' };
       await updateConvState(conversation.id, {
         order_placed: true,
         awaiting_order_confirm: true,
