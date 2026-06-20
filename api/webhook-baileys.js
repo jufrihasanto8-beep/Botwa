@@ -1501,6 +1501,31 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
 
           await saveMessage(conversation.id, 'ai', closingCustomer);
           await sendWA(userId, reply_jid, closingCustomer);
+
+          // ── Kirim recap ke grup WA setelah customer konfirmasi ──
+          if (WA_GROUP_JID) {
+            try {
+              const snap      = convState.order_snapshot || {};
+              const ongkirSnap = convState.ongkir || {};
+              const csNama    = product?.persona_cs_nama || 'CS';
+              const nomorUrut = await getOrderNumber(userId);
+              const closingMsg = buildClosingMessage({
+                nomorUrut, customer,
+                alamat:  snap.alamat  || convState.alamat || '-',
+                ongkir:  ongkirSnap,
+                product,
+                keluhan: snap.keluhan || convState.keluhan || '-',
+                metode:  snap.metode  || convState.metode_bayar || 'COD',
+                qty:     snap.qty     || 1,
+                csNama,
+              });
+              await sendWA(userId, WA_GROUP_JID, closingMsg, true);
+              console.log(`Recap order #${nomorUrut} terkirim ke grup (setelah customer konfirmasi)`);
+            } catch(e) {
+              console.error('Send recap ke grup error:', e.message);
+            }
+          }
+
           console.log(`Order confirmed oleh customer ${wa_number} — percakapan ditutup`);
           return res.status(200).json({ ok: true, action: 'order_closed' });
 
@@ -2579,24 +2604,6 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         ongkir: confirmedOngkir,
         order_snapshot: orderSnapshot,
       });
-
-      // ── Kirim recap ke grup WA ─────────────────────────────
-      if (WA_GROUP_JID) {
-        try {
-          const csNama    = product?.persona_cs_nama || 'CS';
-          const nomorUrut = await getOrderNumber(userId);
-          const closingMsg = buildClosingMessage({
-            nomorUrut, customer,
-            alamat, ongkir: ongkirData, product,
-            keluhan: orderDataParsed.keluhan || latestState.keluhan || '-',
-            metode, qty, csNama,
-          });
-          await sendWA(userId, WA_GROUP_JID, closingMsg, true);
-          console.log(`Recap order #${nomorUrut} terkirim ke grup`);
-        } catch(e) {
-          console.error('Send recap ke grup error:', e.message);
-        }
-      }
 
       // ── Kirim konfirmasi ke customer (belum tutup — tunggu customer konfirmasi) ──
       try {
