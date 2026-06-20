@@ -945,12 +945,12 @@ async function hitungOngkir(wilayah, product) {
       allRates,
       area: {
         // Prioritaskan data dari tabel lokal (lebih bersih & standar)
-        // Fallback ke data Mengantar kalau lokal tidak ada
-        kelurahan: lokal?.kelurahan   || bestArea.subdistrict || '',
-        kecamatan: lokal?.kecamatan   || bestArea.district    || '',
-        kota:      lokal?.kabupaten   || bestArea.city        || bestArea.regency || '',
-        provinsi:  lokal?.provinsi    || bestArea.province    || '',
-        kodePos:   bestArea.postal_code || bestArea.zip       || '',
+        // Fallback ke data Mengantar (field uppercase) kalau lokal tidak ada
+        kelurahan: lokal?.kelurahan || bestArea.SUBDISTRICT_NAME || bestArea.subdistrict || '',
+        kecamatan: lokal?.kecamatan || bestArea.DISTRICT_NAME    || bestArea.district    || '',
+        kota:      lokal?.kabupaten || bestArea.CITY_NAME        || bestArea.city        || bestArea.regency || '',
+        provinsi:  lokal?.provinsi  || bestArea.PROVINCE_NAME    || bestArea.province    || '',
+        kodePos:   bestArea.ZIP_CODE || bestArea.postal_code || bestArea.postalCode || bestArea.posCode || '',
       },
     };
   } catch (e) {
