@@ -1112,12 +1112,21 @@ ${(product?.nama || 'PRODUK').toUpperCase()} ${qty} CS ${cs}
 KELUHAN: ${keluhan || 'tidak disebutkan'}`.trim();
 }
 
-function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, isCOD, ekspLabel, total }) {
+function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, satuan, isCOD, ekspLabel, harga, ongkirAsli, ongkirPromo, feeCOD }) {
+  const satuanLabel = satuan || 'pcs';
+  const h  = harga       || 0;
+  const op = ongkirPromo || 0;
+  const oa = ongkirAsli  || op;
+  const fc = isCOD ? (feeCOD || 0) : 0;
+  const total = h + op + fc;
+
+  const parts    = isCOD && fc > 0 ? [h, op, fc] : [h, op];
+  const totalStr = `${parts.join('+')}=${total}`;
+
   return `✅ *Konfirmasi Order ${productNama || 'Produk'}*
 
 *Nama:* ${customer?.nama || '-'}
-*No HP:* ${customer?.wa_number || '-'}
-*Alamat Lengkap:* ${alamat || '-'}
+*Alamat:* ${alamat || '-'}
 
 *Kelurahan/Desa:* ${area?.kelurahan || '-'}
 *Kecamatan:* ${area?.kecamatan || '-'}
@@ -1125,12 +1134,11 @@ function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, isC
 *Provinsi:* ${area?.provinsi || '-'}
 *Kode Pos:* ${area?.kodePos || '-'}
 
-*Produk:* ${productNama || '-'}
-*Jumlah Pesanan:* ${qty} pcs
-*Pembayaran:* ${isCOD ? `COD via ${ekspLabel}` : `Transfer via ${ekspLabel}`}
-*Total Pembayaran:* Rp ${total.toLocaleString('id-ID')}
+*Jumlah Pesanan:* ${qty} ${satuanLabel} ${productNama || '-'}
+*Pembayaran:* ${isCOD ? 'COD' : 'Transfer'} ${ekspLabel}
+*Total Pembayaran:* ${totalStr}
 
-Sudah bener kak? Agar bisa kami proses pengiriman 🙏`;
+Sudah bener kak? 😊`;
 }
 
 /* ── MAIN HANDLER ─────────────────────────────────────────── */
@@ -1402,12 +1410,15 @@ Isi field yang berubah saja, sisanya null.` }],
         }
 
         // Kirim ulang konfirmasi dengan data yang sudah dikoreksi
-        const totalBaru = isCOD
-          ? (snap.harga || 0) + (snap.ongkirPromo || 0) + (snap.feeCOD || 0)
-          : (snap.harga || 0) + (snap.ongkirPromo || 0);
         const confirmUlang = buildCustomerConfirmMsg({
           customer, alamat: snap.alamat, area, qty: snap.qty || 1,
-          productNama: product?.nama, isCOD, ekspLabel, total: totalBaru,
+          productNama: product?.nama,
+          satuan: product?.satuan,
+          isCOD, ekspLabel,
+          harga:       snap.harga       || product?.harga || 0,
+          ongkirAsli:  snap.ongkirAsli  || snap.ongkirPromo || 0,
+          ongkirPromo: snap.ongkirPromo || 0,
+          feeCOD:      snap.feeCOD      || 0,
         });
 
         await updateConvState(conversation.id, {
@@ -2038,7 +2049,14 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       // ── Kirim konfirmasi ke customer (belum tutup — tunggu customer konfirmasi) ──
       try {
         const confirmMsg = buildCustomerConfirmMsg({
-          customer, alamat, area, qty, productNama: product?.nama, isCOD, ekspLabel, total,
+          customer, alamat, area, qty,
+          productNama: product?.nama,
+          satuan: product?.satuan,
+          isCOD, ekspLabel,
+          harga:       ongkirData?.harga       || product?.harga || 0,
+          ongkirAsli:  ongkirData?.ongkirAsli  || 0,
+          ongkirPromo: ongkirData?.ongkirPromo || 0,
+          feeCOD:      ongkirData?.feeCOD      || 0,
         });
         await saveMessage(conversation.id, 'ai', confirmMsg);
         await sendWA(userId, reply_jid, confirmMsg);
