@@ -96,23 +96,65 @@ body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
 .sum-item b{color:var(--text);font-weight:700}
 
 /* Table */
-.tbl-wrap{flex:1;overflow:auto;margin:16px 24px 24px;background:var(--white);border:1px solid var(--border);border-radius:14px}
+.tbl-wrap{flex:1;overflow:auto;margin:16px 24px 24px;background:#0f172a;border:1px solid rgba(255,255,255,.06);border-radius:14px}
+body.light .tbl-wrap{background:var(--white);border-color:var(--border)}
 .tbl-wrap::-webkit-scrollbar{width:4px;height:6px}
-.tbl-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:4px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+body.light .tbl-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1)}
+
 table{width:100%;border-collapse:collapse;min-width:1600px}
-thead th{padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0;white-space:nowrap}
-thead th.num{text-align:center;width:48px}
-tbody td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle;color:var(--text)}
-tbody tr:last-child td{border-bottom:none}
-tbody tr:hover td{background:rgba(59,130,246,.03)}
-.td-no{text-align:center;font-weight:700;color:var(--text-3);font-size:11px}
-.td-wrap{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.td-wrap-sm{max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bdg{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
-.bdg-cod{background:rgba(251,146,60,.12);color:#fb923c}
-.bdg-tf{background:rgba(99,102,241,.12);color:#818cf8}
-.empty-cell{text-align:center;padding:60px 20px;color:var(--text-3)}
-.empty-cell h4{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text-2)}
+
+thead th{
+  padding:12px 16px;text-align:left;
+  font-size:10px;font-weight:700;color:#475569;
+  text-transform:uppercase;letter-spacing:.8px;
+  background:#0f172a;border-bottom:1px solid rgba(255,255,255,.05);
+  position:sticky;top:0;white-space:nowrap;z-index:2;
+}
+body.light thead th{background:#f8fafc;color:#94a3b8;border-bottom-color:var(--border)}
+thead th.th-cb{width:44px;padding-left:20px}
+
+tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s}
+body.light tbody tr{border-bottom-color:var(--border)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover td{background:rgba(255,255,255,.03)}
+body.light tbody tr:hover td{background:rgba(59,130,246,.03)}
+
+tbody td{
+  padding:16px 16px;
+  font-size:12.5px;vertical-align:middle;
+  color:#cbd5e1;
+}
+body.light tbody td{color:var(--text)}
+
+.td-cb{padding-left:20px;width:44px}
+.td-cb input[type=checkbox]{width:15px;height:15px;accent-color:#3b82f6;cursor:pointer}
+.td-no{font-size:11px;font-weight:700;color:#475569;white-space:nowrap}
+.td-name{font-weight:600;color:#e2e8f0;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+body.light .td-name{color:var(--text)}
+.td-wrap{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8}
+body.light .td-wrap{color:var(--text-2)}
+.td-wrap-sm{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8}
+body.light .td-wrap-sm{color:var(--text-2)}
+.td-phone{font-family:monospace;font-size:12px;color:#64748b;white-space:nowrap}
+.td-num{font-weight:700;color:#e2e8f0;text-align:right}
+body.light .td-num{color:var(--text)}
+
+/* Badges */
+.bdg{display:inline-flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;letter-spacing:.5px;
+  padding:4px 10px;border-radius:20px;white-space:nowrap}
+.bdg-cod{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25)}
+.bdg-tf{background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.25)}
+body.light .bdg-cod{background:rgba(34,197,94,.1);color:#16a34a}
+body.light .bdg-tf{background:rgba(99,102,241,.1);color:#6366f1}
+
+/* Select all checkbox */
+#cb-all{width:15px;height:15px;accent-color:#3b82f6;cursor:pointer}
+
+.empty-cell{text-align:center;padding:80px 20px;color:#475569}
+.empty-cell h4{font-size:15px;font-weight:700;margin-bottom:8px;color:#64748b}
+.empty-cell p{font-size:13px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -215,8 +257,9 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
     <table>
       <thead>
         <tr>
-          <th class="num">No</th>
+          <th class="th-cb"><input type="checkbox" id="cb-all" onchange="toggleAll(this)"></th>
           <th>Tanggal</th>
+          <th>Produk</th>
           <th>Nama</th>
           <th>No Telpon</th>
           <th>Alamat</th>
@@ -225,14 +268,13 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
           <th>Kabupaten</th>
           <th>Provinsi</th>
           <th>Kode Pos</th>
-          <th>Jumlah Pesanan</th>
-          <th>Quantity</th>
-          <th>Pembayaran</th>
-          <th>Total Pembayaran</th>
-          <th>Instruksi Pengiriman</th>
-          <th>Keterangan</th>
-          <th>Rincian Pembayaran</th>
+          <th>Qty</th>
+          <th>Tipe</th>
+          <th>Total</th>
+          <th>Kurir</th>
+          <th>Rincian</th>
           <th>Keluhan</th>
+          <th>Keterangan</th>
         </tr>
       </thead>
       <tbody id="tbody">
@@ -448,6 +490,7 @@ function getOrderRow(c, idx) {
     notelp: cu.wa_number || '',
     alamat: jalan,
     kelurahan, kecamatan, kabupaten, provinsi, kodepos,
+    produkNama: prod.nama || '—',
     jumlah: prod.nama ? `${prod.nama} ×${qty}` : `×${qty}`,
     qty, metode, total, instruksi, keterangan, rincian, keluhan,
     isCOD
@@ -478,37 +521,49 @@ function renderTable(rows) {
   const tbody = document.getElementById('tbody');
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="18" class="empty-cell">
-      <div style="font-size:32px;margin-bottom:12px">📭</div>
+      <div style="font-size:36px;margin-bottom:14px;opacity:.4">📭</div>
       <h4>Belum ada order di periode ini</h4>
       <p>Order yang sudah closing akan muncul di sini.</p>
     </td></tr>`;
+    document.getElementById('cb-all').checked = false;
     return;
   }
 
-  tbody.innerHTML = rows.map(r => `<tr>
-    <td class="td-no">${r.no}</td>
-    <td style="white-space:nowrap;font-size:11px;color:var(--text-2)">${fmtDt(r.tanggal)}</td>
-    <td><div class="td-wrap" title="${escH(r.nama)}">${escH(r.nama)}</div></td>
-    <td style="white-space:nowrap">${fmtWA(r.notelp)}</td>
+  tbody.innerHTML = rows.map((r, i) => `<tr>
+    <td class="td-cb"><input type="checkbox" class="row-cb" value="${i}" onchange="updateSelectAll()"></td>
+    <td class="td-no" style="white-space:nowrap">${fmtDt(r.tanggal)}</td>
+    <td><div class="td-wrap-sm" style="color:#e2e8f0;font-weight:500" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
+    <td><div class="td-name" title="${escH(r.nama)}">${escH(r.nama)}</div></td>
+    <td class="td-phone">${fmtWA(r.notelp)}</td>
     <td><div class="td-wrap" title="${escH(r.alamat)}">${escH(r.alamat)||'—'}</div></td>
     <td><div class="td-wrap-sm">${escH(r.kelurahan)||'—'}</div></td>
     <td><div class="td-wrap-sm">${escH(r.kecamatan)||'—'}</div></td>
     <td><div class="td-wrap-sm">${escH(r.kabupaten)||'—'}</div></td>
     <td><div class="td-wrap-sm">${escH(r.provinsi)||'—'}</div></td>
-    <td style="white-space:nowrap">${escH(r.kodepos)||'—'}</td>
-    <td><div class="td-wrap">${escH(r.jumlah)}</div></td>
-    <td style="text-align:center;font-weight:600">${r.qty}</td>
-    <td><span class="bdg ${r.isCOD?'bdg-cod':'bdg-tf'}">${r.metode}</span></td>
-    <td style="font-weight:700;white-space:nowrap">${rp(r.total)}</td>
-    <td style="white-space:nowrap;font-size:11px">${escH(r.instruksi)}</td>
-    <td><div class="td-wrap" title="${escH(r.keterangan)}">${escH(r.keterangan)||'—'}</div></td>
-    <td style="font-size:11px;white-space:nowrap;color:var(--text-3)">${escH(r.rincian)}</td>
+    <td style="white-space:nowrap;color:#64748b">${escH(r.kodepos)||'—'}</td>
+    <td style="text-align:center;font-weight:700;color:#e2e8f0">${r.qty}</td>
+    <td><span class="bdg ${r.isCOD?'bdg-cod':'bdg-tf'}">${r.isCOD?'COD':'TF'}</span></td>
+    <td class="td-num" style="white-space:nowrap">${rp(r.total)}</td>
+    <td style="white-space:nowrap;font-size:11px;color:#64748b">${escH(r.instruksi)}</td>
+    <td style="font-size:11px;white-space:nowrap;color:#475569">${escH(r.rincian)}</td>
     <td><div class="td-wrap" title="${escH(r.keluhan)}">${escH(r.keluhan)||'—'}</div></td>
+    <td><div class="td-wrap" title="${escH(r.keterangan)}">${escH(r.keterangan)||'—'}</div></td>
   </tr>`).join('');
 }
 
+function toggleAll(cb) {
+  document.querySelectorAll('.row-cb').forEach(el => el.checked = cb.checked);
+}
+function updateSelectAll() {
+  const all  = document.querySelectorAll('.row-cb');
+  const chk  = document.querySelectorAll('.row-cb:checked');
+  const cbAll = document.getElementById('cb-all');
+  cbAll.checked       = chk.length === all.length && all.length > 0;
+  cbAll.indeterminate = chk.length > 0 && chk.length < all.length;
+}
+
 // ── EXPORT ────────────────────────────────────────────────
-const HEADERS = ['No','Tanggal','Nama','No Telpon','Alamat','Kelurahan','Kecamatan','Kabupaten','Provinsi','Kode Pos','Jumlah Pesanan','Quantity','Pembayaran','Total Pembayaran','Instruksi Pengiriman','Keterangan','Rincian Pembayaran','Keluhan'];
+const HEADERS = ['No','Tanggal','Produk','Nama','No Telpon','Alamat','Kelurahan','Kecamatan','Kabupaten','Provinsi','Kode Pos','Qty','Tipe','Total Pembayaran','Kurir','Rincian Pembayaran','Keluhan','Keterangan'];
 
 function getExportRows() {
   const list = filterByRange(allOrders);
@@ -517,6 +572,7 @@ function getExportRows() {
     return [
       r.no,
       fmtDt(r.tanggal),
+      r.produkNama,
       r.nama,
       fmtWA(r.notelp),
       r.alamat,
@@ -525,14 +581,13 @@ function getExportRows() {
       r.kabupaten,
       r.provinsi,
       r.kodepos,
-      r.jumlah,
       r.qty,
-      r.metode,
+      r.isCOD ? 'COD' : 'Transfer',
       r.total,
       r.instruksi,
-      r.keterangan,
       r.rincian,
-      r.keluhan
+      r.keluhan,
+      r.keterangan
     ];
   });
 }
