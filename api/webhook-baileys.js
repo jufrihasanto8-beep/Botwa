@@ -1894,6 +1894,20 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
           convState.proposed_wilayah = wilayahBaru;
           proposedWilayah = wilayahBaru;
+
+          // Simpan area ke customers.alamat lebih awal (tidak nunggu WILAYAH_OK)
+          if (customer?.id) {
+            const alamatEarly = {
+              ...(customer.alamat || {}),
+              ...(w.kelurahan ? { kelurahan: w.kelurahan } : {}),
+              ...(w.kecamatan ? { kecamatan: w.kecamatan } : {}),
+              ...(w.kabupaten ? { kabupaten: w.kabupaten } : {}),
+              ...(w.provinsi  ? { provinsi:  w.provinsi  } : {}),
+            };
+            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatEarly })
+              .catch(e => console.error('[proposedWilayah] Gagal save customer.alamat:', e.message));
+            customer.alamat = alamatEarly;
+          }
         } else {
           // Banyak kecamatan → clear proposed, biar AI tanya
           console.log(`Pesan "${pesanBersih}" punya ${kecUnik.length} kecamatan, tunggu AI konfirmasi`);
