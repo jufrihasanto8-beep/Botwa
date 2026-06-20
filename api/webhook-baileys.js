@@ -1641,7 +1641,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     const lastAiMsg = history.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
     const aiTanyaLokasi = /daerah|wilayah|provinsi|kota|kabupaten|kecamatan|kelurahan|desa|alamat|kirim ke|tinggal di|dari mana|lokasi/i.test(lastAiMsg);
     const kelurahanBelumTerisi = !convState.ongkir?.area?.kelurahan || convState.pending_kecamatan;
-    if ((!convState.wilayah || kelurahanBelumTerisi) && aiTanyaLokasi && message.length >= 3 && message.length <= 80) {
+    // Kalau pending_kecamatan aktif, selalu coba search (tidak perlu aiTanyaLokasi)
+    const perluSearchWilayah = (!convState.wilayah || kelurahanBelumTerisi) && (aiTanyaLokasi || convState.pending_kecamatan);
+    if (perluSearchWilayah && message.length >= 3 && message.length <= 80) {
       try {
         // ── Kalau bot sedang menunggu jawaban kelurahan (pending_kecamatan ada di state),
         //    cari kelurahan di kecamatan itu saja — jangan search global (bisa salah kecamatan)
