@@ -105,20 +105,20 @@ async function processOrder(order) {
   const customer = customers[0];
 
   // Cari order di orders_new yang belum ada resi
-  const orders = await sbGet(
+  const orderRows = await sbGet(
     `orders_new?customer_id=eq.${customer.id}&no_resi=is.null&status=eq.pending&order=created_at.desc&limit=1`
   );
-  if (!orders.length) return { skip: 'tidak ada order pending tanpa resi' };
+  if (!orderRows.length) return { skip: 'tidak ada order pending tanpa resi' };
 
-  const order = orders[0];
+  const orderRow = orderRows[0];
   const urlLacak = trackingUrl(kurir, noResi);
   const namaKak  = (nama || '').split(' ')[0];
 
   // Simpan resi ke orders_new
-  await sbPatch('orders_new', `?id=eq.${order.id}`, {
-    no_resi:        noResi,
-    ekspedisi:      kurir || order.ekspedisi,
-    status:         'dikirim',
+  await sbPatch('orders_new', `?id=eq.${orderRow.id}`, {
+    no_resi:         noResi,
+    ekspedisi:       kurir || orderRow.ekspedisi,
+    status:          'dikirim',
     status_tracking: 'dikirim',
   });
 
@@ -161,7 +161,7 @@ Tulis pesannya langsung tanpa penjelasan.` }],
     pesanResi = `Halo ${namaKak ? 'kak ' + namaKak : 'kak'}! Pesanan kakak sudah kami kirim nih 📦\n\nKurir: ${kurir || 'ekspedisi'}\nNo. Resi: ${noResi}\nLacak di: ${urlLacak}\n\nEstimasi tiba 2-3 hari kerja. Ada pertanyaan? Kami siap bantu 🙏`;
   }
 
-  await sendWA(order.user_id, waNumber, pesanResi);
+  await sendWA(orderRow.user_id, waNumber, pesanResi);
   console.log(`[resi-poller] Resi ${noResi} terkirim ke ${waNumber}`);
   return { sent: true, wa: waNumber, resi: noResi };
 }
