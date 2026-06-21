@@ -120,7 +120,10 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
         <h1>📦 Pesanan</h1>
         <p>Monitor status pengiriman semua order</p>
       </div>
-      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Ganti tema" style="margin-left:auto">🌙</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+        <button onclick="openTplModal()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(59,130,246,.4);background:rgba(59,130,246,.08);color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer">✏️ Template Notif</button>
+        <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
+      </div>
     </div>
 
     <div class="ps-layout">
@@ -134,7 +137,6 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
         </div>
         <input class="ps-search" type="text" placeholder="Cari nama / resi / produk..." oninput="render()" id="ps-search">
         <div class="ps-count" id="ps-count"></div>
-        <button class="ps-tab" onclick="openTplModal()" style="margin-left:auto;background:rgba(59,130,246,.1);color:#3b82f6;border-color:#3b82f6">✏️ Template Notif</button>
       </div>
       <div class="ps-list" id="ps-list">
         <div class="empty-state"><div>📦</div>Memuat pesanan...</div>
