@@ -54,10 +54,63 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
 
 .empty-state{text-align:center;padding:60px 20px;color:var(--text-2)}
 .empty-state div:first-child{font-size:40px;margin-bottom:12px}
+
+/* ── Template Modal ── */
+.tpl-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
+.tpl-overlay.open{display:flex}
+.tpl-modal{background:var(--white);border-radius:16px;width:560px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.tpl-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.tpl-header h2{font-size:15px;font-weight:700;color:var(--text)}
+.tpl-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);line-height:1}
+.tpl-body{padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
+.tpl-section{display:flex;flex-direction:column;gap:8px}
+.tpl-label{font-size:12px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px}
+.tpl-desc{font-size:11px;color:var(--text-2)}
+.tpl-vars{font-size:11px;color:#3b82f6;background:rgba(59,130,246,.06);padding:6px 10px;border-radius:6px}
+.tpl-textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-family:inherit;resize:vertical;min-height:90px;line-height:1.6}
+.tpl-textarea:focus{outline:none;border-color:#3b82f6}
+.tpl-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+.tpl-status{font-size:12px;color:#22c55e;align-self:center;margin-right:auto}
 </style>
 </head>
 <body>
 <div id="toast"></div>
+
+<!-- Template Notif Modal -->
+<div class="tpl-overlay" id="tpl-overlay" onclick="if(event.target===this)closeTplModal()">
+  <div class="tpl-modal">
+    <div class="tpl-header">
+      <h2>✏️ Template Notif Pengiriman</h2>
+      <button class="tpl-close" onclick="closeTplModal()">✕</button>
+    </div>
+    <div class="tpl-body">
+      <div class="tpl-vars">Variabel yang bisa dipakai: <b>{nama}</b> · <b>{resi}</b> · <b>{kurir}</b> · <b>{link}</b></div>
+
+      <div class="tpl-section">
+        <div class="tpl-label">📦 Resi Baru Masuk</div>
+        <div class="tpl-desc">Dikirim otomatis saat resi pertama kali diinput tim.</div>
+        <textarea class="tpl-textarea" id="tpl-resi-dikirim" placeholder="Contoh: Kak {nama}, pesanan udah meluncur nih! 🚀&#10;Resi: {resi}&#10;Lacak: {link}&#10;&#10;Semoga cepet sampe dan langsung berasa manfaatnya ya 🌿"></textarea>
+      </div>
+
+      <div class="tpl-section">
+        <div class="tpl-label">🚚 Paket Dalam Pengantaran</div>
+        <div class="tpl-desc">Dikirim otomatis saat status tracking "out for delivery" (kurir sedang antar ke rumah).</div>
+        <textarea class="tpl-textarea" id="tpl-out-for-delivery" placeholder="Contoh: Kak {nama}, kurir lagi otw ke rumah nih hari ini! 🏠&#10;Standby ya kak, paketnya sebentar lagi sampai 😊"></textarea>
+      </div>
+
+      <div class="tpl-section">
+        <div class="tpl-label">⚠️ Paket Bermasalah</div>
+        <div class="tpl-desc">Dikirim otomatis saat resi tidak bergerak lebih dari 3 hari.</div>
+        <textarea class="tpl-textarea" id="tpl-bermasalah" placeholder="Contoh: Kak {nama}, kami mau kasih info nih — paket kak sepertinya ada kendala di jalan 🙏&#10;Kami lagi follow up ke {kurir} ya kak. Tenang, kami pastiin pesanannya sampai!"></textarea>
+      </div>
+    </div>
+    <div class="tpl-footer">
+      <span class="tpl-status" id="tpl-status"></span>
+      <button class="ps-tab" onclick="closeTplModal()">Batal</button>
+      <button class="ps-tab" style="background:#3b82f6;color:#fff;border-color:#3b82f6" onclick="saveTplModal()">Simpan Template</button>
+    </div>
+  </div>
+</div>
 <div class="app-layout">
   <div id="sidebar-container"></div>
   <div class="main-content" style="overflow:hidden;display:flex;flex-direction:column;">
@@ -81,6 +134,7 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
         </div>
         <input class="ps-search" type="text" placeholder="Cari nama / resi / produk..." oninput="render()" id="ps-search">
         <div class="ps-count" id="ps-count"></div>
+        <button class="ps-tab" onclick="openTplModal()" style="margin-left:auto;background:rgba(59,130,246,.1);color:#3b82f6;border-color:#3b82f6">✏️ Template Notif</button>
       </div>
       <div class="ps-list" id="ps-list">
         <div class="empty-state"><div>📦</div>Memuat pesanan...</div>
@@ -245,6 +299,49 @@ function render() {
       </div>
     </div>`;
   }).join('');
+}
+
+/* ── TEMPLATE NOTIF ── */
+async function openTplModal() {
+  document.getElementById('tpl-overlay').classList.add('open');
+  document.getElementById('tpl-status').textContent = '';
+  try {
+    const data = await SB.get('users', `?id=eq.${uid}&select=template_resi_dikirim,template_out_for_delivery,template_bermasalah&limit=1`);
+    const row = data[0] || {};
+    document.getElementById('tpl-resi-dikirim').value     = row.template_resi_dikirim     || '';
+    document.getElementById('tpl-out-for-delivery').value = row.template_out_for_delivery || '';
+    document.getElementById('tpl-bermasalah').value       = row.template_bermasalah       || '';
+  } catch(e) { console.error('loadTpl:', e.message); }
+}
+
+function closeTplModal() {
+  document.getElementById('tpl-overlay').classList.remove('open');
+}
+
+async function saveTplModal() {
+  const status = document.getElementById('tpl-status');
+  status.textContent = 'Menyimpan...';
+  status.style.color = '#94a3b8';
+  try {
+    await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: uid,
+        table: 'users_template',
+        payload: {
+          template_resi_dikirim:     document.getElementById('tpl-resi-dikirim').value.trim(),
+          template_out_for_delivery: document.getElementById('tpl-out-for-delivery').value.trim(),
+          template_bermasalah:       document.getElementById('tpl-bermasalah').value.trim(),
+        }
+      })
+    });
+    status.textContent = '✅ Tersimpan';
+    status.style.color = '#22c55e';
+  } catch(e) {
+    status.textContent = '❌ Gagal simpan';
+    status.style.color = '#f87171';
+  }
 }
 
 init();
