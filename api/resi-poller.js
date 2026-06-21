@@ -133,23 +133,24 @@ async function processOrder(order) {
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 200,
           messages: [{ role: 'user', content:
-            `Kamu CS herbal yang hangat dan peduli. Buat pesan WhatsApp kasih tau customer pesanannya sudah dikirim.
+            `Kamu CS produk herbal yang hangat dan peduli. Tulis pesan WhatsApp ke customer yang pesanannya baru dikirim.
 
-Nama: ${namaKak ? 'kak ' + namaKak : 'kak'}
-Kurir: ${kurir || 'ekspedisi'}
-No. Resi: ${noResi}
-Link lacak: ${urlLacak}
+Data:
+- Nama: ${namaKak ? 'kak ' + namaKak : 'kak'}
+- No. Resi: ${noResi}
+- Link lacak: ${urlLacak}
 
-Ketentuan:
-- Gaya santai seperti chat teman, bukan template kaku
-- Semangatin customer buat sabar nunggu, produknya segera sampai dan semoga cepat membantu
-- Kasih tau bisa lacak resi di link yang dikasih
-- 2-3 kalimat cukup
-- 1-2 emoji yang hangat
+Gaya penulisan:
+- Seperti teman yang excited kasih kabar baik, bukan CS formal
+- Bangun antusias customer buat nunggu produknya datang, yakinkan manfaatnya akan segera terasa
+- Resi dan link lacak wajib ada, taruh di baris terpisah
+- Maksimal 4 kalimat pendek
+- 2 emoji yang hangat dan relevan
+- JANGAN sebut nama kurir kalau tidak ada
 - JANGAN pakai markdown (*, _, dll)
-- JANGAN mulai dengan "Halo" atau salam formal
+- JANGAN mulai dengan "Halo kak" atau salam kaku
 
-Tulis pesannya langsung.` }],
+Langsung tulis pesannya.` }],
         }),
       });
       const d = await r.json();
