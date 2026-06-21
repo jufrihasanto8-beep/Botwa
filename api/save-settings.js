@@ -42,6 +42,21 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── Template notif ──
+  if (body.userId && body.table === 'users_template' && body.payload) {
+    const allowed = ['template_resi_dikirim', 'template_out_for_delivery', 'template_bermasalah'];
+    const patch = {};
+    for (const key of allowed) {
+      if (key in body.payload) patch[key] = body.payload[key];
+    }
+    try {
+      await sbReq('PATCH', `users?id=eq.${body.userId}`, patch);
+      return res.status(200).json({ ok: true });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── Generic CRUD: table + action ──
   const { userId, table, action, id, payload } = body;
   const ALLOWED = ['courier_whitelist'];
