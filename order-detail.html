@@ -449,62 +449,56 @@ function filterByRange(list) {
 }
 
 async function init() {
-  const [convs, custs, prods] = await Promise.all([
-    sbFetch('conversations', `?user_id=eq.${uid}&select=id,customer_id,product_id,status,state,last_msg_at,created_at&order=last_msg_at.desc`),
-    sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,alamat,catatan`),
+  const [orders, custs, prods] = await Promise.all([
+    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,created_at&order=created_at.desc`),
+    sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,catatan`),
     sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga,persona_cs_nama`)
   ]);
 
   custs.forEach(c => { custMap[c.id] = c; });
   prods.forEach(p => { prodMap[p.id] = p; });
 
-  allOrders = (convs||[]).filter(c => {
-    try { return c.state?.order_placed === true; } catch { return false; }
-  });
+  allOrders = orders || [];
 
   render();
 }
 
 function getOrderRow(c, idx) {
-  const cu   = custMap[c.customer_id] || {};
-  const prod = prodMap[c.product_id]  || {};
-  const st   = c.state || {};
+  const cu      = custMap[c.customer_id] || {};
+  const prod    = prodMap[c.product_id]  || {};
+  const alamat  = c.alamat || {};
 
-  // Alamat fields — prioritas: ongkir.area > customers.alamat
-  const area     = st.ongkir?.area || {};
-  const custAlmt = cu.alamat || {};
-  const kelurahan = area.kelurahan || custAlmt.kelurahan || '';
-  const kecamatan = area.kecamatan || custAlmt.kecamatan || '';
-  const kabupaten = area.kota      || custAlmt.kabupaten || '';
-  const provinsi  = area.provinsi  || custAlmt.provinsi  || '';
-  const kodepos   = area.kodePos   || custAlmt.kodepos   || '';
-  const jalan     = st.alamat      || custAlmt.jalan     || '';
+  // Alamat fields langsung dari orders_new.alamat
+  const jalan     = alamat.jalan     || '';
+  const kelurahan = alamat.kelurahan || '';
+  const kecamatan = alamat.kecamatan || '';
+  const kabupaten = alamat.kabupaten || '';
+  const provinsi  = alamat.provinsi  || '';
+  const kodepos   = alamat.kodepos   || '';
 
-  // Order data
-  const qty       = parseInt(st.qty || st.order_snapshot?.qty || 1);
-  const metode    = (st.metode_bayar || st.order_snapshot?.metode || 'COD').toUpperCase();
+  // Order data langsung dari kolom orders_new
+  const qty       = parseInt(c.qty || 1);
+  const metode    = (c.metode || 'cod').toUpperCase();
   const isCOD     = metode !== 'TRANSFER';
-  const snap      = st.order_snapshot || {};
-  const harga     = snap.harga     || prod.harga     || st.ongkir?.harga     || 0;
-  const ongkir    = snap.ongkirPromo ?? snap.ongkirAsli ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-  const feeCOD    = isCOD ? (snap.feeCOD ?? st.ongkir?.feeCOD ?? 0) : 0;
-  const total     = (harga * qty) + ongkir + feeCOD;
-  const ekspedisi = (snap.ekspedisi || st.ongkir?.ekspedisi || 'KURIR').toUpperCase();
-  const keluhan   = snap.keluhan || st.keluhan || '';
-  const csNama    = (prod.persona_cs_nama || 'CS').toUpperCase();
+  const harga     = c.harga    || prod.harga || 0;
+  const ongkir    = c.ongkir_after_promo ?? c.ongkir ?? 0;
+  const feeCOD    = isCOD ? (c.fee_cod || 0) : 0;
+  const total     = c.total || (harga * qty) + ongkir + feeCOD;
+  const ekspedisi = (c.ekspedisi || 'KURIR').toUpperCase();
+  const keluhan   = c.keluhan || '';
 
   // Rincian pembayaran
   const parts = isCOD && feeCOD > 0 ? [harga*qty, ongkir, feeCOD] : [harga*qty, ongkir];
   const rincian = parts.join('+') + '=' + total;
 
-  // Instruksi pengiriman (format kurir)
+  // Instruksi pengiriman
   const instruksi = ekspedisi ? `${ekspedisi}-MENG` : '—';
 
-  // Keterangan (dari catatan customer atau snap)
+  // Keterangan dari catatan customer
   const keterangan = cu.catatan ? cu.catatan.split('\n')[0] : '';
 
   return {
-    tanggal: c.last_msg_at || c.created_at,
+    tanggal: c.created_at,
     no: idx + 1,
     nama: cu.nama || '—',
     notelp: cu.wa_number || '',
