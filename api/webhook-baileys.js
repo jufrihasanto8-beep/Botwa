@@ -1533,6 +1533,40 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
           await saveMessage(conversation.id, 'ai', closingCustomer);
           await sendWA(userId, reply_jid, closingCustomer);
 
+          // ── Insert ke orders_new ──
+          try {
+            const snap       = convState.order_snapshot || {};
+            const ongkirSnap = convState.ongkir || {};
+            const alamatSnap = {
+              jalan:      snap.alamat       || convState.alamat              || '',
+              kelurahan:  ongkirSnap.area?.kelurahan || customer.alamat?.kelurahan || '',
+              kecamatan:  ongkirSnap.area?.kecamatan || customer.alamat?.kecamatan || '',
+              kabupaten:  ongkirSnap.area?.kota      || customer.alamat?.kabupaten || '',
+              provinsi:   ongkirSnap.area?.provinsi  || customer.alamat?.provinsi  || '',
+              kodepos:    ongkirSnap.area?.kodePos   || customer.alamat?.kodepos   || '',
+            };
+            await sbPost('orders_new', {
+              user_id:           userId,
+              customer_id:       customer.id,
+              conversation_id:   conversation.id,
+              product_id:        product?.id || null,
+              metode:            (snap.metode || convState.metode_bayar || 'cod').toLowerCase(),
+              qty:               parseInt(snap.qty || convState.qty || 1),
+              harga:             snap.harga        || product?.harga || 0,
+              ongkir:            snap.ongkirAsli   || ongkirSnap.ongkirAsli   || 0,
+              ongkir_after_promo: snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? null,
+              fee_cod:           snap.feeCOD       || ongkirSnap.feeCOD       || 0,
+              total:             snap.total        || 0,
+              ekspedisi:         snap.ekspedisi    || ongkirSnap.ekspedisi    || '',
+              alamat:            alamatSnap,
+              keluhan:           snap.keluhan      || convState.keluhan        || '',
+              status:            'pending',
+            });
+            console.log(`[closing] Insert orders_new OK — conv ${conversation.id}`);
+          } catch(e) {
+            console.error('[closing] Gagal insert orders_new:', e.message);
+          }
+
           // ── Update total_order & last_order_at di customers ──
           await sbPatch('customers', `?id=eq.${customer.id}`, {
             total_order:   (customer.total_order || 0) + 1,

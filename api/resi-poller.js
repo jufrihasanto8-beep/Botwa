@@ -104,20 +104,22 @@ async function processOrder(order) {
 
   const customer = customers[0];
 
-  // Cari conversation aktif dengan order_placed=true dan belum ada resi
-  const convs = await sbGet(
-    `conversations?customer_id=eq.${customer.id}&order=last_msg_at.desc&limit=10`
+  // Cari order di orders_new yang belum ada resi
+  const orders = await sbGet(
+    `orders_new?customer_id=eq.${customer.id}&no_resi=is.null&status=eq.pending&order=created_at.desc&limit=1`
   );
-  const conv = convs.find(c => c.state?.order_placed && !c.state?.no_resi);
-  if (!conv) return { skip: 'tidak ada order aktif tanpa resi' };
+  if (!orders.length) return { skip: 'tidak ada order pending tanpa resi' };
 
+  const order = orders[0];
   const urlLacak = trackingUrl(kurir, noResi);
   const namaKak  = (nama || '').split(' ')[0];
 
-  // Simpan resi ke conversation state
-  const currentState = conv.state || {};
-  await sbPatch('conversations', `?id=eq.${conv.id}`, {
-    state: { ...currentState, no_resi: noResi, kurir_resi: kurir, tracking_status: 'dikirim' },
+  // Simpan resi ke orders_new
+  await sbPatch('orders_new', `?id=eq.${order.id}`, {
+    no_resi:        noResi,
+    ekspedisi:      kurir || order.ekspedisi,
+    status:         'dikirim',
+    status_tracking: 'dikirim',
   });
 
   // Generate pesan AI
@@ -159,7 +161,7 @@ Tulis pesannya langsung tanpa penjelasan.` }],
     pesanResi = `Halo ${namaKak ? 'kak ' + namaKak : 'kak'}! Pesanan kakak sudah kami kirim nih 📦\n\nKurir: ${kurir || 'ekspedisi'}\nNo. Resi: ${noResi}\nLacak di: ${urlLacak}\n\nEstimasi tiba 2-3 hari kerja. Ada pertanyaan? Kami siap bantu 🙏`;
   }
 
-  await sendWA(conv.user_id, waNumber, pesanResi);
+  await sendWA(order.user_id, waNumber, pesanResi);
   console.log(`[resi-poller] Resi ${noResi} terkirim ke ${waNumber}`);
   return { sent: true, wa: waNumber, resi: noResi };
 }
