@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Detail Order · Adsy CS</title>
-<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
+<script>if(localStorage.getItem('cs_theme')==='light')document.documentElement.classList.add('light');</script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="css/style.css">
 <style>
@@ -439,11 +439,11 @@ function drpNav(dir){
 }
 
 // ── SUPABASE FETCH ─────────────────────────────────────────
-const SB_URL = window.SUPABASE_URL || '';
-const SB_KEY = window.SUPABASE_ANON_KEY || '';
 function sbFetch(table, query) {
-  return fetch(`${SB_URL}/rest/v1/${table}${query}`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' }
+  const url = window.SUPABASE_URL || '';
+  const key = window.SUPABASE_ANON_KEY || '';
+  return fetch(`${url}/rest/v1/${table}${query}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
   }).then(r => r.json()).catch(() => []);
 }
 
