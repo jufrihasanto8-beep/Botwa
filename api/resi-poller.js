@@ -182,7 +182,7 @@ module.exports = async function handler(req, res) {
     // Resi biasanya masuk D+1 atau D+2, jadi 3 hari cukup aman
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     const orders = await valGet(
-      `all_orderan?no_resi=not.is.null&no_resi=neq.&created_at=gte.${threeDaysAgo}&order=created_at.desc&limit=2000`
+      `all_orderan?resi=not.is.null&resi=neq.&created_at=gte.${threeDaysAgo}&order=created_at.desc&limit=2000`
     );
 
     const results = { sent: 0, skipped: 0, errors: 0, detail: [] };
