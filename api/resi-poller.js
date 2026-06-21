@@ -184,8 +184,9 @@ module.exports = async function handler(req, res) {
   try {
     // Ambil order 3 hari terakhir yang sudah ada no_resi
     // Resi biasanya masuk D+1 atau D+2, jadi 3 hari cukup aman
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
     const orders = await valGet(
-      `all_orderan?resi=not.is.null&resi=neq.&created_at=gte.2026-05-25T00:00:00Z&created_at=lte.2026-05-26T00:00:00Z&order=created_at.desc&limit=200`
+      `all_orderan?resi=not.is.null&resi=neq.&created_at=gte.${fiveDaysAgo}&order=created_at.desc&limit=500`
     );
 
     const results = { sent: 0, skipped: 0, errors: 0, detail: [] };
