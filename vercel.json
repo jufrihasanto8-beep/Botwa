@@ -22,6 +22,12 @@
     },
     "api/followup.js": {
       "maxDuration": 60
+    },
+    "api/resi-poller.js": {
+      "maxDuration": 60
+    },
+    "api/tracking.js": {
+      "maxDuration": 60
     }
   },
   "crons": []
