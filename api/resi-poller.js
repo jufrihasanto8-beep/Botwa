@@ -103,6 +103,7 @@ async function processOrder(order) {
   if (!customers.length) return { skip: 'customer tidak ada di BotWA' };
 
   const customer = customers[0];
+  const namaKak  = (customer.nama || '').split(' ')[0]; // ambil dari customers BotWA
 
   // Cari order di orders_new yang belum ada resi
   const orderRows = await sbGet(
@@ -112,7 +113,6 @@ async function processOrder(order) {
 
   const orderRow = orderRows[0];
   const urlLacak = trackingUrl(kurir, noResi);
-  const namaKak  = (nama || '').split(' ')[0];
 
   // Simpan resi ke orders_new
   await sbPatch('orders_new', `?id=eq.${orderRow.id}`, {
@@ -133,20 +133,23 @@ async function processOrder(order) {
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 200,
           messages: [{ role: 'user', content:
-            `Kamu CS toko online Indonesia yang ramah. Buat notifikasi WhatsApp bahwa pesanan customer sudah dikirim.
+            `Kamu CS herbal yang hangat dan peduli. Buat pesan WhatsApp kasih tau customer pesanannya sudah dikirim.
 
-Customer: ${namaKak ? 'kak ' + namaKak : 'kak'}
+Nama: ${namaKak ? 'kak ' + namaKak : 'kak'}
 Kurir: ${kurir || 'ekspedisi'}
 No. Resi: ${noResi}
-Link tracking: ${urlLacak}
+Link lacak: ${urlLacak}
 
 Ketentuan:
-- 2-3 kalimat natural, tidak kaku
-- Sertakan no resi dan link tracking
-- 1-2 emoji saja
-- JANGAN markdown (*, _, dll)
+- Gaya santai seperti chat teman, bukan template kaku
+- Semangatin customer buat sabar nunggu, produknya segera sampai dan semoga cepat membantu
+- Kasih tau bisa lacak resi di link yang dikasih
+- 2-3 kalimat cukup
+- 1-2 emoji yang hangat
+- JANGAN pakai markdown (*, _, dll)
+- JANGAN mulai dengan "Halo" atau salam formal
 
-Tulis pesannya langsung tanpa penjelasan.` }],
+Tulis pesannya langsung.` }],
         }),
       });
       const d = await r.json();
@@ -158,7 +161,7 @@ Tulis pesannya langsung tanpa penjelasan.` }],
 
   // Fallback kalau AI gagal
   if (!pesanResi) {
-    pesanResi = `Halo ${namaKak ? 'kak ' + namaKak : 'kak'}! Pesanan kakak sudah kami kirim nih 📦\n\nKurir: ${kurir || 'ekspedisi'}\nNo. Resi: ${noResi}\nLacak di: ${urlLacak}\n\nEstimasi tiba 2-3 hari kerja. Ada pertanyaan? Kami siap bantu 🙏`;
+    pesanResi = `${namaKak ? 'Kak ' + namaKak : 'Kak'}, pesanan sudah kami kirim nih 📦 Semoga produknya cepat sampai dan langsung terasa manfaatnya ya!\n\nResi: ${noResi} (${kurir || 'ekspedisi'})\nLacak di: ${urlLacak}`;
   }
 
   await sendWA(orderRow.user_id, waNumber, pesanResi);
