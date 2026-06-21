@@ -180,9 +180,8 @@ module.exports = async function handler(req, res) {
   try {
     // Ambil order 3 hari terakhir yang sudah ada no_resi
     // Resi biasanya masuk D+1 atau D+2, jadi 3 hari cukup aman
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const orders = await valGet(
-      `all_orderan?resi=not.is.null&resi=neq.&created_at=gte.${thirtyDaysAgo}&order=created_at.desc&limit=200`
+      `all_orderan?resi=not.is.null&resi=neq.&created_at=gte.2026-05-25T00:00:00Z&created_at=lte.2026-05-26T00:00:00Z&order=created_at.desc&limit=200`
     );
 
     const results = { sent: 0, skipped: 0, errors: 0, detail: [] };
@@ -195,6 +194,7 @@ module.exports = async function handler(req, res) {
           results.detail.push({ resi: result.resi, wa: result.wa, status: 'sent' });
         } else {
           results.skipped++;
+          results.detail.push({ resi: order.resi, hp: order.hp, status: 'skipped', alasan: result.skip });
         }
       } catch (e) {
         results.errors++;
