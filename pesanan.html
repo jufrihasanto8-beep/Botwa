@@ -102,6 +102,7 @@ const uid = Auth.getUser()?.id;
 let allConvs = [], custMap = {}, prodMap = {};
 let activeTab = 'semua';
 
+
 function rp(n) { return 'Rp ' + (n||0).toLocaleString('id-ID'); }
 function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 function avColor(n) { const c=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4']; let h=0; for(let i=0;i<(n||'').length;i++) h=(h*31+n.charCodeAt(i))%c.length; return c[h]; }
@@ -111,10 +112,10 @@ function fmtDt(iso) {
   return new Date(iso).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 
-function getStatus(st) {
-  if (st.tracking_sampai)  return 'sampai';
-  if (st.tracking_status)  return 'transit';
-  if (st.no_resi)          return 'dikirim';
+function getStatus(c) {
+  if (c.sampai)            return 'sampai';
+  if (c.status_tracking)   return 'transit';
+  if (c.no_resi)           return 'dikirim';
   return 'menunggu';
 }
 
@@ -126,11 +127,8 @@ function setTab(tab, btn) {
 }
 
 async function init() {
-  // Query hanya conversation yang sudah ada order (status selesai atau masih proses tapi order_placed)
-  // Gunakan 2 query terpisah untuk cover semua status
-  const [convsDone, convsProses, custs, prods] = await Promise.all([
-    SB.get('conversations', `?user_id=eq.${uid}&status=eq.selesai&order=last_msg_at.desc&limit=1000`),
-    SB.get('conversations', `?user_id=eq.${uid}&status=in.(baru,diproses)&order=last_msg_at.desc&limit=200`),
+  const [orders, custs, prods] = await Promise.all([
+    SB.get('orders_new', `?user_id=eq.${uid}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,status_tracking,tracking_lokasi,sampai,created_at&order=created_at.desc&limit=1000`),
     SB.get('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,reply_jid`),
     SB.get('products',  `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
   ]);
@@ -138,9 +136,7 @@ async function init() {
   custs.forEach(c => custMap[c.id] = c);
   prods.forEach(p => prodMap[p.id] = p);
 
-  // Gabung + filter order_placed
-  const all = [...(convsDone||[]), ...(convsProses||[])];
-  allConvs = all.filter(c => c.state?.order_placed === true);
+  allConvs = orders || [];
   render();
 }
 
@@ -150,7 +146,7 @@ function render() {
 
   // Filter tab
   if (activeTab !== 'semua') {
-    list = list.filter(c => getStatus(c.state || {}) === activeTab);
+    list = list.filter(c => getStatus(c) === activeTab);
   }
 
   // Filter search
@@ -158,11 +154,10 @@ function render() {
     list = list.filter(c => {
       const cu = custMap[c.customer_id] || {};
       const pr = prodMap[c.product_id] || {};
-      const st = c.state || {};
       return (cu.nama||'').toLowerCase().includes(q)
         || (cu.wa_number||'').includes(q)
         || (pr.nama||'').toLowerCase().includes(q)
-        || (st.no_resi||'').toLowerCase().includes(q);
+        || (c.no_resi||'').toLowerCase().includes(q);
     });
   }
 
@@ -177,14 +172,13 @@ function render() {
   container.innerHTML = list.map(c => {
     const cu    = custMap[c.customer_id] || {};
     const pr    = prodMap[c.product_id]  || {};
-    const st    = c.state || {};
     const nama  = cu.nama || cu.wa_number || 'Pelanggan';
     const color = avColor(nama);
-    const qty   = parseInt(st.qty || 1);
-    const ongkir= st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const nilai = ((pr.harga||0) * qty) + ongkir;
-    const metode= (st.metode_bayar || 'cod').toLowerCase();
-    const status= getStatus(st);
+    const qty   = parseInt(c.qty || 1);
+    const ongkir= c.ongkir_after_promo ?? c.ongkir ?? 0;
+    const nilai = c.total || ((pr.harga||0) * qty) + ongkir;
+    const metode= (c.metode || 'cod').toLowerCase();
+    const status= getStatus(c);
 
     // Pipeline steps: confirmed → dikirim → transit → sampai
     const steps = [
@@ -217,14 +211,14 @@ function render() {
     const statusMap = {
       menunggu: `<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>`,
       dikirim:  `<span class="bdg bdg-dikirim">📦 Dikirim</span>`,
-      transit:  `<span class="bdg bdg-transit">🚚 ${escH((st.tracking_status||'').slice(0,25))}</span>`,
+      transit:  `<span class="bdg bdg-transit">🚚 ${escH((c.status_tracking||'').slice(0,25))}</span>`,
       sampai:   `<span class="bdg bdg-sampai">✅ Sampai</span>`,
     };
 
     // Tracking info
     let trackingInfo = '';
-    if (st.no_resi) {
-      trackingInfo = `<div class="ps-tracking-info"><b>${escH(st.no_resi)}</b> · ${escH((st.kurir_resi||'').toUpperCase())}${st.tracking_lokasi ? `<br>${escH(st.tracking_lokasi)}` : ''}</div>`;
+    if (c.no_resi) {
+      trackingInfo = `<div class="ps-tracking-info"><b>${escH(c.no_resi)}</b> · ${escH((c.ekspedisi||'').toUpperCase())}${c.tracking_lokasi ? `<br>${escH(c.tracking_lokasi)}` : ''}</div>`;
     }
 
     return `<div class="ps-card">
@@ -240,13 +234,13 @@ function render() {
         </div>
         <div class="ps-produk">
           ${escH(pr.nama || '—')} × ${qty}
-          ${st.ongkir?.ekspedisi ? `· <b>${escH(st.ongkir.ekspedisi.toUpperCase())}</b>` : ''}
+          ${c.ekspedisi ? `· <b>${escH(c.ekspedisi.toUpperCase())}</b>` : ''}
         </div>
         <div class="ps-pipeline">${pipelineHtml}</div>
       </div>
       <div class="ps-card-right">
         <div class="ps-nilai">${rp(nilai)}</div>
-        <div class="ps-date">${fmtDt(c.last_msg_at)}</div>
+        <div class="ps-date">${fmtDt(c.created_at)}</div>
         ${trackingInfo}
       </div>
     </div>`;
