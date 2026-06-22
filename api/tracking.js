@@ -76,6 +76,12 @@ async function cekResi(resi, ekspedisi) {
     const statusCat  = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
     const destCity   = (d.RECEIVER_CITY || d.destination_city || '').toUpperCase();
 
+    // Kalau tidak ada status sama sekali → API tidak kenal resi/kurir ini
+    if (!statusCat) {
+      console.warn(`[tracking] Tidak ada status dari API untuk ${resi} (kurir: ${ekspedisi}) — cek nama ekspedisi`);
+      return null;
+    }
+
     // Ambil history entry terakhir yang punya desc
     const lastHistory = [...history].reverse().find(h => h.desc || h.content || h.description);
     const deskripsi   = (lastHistory?.desc || lastHistory?.content || lastHistory?.description || '').trim();
