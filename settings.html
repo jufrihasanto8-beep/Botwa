@@ -713,7 +713,10 @@ async function loadKurir() {
   const list = document.getElementById('kurir-list');
   list.innerHTML = '<div style="color:#64748b;font-size:13px;padding:12px 0;grid-column:1/-1">Memuat...</div>';
   try {
-    const data = await SB.get('courier_whitelist', `?user_id=eq.${userId}`);
+    // Pakai service key endpoint agar tidak terblokir RLS
+    const r = await fetch(`/api/save-settings?userId=${userId}`);
+    const json = await r.json();
+    const data = json.data || [];
     kurirDbMap = {};
     kurirAktif = new Set();
     data.forEach(k => {
