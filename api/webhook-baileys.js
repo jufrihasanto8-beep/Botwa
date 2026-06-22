@@ -12,6 +12,8 @@ const WEBHOOK_SECRET     = process.env.WEBHOOK_SECRET;
 const MENGANTAR_KEY      = process.env.MENGANTAR_KEY;
 const GROQ_API_KEY       = process.env.GROQ_API_KEY;
 const WA_GROUP_JID       = process.env.WA_GROUP_JID; // JID grup WA tujuan recap order
+const VALIDASI_URL       = process.env.VALIDASI_SUPABASE_URL;
+const VALIDASI_KEY       = process.env.VALIDASI_SUPABASE_KEY;
 
 /* ── FETCH WITH TIMEOUT ───────────────────────────────────── */
 async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
@@ -1045,6 +1047,28 @@ async function sendWA(sessionId, waNumber, message, isOutbound = false, imageUrl
   return res.json();
 }
 
+/* ── CEK WILAYAH RISK dari kodepos_stats (Validasiorder) ─── */
+async function cekWilayahRisk(kodepos) {
+  if (!kodepos || !VALIDASI_URL || !VALIDASI_KEY) return null;
+  try {
+    const res = await fetch(
+      `${VALIDASI_URL}/rest/v1/kodepos_stats?kodepos=eq.${encodeURIComponent(kodepos)}&limit=1`,
+      { headers: { 'apikey': VALIDASI_KEY, 'Authorization': `Bearer ${VALIDASI_KEY}` } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length) return null;
+    const r = data[0];
+    const pct   = r.pct ?? Math.round((r.retur / r.total) * 100);
+    const level = pct >= 30 ? 'rawan' : pct >= 15 ? 'perhatian' : 'aman';
+    const label = pct >= 30 ? `Rawan Tinggi (${pct}% RTS)` : pct >= 15 ? `Perlu Diperhatikan (${pct}% RTS)` : `Relatif Aman (${pct}% RTS)`;
+    return { kodepos: String(kodepos), total: r.total, retur: r.retur, pct, level, label };
+  } catch(e) {
+    console.error('[cekWilayahRisk] error:', e.message);
+    return null;
+  }
+}
+
 /* ── BUILD INJEKSI ONGKIR untuk Claude ───────────────────── */
 function buildOngkirInjeksi(hasil, product, konteks = '') {
   const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
@@ -1774,6 +1798,16 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
 
+    // Inject wilayah risk agar Claude ingat sepanjang conversation
+    const wr = customer?.wilayah_risk;
+    if (wr && convState.ongkir && !convState.order_placed) {
+      if (wr.level === 'rawan') {
+        systemPrompt += `\n\n[SISTEM - WILAYAH RAWAN] Area customer (kodepos ${wr.kodepos}) RTS ${wr.pct}% (${wr.label}). Sepanjang conversation ini: utamakan Transfer, kalau customer minta COD tanya ekspedisi yang biasa mereka pakai. Jangan sebut angka RTS ke customer secara blak-blakan, sampaikan dengan empati.`;
+      } else if (wr.level === 'perhatian') {
+        systemPrompt += `\n\n[SISTEM - WILAYAH PERHATIAN] Area customer RTS ${wr.pct}% — mention Transfer sebagai opsi lebih aman tapi tidak perlu dipaksakan.`;
+      }
+    }
+
     // Inject konteks awaiting_order_confirm agar Claude tidak trigger ORDER_CONFIRMED lagi
     if (convState.awaiting_order_confirm || convState.awaiting_order_correction) {
       systemPrompt += `\n\n[SISTEM - PENTING] Kamu sudah mengirim ringkasan pesanan ke customer dan sedang menunggu konfirmasi mereka. JANGAN generate marker [ORDER_CONFIRMED] lagi.
@@ -2359,7 +2393,53 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
               customer.alamat = alamatBaru;
             }
 
-            const injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
+            // ── Cek wilayah risk dari kodepos_stats ──────────────
+            const kodepos = hasil.area?.kodePos;
+            let wilayahRisk = customer?.wilayah_risk || null;
+
+            // Cek cache di customers.wilayah_risk dulu
+            if (!wilayahRisk && kodepos) {
+              wilayahRisk = await cekWilayahRisk(kodepos);
+              if (wilayahRisk && customer?.id) {
+                await sbPatch('customers', `?id=eq.${customer.id}`, { wilayah_risk: wilayahRisk })
+                  .catch(e => console.error('[wilayahRisk] Gagal save:', e.message));
+                customer.wilayah_risk = wilayahRisk;
+              }
+            }
+
+            // ── Build injeksi berdasarkan risk level ─────────────
+            const ongkirInfo = buildOngkirInjeksi(hasil, product, '');
+            let injeksi;
+
+            if (wilayahRisk?.level === 'rawan') {
+              // Area rawan: warning dulu, ongkir disimpan tapi tidak ditampilkan
+              injeksi = `[SISTEM - PERINGATAN WILAYAH RAWAN COD]
+Area customer (kodepos ${kodepos}) memiliki tingkat RTS ${wilayahRisk.pct}% — ${wilayahRisk.retur} dari ${wilayahRisk.total} orderan pernah retur.
+
+JANGAN tampilkan total ongkir dulu. Sampaikan dengan santai dan empati bahwa area ini sering gagal COD, lalu sarankan Transfer. Contoh gaya: "Kak sebelumnya aku mau kasih info dulu nih, area [kecamatan] dari pengalaman kami agak susah COD, beberapa kali pengiriman balik lagi 😅 Lebih aman Transfer kak biar pesanannya pasti sampai 🙏 Kakak bisa Transfer?"
+
+Kalau customer tetap minta COD → tanya: "Biasanya kakak pakai ekspedisi apa yang lancar COD ke sana? Nanti aku coba sesuaikan 😊"
+Kalau customer kasih rekomendasi ekspedisi → boleh lanjut COD, tampilkan total.
+Kalau customer setuju Transfer atau tidak punya rekomendasi → push Transfer, tampilkan total Transfer saja.
+
+Data ongkir (simpan untuk ditampilkan setelah customer pilih metode bayar):
+${ongkirInfo}`;
+
+            } else if (wilayahRisk?.level === 'perhatian') {
+              // Area perlu diperhatikan: mention ringan di akhir
+              injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `)
+                + `\n\nCatatan tambahan (sebut ringan setelah tampilkan harga): area kakak memiliki tingkat retur ${wilayahRisk.pct}%, sarankan Transfer tapi tidak perlu dipaksakan.`;
+
+            } else if (!wilayahRisk && kodepos) {
+              // Tidak ada data wilayah → tanya preferensi ekspedisi customer
+              injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `)
+                + `\n\nData pengalaman pengiriman ke area ini belum tersedia. Setelah tampilkan harga, tanya: "Oh iya kak, biasanya pengiriman ke sana pakai ekspedisi apa yang nyaman? 😊"`;
+
+            } else {
+              // Area aman: normal flow
+              injeksi = buildOngkirInjeksi(hasil, product, `Ongkir ke ${wilayah}. Lanjutkan balasan di atas dan `);
+            }
+
             const histWithOngkir = [
               ...history,
               { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
