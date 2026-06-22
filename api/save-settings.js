@@ -25,6 +25,19 @@ async function sbReq(method, path, body) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // ── GET: baca courier_whitelist pakai service key (bypass RLS) ──
+  if (req.method === 'GET') {
+    const userId = req.query?.userId || req.query?.user_id;
+    if (!userId) return res.status(400).json({ error: 'userId wajib' });
+    try {
+      const data = await sbReq('GET', `courier_whitelist?user_id=eq.${userId}&order=nama.asc`);
+      return res.status(200).json({ ok: true, data });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).end();
 
   const body = req.body || {};
