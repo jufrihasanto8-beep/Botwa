@@ -110,24 +110,22 @@ async function cekResi(resi, ekspedisi) {
     } else if (['DEX','UNDELIVERED','FAILED','UNDELL'].some(s => statusCat.includes(s))) {
       eventType = 'bermasalah';
     } else {
-      // Untuk ON PROSES → cari granular event dari desc text (universal semua kurir)
+      // Untuk status masih dalam proses → cari granular event dari desc + statusCat
+      const OTW_PATTERN = /WITH DELIVERY COURIER|OUT FOR DELIVERY|DIBAWA KURIR|ANTAR KE TUJUAN|ON DELIVERY|DRIVER PICKUP|SEDANG DIKIRIM|DALAM PENGIRIMAN|AKAN DIKIRIM KE ALAMAT|DIKIRIM KE PENERIMA|OUT FOR DEL/;
+      const TIBA_PATTERN = /RECEIVED AT|ARRIVED AT|MASUK HUB|TIBA DI|INBOUND|RECEIVED AT WAREHOUSE|TIBA DI KOTA|SAMPAI DI KOTA/;
 
-      // Out for delivery: kurir lagi antar hari ini
-      const isOTW = /WITH DELIVERY COURIER|OUT FOR DELIVERY|DIBAWA KURIR|ANTAR KE TUJUAN|ON DELIVERY|DRIVER PICKUP|SEDANG DIKIRIM|DALAM PENGIRIMAN/.test(descUp)
-                 || lastCode === 'IP3';
+      const isOTW = OTW_PATTERN.test(descUp) || OTW_PATTERN.test(statusCat) || lastCode === 'IP3';
 
-      // Tiba kota tujuan: masuk hub/gudang di kota customer
-      // Deteksi: desc mengandung kata "RECEIVED AT" / "ARRIVED" DAN lokasi cocok dengan kota tujuan
       const lokasiUp  = (lokasiFromDesc || lokasi).toUpperCase();
       const isDestLoc = destCity && lokasiUp && (
         destCity.split(',').some(c => lokasiUp.includes(c.trim())) ||
         lokasiUp.split(',').some(c => destCity.includes(c.trim()))
       );
       const isTibaKota = (
-        /RECEIVED AT|ARRIVED AT|MASUK HUB|TIBA DI|INBOUND|RECEIVED AT WAREHOUSE/.test(descUp) && isDestLoc
+        (TIBA_PATTERN.test(descUp) || TIBA_PATTERN.test(statusCat)) && isDestLoc
       ) || /IP[12]/.test(lastCode);
 
-      if (isOTW)       eventType = 'out_for_delivery';
+      if (isOTW)           eventType = 'out_for_delivery';
       else if (isTibaKota) eventType = 'tiba_kota';
     }
 
