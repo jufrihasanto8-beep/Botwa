@@ -48,6 +48,10 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
 .bdg-menunggu{background:rgba(148,163,184,.12);color:#94a3b8}
 .bdg-dikirim{background:rgba(59,130,246,.12);color:#60a5fa}
 .bdg-transit{background:rgba(251,191,36,.12);color:#d97706}
+.bdg-tiba_kota{background:rgba(99,102,241,.12);color:#818cf8}
+.bdg-out_for_delivery{background:rgba(16,185,129,.12);color:#34d399}
+.bdg-bermasalah{background:rgba(239,68,68,.12);color:#f87171}
+.bdg-retur{background:rgba(236,72,153,.12);color:#f472b6}
 .bdg-sampai{background:rgba(34,197,94,.12);color:#16a34a}
 .bdg-cod{background:rgba(251,146,60,.12);color:#fb923c}
 .bdg-tf{background:rgba(99,102,241,.12);color:#818cf8}
@@ -132,8 +136,11 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
           <button class="ps-tab active" onclick="setTab('semua',this)">Semua</button>
           <button class="ps-tab" onclick="setTab('menunggu',this)">⏳ Menunggu Resi</button>
           <button class="ps-tab" onclick="setTab('dikirim',this)">📦 Dikirim</button>
-          <button class="ps-tab" onclick="setTab('transit',this)">🚚 Transit</button>
+          <button class="ps-tab" onclick="setTab('tiba_kota',this)">🏙️ Kota Tujuan</button>
+          <button class="ps-tab" onclick="setTab('out_for_delivery',this)">🚚 OTW</button>
           <button class="ps-tab" onclick="setTab('sampai',this)">✅ Sampai</button>
+          <button class="ps-tab" onclick="setTab('bermasalah',this)">⚠️ Bermasalah</button>
+          <button class="ps-tab" onclick="setTab('retur',this)">🔄 Retur</button>
         </div>
         <input class="ps-search" type="text" placeholder="Cari nama / resi / produk..." oninput="render()" id="ps-search">
         <div class="ps-count" id="ps-count"></div>
@@ -169,7 +176,12 @@ function fmtDt(iso) {
 }
 
 function getStatus(c) {
-  if (c.sampai)            return 'sampai';
+  if (c.sampai) return 'sampai';
+  const ev = c.tracking_events || {};
+  if (ev.retur)            return 'retur';
+  if (ev.bermasalah)       return 'bermasalah';
+  if (ev.out_for_delivery) return 'out_for_delivery';
+  if (ev.tiba_kota)        return 'tiba_kota';
   if (c.status_tracking)   return 'transit';
   if (c.no_resi)           return 'dikirim';
   return 'menunggu';
@@ -184,7 +196,7 @@ function setTab(tab, btn) {
 
 async function init() {
   const [orders, custs, prods] = await Promise.all([
-    SB.get('orders_new', `?user_id=eq.${uid}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,status_tracking,tracking_lokasi,sampai,created_at&order=created_at.desc&limit=1000`),
+    SB.get('orders_new', `?user_id=eq.${uid}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,status_tracking,tracking_lokasi,tracking_events,sampai,created_at&order=created_at.desc&limit=1000`),
     SB.get('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,reply_jid`),
     SB.get('products',  `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
   ]);
@@ -236,18 +248,26 @@ function render() {
     const metode= (c.metode || 'cod').toLowerCase();
     const status= getStatus(c);
 
-    // Pipeline steps: confirmed → dikirim → transit → sampai
-    const steps = [
-      { key:'confirmed', label:'Konfirmasi' },
-      { key:'dikirim',   label:'Dikirim' },
-      { key:'transit',   label:'Transit' },
-      { key:'sampai',    label:'Sampai' },
+    // Pipeline steps
+    const isProb = status === 'bermasalah' || status === 'retur';
+    const steps = isProb ? [
+      { key:'confirmed',       label:'Konfirmasi' },
+      { key:'dikirim',         label:'Dikirim' },
+      { key:'bermasalah_retur',label: status === 'retur' ? '🔄 Retur' : '⚠️ Bermasalah' },
+    ] : [
+      { key:'confirmed',       label:'Konfirmasi' },
+      { key:'dikirim',         label:'Dikirim' },
+      { key:'tiba_kota',       label:'Kota Tujuan' },
+      { key:'out_for_delivery',label:'OTW' },
+      { key:'sampai',          label:'Sampai' },
     ];
-    const stepOrder = ['confirmed','dikirim','transit','sampai'];
-    const currentIdx = status === 'menunggu' ? 0
-      : status === 'dikirim' ? 1
-      : status === 'transit' ? 2
-      : 3;
+    const currentIdx = isProb ? 2
+      : status === 'menunggu'          ? 0
+      : status === 'dikirim'           ? 1
+      : status === 'transit'           ? 1
+      : status === 'tiba_kota'         ? 2
+      : status === 'out_for_delivery'  ? 3
+      : 4;
 
     const pipelineHtml = steps.map((s, i) => {
       const isDone   = i < currentIdx;
@@ -265,10 +285,14 @@ function render() {
 
     // Status badge
     const statusMap = {
-      menunggu: `<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>`,
-      dikirim:  `<span class="bdg bdg-dikirim">📦 Dikirim</span>`,
-      transit:  `<span class="bdg bdg-transit">🚚 ${escH((c.status_tracking||'').slice(0,25))}</span>`,
-      sampai:   `<span class="bdg bdg-sampai">✅ Sampai</span>`,
+      menunggu:         `<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>`,
+      dikirim:          `<span class="bdg bdg-dikirim">📦 Dikirim</span>`,
+      transit:          `<span class="bdg bdg-transit">🚚 ${escH((c.status_tracking||'').slice(0,20))}</span>`,
+      tiba_kota:        `<span class="bdg bdg-tiba_kota">🏙️ Kota Tujuan</span>`,
+      out_for_delivery: `<span class="bdg bdg-out_for_delivery">🚚 OTW ke Rumah</span>`,
+      sampai:           `<span class="bdg bdg-sampai">✅ Sampai</span>`,
+      bermasalah:       `<span class="bdg bdg-bermasalah">⚠️ Bermasalah</span>`,
+      retur:            `<span class="bdg bdg-retur">🔄 Retur</span>`,
     };
 
     // Tracking info
