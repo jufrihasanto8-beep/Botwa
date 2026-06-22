@@ -1,7 +1,7 @@
 /**
  * Cron: Tracking resi harian via Mengantar API
  * Schedule: 0 8 * * * (tiap pagi 08:00 WIB = 01:00 UTC)
- * Update status resi → notif proaktif ke customer jika ada update
+ * Baca dari orders_new (status=dikirim, no_resi ada)
  */
 
 const SUPABASE_URL         = process.env.SUPABASE_URL;
@@ -19,7 +19,7 @@ const sbH = () => ({
 
 async function sbGet(table, query = '') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { headers: sbH() });
-  if (!res.ok) throw new Error(`sbGet: ${await res.text()}`);
+  if (!res.ok) throw new Error(`sbGet ${table}: ${await res.text()}`);
   return res.json();
 }
 async function sbPatch(table, query, body) {
@@ -28,43 +28,116 @@ async function sbPatch(table, query, body) {
     headers: { ...sbH(), 'Prefer': 'return=representation' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`sbPatch: ${await res.text()}`);
+  if (!res.ok) throw new Error(`sbPatch ${table}: ${await res.text()}`);
   return res.json();
 }
 
-/* ── Cek resi via Mengantar ──────────────────────────────── */
+/* ── Normalisasi nama kurir ke format Mengantar ─────────── */
+function normalizeKurir(eks) {
+  const e = (eks || '').toUpperCase();
+  if (e.includes('JNE'))                         return 'JNE';
+  if (e.includes('JNT') || e.includes('J&T'))    return 'JNT';
+  if (e.includes('SICEPAT'))                      return 'SICEPAT';
+  if (e.includes('SAP'))                          return 'SAP';
+  if (e.includes('LION'))                         return 'LION';
+  if (e.includes('NINJA'))                        return 'NINJA';
+  if (e.includes('ANTERAJA'))                     return 'ANTERAJA';
+  if (e.includes('IDX') || e.includes('IDEXPRESS')) return 'IDEXPRESS';
+  if (e.includes('POS'))                          return 'POS';
+  if (e.includes('SICEPAT') || e.includes('SI CEPAT')) return 'SICEPAT';
+  return e;
+}
+
+/* ── Cek resi via Mengantar public API (tanpa key) ───────── */
 async function cekResi(resi, ekspedisi) {
-  if (!MENGANTAR_KEY) return null;
+  if (!resi) return null;
+  const courier = normalizeKurir(ekspedisi);
   try {
     const res = await fetch(
-      `https://api.mengantar.com/v1/tracking?resi=${resi}&courier=${encodeURIComponent(ekspedisi)}`,
-      { headers: { 'Authorization': `Bearer ${MENGANTAR_KEY}` } }
+      `https://app.mengantar.com/api/order/getPublic?tracking_number=${encodeURIComponent(resi)}&courier=${encodeURIComponent(courier)}`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          'Accept': 'application/json',
+          'Referer': 'https://www.mengantar.com/',
+          'Origin': 'https://www.mengantar.com',
+        },
+        signal: AbortSignal.timeout(10000),
+      }
     );
-    const data = await res.json();
-    return data?.data || null;
+    if (!res.ok) {
+      console.warn(`[tracking] Mengantar API ${res.status} untuk ${resi}`);
+      return null;
+    }
+    const json = await res.json();
+    const d = json?.data || json;
+    if (!d) return null;
+
+    const history = d.history || d.connote_history || [];
+
+    // Deteksi event spesifik dari kode history
+    const lastHistory  = [...history].reverse().find(h => h.desc || h.description);
+    const deskripsi    = lastHistory?.desc || lastHistory?.description || '';
+    const lokasi       = lastHistory?.location || lastHistory?.city || '';
+    const statusCat    = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
+
+    // Deteksi tipe event — urutan prioritas dari yang paling akhir
+    let eventType = 'update'; // default
+
+    const lastCode = lastHistory?.code || '';
+    const descUp   = deskripsi.toUpperCase();
+
+    if (statusCat === 'DELIVERED' || lastCode === 'D01' || descUp.includes('DELIVERED TO')) {
+      eventType = 'delivered';
+    } else if (statusCat === 'RETUR' || statusCat.includes('RETUR')) {
+      eventType = 'retur';
+    } else if (/DEX|UNDEL|FAIL|UNDELIVERED/.test(lastCode) || /DEX|UNDELIVERED|ATTEMPT FAILED/.test(descUp) || statusCat.includes('UNDELL')) {
+      eventType = 'bermasalah';
+    } else if (lastCode === 'IP3' || descUp.includes('WITH DELIVERY COURIER') || descUp.includes('OUT FOR DELIVERY')) {
+      eventType = 'out_for_delivery';
+    } else if (lastCode === 'IP1' || lastCode === 'IP2' || descUp.includes('RECEIVED AT WAREHOUSE') || descUp.includes('RECEIVED AT') && /IP[12]/.test(lastCode)) {
+      eventType = 'tiba_kota';
+    }
+
+    return { statusCat, eventType, lokasi, deskripsi, raw: d };
   } catch (e) {
-    console.error('Cek resi error:', e.message);
+    console.error(`[tracking] cekResi error (${resi}):`, e.message);
     return null;
   }
 }
 
+/* ── Deteksi event baru berdasarkan perubahan dari tracking sebelumnya ── */
+function detectNewEvent(tracking, order) {
+  const prev = order.status_tracking || '';
+  const curr = tracking.statusCat;
+  const eventType = tracking.eventType;
+
+  // Kalau status sama dan event bukan update baru → skip
+  if (curr === prev && eventType === 'update') return null;
+  // Kalau sudah pernah notif event ini → skip (simpan di tracking_events JSON)
+  const doneEvents = order.tracking_events || {};
+  if (doneEvents[eventType]) return null;
+
+  return eventType;
+}
+
 /* ── Kirim notif WA via Baileys ──────────────────────────── */
-async function kirimNotif(waNumber, pesan, sessionId = null) {
-  if (!BAILEYS_URL) return;
+async function kirimNotif(sessionId, waNumber, pesan) {
+  if (!BAILEYS_URL || !waNumber) return;
   try {
     await fetch(`${BAILEYS_URL}/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         secret: WEBHOOK_SECRET,
-        session_id: sessionId || undefined,
+        session_id: sessionId,
         wa_number: waNumber,
         message: pesan,
         is_outbound: true,
       }),
     });
   } catch (e) {
-    console.error('Kirim notif error:', e.message);
+    console.error('[tracking] kirimNotif error:', e.message);
   }
 }
 
@@ -81,230 +154,182 @@ function trackingUrl(kurir, resi) {
   return `https://cekresi.com/?noresi=${resi}`;
 }
 
-/* ── Generate pesan tracking via AI ────────────────────── */
-async function buildAITrackingMsg({ namaKak, resi, ekspedisi, status, lokasi, sudahSampai, urlLacak }) {
-  if (ANTHROPIC_KEY) {
-    try {
-      const konteks = sudahSampai
-        ? `Paket sudah SAMPAI dan diterima di tujuan.`
-        : `Status terbaru: "${status}"${lokasi ? `. Sekarang di lokasi: ${lokasi}` : ''}.`;
+/* ── Template pesan per event ────────────────────────────── */
+const PESAN_TEMPLATE = {
+  tiba_kota: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
+    `${nama ? 'Kak ' + nama : 'Kak'}, paket udah sampai di kota tujuan nih 📦${isCOD ? '\n\nMohon siapkan uang COD-nya ya kak, sebentar lagi kurir datang!' : ''}\n\nResi: ${resi}${lokasi ? `\nLokasi: ${lokasi}` : ''}\nCek tracking: ${urlLacak}`,
 
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 200,
-          messages: [{ role: 'user', content:
-            `Kamu CS toko online Indonesia yang ramah. Kirim update status paket ke customer via WhatsApp.
+  out_for_delivery: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
+    `${nama ? 'Kak ' + nama : 'Kak'}, kurir lagi otw ke rumah kak hari ini! 🚚${isCOD ? '\n\n⚠️ Siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${resi}\nCek tracking: ${urlLacak}`,
+
+  delivered: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
+    `${nama ? 'Kak ' + nama : 'Kak'}, paket sudah sampai dan diterima nih! 🎉\n\nSemoga produknya langsung bisa dipakai dan manfaatnya terasa ya kak 🙏 Kalau ada pertanyaan, kami siap bantu!`,
+
+  bermasalah: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
+    `${nama ? 'Kak ' + nama : 'Kak'}, ada kendala pengiriman paket kakak nih 😟\n\nKurir tidak berhasil mengantar. Mohon pastikan alamat dan nomor HP aktif ya kak.\n\nResi: ${resi}\nCek tracking: ${urlLacak}`,
+
+  retur: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
+    `${nama ? 'Kak ' + nama : 'Kak'}, paket kakak sedang dalam proses retur ke pengirim 😔\n\nResi: ${resi}\n\nNanti kami hubungi untuk koordinasi lebih lanjut ya kak.`,
+};
+
+/* ── Generate pesan via AI (dengan fallback ke template) ─── */
+async function buildPesan({ namaKak, resi, ekspedisi, eventType, deskripsi, lokasi, isCOD, urlLacak }) {
+  const tmpl = PESAN_TEMPLATE[eventType];
+  const fallback = tmpl ? tmpl(namaKak, resi, ekspedisi, lokasi, isCOD, urlLacak) : null;
+
+  if (!ANTHROPIC_KEY || eventType === 'retur' || eventType === 'bermasalah') return fallback;
+
+  const konteksMap = {
+    tiba_kota:        `Paket baru SAMPAI DI KOTA TUJUAN customer.${isCOD ? ' Ini order COD, customer perlu siapkan uang.' : ''} Lokasi sekarang: ${lokasi || 'kota tujuan'}.`,
+    out_for_delivery: `Paket SEDANG DIANTAR kurir hari ini ke alamat customer.${isCOD ? ' Ini order COD, ingatkan siapkan uang.' : ''}`,
+    delivered:        `Paket SUDAH SAMPAI dan diterima customer. Tanyakan kondisi/manfaat produk.`,
+  };
+
+  const konteks = konteksMap[eventType] || `Status terbaru: "${deskripsi}".`;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{ role: 'user', content:
+          `Kamu CS toko herbal yang hangat. Kirim notif WhatsApp ke customer soal status paket.
 
 Customer: ${namaKak ? 'kak ' + namaKak : 'kak'}
 Kurir: ${ekspedisi || 'ekspedisi'}
-No. Resi: ${resi}
-${konteks}
-${!sudahSampai ? `Link tracking: ${urlLacak}` : ''}
+Resi: ${resi}
+Situasi: ${konteks}
+${eventType !== 'delivered' ? `Link tracking: ${urlLacak}` : ''}
 
 Ketentuan:
-- 2-3 kalimat, natural dan hangat
-- ${sudahSampai ? 'Ucapkan selamat paket sudah sampai, tanyakan kondisi barang' : 'Sertakan info status/lokasi dan link tracking'}
+- 2-3 kalimat, natural, seperti teman — bukan CS formal
+- ${eventType === 'tiba_kota' || eventType === 'out_for_delivery' ? 'Sertakan link tracking' : 'Tanyakan kondisi/manfaat produknya'}
 - 1-2 emoji saja
 - JANGAN markdown (*, _, dll)
 
 Tulis pesannya langsung.` }],
-        }),
-      });
-      const d = await r.json();
-      const txt = d.content?.[0]?.text?.trim();
-      if (txt) return txt;
-    } catch (e) {
-      console.error('AI tracking msg error:', e.message);
-    }
+      }),
+    });
+    const d = await r.json();
+    return d.content?.[0]?.text?.trim() || fallback;
+  } catch (e) {
+    console.error('[tracking] AI msg error:', e.message);
+    return fallback;
   }
-  // Fallback
-  if (sudahSampai) {
-    return `Halo ${namaKak ? 'kak ' + namaKak : 'kak'}! Paket kakak sudah sampai nih 🎉 Semoga suka dengan produknya ya kak! Kalau ada pertanyaan, kami siap bantu 😊`;
-  }
-  return `Halo ${namaKak ? 'kak ' + namaKak : 'kak'}! Update paket kakak nih 📦 Status: ${status}${lokasi ? ` (${lokasi})` : ''}. Cek tracking di: ${urlLacak}`;
-}
-
-/* ── Pesan notif tracking (legacy untuk orders_new) ─────── */
-function buildNotifPesan(tracking, resi, ekspedisi) {
-  const status = tracking?.status || tracking?.description || 'dalam perjalanan';
-  const lokasi = tracking?.location || '';
-  return `📦 Update paket kak!\n\nResi: ${resi} (${ekspedisi})\nStatus: ${status}${lokasi ? `\nLokasi: ${lokasi}` : ''}\n\nAda pertanyaan? Balas pesan ini ya kak 😊`;
 }
 
 /* ── MAIN HANDLER ─────────────────────────────────────────── */
 module.exports = async function handler(req, res) {
-  res.status(200).json({ ok: true, service: 'tracking-cron' });
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Verifikasi cron secret
+  const CRON_SECRET = process.env.CRON_SECRET;
+  if (CRON_SECRET) {
+    const secret = req.headers['x-cron-secret'];
+    if (secret !== CRON_SECRET) return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  // Langsung balas 200 biar cron tidak timeout, proses di background
+  res.status(200).json({ ok: true, service: 'tracking-cron', started: new Date().toISOString() });
 
   try {
-    console.log('🚚 Mulai tracking resi...');
+    console.log('🚚 Mulai tracking resi dari orders_new...');
 
-    // ══════════════════════════════════════════════
-    // BAGIAN 1: Tracking conversations BotWA
-    // Cari semua conv yang punya no_resi dan belum sampai
-    // ══════════════════════════════════════════════
-    const convs = await sbGet('conversations',
-      `?select=id,user_id,customer_id,state&order=last_msg_at.desc&limit=500`
-    );
-    const activeConvs = convs.filter(c =>
-      c.state?.no_resi && !c.state?.tracking_sampai
+    // Ambil semua order yang status=dikirim dan punya no_resi
+    const orders = await sbGet('orders_new',
+      `?status=eq.dikirim&no_resi=not.is.null&no_resi=neq.&select=id,user_id,customer_id,no_resi,ekspedisi,metode,status_tracking,tracking_lokasi,tracking_events`
     );
 
-    console.log(`[BotWA] Tracking ${activeConvs.length} conversations...`);
-    let waUpdated = 0, waNotified = 0;
-
-    for (const conv of activeConvs) {
-      try {
-        const st     = conv.state || {};
-        const noResi = st.no_resi;
-        const kurir  = st.kurir_resi || '';
-
-        const tracking = await cekResi(noResi, kurir);
-        if (!tracking) continue;
-
-        const statusBaru  = tracking.status || tracking.description || '';
-        const lokasiBaru  = tracking.location || '';
-        const sudahSampai = /diterima|delivered|terkirim|sampai/i.test(statusBaru);
-        const adaUpdate   = statusBaru && statusBaru !== st.tracking_status;
-
-        if (!adaUpdate) {
-          // Update last_checked saja
-          await sbPatch('conversations', `?id=eq.${conv.id}`, {
-            state: { ...st, tracking_last_checked: new Date().toISOString() },
-          });
-          continue;
-        }
-
-        // Update state
-        await sbPatch('conversations', `?id=eq.${conv.id}`, {
-          state: {
-            ...st,
-            tracking_status: statusBaru,
-            tracking_lokasi: lokasiBaru,
-            tracking_sampai: sudahSampai,
-            tracking_last_checked: new Date().toISOString(),
-            tracking_updated_at: new Date().toISOString(),
-          },
-        });
-        waUpdated++;
-
-        // Kirim notif ke customer
-        const custs = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
-        if (!custs.length) continue;
-        const cust    = custs[0];
-        const jid     = cust.reply_jid || cust.wa_number;
-        if (!jid) continue;
-
-        const namaKak = (cust.nama || '').split(' ')[0];
-        const urlLacak = trackingUrl(kurir, noResi);
-
-        const pesan = await buildAITrackingMsg({
-          namaKak, resi: noResi, ekspedisi: kurir,
-          status: statusBaru, lokasi: lokasiBaru,
-          sudahSampai, urlLacak,
-        });
-
-        await kirimNotif(jid, pesan, conv.user_id);
-        waNotified++;
-        console.log(`[BotWA] ${sudahSampai ? '✅ SAMPAI' : '📦 Update'}: ${noResi} → ${cust.wa_number}`);
-
-        await new Promise(r => setTimeout(r, 600));
-      } catch (e) {
-        console.error(`[BotWA] Error conv ${conv.id}:`, e.message);
-      }
-    }
-
-    console.log(`[BotWA] Done: ${waUpdated} updated, ${waNotified} notified`);
-
-    // ══════════════════════════════════════════════
-    // BAGIAN 2: Tracking orders_new / shipments (sistem lama)
-    // ══════════════════════════════════════════════
-
-    // Ambil semua shipment yang belum sampai
-    const shipments = await sbGet('shipments',
-      `?sampai=eq.false&select=*,orders_new(id,customer_id,user_id,flag_risiko)`
-    );
-
-    if (!shipments.length) {
-      console.log('Tidak ada shipment aktif.');
+    if (!orders.length) {
+      console.log('[tracking] Tidak ada order aktif yang perlu di-tracking.');
       return;
     }
 
-    console.log(`Tracking ${shipments.length} shipment...`);
-    let updated = 0, notified = 0;
+    // Ambil semua customer sekaligus
+    const custIds = [...new Set(orders.map(o => o.customer_id))];
+    const customers = await sbGet('customers',
+      `?id=in.(${custIds.join(',')})&select=id,user_id,wa_number,nama,reply_jid`
+    );
+    const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
 
-    for (const shipment of shipments) {
+    console.log(`[tracking] ${orders.length} order akan di-tracking...`);
+    let updated = 0, notified = 0, errors = 0;
+
+    for (const order of orders) {
       try {
-        const tracking = await cekResi(shipment.resi, shipment.ekspedisi);
-        if (!tracking) continue;
-
-        const statusBaru = tracking.status || tracking.description || '';
-        const sudahSampai = statusBaru.toLowerCase().includes('diterima') ||
-                            statusBaru.toLowerCase().includes('delivered') ||
-                            statusBaru.toLowerCase().includes('terkirim');
-
-        // Cek ada update baru
-        const adaUpdate = statusBaru !== shipment.status_tracking;
-
-        if (adaUpdate) {
-          await sbPatch('shipments', `?id=eq.${shipment.id}`, {
-            status_tracking: statusBaru,
-            last_checked_at: new Date().toISOString(),
-            last_status_update: new Date().toISOString(),
-            sampai: sudahSampai,
-          });
-
-          // Update order status jika sudah sampai
-          if (sudahSampai && shipment.orders_new?.id) {
-            await sbPatch('orders_new', `?id=eq.${shipment.orders_new.id}`, {
-              status: 'selesai',
-            });
-          }
-
-          updated++;
-
-          // Kirim notif ke customer
-          const orderId = shipment.orders_new?.id;
-          if (orderId) {
-            const orders = await sbGet('orders_new',
-              `?id=eq.${orderId}&select=*,customers(wa_number,nama)`
-            );
-            if (orders.length && orders[0].customers?.wa_number) {
-              const cust = orders[0].customers;
-              const pesan = buildNotifPesan(tracking, shipment.resi, shipment.ekspedisi);
-              await kirimNotif(cust.wa_number, pesan);
-              notified++;
-            }
-          }
-        } else {
-          // Hanya update last_checked_at
-          await sbPatch('shipments', `?id=eq.${shipment.id}`, {
-            last_checked_at: new Date().toISOString(),
-          });
+        const tracking = await cekResi(order.no_resi, order.ekspedisi);
+        if (!tracking) {
+          console.log(`[tracking] No data: ${order.no_resi}`);
+          continue;
         }
 
-        // Flag risiko: resi tidak gerak > 3 hari
-        if (shipment.orders_new?.flag_risiko && shipment.last_status_update) {
-          const lastUpdate = new Date(shipment.last_status_update);
-          const daysSinceUpdate = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
-          if (daysSinceUpdate > 3) {
-            console.warn(`⚠️ RESI TIDAK GERAK: ${shipment.resi} (${daysSinceUpdate.toFixed(1)} hari)`);
-          }
+        const { statusCat, eventType, lokasi, deskripsi } = tracking;
+
+        // Cek apakah event ini sudah pernah dinotifkan sebelumnya
+        const doneEvents = order.tracking_events || {};
+        if (doneEvents[eventType] && eventType !== 'update') {
+          console.log(`[tracking] Event "${eventType}" sudah pernah dinotif: ${order.no_resi}`);
+          continue;
         }
+        if (statusCat === order.status_tracking && eventType === 'update') {
+          console.log(`[tracking] No update: ${order.no_resi}`);
+          continue;
+        }
+
+        // Update orders_new
+        const patch = {
+          status_tracking: statusCat,
+          tracking_lokasi: lokasi,
+          tracking_events: { ...doneEvents, [eventType]: new Date().toISOString() },
+        };
+        if (eventType === 'delivered') {
+          patch.status    = 'selesai';
+          patch.sampai    = true;
+          patch.sampai_at = new Date().toISOString();
+        }
+        await sbPatch('orders_new', `?id=eq.${order.id}`, patch);
+        updated++;
+
+        const label = { tiba_kota: '🏙️ TIBA KOTA', out_for_delivery: '🚚 OTW', delivered: '✅ SAMPAI', bermasalah: '⚠️ BERMASALAH', retur: '🔄 RETUR', update: '📦 UPDATE' };
+        console.log(`[tracking] ${label[eventType] || eventType}: ${order.no_resi} (${statusCat})`);
+
+        // Kirim notif ke customer (skip kalau hanya 'update' biasa tanpa event spesifik)
+        if (eventType === 'update') continue;
+
+        const cust = custMap[order.customer_id];
+        if (!cust) continue;
+        const waTarget = cust.reply_jid || cust.wa_number;
+        if (!waTarget) continue;
+
+        const namaKak  = (cust.nama || '').split(' ')[0];
+        const urlLacak = trackingUrl(order.ekspedisi, order.no_resi);
+        const isCOD    = (order.metode || '').toLowerCase() === 'cod';
+
+        const pesan = await buildPesan({
+          namaKak, resi: order.no_resi, ekspedisi: order.ekspedisi,
+          eventType, deskripsi, lokasi, isCOD, urlLacak,
+        });
+
+        if (pesan) {
+          await kirimNotif(order.user_id, waTarget, pesan);
+          notified++;
+        }
+
+        // Jeda antar request ke Mengantar
+        await new Promise(r => setTimeout(r, 600));
 
       } catch (e) {
-        console.error(`Error tracking ${shipment.resi}:`, e.message);
+        errors++;
+        console.error(`[tracking] Error order ${order.id} (${order.no_resi}):`, e.message);
       }
-
-      // Jeda 500ms antar request ke Mengantar (rate limit)
-      await new Promise(r => setTimeout(r, 500));
     }
 
-    console.log(`✅ Tracking selesai. Updated: ${updated}, Notified: ${notified}`);
+    console.log(`[tracking] ✅ Selesai. Updated: ${updated}, Notified: ${notified}, Errors: ${errors}`);
 
   } catch (err) {
-    console.error('Tracking cron error:', err.message);
+    console.error('[tracking] Fatal error:', err.message);
   }
 };
