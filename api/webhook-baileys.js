@@ -1414,6 +1414,10 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
     // ── Cek apakah sudah eskalasi → AI diam, CS manusia yang balas ──
     if (conversation.status === 'eskalasi') {
       console.log(`Conversation ${conversation.id} status eskalasi — AI skip, tunggu CS manusia`);
+      // Tetap update last_msg_at agar inbox sort benar
+      await sbPatch('conversations', `?id=eq.${conversation.id}`, {
+        last_msg_at: new Date().toISOString(),
+      }).catch(() => {});
       return res.status(200).json({ ok: true, skipped: 'eskalasi' });
     }
 
