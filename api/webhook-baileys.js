@@ -541,8 +541,10 @@ async function updateRingkasan(conversationId) {
   }
 }
 
-async function saveMessage(conversationId, role, isi) {
-  return sbPost('conv_messages', { conversation_id: conversationId, role, isi });
+async function saveMessage(conversationId, role, isi, wamid = null) {
+  const payload = { conversation_id: conversationId, role, isi };
+  if (wamid) payload.wamid = wamid;
+  return sbPost('conv_messages', payload);
 }
 
 /* ── CALL CLAUDE ──────────────────────────────────────────── */
@@ -1202,10 +1204,20 @@ module.exports = async function handler(req, res) {
     const reply_jid   = body.reply_jid || normalizeWA(body.wa_number || ''); // untuk kirim WA (LID atau normal)
     const wa_number   = normalizeWA(body.wa_number || '');                  // nomor asli untuk disimpan ke customer
     const pushName    = body.push_name || wa_number;
+    const msgId       = body.msg_id || null;  // WA message ID dari Baileys
     let message       = String(body.message || '').trim();
     const messageType = body.message_type || 'text';
     const mediaUrl    = body.media_url || null;
     const referral    = body.referral || null; // dari CTWA
+
+    // ── Idempotency check: skip kalau msg_id sudah pernah diproses ──
+    if (msgId) {
+      const alreadyProcessed = await sbGet('conv_messages', `?wamid=eq.${encodeURIComponent(msgId)}&limit=1`);
+      if (alreadyProcessed.length) {
+        console.log(`[dedup] msg_id ${msgId} sudah diproses, skip`);
+        return res.status(200).json({ ok: true, skipped: 'duplicate_msgid' });
+      }
+    }
 
     console.log(`wa_number="${wa_number}" reply_jid="${reply_jid}" message="${message}" type="${messageType}"`);
     if (!reply_jid || (!message && messageType === 'text')) {
@@ -1383,7 +1395,7 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
         ? `[KTP terkirim — ${imageAnalysis.ktp?.nama || 'nama tidak terbaca'}]`
         : `[Gambar terkirim — ${imageAnalysis.is_bukti_tf ? `Bukti TF ${imageAnalysis.bank || ''} ${imageAnalysis.nominal || ''}`.trim() : 'Bukan bukti transfer'}]`
       : `[${messageType}]`);
-    const savedMsg = await saveMessage(conversation.id, 'customer', msgText);
+    const savedMsg = await saveMessage(conversation.id, 'customer', msgText, msgId);
     const savedMsgId = savedMsg?.[0]?.id;
 
     // ── Debounce: kalau customer kirim 2+ pesan cepat, proses hanya yang terakhir ──
@@ -1420,6 +1432,14 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
         : (snap.harga || 0) + (snap.ongkirPromo || 0);
 
       if (convState.awaiting_order_correction) {
+        // ── Cek dulu: apakah ini pertanyaan atau koreksi order? ──
+        const isQuestionInCorr = message.includes('?') || /^(apa|gimana|berapa|kapan|kenapa|bagaimana|apakah|udah|sudah|ada|bisa|boleh|kalau)/i.test(msgLower);
+        const hasOrderCorrKeyword = /\b(nama|alamat|jalan|kecamatan|kota|provinsi|kodepos|kode pos|qty|jumlah|kurir|ekspedisi|ongkir|transfer|cod|ganti|ubah|koreksi|ralat|perbaiki|salah)\b/i.test(msgLower);
+
+        if (isQuestionInCorr && !hasOrderCorrKeyword) {
+          // Customer nanya hal lain, bukan koreksi order → jawab via Claude, state tetap awaiting_order_correction
+          // Fall through ke Claude di bawah
+        } else {
         // ── Customer kirim koreksi — extract via Claude Haiku ──
         try {
           const extractRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
@@ -1490,12 +1510,23 @@ Isi field yang berubah saja, sisanya null.` }],
         await sendWA(userId, reply_jid, confirmUlang);
         return res.status(200).json({ ok: true, action: 'confirm_resent' });
 
+        } // end else (bukan pertanyaan biasa)
+        // Kalau pertanyaan biasa → fall through ke Claude di bawah
+
       } else {
         // ── Awaiting confirm — cek jawaban customer ────────────
         const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|udah|siap|fix|setuju|benar|yap|yep|mantap|jadi|boleh|lanjut|gas|benar|okey)\b/i.test(msgLower);
-        const isDeny    = /\b(belum|salah|ganti|ubah|bukan|kurang|koreksi|ralat|perbaiki|enggak|nggak|ngga|tidak|gak|ga |wrong|no |nope)\b/i.test(msgLower);
+        // isDeny: hanya kalau jelas nolak/minta ubah order — jangan trigger dari "gak" / "ga" yang sering muncul di kalimat biasa
+        const isDeny    = /\b(salah|ganti|ubah|bukan|koreksi|ralat|perbaiki|enggak|nggak|ngga|wrong|nope)\b/i.test(msgLower)
+                       || /\b(tidak|belum)\s+(benar|bener|betul|sesuai|cocok|iya|ya|oke)\b/i.test(msgLower);
+        // Deteksi pertanyaan: kalau customer nanya hal lain → jangan paksa confirm/deny, teruskan ke Claude
+        const isQuestion = message.includes('?') || /^(apa|gimana|berapa|kapan|kenapa|bagaimana|apakah|udah|sudah|ada|bisa|boleh|kalau)/i.test(msgLower);
 
-        if (isConfirm) {
+        if (isQuestion && !isConfirm && !isDeny) {
+          // Customer nanya hal lain (bukan konfirmasi/nolak) → teruskan ke Claude, ingatkan soal order di akhir sistem prompt
+          // Tidak ubah state — tetap awaiting_order_confirm
+          // Fall through ke Claude di bawah (sudah ada inject konteks awaiting_order_confirm di system prompt)
+        } else if (isConfirm) {
           // ✅ Closing!
           await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
           await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
@@ -1741,7 +1772,9 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
 
     // Inject konteks awaiting_order_confirm agar Claude tidak trigger ORDER_CONFIRMED lagi
     if (convState.awaiting_order_confirm || convState.awaiting_order_correction) {
-      systemPrompt += `\n\n[SISTEM - PENTING] Order customer ini SUDAH DIKONFIRMASI sebelumnya. Kamu sudah mengirim ringkasan pesanan dan menunggu customer membalas. JANGAN generate marker [ORDER_CONFIRMED] lagi. Jika customer bertanya tentang status pesanan, beritahu bahwa pesanan sudah dicatat dan sedang diproses. Jika customer ingin mengubah sesuatu, bantu dengan ramah.`;
+      systemPrompt += `\n\n[SISTEM - PENTING] Kamu sudah mengirim ringkasan pesanan ke customer dan sedang menunggu konfirmasi mereka. JANGAN generate marker [ORDER_CONFIRMED] lagi.
+Jika customer bertanya hal lain (bukan soal order), jawab pertanyaannya dulu dengan ramah dan lengkap. Setelah menjawab, tambahkan 1 kalimat pengingat ringan di akhir seperti: "Oh iya kak, kalau data pesanannya sudah oke, langsung konfirmasi ya 😊" — tapi hanya kalau relevan dan tidak memotong konteks.
+JANGAN langsung kirim ulang ringkasan pesanan kalau customer tidak minta.`;
     }
 
     // Inject ulang allRates setiap pesan agar Claude selalu bisa jawab pertanyaan kurir
