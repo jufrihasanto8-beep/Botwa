@@ -35,16 +35,15 @@ async function sbPatch(table, query, body) {
 /* ── Normalisasi nama kurir ke format Mengantar ─────────── */
 function normalizeKurir(eks) {
   const e = (eks || '').toUpperCase();
-  if (e.includes('JNE'))                         return 'JNE';
-  if (e.includes('JNT') || e.includes('J&T'))    return 'JNT';
-  if (e.includes('SICEPAT'))                      return 'SICEPAT';
-  if (e.includes('SAP'))                          return 'SAP';
-  if (e.includes('LION'))                         return 'LION';
-  if (e.includes('NINJA'))                        return 'NINJA';
-  if (e.includes('ANTERAJA'))                     return 'ANTERAJA';
-  if (e.includes('IDX') || e.includes('IDEXPRESS')) return 'IDEXPRESS';
-  if (e.includes('POS'))                          return 'POS';
+  if (e.includes('JNE'))                              return 'JNE';
+  if (e.includes('JNT') || e.includes('J&T'))         return 'JNT';
   if (e.includes('SICEPAT') || e.includes('SI CEPAT')) return 'SICEPAT';
+  if (e.includes('SAP'))                              return 'SAP';
+  if (e.includes('LION'))                             return 'LION';
+  if (e.includes('NINJA'))                            return 'NINJA';
+  if (e.includes('ANTERAJA'))                         return 'ANTERAJA';
+  if (e.includes('IDX') || e.includes('IDEXPRESS'))   return 'IDEXPRESS';
+  if (e.includes('POS'))                              return 'POS';
   return e;
 }
 
@@ -73,30 +72,48 @@ async function cekResi(resi, ekspedisi) {
     const d = json?.data || json;
     if (!d) return null;
 
-    const history = d.history || d.connote_history || [];
+    const history    = d.history || d.connote_history || [];
+    const statusCat  = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
+    const destCity   = (d.RECEIVER_CITY || d.destination_city || '').toUpperCase();
 
-    // Deteksi event spesifik dari kode history
-    const lastHistory  = [...history].reverse().find(h => h.desc || h.description);
-    const deskripsi    = lastHistory?.desc || lastHistory?.description || '';
-    const lokasi       = lastHistory?.location || lastHistory?.city || '';
-    const statusCat    = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
+    // Ambil history entry terakhir yang punya desc
+    const lastHistory = [...history].reverse().find(h => h.desc || h.content || h.description);
+    const deskripsi   = (lastHistory?.desc || lastHistory?.content || lastHistory?.description || '').trim();
+    const lokasi      = (lastHistory?.location || lastHistory?.city || '').trim();
+    const lastCode    = (lastHistory?.code || '').toUpperCase();
+    const descUp      = deskripsi.toUpperCase();
+    // Kalau lokasi kosong, coba ekstrak dari desc (banyak kurir tulis kota di desc)
+    const lokasiFromDesc = lokasi || (deskripsi.match(/(?:DI|AT|HUB|KOTA)\s+([A-Z\s]+?)(?:\s*[-,]|$)/i)?.[1] || '').trim();
 
-    // Deteksi tipe event — urutan prioritas dari yang paling akhir
-    let eventType = 'update'; // default
+    // ── Deteksi event berdasarkan statusCategory (reliable semua kurir) ──
+    let eventType = 'update';
 
-    const lastCode = lastHistory?.code || '';
-    const descUp   = deskripsi.toUpperCase();
-
-    if (statusCat === 'DELIVERED' || lastCode === 'D01' || descUp.includes('DELIVERED TO')) {
+    if (statusCat === 'DELIVERED' || statusCat === 'POD') {
       eventType = 'delivered';
-    } else if (statusCat === 'RETUR' || statusCat.includes('RETUR')) {
+    } else if (statusCat.includes('RETUR') || statusCat.includes('RETURN')) {
       eventType = 'retur';
-    } else if (/DEX|UNDEL|FAIL|UNDELIVERED/.test(lastCode) || /DEX|UNDELIVERED|ATTEMPT FAILED/.test(descUp) || statusCat.includes('UNDELL')) {
+    } else if (['DEX','UNDELIVERED','FAILED','UNDELL'].some(s => statusCat.includes(s))) {
       eventType = 'bermasalah';
-    } else if (lastCode === 'IP3' || descUp.includes('WITH DELIVERY COURIER') || descUp.includes('OUT FOR DELIVERY')) {
-      eventType = 'out_for_delivery';
-    } else if (lastCode === 'IP1' || lastCode === 'IP2' || descUp.includes('RECEIVED AT WAREHOUSE') || descUp.includes('RECEIVED AT') && /IP[12]/.test(lastCode)) {
-      eventType = 'tiba_kota';
+    } else {
+      // Untuk ON PROSES → cari granular event dari desc text (universal semua kurir)
+
+      // Out for delivery: kurir lagi antar hari ini
+      const isOTW = /WITH DELIVERY COURIER|OUT FOR DELIVERY|DIBAWA KURIR|ANTAR KE TUJUAN|ON DELIVERY|DRIVER PICKUP|SEDANG DIKIRIM|DALAM PENGIRIMAN/.test(descUp)
+                 || lastCode === 'IP3';
+
+      // Tiba kota tujuan: masuk hub/gudang di kota customer
+      // Deteksi: desc mengandung kata "RECEIVED AT" / "ARRIVED" DAN lokasi cocok dengan kota tujuan
+      const lokasiUp  = (lokasiFromDesc || lokasi).toUpperCase();
+      const isDestLoc = destCity && lokasiUp && (
+        destCity.split(',').some(c => lokasiUp.includes(c.trim())) ||
+        lokasiUp.split(',').some(c => destCity.includes(c.trim()))
+      );
+      const isTibaKota = (
+        /RECEIVED AT|ARRIVED AT|MASUK HUB|TIBA DI|INBOUND|RECEIVED AT WAREHOUSE/.test(descUp) && isDestLoc
+      ) || /IP[12]/.test(lastCode);
+
+      if (isOTW)       eventType = 'out_for_delivery';
+      else if (isTibaKota) eventType = 'tiba_kota';
     }
 
     return { statusCat, eventType, lokasi, deskripsi, raw: d };
@@ -104,21 +121,6 @@ async function cekResi(resi, ekspedisi) {
     console.error(`[tracking] cekResi error (${resi}):`, e.message);
     return null;
   }
-}
-
-/* ── Deteksi event baru berdasarkan perubahan dari tracking sebelumnya ── */
-function detectNewEvent(tracking, order) {
-  const prev = order.status_tracking || '';
-  const curr = tracking.statusCat;
-  const eventType = tracking.eventType;
-
-  // Kalau status sama dan event bukan update baru → skip
-  if (curr === prev && eventType === 'update') return null;
-  // Kalau sudah pernah notif event ini → skip (simpan di tracking_events JSON)
-  const doneEvents = order.tracking_events || {};
-  if (doneEvents[eventType]) return null;
-
-  return eventType;
 }
 
 /* ── Kirim notif WA via Baileys ──────────────────────────── */
@@ -268,21 +270,30 @@ module.exports = async function handler(req, res) {
 
         const { statusCat, eventType, lokasi, deskripsi } = tracking;
 
-        // Cek apakah event ini sudah pernah dinotifkan sebelumnya
         const doneEvents = order.tracking_events || {};
+
+        // Selalu update status & lokasi terbaru ke DB
+        const lokasiUpdate = lokasi || order.tracking_lokasi;
+        if (statusCat !== order.status_tracking || lokasi !== order.tracking_lokasi) {
+          await sbPatch('orders_new', `?id=eq.${order.id}`, {
+            status_tracking: statusCat,
+            tracking_lokasi: lokasiUpdate,
+          });
+          updated++;
+        }
+
+        // Cek apakah ada event baru yang perlu dinotif
         if (doneEvents[eventType] && eventType !== 'update') {
           console.log(`[tracking] Event "${eventType}" sudah pernah dinotif: ${order.no_resi}`);
           continue;
         }
-        if (statusCat === order.status_tracking && eventType === 'update') {
-          console.log(`[tracking] No update: ${order.no_resi}`);
+        if (eventType === 'update') {
+          console.log(`[tracking] Lokasi update (no notif): ${order.no_resi} → ${lokasiUpdate}`);
           continue;
         }
 
-        // Update orders_new
+        // Catat event ke tracking_events
         const patch = {
-          status_tracking: statusCat,
-          tracking_lokasi: lokasi,
           tracking_events: { ...doneEvents, [eventType]: new Date().toISOString() },
         };
         if (eventType === 'delivered') {
@@ -291,7 +302,6 @@ module.exports = async function handler(req, res) {
           patch.sampai_at = new Date().toISOString();
         }
         await sbPatch('orders_new', `?id=eq.${order.id}`, patch);
-        updated++;
 
         const label = { tiba_kota: '🏙️ TIBA KOTA', out_for_delivery: '🚚 OTW', delivered: '✅ SAMPAI', bermasalah: '⚠️ BERMASALAH', retur: '🔄 RETUR', update: '📦 UPDATE' };
         console.log(`[tracking] ${label[eventType] || eventType}: ${order.no_resi} (${statusCat})`);
