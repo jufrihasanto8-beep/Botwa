@@ -797,18 +797,17 @@ function avatarColor(n) {
   return colors[Math.abs(h)];
 }
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function formatPhone(raw, fallbackName) {
+function formatPhone(raw) {
   if (!raw) return '—';
   const n = String(raw).split('@')[0].replace(/\D/g,'');
   if (!n) return '—';
-  // Nomor HP Indonesia valid maksimal 13 digit (628xxxxxxxxxx)
-  // Lebih dari itu = LID WhatsApp, bukan nomor asli
-  if (n.length > 13) return fallbackName ? `(${fallbackName})` : '(No. belum terdeteksi)';
-  const local = n.startsWith('62') ? n.slice(2) : n;
-  if (local.length >= 9) {
+  // Nomor HP Indonesia valid: 10-13 digit (628xxxxxxxxxx)
+  if (n.length >= 10 && n.length <= 13) {
+    const local = n.startsWith('62') ? n.slice(2) : n;
     return '+62 ' + local.slice(0,3) + '-' + local.slice(3,7) + '-' + local.slice(7);
   }
-  return '+62' + local;
+  // LID atau format lain — tampilkan apa adanya
+  return n;
 }
 function timeStr(ts) {
   if (!ts) return '';
@@ -960,7 +959,7 @@ async function renderChat() {
   document.getElementById('ch-av').textContent   = initials(nama);
   document.getElementById('ch-av').style.background = color;
   document.getElementById('ch-name').textContent = nama;
-  document.getElementById('ch-sub').innerHTML    = `<span class="ch-live"></span> WhatsApp &middot; ${formatPhone(activeCustomer?.wa_number, activeCustomer?.nama)}`;
+  document.getElementById('ch-sub').innerHTML    = `<span class="ch-live"></span> WhatsApp &middot; ${formatPhone(activeCustomer?.wa_number)}`;
 
   // Status badge
   const statusArea = document.getElementById('ch-status-area');
@@ -976,7 +975,7 @@ async function renderChat() {
   document.getElementById('ae-av').textContent  = initials(nama);
   document.getElementById('ae-av').style.background = color;
   document.getElementById('ae-name').textContent = nama;
-  document.getElementById('ae-num').textContent  = formatPhone(activeCustomer?.wa_number, activeCustomer?.nama);
+  document.getElementById('ae-num').textContent  = formatPhone(activeCustomer?.wa_number);
 
   const msgs = await sbGet('conv_messages',
     `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=200`);
@@ -992,7 +991,7 @@ async function renderChat() {
   const cmRows  = document.getElementById('cm-rows');
   if (activeCustomer) {
     document.getElementById('cm-nama').textContent  = esc(activeCustomer.nama || '—');
-    document.getElementById('cm-phone').textContent = formatPhone(activeCustomer.wa_number, activeCustomer.nama);
+    document.getElementById('cm-phone').textContent = formatPhone(activeCustomer.wa_number);
 
     // Produk dari conversation (product_id), fallback ke produk pertama user
     const prodId = activeConv?.product_id;
