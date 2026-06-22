@@ -295,6 +295,8 @@ module.exports = async function handler(req, res) {
 
         const { statusCat, eventType, lokasi, deskripsi } = tracking;
 
+        console.log(`[tracking] ${order.no_resi} | kurir: ${order.ekspedisi || '?'} | statusCat: ${statusCat} | event: ${eventType} | lokasi: ${lokasi || '-'} | desc: ${deskripsi?.slice(0,60) || '-'}`);
+
         const doneEvents = order.tracking_events || {};
 
         // Selalu update status & lokasi terbaru ke DB
@@ -313,7 +315,7 @@ module.exports = async function handler(req, res) {
           continue;
         }
         if (eventType === 'update') {
-          console.log(`[tracking] Lokasi update (no notif): ${order.no_resi} → ${lokasiUpdate}`);
+          console.log(`[tracking] Lokasi update (no notif): ${order.no_resi} → ${lokasiUpdate || '-'}`);
           continue;
         }
 
