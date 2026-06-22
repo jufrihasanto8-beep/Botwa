@@ -76,10 +76,19 @@ function normalizeWA(num) {
 /* ── FIND / CREATE CUSTOMER ───────────────────────────────── */
 async function findOrCreateCustomer(userId, waNumber, nama, replyJid = null) {
   const normalized = normalizeWA(waNumber);
+  const isLid      = replyJid && replyJid.includes('@lid');
 
   // Cari by wa_number dulu
   let existing = await sbGet('customers', `?user_id=eq.${userId}&wa_number=eq.${normalized}`);
-  if (existing.length) return existing[0];
+  if (existing.length) {
+    const c = existing[0];
+    // Update reply_jid kalau belum ada (agar lookup future bisa by LID juga)
+    if (replyJid && !c.reply_jid) {
+      await sbPatch('customers', `?id=eq.${c.id}`, { reply_jid: replyJid }).catch(() => {});
+      c.reply_jid = replyJid;
+    }
+    return c;
+  }
 
   // Kalau tidak ketemu, cari by reply_jid (handle LID yang sudah tersimpan sebelumnya)
   if (replyJid) {
@@ -87,20 +96,25 @@ async function findOrCreateCustomer(userId, waNumber, nama, replyJid = null) {
     if (byJid.length) {
       // Ketemu by LID — update wa_number ke nomor asli yang sudah resolve
       const old = byJid[0];
-      if (old.wa_number !== normalized) {
-        await sbPatch('customers', `?id=eq.${old.id}`, { wa_number: normalized }).catch(() => {});
+      const updates = {};
+      if (old.wa_number !== normalized && !isLid) {
+        updates.wa_number = normalized;
         old.wa_number = normalized;
         console.log(`[customer] Update wa_number LID → ${normalized} untuk id=${old.id}`);
+      }
+      if (Object.keys(updates).length) {
+        await sbPatch('customers', `?id=eq.${old.id}`, updates).catch(() => {});
       }
       return old;
     }
   }
 
-  // Benar-benar customer baru
+  // Benar-benar customer baru — simpan reply_jid kalau LID agar next message bisa lookup
   const rows = await sbPost('customers', {
     user_id: userId,
     wa_number: normalized,
     nama: nama || normalized,
+    ...(isLid ? { reply_jid: replyJid } : {}),
   });
   return rows[0];
 }
