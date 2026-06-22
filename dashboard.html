@@ -797,13 +797,13 @@ function avatarColor(n) {
   return colors[Math.abs(h)];
 }
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function formatPhone(raw) {
+function formatPhone(raw, fallbackName) {
   if (!raw) return '—';
   const n = String(raw).split('@')[0].replace(/\D/g,'');
   if (!n) return '—';
   // Nomor HP Indonesia valid maksimal 13 digit (628xxxxxxxxxx)
   // Lebih dari itu = LID WhatsApp, bukan nomor asli
-  if (n.length > 13) return '(WA ID)';
+  if (n.length > 13) return fallbackName ? `(${fallbackName})` : '(No. belum terdeteksi)';
   const local = n.startsWith('62') ? n.slice(2) : n;
   if (local.length >= 9) {
     return '+62 ' + local.slice(0,3) + '-' + local.slice(3,7) + '-' + local.slice(7);
@@ -918,6 +918,7 @@ async function renderInbox() {
 }
 
 let custMapCache = {};
+let riskCache = {}; // convId → { data, ts } — cache customer-risk per conversation
 
 function setTab(tab, btn) {
   tabFilter = tab;
@@ -959,7 +960,7 @@ async function renderChat() {
   document.getElementById('ch-av').textContent   = initials(nama);
   document.getElementById('ch-av').style.background = color;
   document.getElementById('ch-name').textContent = nama;
-  document.getElementById('ch-sub').innerHTML    = `<span class="ch-live"></span> WhatsApp &middot; ${formatPhone(activeCustomer?.wa_number)}`;
+  document.getElementById('ch-sub').innerHTML    = `<span class="ch-live"></span> WhatsApp &middot; ${formatPhone(activeCustomer?.wa_number, activeCustomer?.nama)}`;
 
   // Status badge
   const statusArea = document.getElementById('ch-status-area');
@@ -975,7 +976,7 @@ async function renderChat() {
   document.getElementById('ae-av').textContent  = initials(nama);
   document.getElementById('ae-av').style.background = color;
   document.getElementById('ae-name').textContent = nama;
-  document.getElementById('ae-num').textContent  = formatPhone(activeCustomer?.wa_number);
+  document.getElementById('ae-num').textContent  = formatPhone(activeCustomer?.wa_number, activeCustomer?.nama);
 
   const msgs = await sbGet('conv_messages',
     `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=200`);
@@ -991,7 +992,7 @@ async function renderChat() {
   const cmRows  = document.getElementById('cm-rows');
   if (activeCustomer) {
     document.getElementById('cm-nama').textContent  = esc(activeCustomer.nama || '—');
-    document.getElementById('cm-phone').textContent = formatPhone(activeCustomer.wa_number);
+    document.getElementById('cm-phone').textContent = formatPhone(activeCustomer.wa_number, activeCustomer.nama);
 
     // Produk dari conversation (product_id), fallback ke produk pertama user
     const prodId = activeConv?.product_id;
@@ -1177,8 +1178,18 @@ async function updateCaseBoard() {
   try {
     const params = new URLSearchParams({ wa_number: waNumber });
     if (wilayah) params.append('wilayah', wilayah);
-    const resp = await fetch(`/api/customer-risk?${params}`);
-    const data = await resp.json();
+
+    // Pakai cache kalau ada dan belum lebih dari 2 menit
+    const cached = riskCache[activeConvId];
+    const now = Date.now();
+    let data;
+    if (cached && (now - cached.ts) < 120000) {
+      data = cached.data;
+    } else {
+      const resp = await fetch(`/api/customer-risk?${params}`);
+      data = await resp.json();
+      riskCache[activeConvId] = { data, ts: now };
+    }
 
     // RTS
     const rts = data.rts;
