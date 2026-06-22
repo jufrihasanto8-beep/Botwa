@@ -103,9 +103,27 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
       </div>
 
       <div class="tpl-section">
+        <div class="tpl-label">🏙️ Paket Sampai Kota Tujuan</div>
+        <div class="tpl-desc">Dikirim otomatis saat paket tiba di hub/kota tujuan. Order COD otomatis dapat tambahan reminder siapkan uang.</div>
+        <textarea class="tpl-textarea" id="tpl-tiba-kota" placeholder="Contoh: Kak {nama}, paket udah sampai di kota kak nih 📦&#10;Sebentar lagi kurir datang, siap-siap ya!&#10;&#10;Resi: {resi}&#10;Cek tracking: {link}"></textarea>
+      </div>
+
+      <div class="tpl-section">
+        <div class="tpl-label">✅ Paket Sudah Diterima</div>
+        <div class="tpl-desc">Dikirim otomatis saat status tracking konfirmasi paket sudah sampai ke tangan customer.</div>
+        <textarea class="tpl-textarea" id="tpl-delivered" placeholder="Contoh: Kak {nama}, paket sudah sampai nih! 🎉&#10;Semoga produknya langsung bisa dipakai dan terasa manfaatnya ya kak 🙏"></textarea>
+      </div>
+
+      <div class="tpl-section">
         <div class="tpl-label">⚠️ Paket Bermasalah</div>
-        <div class="tpl-desc">Dikirim otomatis saat resi tidak bergerak lebih dari 3 hari.</div>
+        <div class="tpl-desc">Dikirim otomatis saat kurir gagal mengantar (DEX/failed delivery).</div>
         <textarea class="tpl-textarea" id="tpl-bermasalah" placeholder="Contoh: Kak {nama}, kami mau kasih info nih — paket kak sepertinya ada kendala di jalan 🙏&#10;Kami lagi follow up ke {kurir} ya kak. Tenang, kami pastiin pesanannya sampai!"></textarea>
+      </div>
+
+      <div class="tpl-section">
+        <div class="tpl-label">🔄 Paket Retur</div>
+        <div class="tpl-desc">Dikirim otomatis saat paket dalam proses retur ke pengirim.</div>
+        <textarea class="tpl-textarea" id="tpl-retur" placeholder="Contoh: Kak {nama}, paket kak sedang diretur ke kami 😔&#10;Nanti kami hubungi untuk koordinasi pengiriman ulang ya kak.&#10;&#10;Resi: {resi}"></textarea>
       </div>
     </div>
     <div class="tpl-footer">
@@ -332,11 +350,14 @@ async function openTplModal() {
   document.getElementById('tpl-overlay').classList.add('open');
   document.getElementById('tpl-status').textContent = '';
   try {
-    const data = await SB.get('users', `?id=eq.${uid}&select=template_resi_dikirim,template_out_for_delivery,template_bermasalah&limit=1`);
+    const data = await SB.get('users', `?id=eq.${uid}&select=template_resi_dikirim,template_out_for_delivery,template_bermasalah,template_tiba_kota,template_delivered,template_retur&limit=1`);
     const row = data[0] || {};
     document.getElementById('tpl-resi-dikirim').value     = row.template_resi_dikirim     || '';
+    document.getElementById('tpl-tiba-kota').value        = row.template_tiba_kota        || '';
     document.getElementById('tpl-out-for-delivery').value = row.template_out_for_delivery || '';
+    document.getElementById('tpl-delivered').value        = row.template_delivered        || '';
     document.getElementById('tpl-bermasalah').value       = row.template_bermasalah       || '';
+    document.getElementById('tpl-retur').value            = row.template_retur            || '';
   } catch(e) { console.error('loadTpl:', e.message); }
 }
 
@@ -357,8 +378,11 @@ async function saveTplModal() {
         table: 'users_template',
         payload: {
           template_resi_dikirim:     document.getElementById('tpl-resi-dikirim').value.trim(),
+          template_tiba_kota:        document.getElementById('tpl-tiba-kota').value.trim(),
           template_out_for_delivery: document.getElementById('tpl-out-for-delivery').value.trim(),
+          template_delivered:        document.getElementById('tpl-delivered').value.trim(),
           template_bermasalah:       document.getElementById('tpl-bermasalah').value.trim(),
+          template_retur:            document.getElementById('tpl-retur').value.trim(),
         }
       })
     });
