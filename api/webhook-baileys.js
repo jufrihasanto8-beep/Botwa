@@ -1610,6 +1610,13 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
           await saveMessage(conversation.id, 'ai', closingCustomer);
           await sendWA(userId, reply_jid, closingCustomer);
 
+          // ── Guard: cek dulu apakah order untuk conversation ini sudah ada (anti-double) ──
+          const existingOrder = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&limit=1`).catch(() => []);
+          if (existingOrder.length) {
+            console.warn(`[closing] Order untuk conv ${conversation.id} sudah ada — skip insert & recap`);
+            return res.status(200).json({ ok: true, skipped: 'order_already_exists' });
+          }
+
           // ── Insert ke orders_new ──
           try {
             const snap       = convState.order_snapshot || {};
