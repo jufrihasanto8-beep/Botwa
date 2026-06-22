@@ -175,7 +175,28 @@ const PESAN_TEMPLATE = {
 };
 
 /* ── Generate pesan via AI (dengan fallback ke template) ─── */
-async function buildPesan({ namaKak, resi, ekspedisi, eventType, deskripsi, lokasi, isCOD, urlLacak }) {
+async function buildPesan({ namaKak, resi, ekspedisi, eventType, deskripsi, lokasi, isCOD, urlLacak, userTpl }) {
+  // Pakai template custom dari user kalau ada
+  const tplKeyMap = {
+    tiba_kota: 'template_tiba_kota',
+    out_for_delivery: 'template_out_for_delivery',
+    delivered: 'template_delivered',
+    bermasalah: 'template_bermasalah',
+    retur: 'template_retur',
+  };
+  const customTpl = userTpl?.[tplKeyMap[eventType]];
+  if (customTpl) {
+    let pesan = customTpl
+      .replace(/{nama}/g, namaKak || '')
+      .replace(/{resi}/g, resi || '')
+      .replace(/{kurir}/g, ekspedisi || '')
+      .replace(/{link}/g, urlLacak || '');
+    if (eventType === 'tiba_kota' && isCOD) {
+      pesan += '\n\n⚠️ Siapkan uang COD-nya ya kak!';
+    }
+    return pesan;
+  }
+
   const tmpl = PESAN_TEMPLATE[eventType];
   const fallback = tmpl ? tmpl(namaKak, resi, ekspedisi, lokasi, isCOD, urlLacak) : null;
 
@@ -257,6 +278,13 @@ module.exports = async function handler(req, res) {
     );
     const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
 
+    // Ambil template notif per user
+    const userIds = [...new Set(orders.map(o => o.user_id))];
+    const userRows = await sbGet('users',
+      `?id=in.(${userIds.join(',')})&select=id,template_tiba_kota,template_out_for_delivery,template_delivered,template_bermasalah,template_retur`
+    );
+    const userTplMap = Object.fromEntries(userRows.map(u => [u.id, u]));
+
     console.log(`[tracking] ${orders.length} order akan di-tracking...`);
     let updated = 0, notified = 0, errors = 0;
 
@@ -321,6 +349,7 @@ module.exports = async function handler(req, res) {
         const pesan = await buildPesan({
           namaKak, resi: order.no_resi, ekspedisi: order.ekspedisi,
           eventType, deskripsi, lokasi, isCOD, urlLacak,
+          userTpl: userTplMap[order.user_id],
         });
 
         if (pesan) {

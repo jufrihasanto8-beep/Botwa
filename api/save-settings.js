@@ -57,7 +57,7 @@ module.exports = async function handler(req, res) {
 
   // ── Template notif ──
   if (body.userId && body.table === 'users_template' && body.payload) {
-    const allowed = ['template_resi_dikirim', 'template_out_for_delivery', 'template_bermasalah'];
+    const allowed = ['template_resi_dikirim', 'template_tiba_kota', 'template_out_for_delivery', 'template_delivered', 'template_bermasalah', 'template_retur'];
     const patch = {};
     for (const key of allowed) {
       if (key in body.payload) patch[key] = body.payload[key];
