@@ -131,12 +131,14 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
         metode_bayar: prevState.metode_bayar  || null,
         qty:          prevState.qty           || null,
         // Clear state transient agar tidak salah konteks
-        proposed_wilayah:  null,
-        pending_kecamatan: null,
-        followed_up:       false,
-        followed_up_days:  [],
-        order_placed:      false,
-        foto_terkirim:     false,
+        proposed_wilayah:       null,
+        pending_kecamatan:      null,
+        followed_up:            false,
+        followed_up_days:       [],
+        order_placed:           !!prevState.order_placed, // preserve — jangan reset kalau sudah order
+        awaiting_order_confirm: false, // clear — jangan minta konfirmasi lagi
+        awaiting_order_correction: false,
+        foto_terkirim:          false,
       };
       const updated = await sbPatch('conversations', `?id=eq.${conv.id}`, {
         status: 'baru',
@@ -1543,7 +1545,9 @@ Isi field yang berubah saja, sisanya null.` }],
 
       } else {
         // ── Awaiting confirm — cek jawaban customer ────────────
-        const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|udah|siap|fix|setuju|benar|yap|yep|mantap|jadi|boleh|lanjut|gas|benar|okey)\b/i.test(msgLower);
+        // Normalize repeated vowel di akhir: "yaa" → "ya", "iyaa" → "iya", "okee" → "oke"
+        const msgNorm = msgLower.replace(/([aeiou])\1+$/g, '$1').replace(/([aeiou])\1+\b/g, '$1');
+        const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|udah|siap|fix|setuju|benar|yap|yep|mantap|jadi|boleh|lanjut|gas|benar|okey)\b/i.test(msgNorm);
         // isDeny: hanya kalau jelas nolak/minta ubah order — jangan trigger dari "gak" / "ga" yang sering muncul di kalimat biasa
         const isDeny    = /\b(salah|ganti|ubah|bukan|koreksi|ralat|perbaiki|enggak|nggak|ngga|wrong|nope)\b/i.test(msgLower)
                        || /\b(tidak|belum)\s+(benar|bener|betul|sesuai|cocok|iya|ya|oke)\b/i.test(msgLower);
@@ -1796,6 +1800,11 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
 
     if (conversation.ringkasan) {
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
+    }
+
+    // Inject konteks order sudah placed — cegah Claude kirim konfirmasi ulang
+    if (convState.order_placed && !convState.awaiting_order_confirm) {
+      systemPrompt += `\n\n[SISTEM - PENTING] Order customer ini SUDAH SELESAI DIPROSES sebelumnya. JANGAN generate marker [ORDER_CONFIRMED] atau kirim ringkasan order lagi. Baca konteks percakapan dan jawab pertanyaan customer secara natural sesuai apa yang mereka tanyakan.`;
     }
 
     // Inject wilayah risk agar Claude ingat sepanjang conversation
