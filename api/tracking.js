@@ -255,9 +255,6 @@ module.exports = async function handler(req, res) {
     if (secret !== CRON_SECRET) return res.status(401).json({ error: 'unauthorized' });
   }
 
-  // Langsung balas 200 biar cron tidak timeout, proses di background
-  res.status(200).json({ ok: true, service: 'tracking-cron', started: new Date().toISOString() });
-
   try {
     console.log('🚚 Mulai tracking resi dari orders_new...');
 
@@ -268,7 +265,7 @@ module.exports = async function handler(req, res) {
 
     if (!orders.length) {
       console.log('[tracking] Tidak ada order aktif yang perlu di-tracking.');
-      return;
+      return res.status(200).json({ ok: true, message: 'tidak ada order aktif' });
     }
 
     // Ambil semua customer sekaligus
@@ -331,11 +328,8 @@ module.exports = async function handler(req, res) {
         }
         await sbPatch('orders_new', `?id=eq.${order.id}`, patch);
 
-        const label = { tiba_kota: '🏙️ TIBA KOTA', out_for_delivery: '🚚 OTW', delivered: '✅ SAMPAI', bermasalah: '⚠️ BERMASALAH', retur: '🔄 RETUR', update: '📦 UPDATE' };
+        const label = { tiba_kota: '🏙️ TIBA KOTA', out_for_delivery: '🚚 OTW', delivered: '✅ SAMPAI', bermasalah: '⚠️ BERMASALAH', retur: '🔄 RETUR' };
         console.log(`[tracking] ${label[eventType] || eventType}: ${order.no_resi} (${statusCat})`);
-
-        // Kirim notif ke customer (skip kalau hanya 'update' biasa tanpa event spesifik)
-        if (eventType === 'update') continue;
 
         const cust = custMap[order.customer_id];
         if (!cust) continue;
@@ -367,8 +361,10 @@ module.exports = async function handler(req, res) {
     }
 
     console.log(`[tracking] ✅ Selesai. Updated: ${updated}, Notified: ${notified}, Errors: ${errors}`);
+    return res.status(200).json({ ok: true, updated, notified, errors });
 
   } catch (err) {
     console.error('[tracking] Fatal error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 };
