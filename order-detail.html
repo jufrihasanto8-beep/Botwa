@@ -253,7 +253,8 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
         </div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-left:auto">
+    <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
+      <button id="btn-delete" class="btn-export" onclick="deleteSelected()" style="background:#ef4444;display:none">🗑 Hapus (<span id="del-count">0</span>)</button>
       <button class="btn-export btn-csv" onclick="exportCSV()">⬇ CSV</button>
       <button class="btn-export btn-xlsx" onclick="exportExcel()">⬇ Excel (.xlsx)</button>
     </div>
@@ -507,6 +508,7 @@ function getOrderRow(c, idx) {
   const keterangan = cu.catatan ? cu.catatan.split('\n')[0] : '';
 
   return {
+    id: c.id,
     tanggal: c.created_at,
     no: idx + 1,
     nama: cu.nama || '—',
@@ -553,7 +555,7 @@ function renderTable(rows) {
   }
 
   tbody.innerHTML = rows.map((r, i) => `<tr>
-    <td class="td-cb"><input type="checkbox" class="row-cb" value="${i}" onchange="updateSelectAll()"></td>
+    <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()"></td>
     <td class="td-no">${fmtDt(r.tanggal)}</td>
     <td><div class="td-wrap-sm td-bold" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
     <td><div class="td-name" title="${escH(r.nama)}">${escH(r.nama)}</div></td>
@@ -576,13 +578,52 @@ function renderTable(rows) {
 
 function toggleAll(cb) {
   document.querySelectorAll('.row-cb').forEach(el => el.checked = cb.checked);
+  updateSelectAll();
 }
 function updateSelectAll() {
-  const all  = document.querySelectorAll('.row-cb');
-  const chk  = document.querySelectorAll('.row-cb:checked');
+  const all   = document.querySelectorAll('.row-cb');
+  const chk   = document.querySelectorAll('.row-cb:checked');
   const cbAll = document.getElementById('cb-all');
   cbAll.checked       = chk.length === all.length && all.length > 0;
   cbAll.indeterminate = chk.length > 0 && chk.length < all.length;
+
+  const btnDel = document.getElementById('btn-delete');
+  document.getElementById('del-count').textContent = chk.length;
+  btnDel.style.display = chk.length > 0 ? 'inline-flex' : 'none';
+}
+
+async function deleteSelected() {
+  const chk = document.querySelectorAll('.row-cb:checked');
+  if (!chk.length) return;
+  const ids = Array.from(chk).map(el => el.value).filter(Boolean);
+  if (!ids.length) return;
+
+  const conf = confirm(`Hapus ${ids.length} order ini secara permanen?\nTindakan ini tidak bisa dibatalkan.`);
+  if (!conf) return;
+
+  const url = window.SUPABASE_URL || '';
+  const key = window.SUPABASE_ANON_KEY || '';
+
+  try {
+    const res = await fetch(`${url}/rest/v1/orders_new?id=in.(${ids.join(',')})`, {
+      method: 'DELETE',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      alert('Gagal hapus: ' + txt);
+      return;
+    }
+
+    // Hapus dari allOrders lokal
+    allOrders = allOrders.filter(o => !ids.includes(String(o.id)));
+    document.getElementById('btn-delete').style.display = 'none';
+    document.getElementById('cb-all').checked = false;
+    render();
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 // ── EXPORT ────────────────────────────────────────────────
