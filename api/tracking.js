@@ -36,7 +36,7 @@ async function sbPatch(table, query, body) {
 function normalizeKurir(eks) {
   const e = (eks || '').toUpperCase();
   if (e.includes('JNE'))                              return 'JNE';
-  if (e.includes('JNT') || e.includes('J&T'))         return 'JNT';
+  if (e.includes('JNT') || e.includes('J&T'))         return 'JT';
   if (e.includes('SICEPAT') || e.includes('SI CEPAT')) return 'SICEPAT';
   if (e.includes('SAP'))                              return 'SAP';
   if (e.includes('LION'))                             return 'LION';
@@ -48,28 +48,37 @@ function normalizeKurir(eks) {
 }
 
 /* ── Cek resi via Mengantar public API (tanpa key) ───────── */
+async function fetchMengantar(resi, courier) {
+  const url = courier
+    ? `https://app.mengantar.com/api/order/getPublic?tracking_number=${encodeURIComponent(resi)}&courier=${encodeURIComponent(courier)}`
+    : `https://app.mengantar.com/api/order/getPublic?tracking_number=${encodeURIComponent(resi)}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      'Accept': 'application/json',
+      'Referer': 'https://www.mengantar.com/',
+      'Origin': 'https://www.mengantar.com',
+    },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json?.data || json || null;
+}
+
 async function cekResi(resi, ekspedisi) {
   if (!resi) return null;
   const courier = normalizeKurir(ekspedisi);
   try {
-    const res = await fetch(
-      `https://app.mengantar.com/api/order/getPublic?tracking_number=${encodeURIComponent(resi)}&courier=${encodeURIComponent(courier)}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-          'Accept': 'application/json',
-          'Referer': 'https://www.mengantar.com/',
-          'Origin': 'https://www.mengantar.com',
-        },
-        signal: AbortSignal.timeout(10000),
-      }
-    );
-    if (!res.ok) {
-      console.warn(`[tracking] Mengantar API ${res.status} untuk ${resi}`);
-      return null;
+    // Coba dengan kurir spesifik dulu
+    let d = await fetchMengantar(resi, courier);
+
+    // Kalau tidak ada data, coba auto-detect (tanpa kurir)
+    if (!d || !(d.statusCategory || d.status || d.connote_state)) {
+      console.log(`[tracking] Retry auto-detect tanpa kurir: ${resi}`);
+      d = await fetchMengantar(resi, null);
     }
-    const json = await res.json();
-    const d = json?.data || json;
+
     if (!d) return null;
 
     const history    = d.history || d.connote_history || [];
