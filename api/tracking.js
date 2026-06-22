@@ -94,8 +94,9 @@ async function cekResi(resi, ekspedisi) {
     // Ambil history entry terakhir yang punya desc
     const lastHistory = [...history].reverse().find(h => h.desc || h.content || h.description);
     const deskripsi   = (lastHistory?.desc || lastHistory?.content || lastHistory?.description || '').trim();
-    const lokasi      = (lastHistory?.location || lastHistory?.city || '').trim();
+    const lokasi      = (lastHistory?.location || lastHistory?.city || lastHistory?.city_name || '').trim();
     const lastCode    = (lastHistory?.code || '').toUpperCase();
+    const lastStatusCode = lastHistory?.status_code ? Number(lastHistory.status_code) : null;
     const descUp      = deskripsi.toUpperCase();
     // Kalau lokasi kosong, coba ekstrak dari desc (banyak kurir tulis kota di desc)
     const lokasiFromDesc = lokasi || (deskripsi.match(/(?:DI|AT|HUB|KOTA)\s+([A-Z\s]+?)(?:\s*[-,]|$)/i)?.[1] || '').trim();
@@ -103,30 +104,48 @@ async function cekResi(resi, ekspedisi) {
     // ── Deteksi event berdasarkan statusCategory (reliable semua kurir) ──
     let eventType = 'update';
 
-    if (statusCat === 'DELIVERED' || statusCat === 'POD') {
-      eventType = 'delivered';
-    } else if (statusCat.includes('RETUR') || statusCat.includes('RETURN')) {
-      eventType = 'retur';
-    } else if (['DEX','UNDELIVERED','FAILED','UNDELL'].some(s => statusCat.includes(s))) {
-      eventType = 'bermasalah';
+    // ── Deteksi per kurir ───────────────────────────────────
+    if (courier === 'JT') {
+      // J&T: pakai status_code dari history (lebih reliable dari text)
+      // 200 = delivered, 401 = retur, 152 = gagal antar (simpan di gudang)
+      if (lastStatusCode === 200 || statusCat === 'PAKET TELAH DITERIMA') {
+        eventType = 'delivered';
+      } else if (lastStatusCode === 401 || statusCat.includes('DIRETUR') || statusCat.includes('AKAN DIRETUR')) {
+        eventType = 'retur';
+      } else if (lastStatusCode === 152) {
+        // 152 = kurir sudah coba antar tapi gagal, paket balik ke gudang
+        eventType = 'bermasalah';
+      } else if (statusCat.includes('AKAN DIKIRIM KE ALAMAT PENERIMA')) {
+        eventType = 'out_for_delivery';
+      }
+      // tiba_kota: J&T tidak return RECEIVER_CITY → skip untuk sekarang
     } else {
-      // Untuk status masih dalam proses → cari granular event dari desc + statusCat
-      const OTW_PATTERN = /WITH DELIVERY COURIER|OUT FOR DELIVERY|DIBAWA KURIR|ANTAR KE TUJUAN|ON DELIVERY|DRIVER PICKUP|SEDANG DIKIRIM|DALAM PENGIRIMAN|AKAN DIKIRIM KE ALAMAT|DIKIRIM KE PENERIMA|OUT FOR DEL/;
-      const TIBA_PATTERN = /RECEIVED AT|ARRIVED AT|MASUK HUB|TIBA DI|INBOUND|RECEIVED AT WAREHOUSE|TIBA DI KOTA|SAMPAI DI KOTA/;
+      // ── Kurir lain (JNE, SiCepat, dll) — pakai statusCategory normalized ──
+      if (statusCat === 'DELIVERED' || statusCat === 'POD') {
+        eventType = 'delivered';
+      } else if (statusCat.includes('RETUR') || statusCat.includes('RETURN')) {
+        eventType = 'retur';
+      } else if (['DEX','UNDELIVERED','FAILED','UNDELL'].some(s => statusCat.includes(s))) {
+        eventType = 'bermasalah';
+      } else {
+        // Untuk ON PROSES → cari granular event dari desc + statusCat
+        const OTW_PATTERN = /WITH DELIVERY COURIER|OUT FOR DELIVERY|DIBAWA KURIR|ANTAR KE TUJUAN|ON DELIVERY|DRIVER PICKUP|SEDANG DIKIRIM|DALAM PENGIRIMAN/;
+        const TIBA_PATTERN = /RECEIVED AT|ARRIVED AT|MASUK HUB|TIBA DI|INBOUND|RECEIVED AT WAREHOUSE/;
 
-      const isOTW = OTW_PATTERN.test(descUp) || OTW_PATTERN.test(statusCat) || lastCode === 'IP3';
+        const isOTW = OTW_PATTERN.test(descUp) || OTW_PATTERN.test(statusCat) || lastCode === 'IP3';
 
-      const lokasiUp  = (lokasiFromDesc || lokasi).toUpperCase();
-      const isDestLoc = destCity && lokasiUp && (
-        destCity.split(',').some(c => lokasiUp.includes(c.trim())) ||
-        lokasiUp.split(',').some(c => destCity.includes(c.trim()))
-      );
-      const isTibaKota = (
-        (TIBA_PATTERN.test(descUp) || TIBA_PATTERN.test(statusCat)) && isDestLoc
-      ) || /IP[12]/.test(lastCode);
+        const lokasiUp  = (lokasiFromDesc || lokasi).toUpperCase();
+        const isDestLoc = destCity && lokasiUp && (
+          destCity.split(',').some(c => lokasiUp.includes(c.trim())) ||
+          lokasiUp.split(',').some(c => destCity.includes(c.trim()))
+        );
+        const isTibaKota = (
+          (TIBA_PATTERN.test(descUp) || TIBA_PATTERN.test(statusCat)) && isDestLoc
+        ) || /IP[12]/.test(lastCode);
 
-      if (isOTW)           eventType = 'out_for_delivery';
-      else if (isTibaKota) eventType = 'tiba_kota';
+        if (isOTW)           eventType = 'out_for_delivery';
+        else if (isTibaKota) eventType = 'tiba_kota';
+      }
     }
 
     return { statusCat, eventType, lokasi, deskripsi, raw: d };
