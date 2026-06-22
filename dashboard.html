@@ -1069,8 +1069,10 @@ async function sendMsg() {
   document.getElementById('ai-suggest-box').style.display = 'none';
 
   try {
-    await sbPost('conv_messages', { conversation_id: activeConvId, role: 'cs', isi: text });
-    appendBubble('bot', text, true, new Date().toISOString(), 'cs');
+    const saved = await sbPost('conv_messages', { conversation_id: activeConvId, role: 'cs', isi: text });
+    const sentAt = saved?.[0]?.created_at || new Date().toISOString();
+    if (sentAt > (lastMsgTimestamp || '')) lastMsgTimestamp = sentAt; // cegah poll re-append pesan ini
+    appendBubble('bot', text, true, sentAt, 'cs');
     await fetch(`${PROXY}?path=${encodeURIComponent('/send')}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: userId, wa_number: activeCustomer.reply_jid || activeCustomer.wa_number, message: text, is_outbound: true }),
