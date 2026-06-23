@@ -1091,9 +1091,11 @@ let _allGroups = [];
 
 async function loadGroupJid() {
   try {
-    const uid = getUser()?.id;
+    const uid = Auth.getUser()?.id;
     if (!uid) return;
-    const rows = await sbFetch(`users?id=eq.${uid}&select=group_jid,group_nama&limit=1`);
+    const rows = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=group_jid,group_nama&limit=1`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${Auth.getToken()}` }
+    }).then(r => r.json());
     const jid  = rows[0]?.group_jid  || null;
     const nama = rows[0]?.group_nama || jid || null;
     _selectedGroupJid = jid;
@@ -1108,7 +1110,7 @@ async function loadGroupJid() {
 }
 
 async function loadGrupList() {
-  const uid = getUser()?.id;
+  const uid = Auth.getUser()?.id;
   const btn = document.getElementById('btn-load-grup');
   btn.textContent = 'Memuat...';
   btn.disabled = true;
@@ -1161,7 +1163,7 @@ function clearGroupJid() {
 }
 
 async function saveGroupJid() {
-  const uid = getUser()?.id;
+  const uid = Auth.getUser()?.id;
   if (!uid) return;
   const nama = document.getElementById('group-selected-nama')?.textContent || null;
   try {
@@ -1170,7 +1172,7 @@ async function saveGroupJid() {
       headers: {
         'Content-Type': 'application/json',
         'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'Prefer': 'return=minimal',
       },
       body: JSON.stringify({ group_jid: _selectedGroupJid || null, group_nama: _selectedGroupJid ? nama : null }),
