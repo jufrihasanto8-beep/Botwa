@@ -87,22 +87,19 @@ function trackingUrl(kurir, resi) {
   return `https://cekresi.com/?noresi=${resi}`;
 }
 
-async function processOrder(order) {
+async function processOrder(order, customerByWA = {}) {
   const noResi = order.no_resi || order.resi || '';
   const hp     = order.hp || order.no_hp || '';
   const kurir  = order.ekspedisi || order.kurir || '';
-  const nama   = order.nama || '';
 
   if (!noResi || !hp) return { skip: 'resi/hp kosong' };
 
   const waNumber = normalizeHP(hp);
   if (!waNumber || waNumber.length < 10) return { skip: 'hp tidak valid' };
 
-  // Cari customer di BotWA
-  const customers = await sbGet(`customers?wa_number=eq.${waNumber}&limit=1`);
-  if (!customers.length) return { skip: 'customer tidak ada di BotWA' };
-
-  const customer = customers[0];
+  // Ambil dari map (sudah di-batch fetch), tidak hit DB lagi
+  const customer = customerByWA[waNumber];
+  if (!customer) return { skip: 'customer tidak ada di BotWA' };
   const namaKak  = (customer.nama || '').split(' ')[0]; // ambil dari customers BotWA
 
   // Cari order di orders_new yang belum ada resi
@@ -183,17 +180,27 @@ module.exports = async function handler(req, res) {
 
   try {
     // Ambil order 3 hari terakhir yang sudah ada no_resi
-    // Resi biasanya masuk D+1 atau D+2, jadi 3 hari cukup aman
-    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     const orders = await valGet(
-      `all_orderan?resi=not.is.null&resi=neq.&created_at=gte.${fiveDaysAgo}&order=created_at.desc&limit=500`
+      `all_orderan?resi=not.is.null&resi=neq.&created_at=gte.${threeDaysAgo}&order=created_at.desc&limit=100`
     );
+
+    if (!orders.length) {
+      return res.status(200).json({ ok: true, sent: 0, skipped: 0, errors: 0, detail: [] });
+    }
+
+    // Batch pre-fetch semua customers BotWA sekaligus berdasarkan HP dari validasi
+    const allHPs = [...new Set(orders.map(o => normalizeHP(o.hp || o.no_hp || '')).filter(Boolean))];
+    const customerRows = allHPs.length
+      ? await sbGet(`customers?wa_number=in.(${allHPs.join(',')})&select=id,user_id,wa_number,nama`)
+      : [];
+    const customerByWA = Object.fromEntries(customerRows.map(c => [c.wa_number, c]));
 
     const results = { sent: 0, skipped: 0, errors: 0, detail: [] };
 
     for (const order of orders) {
       try {
-        const result = await processOrder(order);
+        const result = await processOrder(order, customerByWA);
         if (result.sent) {
           results.sent++;
           results.detail.push({ resi: result.resi, wa: result.wa, status: 'sent' });
