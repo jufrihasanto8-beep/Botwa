@@ -138,6 +138,33 @@ function parseOrderEmail(body) {
   };
 }
 
+// ── Parse alamat dari string → JSONB + cek kelengkapan ───
+function parseAlamat(raw) {
+  if (!raw) return { jsonb: null, lengkap: false };
+
+  // Bersihkan tanda "-" tunggal di setiap bagian
+  const parts = raw.split(',').map(p => p.trim()).filter(p => p && p !== '-');
+
+  let jalan = '', kecamatan = '', kabupaten = '', provinsi = '';
+
+  if (parts.length >= 4) {
+    [jalan, kecamatan, kabupaten, provinsi] = parts;
+  } else if (parts.length === 3) {
+    [jalan, kabupaten, provinsi] = parts;
+  } else if (parts.length === 2) {
+    [jalan, kabupaten] = parts;
+  } else {
+    jalan = parts[0] || raw;
+  }
+
+  const jsonb = { jalan, kecamatan, kabupaten, provinsi };
+
+  // Alamat dianggap lengkap kalau minimal ada jalan + kabupaten
+  const lengkap = !!(jalan && kabupaten && jalan.length > 3 && kabupaten.length > 2);
+
+  return { jsonb, lengkap };
+}
+
 // ── Render template dengan variabel ──────────────────────
 function renderTemplate(template, { nama, produk, alamat, hp }) {
   const namaSapa = nama ? nama.split(' ')[0] : 'kak';
@@ -154,51 +181,72 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   const waNumber = normalizeWA(hp);
   const now = new Date().toISOString();
 
-  // Upsert customer
-  const existing = await sbGet('customers', `?user_id=eq.${userId}&wa_number=eq.${waNumber}&limit=1`);
+  // Parse alamat
+  const { jsonb: alamatJsonb, lengkap: alamatLengkap } = parseAlamat(alamat);
+
+  // ── Cek apakah customer sudah ada ───────────────────────
+  const existing    = await sbGet('customers', `?user_id=eq.${userId}&wa_number=eq.${waNumber}&limit=1`);
+  const isNewCustomer = existing.length === 0;
   let customerId;
+
   if (existing.length) {
+    // Customer lama — update data yang kurang saja
     customerId = existing[0].id;
-    if (nama && !existing[0].nama) await sbPatch('customers', `?id=eq.${customerId}`, { nama });
+    const patch = {};
+    if (nama && !existing[0].nama) patch.nama = nama;
+    if (alamatJsonb && !existing[0].alamat?.kabupaten) patch.alamat = alamatJsonb;
+    if (Object.keys(patch).length) await sbPatch('customers', `?id=eq.${customerId}`, patch);
   } else {
+    // Customer baru — insert
     const c = await sbPost('customers', {
       user_id: userId, wa_number: waNumber,
-      nama: nama || null, alamat: alamat ? { jalan: alamat } : null,
+      nama: nama || null, alamat: alamatJsonb || null,
     });
     customerId = c[0]?.id;
   }
 
-  // Upsert conversation
+  // ── Upsert conversation ──────────────────────────────────
   const existingConv = await sbGet('conversations',
     `?user_id=eq.${userId}&wa_number=eq.${waNumber}&order=created_at.desc&limit=1`
   );
   let convId;
+  const convState = {
+    tahap: isNewCustomer ? 'awal' : existingConv[0]?.state?.tahap || 'awal',
+    is_form_lead: true,
+    form_produk: produk || null,
+    form_alamat: alamat || null,
+    alamat_lengkap: alamatLengkap,
+    followed_up: false,
+    order_placed: existingConv[0]?.state?.order_placed || false,
+  };
+
   if (existingConv.length) {
     convId = existingConv[0].id;
     await sbPatch('conversations', `?id=eq.${convId}`, {
-      state: { tahap: 'awal', is_form_lead: true, form_produk: produk || null,
-               form_alamat: alamat || null, followed_up: false, order_placed: false },
-      eskalasi: false, updated_at: now,
+      state: { ...existingConv[0].state, ...convState },
+      updated_at: now,
     });
   } else {
     const c = await sbPost('conversations', {
       user_id: userId, customer_id: customerId || null, wa_number: waNumber,
-      state: { tahap: 'awal', is_form_lead: true, form_produk: produk || null,
-               form_alamat: alamat || null, followed_up: false, order_placed: false },
-      eskalasi: false, created_at: now, updated_at: now,
+      state: convState, eskalasi: false, created_at: now, updated_at: now,
     });
     convId = c[0]?.id;
   }
 
-  // Ambil template dari users table
-  const userRows = await sbGet('users', `?id=eq.${userId}&select=template_form_lead&limit=1`);
-  const tmpl = userRows[0]?.template_form_lead;
+  // ── Customer lama → simpan data saja, tidak kirim WA ────
+  if (!isNewCustomer) {
+    return { waNumber, convId, ok: true, skipped: true, reason: 'customer lama, data diperbarui' };
+  }
 
-  // Kirim WA sapaan
-  const namaSapa  = nama ? nama.split(' ')[0] : 'kak';
-  const produkTxt = produk ? ` untuk *${produk}*` : '';
+  // ── Customer baru → kirim WA template ───────────────────
+  const userRows = await sbGet('users', `?id=eq.${userId}&select=template_form_lead&limit=1`);
+  const tmpl     = userRows[0]?.template_form_lead;
+
+  const namaSapa     = nama ? nama.split(' ')[0] : 'kak';
+  const produkTxt    = produk ? ` untuk *${produk}*` : '';
   const defaultPesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
-  const pesan = tmpl ? renderTemplate(tmpl, { nama, produk, alamat, hp }) : defaultPesan;
+  const pesan        = tmpl ? renderTemplate(tmpl, { nama, produk, alamat, hp }) : defaultPesan;
 
   const br = await fetch(`${BAILEYS_URL}/send`, {
     method: 'POST',
@@ -208,8 +256,9 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   });
 
   if (br.ok && convId) {
-    await sbPost('conv_messages', { conversation_id: convId, role: 'assistant',
-                                    content: pesan, created_at: now }).catch(() => {});
+    await sbPost('conv_messages', {
+      conversation_id: convId, role: 'assistant', content: pesan, created_at: now,
+    }).catch(() => {});
   }
   return { waNumber, convId, ok: br.ok };
 }

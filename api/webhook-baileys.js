@@ -1822,6 +1822,45 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       systemPrompt += ctx;
     }
 
+    // Inject konteks form lead dari orderonline.id / Gmail
+    if (convState.is_form_lead && (convState.form_produk || convState.form_alamat)) {
+      let formCtx = '\n\n[SISTEM - FORM LEAD] Customer ini masuk lewat form order (orderonline.id). Data sudah diketahui dari form — jangan tanya ulang dari nol.';
+
+      if (convState.form_produk) {
+        formCtx += `\n- Produk: ${convState.form_produk} → SUDAH DIKETAHUI, jangan tanya mau beli apa.`;
+      }
+
+      if (convState.form_alamat) {
+        formCtx += `\n- Alamat dari form: "${convState.form_alamat}"`;
+        if (convState.alamat_lengkap) {
+          formCtx += `\n  → Alamat LENGKAP. Tampilkan alamat ini ke customer untuk dikonfirmasi, contoh:`;
+          formCtx += `\n    "Kami konfirmasi alamat pengirimannya ya kak: 📍 ${convState.form_alamat} — sudah benar kak?"`;
+          formCtx += `\n  → Kalau customer bilang benar/iya → langsung proses (hitung ongkir, lanjut order).`;
+          formCtx += `\n  → JANGAN tanya alamat dari awal lagi.`;
+        } else {
+          formCtx += `\n  → Alamat KURANG LENGKAP (belum ada kecamatan/kabupaten).`;
+          formCtx += `\n  → Tampilkan alamat yang ada lalu minta customer melengkapi, contoh:`;
+          formCtx += `\n    "Dari form tadi alamatnya: ${convState.form_alamat} — boleh dilengkapin kak, kecamatan & kota/kabupatennya apa? 🙏"`;
+          formCtx += `\n  → JANGAN minta customer mengulang seluruh alamat dari awal.`;
+        }
+      }
+
+      if (!convState.form_alamat) {
+        formCtx += `\n- Alamat: belum diisi di form → tanyakan alamat lengkap ke customer secara normal.`;
+      }
+
+      formCtx += `\n\nALUR YANG BENAR untuk form lead:`;
+      if (convState.form_alamat) {
+        formCtx += `\n1. Konfirmasi alamat (tampilkan + minta koreksi/persetujuan)`;
+      } else {
+        formCtx += `\n1. Tanyakan alamat lengkap customer`;
+      }
+      formCtx += `\n2. Kalau alamat sudah oke → hitung ongkir → tanyakan metode bayar`;
+      formCtx += `\n3. Proses order seperti biasa`;
+
+      systemPrompt += formCtx;
+    }
+
     if (conversation.ringkasan) {
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
