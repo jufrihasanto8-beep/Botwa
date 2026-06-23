@@ -17,7 +17,7 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const BAILEYS_URL          = process.env.BAILEYS_URL;
 const WEBHOOK_SECRET       = process.env.WEBHOOK_SECRET;
 const CRON_SECRET          = process.env.CRON_SECRET;
-const APP_URL              = 'https://csadys.vercel.app';
+const APP_URL              = 'https://csadsy.vercel.app';
 const REDIRECT_URI         = `${APP_URL}/api/gmail`;
 
 const SCOPE = [
