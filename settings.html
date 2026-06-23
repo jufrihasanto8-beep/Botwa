@@ -404,19 +404,30 @@ Bisa isi lebih dari satu rekening."></textarea>
       <!-- ── Grup WA Recap ── -->
       <div class="settings-section" id="sec-group" style="display:none">
         <div class="section-title">Grup WA Recap Order</div>
-        <div class="section-desc">Setiap ada order closing, bot akan kirim rekap ke grup WA ini. Masukkan JID grup (format: <code style="background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px">120363xxxxxx@g.us</code>).</div>
+        <div class="section-desc">Setiap ada order closing, bot akan kirim rekap ke grup WA ini. Pilih dari daftar grup yang sudah diikuti nomor WA kamu.</div>
 
         <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:16px">
-          <div class="form-group" style="margin-bottom:16px">
-            <label style="font-size:12px;color:#94a3b8;margin-bottom:6px;display:block">JID Grup WhatsApp</label>
-            <input type="text" id="group-jid-input" placeholder="120363xxxxxx@g.us"
-              style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-family:monospace">
+
+          <!-- Grup terpilih -->
+          <div id="group-selected-card" style="display:none;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:12px;color:#64748b;margin-bottom:2px">Grup aktif</div>
+              <div id="group-selected-nama" style="font-weight:600;color:#e2e8f0;font-size:14px">—</div>
+            </div>
+            <button onclick="clearGroupJid()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;padding:4px">✕</button>
           </div>
-          <div style="font-size:12px;color:#64748b;margin-bottom:16px;line-height:1.6">
-            Cara cari JID grup: buka dashboard → lihat URL percakapan grup, atau tanya admin bot untuk cek via log VPS.<br>
-            Contoh: <span style="font-family:monospace;color:#94a3b8">120363427542053258@g.us</span>
+
+          <!-- Tombol load + cari -->
+          <button class="btn" onclick="loadGrupList()" id="btn-load-grup" style="margin-bottom:12px">🔄 Muat Daftar Grup</button>
+
+          <div id="grup-search-area" style="display:none">
+            <input type="text" id="grup-search" placeholder="Cari nama grup..."
+              oninput="filterGrup(this.value)"
+              style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;margin-bottom:10px">
+            <div id="grup-list" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
           </div>
-          <div style="display:flex;align-items:center;gap:10px">
+
+          <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
             <button class="btn-primary" onclick="saveGroupJid()">Simpan</button>
             <span id="group-jid-status" style="font-size:12px;color:#22c55e;display:none">✓ Tersimpan!</span>
           </div>
@@ -1075,20 +1086,84 @@ async function checkBotStatus() {
 checkBotStatus();
 
 /* ── GRUP WA RECAP ── */
+let _selectedGroupJid = null;
+let _allGroups = [];
+
 async function loadGroupJid() {
   try {
     const uid = getUser()?.id;
     if (!uid) return;
-    const rows = await sbFetch(`users?id=eq.${uid}&select=group_jid&limit=1`);
-    const val = rows[0]?.group_jid || '';
-    document.getElementById('group-jid-input').value = val;
+    const rows = await sbFetch(`users?id=eq.${uid}&select=group_jid,group_nama&limit=1`);
+    const jid  = rows[0]?.group_jid  || null;
+    const nama = rows[0]?.group_nama || jid || null;
+    _selectedGroupJid = jid;
+    const card = document.getElementById('group-selected-card');
+    if (jid) {
+      card.style.display = 'flex';
+      document.getElementById('group-selected-nama').textContent = nama;
+    } else {
+      card.style.display = 'none';
+    }
   } catch(e) { console.error('loadGroupJid error', e); }
+}
+
+async function loadGrupList() {
+  const uid = getUser()?.id;
+  const btn = document.getElementById('btn-load-grup');
+  btn.textContent = 'Memuat...';
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${BAILEYS_URL}/groups?secret=${WEBHOOK_SECRET}&session_id=${uid}`);
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error);
+    _allGroups = data.groups;
+    renderGrupList(_allGroups);
+    document.getElementById('grup-search-area').style.display = 'block';
+    btn.textContent = '🔄 Refresh';
+  } catch(e) {
+    btn.textContent = '🔄 Muat Daftar Grup';
+    alert('Gagal muat grup: ' + e.message);
+  }
+  btn.disabled = false;
+}
+
+function filterGrup(q) {
+  const filtered = _allGroups.filter(g => g.nama.toLowerCase().includes(q.toLowerCase()));
+  renderGrupList(filtered);
+}
+
+function renderGrupList(groups) {
+  const el = document.getElementById('grup-list');
+  if (!groups.length) { el.innerHTML = '<div style="color:#64748b;font-size:12px;padding:8px">Tidak ada grup ditemukan</div>'; return; }
+  el.innerHTML = groups.map(g => `
+    <div onclick="pilihGrup('${g.jid}','${g.nama.replace(/'/g,"\\'")}',this)"
+      style="padding:10px 12px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.06);
+             background:${_selectedGroupJid===g.jid?'rgba(59,130,246,.15)':'rgba(255,255,255,.03)'};
+             transition:background .12s"
+      onmouseover="this.style.background='rgba(59,130,246,.1)'"
+      onmouseout="this.style.background='${_selectedGroupJid===g.jid?'rgba(59,130,246,.15)':'rgba(255,255,255,.03)'}'">
+      <div style="font-size:13px;color:#e2e8f0;font-weight:500">${g.nama}</div>
+    </div>
+  `).join('');
+}
+
+function pilihGrup(jid, nama, el) {
+  _selectedGroupJid = jid;
+  const card = document.getElementById('group-selected-card');
+  card.style.display = 'flex';
+  document.getElementById('group-selected-nama').textContent = nama;
+  renderGrupList(_allGroups);
+}
+
+function clearGroupJid() {
+  _selectedGroupJid = null;
+  document.getElementById('group-selected-card').style.display = 'none';
 }
 
 async function saveGroupJid() {
   const uid = getUser()?.id;
-  const val = document.getElementById('group-jid-input').value.trim();
   if (!uid) return;
+  const nama = document.getElementById('group-selected-nama')?.textContent || null;
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}`, {
       method: 'PATCH',
@@ -1098,7 +1173,7 @@ async function saveGroupJid() {
         'Authorization': `Bearer ${getToken()}`,
         'Prefer': 'return=minimal',
       },
-      body: JSON.stringify({ group_jid: val || null }),
+      body: JSON.stringify({ group_jid: _selectedGroupJid || null, group_nama: _selectedGroupJid ? nama : null }),
     });
     const st = document.getElementById('group-jid-status');
     st.style.display = 'inline';
