@@ -13,8 +13,17 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const path = req.query.path || '/health';
-  const url  = BAILEYS_URL + path;
+  const path       = req.query.path || '/health';
+  const session_id = req.query.session_id || '';
+
+  // Inject secret + session_id ke URL untuk GET, ke body untuk POST
+  let url;
+  if (req.method === 'GET') {
+    const sep = path.includes('?') ? '&' : '?';
+    url = BAILEYS_URL + path + sep + `secret=${WEBHOOK_SECRET}` + (session_id ? `&session_id=${session_id}` : '');
+  } else {
+    url = BAILEYS_URL + path;
+  }
 
   try {
     const fetchOpts = {
