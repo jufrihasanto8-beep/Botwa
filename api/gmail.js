@@ -273,7 +273,7 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
         ? `⚠️ Nomor ${waNumber} tidak terdaftar di WhatsApp. Pesan tidak terkirim.`
         : `⚠️ Gagal kirim WA ke ${waNumber}: ${errMsg || 'Unknown error'}`;
       await sbPost('conv_messages', {
-        conversation_id: convId, role: 'system', isi: infoMsg,
+        conversation_id: convId, role: 'cs', isi: infoMsg,
       }).catch(() => {});
       if (notRegistered) {
         await sbPatch('conversations', `?id=eq.${convId}`, {
@@ -282,7 +282,7 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
       }
     } else {
       const saveResult = await sbPost('conv_messages', {
-        conversation_id: convId, role: 'assistant', isi: pesan,
+        conversation_id: convId, role: 'ai', isi: pesan,
       }).catch(e => ({ _err: e.message }));
       const saveErr = saveResult?._err || null;
       if (saveErr) console.error('[gmail] conv_messages save error:', saveErr);
