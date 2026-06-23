@@ -530,6 +530,9 @@ async function getContextMessages(conversationId, afterTimestamp = null) {
   // Harus mulai dari 'user'
   if (result.length && result[0].role === 'assistant') result.shift();
 
+  // Harus diakhiri 'user' (Claude API tidak boleh berakhir dengan assistant)
+  while (result.length && result[result.length - 1].role === 'assistant') result.pop();
+
   return result;
 }
 
@@ -1058,7 +1061,7 @@ async function sendWA(sessionId, waNumber, message, isOutbound = false, imageUrl
       image_url: imageUrl || undefined,
       caption: caption || undefined,
     }),
-  }, 15000); // 15 detik untuk gambar
+  }, 30000); // 30 detik (text + gambar)
   if (!res.ok) throw new Error(`Baileys send error: ${await res.text()}`);
   return res.json();
 }
@@ -2154,7 +2157,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     // Tapi hanya proses kalau ada kata kunci intent lokasi (biar tidak terlalu agresif)
     const intentLokasi = /\b(kirim|alamat|tujuan|lokasi|daerah|wilayah|kecamatan|kelurahan|kota|kabupaten|ganti|pindah|bukan|salah)\b/i.test(message);
 
-    if (!isConfirmation(message) && message.length >= 3 && message.length <= 60 && (intentLokasi || !convState.ongkir)) {
+    const sapaanUmum = /^(kak|min|halo|hai|hi|hei|p|permisi|ada|bang|bos|gan|mba|mbak|bu|pak|om|teh|neng|mas)\s*[?!.]*$/i.test(message.trim());
+    if (!isConfirmation(message) && !sapaanUmum && message.length >= 5 && message.length <= 60 && (intentLokasi || !convState.ongkir)) {
       // Coba cari wilayah dari pesan customer langsung
       const pesanBersih = cleanKelInput(message) || message.replace(/[?!.,]+/g, '').trim();
       const cariHasil = await cariWilayah(pesanBersih, 20);
@@ -2276,6 +2280,11 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         history.push({ role: 'user', content: hint });
         console.log(`[metode-hint] ${pilihCOD ? 'COD' : 'Transfer'} — inject total reminder`);
       }
+    }
+
+    // Safety: pastikan history tidak berakhir dengan assistant sebelum call Claude
+    if (!history.length || history[history.length - 1].role === 'assistant') {
+      history.push({ role: 'user', content: message || '[pesan customer]' });
     }
 
     let rawReply;
@@ -2942,12 +2951,15 @@ ${ongkirInfo}`;
       }
     }
 
-    res.status(200).json({ ok: true });
+    // ── Update ringkasan berjalan (setiap 5 pesan) ──
+    try {
+      const allMsgs = await sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`);
+      if (allMsgs.length % 5 === 0) await updateRingkasan(conversation.id);
+    } catch(e) {
+      console.error('Ringkasan error:', e.message);
+    }
 
-    // ── Update ringkasan berjalan (non-blocking, setiap 5 pesan) ──
-    sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`)
-      .then(all => { if (all.length % 5 === 0) updateRingkasan(conversation.id); })
-      .catch(e => console.error('Ringkasan fetch error:', e.message));
+    res.status(200).json({ ok: true });
 
   } catch (err) {
     console.error('Webhook error:', err.message, err.stack);
