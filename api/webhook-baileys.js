@@ -274,7 +274,8 @@ Sumber chat     : ${sumber === 'ctwa' ? 'CTWA (dari iklan)' : sumber === 'form' 
 Produk          : ${namaProduk}
 Harga           : ${harga}${bundlingTxt ? `
 Paket bundling  : ${bundlingTxt}
-⚡ TAWARKAN PAKET: Prioritaskan tawarkan paket bundling (lebih hemat) saat customer mau order. Kalau customer tidak minta spesifik, rekomendasikan paket terbesar yang relevan dengan keluhannya.` : ''}
+⚡ TAWARKAN PAKET: Prioritaskan tawarkan paket bundling saat customer mau order. Rekomendasikan paket terbesar yang relevan dengan keluhannya.
+⚡ HARGA ORDER: Kalau customer pilih qty yang ada di paket bundling, WAJIB pakai harga bundling di [ORDER_DATA], BUKAN harga satuan × qty. Contoh: customer pilih 4 box → harga=400000 (bukan 480000). Kalau customer pilih qty yang tidak ada di paket bundling → pakai harga satuan × qty.` : ''}
 Cocok untuk     : ${keluhan}
 Cara pakai      : ${product?.cara_pakai || '(lihat kemasan)'}
 Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
