@@ -1104,7 +1104,7 @@ async function loadGroupJid() {
     const uid = Auth.getUser()?.id;
     if (!uid) return;
     const rows = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=group_jid,group_nama&limit=1`, {
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${Auth.getToken()}` }
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.json());
     const jid  = rows[0]?.group_jid  || null;
     const nama = rows[0]?.group_nama || jid || null;
