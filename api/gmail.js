@@ -400,9 +400,19 @@ module.exports = async function handler(req, res) {
               const orderData = parseOrderEmail(emailBody);
               if (!orderData.hp) { await markAsRead(token, msg.id); continue; }
 
-              await processLead(user.id, orderData);
+              const leadResult = await processLead(user.id, orderData);
               await markAsRead(token, msg.id);
               log.processed++;
+              if (!log.details) log.details = [];
+              log.details.push({
+                hp: orderData.hp,
+                nama: orderData.nama,
+                wa_sent: leadResult.ok && !leadResult.skipped,
+                skipped: leadResult.skipped || false,
+                skip_reason: leadResult.reason || null,
+                not_registered: leadResult.not_registered || false,
+                send_error: leadResult.send_error || null,
+              });
             } catch(e) {
               log.errors.push({ msg_id: msg.id, error: e.message });
               try { await markAsRead(token, msg.id); } catch(_) {}
