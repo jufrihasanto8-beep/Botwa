@@ -358,18 +358,25 @@ Bisa isi lebih dari satu rekening."></textarea>
         </div>
 
         <!-- Template Pesan -->
-        <div style="margin-top:24px">
+        <div style="margin-top:24px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px">
           <div style="font-weight:600;font-size:14px;color:#f1f5f9;margin-bottom:4px">Template Pesan WA</div>
-          <div style="font-size:12px;color:#64748b;margin-bottom:12px">
-            Pesan pertama yang dikirim ke customer saat ada order masuk.
-            Variabel: <code style="background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px;color:#93c5fd">{nama}</code>
-            <code style="background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px;color:#93c5fd">{produk}</code>
+          <div style="font-size:12px;color:#64748b;margin-bottom:14px">Pesan pertama yang dikirim ke customer saat ada order masuk.</div>
+
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+            <span style="font-size:11px;color:#94a3b8;align-self:center">Variabel:</span>
+            <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:3px 8px;border-radius:6px;color:#a5b4fc;font-size:12px;cursor:pointer" onclick="insertVar('{nama}')">{nama}</code>
+            <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:3px 8px;border-radius:6px;color:#a5b4fc;font-size:12px;cursor:pointer" onclick="insertVar('{produk}')">{produk}</code>
+            <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:3px 8px;border-radius:6px;color:#a5b4fc;font-size:12px;cursor:pointer" onclick="insertVar('{alamat}')">{alamat}</code>
+            <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:3px 8px;border-radius:6px;color:#a5b4fc;font-size:12px;cursor:pointer" onclick="insertVar('{wa}')">{wa}</code>
           </div>
-          <textarea id="template-form-lead" rows="5" placeholder="Halo {nama} 👋&#10;&#10;Terima kasih sudah order {produk}! 🙏&#10;Kami segera proses pesanan kakak ya."
-            style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;line-height:1.6;resize:vertical;font-family:inherit"></textarea>
+
+          <textarea id="template-form-lead" rows="6"
+            placeholder="Halo {nama} 👋&#10;&#10;Terima kasih sudah order {produk}! 🙏&#10;Kami segera proses pesanan kakak ya."
+            style="width:100%;background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;line-height:1.7;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
+
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
-            <div style="font-size:11px;color:#475569">Kosongkan = pakai template default</div>
-            <button onclick="saveTemplateFormLead()" style="padding:8px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+            <div style="font-size:11px;color:#475569">💡 Klik variabel di atas untuk menyisipkan. Kosongkan = pakai template default.</div>
+            <button onclick="saveTemplateFormLead()" style="padding:8px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
               Simpan Template
             </button>
           </div>
@@ -610,6 +617,14 @@ window.showSection = function(name, el) {
 };
 
 /* ── GMAIL INTEGRATION ── */
+function insertVar(v) {
+  const ta  = document.getElementById('template-form-lead');
+  const pos = ta.selectionStart;
+  ta.value  = ta.value.slice(0, pos) + v + ta.value.slice(ta.selectionEnd);
+  ta.selectionStart = ta.selectionEnd = pos + v.length;
+  ta.focus();
+}
+
 async function loadTemplateFormLead() {
   const userId = Auth.getUser()?.id;
   try {
