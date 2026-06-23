@@ -256,12 +256,35 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
                            wa_number: waNumber, message: pesan, is_outbound: true }),
   });
 
-  if (br.ok && convId) {
-    await sbPost('conv_messages', {
-      conversation_id: convId, role: 'assistant', isi: pesan,
-    }).catch(() => {});
+  const brBody = await br.json().catch(() => ({}));
+  const sendFailed = !br.ok;
+  const errMsg = brBody?.error || '';
+  const notRegistered = sendFailed && (
+    errMsg.includes('not registered') ||
+    errMsg.includes('not on WhatsApp') ||
+    errMsg.includes('No account')
+  );
+
+  if (convId) {
+    if (sendFailed) {
+      const infoMsg = notRegistered
+        ? `⚠️ Nomor ${waNumber} tidak terdaftar di WhatsApp. Pesan tidak terkirim.`
+        : `⚠️ Gagal kirim WA ke ${waNumber}: ${errMsg || 'Unknown error'}`;
+      await sbPost('conv_messages', {
+        conversation_id: convId, role: 'system', isi: infoMsg,
+      }).catch(() => {});
+      if (notRegistered) {
+        await sbPatch('conversations', `?id=eq.${convId}`, {
+          state: { ...convState, wa_not_registered: true },
+        }).catch(() => {});
+      }
+    } else {
+      await sbPost('conv_messages', {
+        conversation_id: convId, role: 'assistant', isi: pesan,
+      }).catch(() => {});
+    }
   }
-  return { waNumber, convId, ok: br.ok };
+  return { waNumber, convId, ok: !sendFailed, not_registered: notRegistered, send_error: sendFailed ? errMsg : null };
 }
 
 // ═══════════════════════════════════════════════════════════
