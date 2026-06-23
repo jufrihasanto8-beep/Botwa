@@ -216,6 +216,7 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
       <a href="#" onclick="showSection('rekening',this)">💳 Rekening Transfer</a>
       <a href="#" onclick="showSection('kurir',this)">🚚 Ekspedisi</a>
       <a href="#" onclick="showSection('ai',this)">🤖 AI Key</a>
+      <a href="#" onclick="showSection('gmail',this)">📧 Integrasi Gmail</a>
     </div>
 
     <div class="settings-body">
@@ -337,6 +338,24 @@ Bisa isi lebih dari satu rekening."></textarea>
           <div style="color:#64748b;font-size:13px;padding:12px 0;grid-column:1/-1">Memuat...</div>
         </div>
         <p class="hint" style="margin-top:4px">💡 Kalau semua dimatikan, sistem pilih kurir termurah secara otomatis dari Mengantar.</p>
+      </div>
+
+      <!-- ── Gmail Integration ── -->
+      <div class="settings-section" id="sec-gmail">
+        <div class="section-title">Integrasi Gmail</div>
+        <div class="section-desc">Hubungkan Gmail untuk menerima order dari orderonline.id secara otomatis. Bot akan langsung kirim WA ke customer tanpa perlu klik manual.</div>
+
+        <div id="gmail-status-card" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:16px">
+          <div style="color:#64748b;font-size:13px">Memuat status...</div>
+        </div>
+
+        <div style="margin-top:16px;padding:14px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:10px">
+          <div style="font-size:12px;color:#93c5fd;font-weight:600;margin-bottom:6px">ℹ️ Cara kerja</div>
+          <div style="font-size:12px;color:#94a3b8;line-height:1.6">
+            Setelah hubungkan Gmail, sistem otomatis cek email baru dari orderonline.id setiap 5 menit.
+            Saat ada pesanan masuk, bot langsung kirim WA ke customer — tanpa perlu klik apapun.
+          </div>
+        </div>
       </div>
 
     </div><!-- settings-body -->
@@ -569,7 +588,101 @@ window.showSection = function(name, el) {
   if (name === 'kurir') loadKurir();
   if (name === 'rekening') loadRekening();
   if (name === 'ai') loadAnthropicKey();
+  if (name === 'gmail') loadGmailStatus();
 };
+
+/* ── GMAIL INTEGRATION ── */
+async function loadGmailStatus() {
+  const userId = Auth.getUser()?.id;
+  const card   = document.getElementById('gmail-status-card');
+  if (!card) return;
+
+  try {
+    const res  = await fetch(`/api/gmail?action=status&user_id=${userId}`);
+    const data = await res.json();
+
+    if (data.connected) {
+      const lastCheck = data.gmail_last_checked
+        ? new Date(data.gmail_last_checked).toLocaleString('id-ID')
+        : 'Belum pernah';
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:44px;height:44px;background:rgba(34,197,94,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📧</div>
+            <div>
+              <div style="font-weight:600;font-size:14px;color:#f1f5f9">${data.gmail_email}</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span>
+                <span style="font-size:12px;color:#86efac;font-weight:500">Terhubung</span>
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px">Terakhir cek: ${lastCheck}</div>
+            </div>
+          </div>
+          <button onclick="disconnectGmail()" style="padding:8px 16px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
+            Putuskan Gmail
+          </button>
+        </div>`;
+    } else {
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:44px;height:44px;background:rgba(255,255,255,.06);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📧</div>
+            <div>
+              <div style="font-weight:600;font-size:14px;color:#f1f5f9">Gmail belum terhubung</div>
+              <div style="font-size:12px;color:#64748b;margin-top:3px">Hubungkan Gmail untuk auto follow-up order masuk</div>
+            </div>
+          </div>
+          <button onclick="connectGmail()" style="padding:10px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+            + Hubungkan Gmail
+          </button>
+        </div>`;
+    }
+  } catch(e) {
+    card.innerHTML = `<div style="color:#fca5a5;font-size:13px">❌ Gagal cek status: ${e.message}</div>`;
+  }
+}
+
+async function connectGmail() {
+  const userId = Auth.getUser()?.id;
+  try {
+    const res  = await fetch(`/api/gmail?action=url&user_id=${userId}`);
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+    else toast('❌ Gagal mendapatkan URL login');
+  } catch(e) { toast('❌ Error: ' + e.message); }
+}
+
+async function disconnectGmail() {
+  if (!confirm('Putuskan Gmail dari BotWA?\nBot tidak akan lagi auto follow-up order masuk.')) return;
+  const userId = Auth.getUser()?.id;
+  try {
+    await fetch(`/api/gmail?action=disconnect&user_id=${userId}`);
+    toast('✅ Gmail berhasil diputus');
+    loadGmailStatus();
+  } catch(e) { toast('❌ Gagal: ' + e.message); }
+}
+
+// Cek hasil OAuth saat kembali dari Google
+(function checkGmailCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const gmail  = params.get('gmail');
+  if (!gmail) return;
+  // Bersihkan URL
+  history.replaceState({}, '', window.location.pathname);
+  if (gmail === 'success') {
+    const email = params.get('email') || '';
+    toast(`✅ Gmail ${email} berhasil terhubung!`);
+    // Otomatis buka tab Gmail
+    setTimeout(() => {
+      const gmailNav = document.querySelector('[onclick*="showSection(\'gmail\'"]');
+      if (gmailNav) gmailNav.click();
+    }, 500);
+  } else if (gmail === 'cancelled') {
+    toast('ℹ️ Koneksi Gmail dibatalkan');
+  } else {
+    toast('❌ Gagal hubungkan Gmail. Coba lagi.');
+  }
+})();
 
 /* ── REKENING TRANSFER ── */
 function showRekeningCard(rek) {

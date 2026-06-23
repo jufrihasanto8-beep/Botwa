@@ -28,6 +28,9 @@
     },
     "api/tracking.js": {
       "maxDuration": 60
+    },
+    "api/gmail.js": {
+      "maxDuration": 60
     }
   },
   "crons": []
