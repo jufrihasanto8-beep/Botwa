@@ -174,6 +174,16 @@ body.light .gmail-info-box{background:rgba(59,130,246,.04)!important;border-colo
 body.light .gmail-info-box *{color:#475569!important}
 body.light #sec-gmail .section-title{color:#0f172a}
 body.light #sec-gmail .section-desc{color:#64748b}
+body.light #sec-group .section-title{color:#0f172a}
+body.light #sec-group .section-desc{color:#475569}
+body.light #grup-search{background:#fff!important;color:#0f172a!important;border-color:#e2e8f0!important}
+body.light #grup-list > div{background:rgba(0,0,0,.02)!important;border-color:#e2e8f0!important;color:#0f172a!important}
+body.light #grup-list > div:hover{background:rgba(59,130,246,.08)!important}
+body.light #group-selected-card{background:rgba(34,197,94,.06)!important;border-color:rgba(34,197,94,.25)!important}
+body.light #group-selected-nama{color:#0f172a!important}
+body.light #sec-group .form-group label{color:#475569}
+.grup-item-nama{color:#e2e8f0}
+body.light .grup-item-nama{color:#0f172a}
 </style>
 </head>
 <body>
@@ -1144,7 +1154,7 @@ function renderGrupList(groups) {
              transition:background .12s"
       onmouseover="this.style.background='rgba(59,130,246,.1)'"
       onmouseout="this.style.background='${_selectedGroupJid===g.jid?'rgba(59,130,246,.15)':'rgba(255,255,255,.03)'}'">
-      <div style="font-size:13px;color:#e2e8f0;font-weight:500">${g.nama}</div>
+      <div class="grup-item-nama" style="font-size:13px;font-weight:500">${g.nama}</div>
     </div>
   `).join('');
 }
