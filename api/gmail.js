@@ -206,9 +206,10 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   }
 
   // ── Upsert conversation ──────────────────────────────────
-  const existingConv = await sbGet('conversations',
-    `?user_id=eq.${userId}&wa_number=eq.${waNumber}&order=created_at.desc&limit=1`
-  );
+  const existingConv = customerId ? await sbGet('conversations',
+    `?user_id=eq.${userId}&customer_id=eq.${customerId}&order=created_at.desc&limit=1`
+  ) : [];
+
   let convId;
   const convState = {
     tahap: isNewCustomer ? 'awal' : existingConv[0]?.state?.tahap || 'awal',
@@ -228,7 +229,7 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
     });
   } else {
     const c = await sbPost('conversations', {
-      user_id: userId, customer_id: customerId || null, wa_number: waNumber,
+      user_id: userId, customer_id: customerId || null,
       state: convState, eskalasi: false, created_at: now, updated_at: now,
     });
     convId = c[0]?.id;
