@@ -231,6 +231,7 @@ body.light .fu-stage-label{color:#0f172a}
 body.light .fu-stage-desc{color:#94a3b8}
 body.light .fu-field label{color:#94a3b8}
 body.light .fu-field input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+body.light #bundling-rows input{background:#f8fafc!important;border-color:#e2e8f0!important;color:#0f172a!important}
 body.light .fu-save-bar{border-color:#e2e8f0}
 body.light .fu-save-hint{color:#94a3b8}
 body.light .fu-msg-area{border-color:#f1f5f9}
@@ -422,7 +423,7 @@ body.light .fu-msg-lbl{color:#94a3b8}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
-            <label>Harga (Rp) *</label>
+            <label>Harga Satuan (Rp) *</label>
             <input type="number" id="f-harga" placeholder="150000">
           </div>
           <div class="form-group">
@@ -432,6 +433,16 @@ body.light .fu-msg-lbl{color:#94a3b8}
               <option value="false">Nonaktif</option>
             </select>
           </div>
+        </div>
+
+        <!-- Paket Bundling -->
+        <div class="form-group">
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            <span>Paket Harga Bundling</span>
+            <button type="button" onclick="tambahPaket()" style="font-size:11px;padding:4px 10px;border:1px solid rgba(59,130,246,.4);background:rgba(59,130,246,.1);color:#93c5fd;border-radius:6px;cursor:pointer">+ Tambah Paket</button>
+          </label>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px">Contoh: 2 box → Rp 220.000, 4 box → Rp 400.000. Bot akan tawarkan paket ini ke customer.</div>
+          <div id="bundling-rows" style="display:flex;flex-direction:column;gap:6px"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
@@ -889,6 +900,39 @@ function formatPromo(promo) {
   return '-';
 }
 
+/* ── Bundling ── */
+function tambahPaket(qty = '', harga = '') {
+  const wrap = document.getElementById('bundling-rows');
+  const row  = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center';
+  row.innerHTML = `
+    <input type="number" placeholder="Jumlah (qty)" value="${qty}"
+      style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
+    <input type="number" placeholder="Harga (Rp)" value="${harga}"
+      style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
+    <button type="button" onclick="this.closest('div').remove()"
+      style="padding:7px 10px;border:1px solid rgba(248,113,113,.2);background:none;color:#f87171;border-radius:6px;cursor:pointer;font-size:13px">✕</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function getBundlingData() {
+  const rows = document.querySelectorAll('#bundling-rows > div');
+  const result = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const qty   = parseInt(inputs[0].value);
+    const harga = parseInt(inputs[1].value);
+    if (qty > 0 && harga > 0) result.push({ qty, harga });
+  });
+  return result.length ? result.sort((a, b) => a.qty - b.qty) : null;
+}
+
+function loadBundling(data) {
+  document.getElementById('bundling-rows').innerHTML = '';
+  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga));
+}
+
 /* ── Modal Produk ── */
 function openAdd() {
   editId = null;
@@ -897,6 +941,7 @@ function openAdd() {
   document.getElementById('modal-title').textContent = 'Tambah Produk';
   document.getElementById('f-nama').value = '';
   document.getElementById('f-harga').value = '';
+  loadBundling([]);
   document.getElementById('f-aktif').value = 'true';
   document.getElementById('f-berat').value = '500';
   document.getElementById('f-cara-pakai').value = '';
@@ -926,6 +971,7 @@ async function openEdit(id) {
   document.getElementById('f-nama').value = p.nama || '';
   document.getElementById('f-harga').value = p.harga || '';
   document.getElementById('f-aktif').value = String(p.aktif);
+  loadBundling(p.harga_bundling || []);
   document.getElementById('f-berat').value = p.berat_gram || 500;
   document.getElementById('f-cara-pakai').value = p.cara_pakai || '';
   document.getElementById('f-asal-pengiriman').value = p.asal_pengiriman || '';
@@ -1087,6 +1133,7 @@ async function saveProduk() {
       nilai_jawa: parseFloat(document.getElementById('f-promo-jawa').value) || 0,
       nilai_luar: parseFloat(document.getElementById('f-promo-luar').value) || 0,
     },
+    harga_bundling: getBundlingData(),
   };
 
   try {
