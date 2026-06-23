@@ -231,6 +231,7 @@ body.light #sec-gmail .section-desc{color:#64748b}
       <a href="#" onclick="showSection('kurir',this)">🚚 Ekspedisi</a>
       <a href="#" onclick="showSection('ai',this)">🤖 AI Key</a>
       <a href="#" onclick="showSection('gmail',this)">📧 Integrasi Gmail</a>
+      <a href="#" onclick="showSection('group',this)">💬 Grup WA Recap</a>
     </div>
 
     <div class="settings-body">
@@ -396,6 +397,28 @@ Bisa isi lebih dari satu rekening."></textarea>
             <button id="btn-save-template" onclick="saveTemplateFormLead()" style="padding:8px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .3s">
               Simpan Template
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Grup WA Recap ── -->
+      <div class="settings-section" id="sec-group" style="display:none">
+        <div class="section-title">Grup WA Recap Order</div>
+        <div class="section-desc">Setiap ada order closing, bot akan kirim rekap ke grup WA ini. Masukkan JID grup (format: <code style="background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px">120363xxxxxx@g.us</code>).</div>
+
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:16px">
+          <div class="form-group" style="margin-bottom:16px">
+            <label style="font-size:12px;color:#94a3b8;margin-bottom:6px;display:block">JID Grup WhatsApp</label>
+            <input type="text" id="group-jid-input" placeholder="120363xxxxxx@g.us"
+              style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-family:monospace">
+          </div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:16px;line-height:1.6">
+            Cara cari JID grup: buka dashboard → lihat URL percakapan grup, atau tanya admin bot untuk cek via log VPS.<br>
+            Contoh: <span style="font-family:monospace;color:#94a3b8">120363427542053258@g.us</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn-primary" onclick="saveGroupJid()">Simpan</button>
+            <span id="group-jid-status" style="font-size:12px;color:#22c55e;display:none">✓ Tersimpan!</span>
           </div>
         </div>
       </div>
@@ -631,6 +654,7 @@ window.showSection = function(name, el) {
   if (name === 'rekening') loadRekening();
   if (name === 'ai') loadAnthropicKey();
   if (name === 'gmail') { loadGmailStatus(); loadTemplateFormLead(); }
+  if (name === 'group') loadGroupJid();
 };
 
 /* ── GMAIL INTEGRATION ── */
@@ -1049,6 +1073,40 @@ async function checkBotStatus() {
   }
 }
 checkBotStatus();
+
+/* ── GRUP WA RECAP ── */
+async function loadGroupJid() {
+  try {
+    const uid = getUser()?.id;
+    if (!uid) return;
+    const rows = await sbFetch(`users?id=eq.${uid}&select=group_jid&limit=1`);
+    const val = rows[0]?.group_jid || '';
+    document.getElementById('group-jid-input').value = val;
+  } catch(e) { console.error('loadGroupJid error', e); }
+}
+
+async function saveGroupJid() {
+  const uid = getUser()?.id;
+  const val = document.getElementById('group-jid-input').value.trim();
+  if (!uid) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${getToken()}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ group_jid: val || null }),
+    });
+    const st = document.getElementById('group-jid-status');
+    st.style.display = 'inline';
+    setTimeout(() => st.style.display = 'none', 2500);
+  } catch(e) {
+    alert('Gagal simpan: ' + e.message);
+  }
+}
 </script>
 </body>
 </html>
