@@ -138,6 +138,16 @@ function parseOrderEmail(body) {
   };
 }
 
+// ── Render template dengan variabel {nama} {produk} ──────
+function renderTemplate(template, { nama, produk }) {
+  const namaSapa  = nama ? nama.split(' ')[0] : 'kak';
+  const produkTxt = produk || '';
+  return template
+    .replace(/\{nama\}/gi, namaSapa)
+    .replace(/\{produk\}/gi, produkTxt)
+    .trim();
+}
+
 // ── Proses satu order lead (shared oleh poller & form-lead) ──
 async function processLead(userId, { nama, hp, alamat, produk }) {
   const waNumber = normalizeWA(hp);
@@ -179,10 +189,15 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
     convId = c[0]?.id;
   }
 
+  // Ambil template dari users table
+  const userRows = await sbGet('users', `?id=eq.${userId}&select=template_form_lead&limit=1`);
+  const tmpl = userRows[0]?.template_form_lead;
+
   // Kirim WA sapaan
   const namaSapa  = nama ? nama.split(' ')[0] : 'kak';
   const produkTxt = produk ? ` untuk *${produk}*` : '';
-  const pesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
+  const defaultPesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
+  const pesan = tmpl ? renderTemplate(tmpl, { nama, produk }) : defaultPesan;
 
   const br = await fetch(`${BAILEYS_URL}/send`, {
     method: 'POST',
