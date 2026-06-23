@@ -356,6 +356,24 @@ Bisa isi lebih dari satu rekening."></textarea>
             Saat ada pesanan masuk, bot langsung kirim WA ke customer — tanpa perlu klik apapun.
           </div>
         </div>
+
+        <!-- Template Pesan -->
+        <div style="margin-top:24px">
+          <div style="font-weight:600;font-size:14px;color:#f1f5f9;margin-bottom:4px">Template Pesan WA</div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+            Pesan pertama yang dikirim ke customer saat ada order masuk.
+            Variabel: <code style="background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px;color:#93c5fd">{nama}</code>
+            <code style="background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px;color:#93c5fd">{produk}</code>
+          </div>
+          <textarea id="template-form-lead" rows="5" placeholder="Halo {nama} 👋&#10;&#10;Terima kasih sudah order {produk}! 🙏&#10;Kami segera proses pesanan kakak ya."
+            style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;line-height:1.6;resize:vertical;font-family:inherit"></textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
+            <div style="font-size:11px;color:#475569">Kosongkan = pakai template default</div>
+            <button onclick="saveTemplateFormLead()" style="padding:8px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+              Simpan Template
+            </button>
+          </div>
+        </div>
       </div>
 
     </div><!-- settings-body -->
@@ -588,10 +606,41 @@ window.showSection = function(name, el) {
   if (name === 'kurir') loadKurir();
   if (name === 'rekening') loadRekening();
   if (name === 'ai') loadAnthropicKey();
-  if (name === 'gmail') loadGmailStatus();
+  if (name === 'gmail') { loadGmailStatus(); loadTemplateFormLead(); }
 };
 
 /* ── GMAIL INTEGRATION ── */
+async function loadTemplateFormLead() {
+  const userId = Auth.getUser()?.id;
+  try {
+    const res  = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=template_form_lead`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    const rows = await res.json();
+    const tmpl = rows[0]?.template_form_lead || '';
+    document.getElementById('template-form-lead').value = tmpl;
+  } catch(e) { console.error('loadTemplateFormLead:', e); }
+}
+
+async function saveTemplateFormLead() {
+  const userId = Auth.getUser()?.id;
+  const tmpl   = document.getElementById('template-form-lead').value.trim();
+  try {
+    const res = await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        table: 'users_template',
+        payload: { template_form_lead: tmpl || null },
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) toast('✅ Template berhasil disimpan');
+    else toast('❌ Gagal simpan: ' + (data.error || ''));
+  } catch(e) { toast('❌ Error: ' + e.message); }
+}
+
 async function loadGmailStatus() {
   const userId = Auth.getUser()?.id;
   const card   = document.getElementById('gmail-status-card');
