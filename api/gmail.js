@@ -258,7 +258,7 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
 
   if (br.ok && convId) {
     await sbPost('conv_messages', {
-      conversation_id: convId, role: 'assistant', content: pesan, created_at: now,
+      conversation_id: convId, role: 'assistant', isi: pesan,
     }).catch(() => {});
   }
   return { waNumber, convId, ok: br.ok };
