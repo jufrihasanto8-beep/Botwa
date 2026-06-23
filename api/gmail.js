@@ -225,12 +225,12 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
     convId = existingConv[0].id;
     await sbPatch('conversations', `?id=eq.${convId}`, {
       state: { ...existingConv[0].state, ...convState },
-      updated_at: now,
     });
   } else {
     const c = await sbPost('conversations', {
       user_id: userId, customer_id: customerId || null,
-      state: convState, created_at: now, updated_at: now,
+      sumber: 'form', status: 'baru', prioritas: 'high',
+      state: convState,
     });
     convId = c[0]?.id;
   }
