@@ -389,8 +389,11 @@ Bisa isi lebih dari satu rekening."></textarea>
             style="width:100%;background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;line-height:1.7;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
 
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
-            <div class="gi-sub" style="font-size:11px">💡 Klik variabel di atas untuk menyisipkan. Kosongkan = pakai template default.</div>
-            <button onclick="saveTemplateFormLead()" style="padding:8px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+            <div>
+              <div class="gi-sub" style="font-size:11px">💡 Klik variabel di atas untuk menyisipkan. Kosongkan = pakai template default.</div>
+              <div id="template-save-status" style="font-size:11px;margin-top:4px;color:#64748b"></div>
+            </div>
+            <button id="btn-save-template" onclick="saveTemplateFormLead()" style="padding:8px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .3s">
               Simpan Template
             </button>
           </div>
@@ -646,14 +649,25 @@ async function loadTemplateFormLead() {
       headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
     });
     const rows = await res.json();
-    const tmpl = rows[0]?.template_form_lead || '';
+    const tmpl   = rows[0]?.template_form_lead || '';
+    const status = document.getElementById('template-save-status');
     document.getElementById('template-form-lead').value = tmpl;
+    if (status) {
+      status.textContent = tmpl ? '✓ Template aktif' : 'Menggunakan template default';
+      status.style.color = tmpl ? '#22c55e' : '#64748b';
+    }
   } catch(e) { console.error('loadTemplateFormLead:', e); }
 }
 
 async function saveTemplateFormLead() {
   const userId = Auth.getUser()?.id;
   const tmpl   = document.getElementById('template-form-lead').value.trim();
+  const btn    = document.getElementById('btn-save-template');
+  const status = document.getElementById('template-save-status');
+
+  btn.disabled    = true;
+  btn.textContent = 'Menyimpan...';
+
   try {
     const res = await fetch('/api/save-settings', {
       method: 'POST',
@@ -665,9 +679,26 @@ async function saveTemplateFormLead() {
       }),
     });
     const data = await res.json();
-    if (data.ok) toast('✅ Template berhasil disimpan');
-    else toast('❌ Gagal simpan: ' + (data.error || ''));
-  } catch(e) { toast('❌ Error: ' + e.message); }
+    if (data.ok) {
+      btn.textContent      = '✓ Tersimpan!';
+      btn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
+      status.textContent   = tmpl ? '✓ Template aktif' : '✓ Menggunakan template default';
+      status.style.color   = '#22c55e';
+      setTimeout(() => {
+        btn.textContent      = 'Simpan Template';
+        btn.style.background = '';
+        btn.disabled         = false;
+      }, 2500);
+    } else {
+      btn.textContent = 'Simpan Template';
+      btn.disabled    = false;
+      toast('❌ Gagal simpan: ' + (data.error || ''));
+    }
+  } catch(e) {
+    btn.textContent = 'Simpan Template';
+    btn.disabled    = false;
+    toast('❌ Error: ' + e.message);
+  }
 }
 
 async function loadGmailStatus() {
