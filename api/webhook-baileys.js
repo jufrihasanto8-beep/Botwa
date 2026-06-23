@@ -503,11 +503,11 @@ function formatPromoOngkir(promo) {
 }
 
 /* ── GET HISTORY & CONTEXT INJECTION ─────────────────────── */
-async function getContextMessages(conversationId, afterTimestamp = null) {
-  // Ambil 30 pesan TERAKHIR — cukup untuk konteks panjang tanpa terlalu boros token
+async function getContextMessages(conversationId, afterTimestamp = null, limit = 20) {
+  // Ambil N pesan TERAKHIR — caller bisa set limit lebih kecil kalau ada ringkasan
   const timeFilter = afterTimestamp ? `&created_at=gte.${encodeURIComponent(afterTimestamp)}` : '';
   const msgs = await sbGet('conv_messages',
-    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=30${timeFilter}`
+    `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=${limit}${timeFilter}`
   );
   msgs.reverse();
 
@@ -1861,8 +1861,9 @@ JANGAN langsung kirim ulang ringkasan pesanan kalau customer tidak minta.`;
       systemPrompt += `\n\nDATA SEMUA KURIR TERSEDIA (selalu gunakan ini kalau customer tanya kurir lain — JANGAN bilang "ditentukan sistem"):\n${tabel}\nRekomendasi sistem: ${convState.ongkir.ekspedisi}${areaOngkir ? `\nWilayah tujuan: ${areaOngkir} (SUDAH DIKETAHUI — jangan tanya wilayah lagi)` : ''}`;
     }
 
-    // ── Ambil pesan terakhir (tanpa filter timestamp agar bot ingat history lama) ───
-    const history = await getContextMessages(conversation.id, null);
+    // ── Ambil pesan terakhir — kalau ada ringkasan, cukup 10 pesan; kalau belum, 20 ───
+    const historyLimit = conversation.ringkasan ? 10 : 20;
+    const history = await getContextMessages(conversation.id, null, historyLimit);
 
     // ── Inject hasil analisa gambar ke history ─────────────────
     if (imageAnalysis) {
@@ -2954,7 +2955,7 @@ ${ongkirInfo}`;
     // ── Update ringkasan berjalan (setiap 5 pesan) ──
     try {
       const allMsgs = await sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`);
-      if (allMsgs.length % 5 === 0) await updateRingkasan(conversation.id);
+      if (allMsgs.length % 4 === 0) await updateRingkasan(conversation.id);
     } catch(e) {
       console.error('Ringkasan error:', e.message);
     }
