@@ -217,6 +217,9 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
   const namaToko   = product?.persona_cs_nama ? 'toko kami' : 'Adsy Store';
   const namaProduk = product?.nama || 'produk kami';
   const harga      = product?.harga ? `Rp ${product.harga.toLocaleString('id-ID')}` : '(akan dikonfirmasi)';
+  const bundlingTxt = Array.isArray(product?.harga_bundling) && product.harga_bundling.length
+    ? product.harga_bundling.map(p => `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}`).join(' | ')
+    : null;
 
   const pertanyaan = Array.isArray(product?.pertanyaan_diagnosa)
     ? product.pertanyaan_diagnosa.join(' | ')
@@ -269,7 +272,9 @@ Sumber chat     : ${sumber === 'ctwa' ? 'CTWA (dari iklan)' : sumber === 'form' 
 - Setelah keluhan tergali & edukasi singkat → langsung tanya wilayah & proses order
 - Alur: jawab pertanyaan → gali keluhan singkat → edukasi ringkas → wilayah → order` : ''}
 Produk          : ${namaProduk}
-Harga           : ${harga}
+Harga           : ${harga}${bundlingTxt ? `
+Paket bundling  : ${bundlingTxt}
+⚡ TAWARKAN PAKET: Prioritaskan tawarkan paket bundling (lebih hemat) saat customer mau order. Kalau customer tidak minta spesifik, rekomendasikan paket terbesar yang relevan dengan keluhannya.` : ''}
 Cocok untuk     : ${keluhan}
 Cara pakai      : ${product?.cara_pakai || '(lihat kemasan)'}
 Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
