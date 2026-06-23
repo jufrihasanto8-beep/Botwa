@@ -256,9 +256,11 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
                            wa_number: waNumber, message: pesan, is_outbound: true }),
   });
 
-  const brBody = await br.json().catch(() => ({}));
+  const brText = await br.text().catch(() => '');
+  let brBody = {};
+  try { brBody = JSON.parse(brText); } catch(e) {}
   const sendFailed = !br.ok;
-  const errMsg = brBody?.error || '';
+  const errMsg = brBody?.error || brText?.slice(0, 100) || '';
   const notRegistered = sendFailed && (
     errMsg.includes('not registered') ||
     errMsg.includes('not on WhatsApp') ||
