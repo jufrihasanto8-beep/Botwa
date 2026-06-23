@@ -1278,9 +1278,10 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Ambil rekening dari users table ───────────────────────
-    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key&limit=1`).catch(() => []);
-    const userRekening   = userRows[0]?.rekening     || null;
+    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid&limit=1`).catch(() => []);
+    const userRekening     = userRows[0]?.rekening      || null;
     const userAnthropicKey = userRows[0]?.anthropic_key || ANTHROPIC_KEY; // fallback ke env
+    const userGroupJid     = userRows[0]?.group_jid     || WA_GROUP_JID;  // fallback ke env global
 
     // ── Routing: cari produk dari referral/isi chat ────────────
     const { product, sumber } = await resolveProduct(userId, referral, message);
@@ -1701,7 +1702,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
           }
 
           // ── Kirim recap ke grup WA setelah customer konfirmasi ──
-          if (WA_GROUP_JID) {
+          if (userGroupJid) {
             try {
               const snap      = convState.order_snapshot || {};
               const ongkirSnap = convState.ongkir || {};
@@ -1717,7 +1718,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
                 qty:     snap.qty     || 1,
                 csNama,
               });
-              await sendWA(userId, WA_GROUP_JID, closingMsg, true);
+              await sendWA(userId, userGroupJid, closingMsg, true);
               console.log(`Recap order #${nomorUrut} terkirim ke grup (setelah customer konfirmasi)`);
             } catch(e) {
               console.error('Send recap ke grup error:', e.message);
