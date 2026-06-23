@@ -138,13 +138,14 @@ function parseOrderEmail(body) {
   };
 }
 
-// ── Render template dengan variabel {nama} {produk} ──────
-function renderTemplate(template, { nama, produk }) {
-  const namaSapa  = nama ? nama.split(' ')[0] : 'kak';
-  const produkTxt = produk || '';
+// ── Render template dengan variabel ──────────────────────
+function renderTemplate(template, { nama, produk, alamat, hp }) {
+  const namaSapa = nama ? nama.split(' ')[0] : 'kak';
   return template
-    .replace(/\{nama\}/gi, namaSapa)
-    .replace(/\{produk\}/gi, produkTxt)
+    .replace(/\{nama\}/gi,   namaSapa)
+    .replace(/\{produk\}/gi, produk  || '')
+    .replace(/\{alamat\}/gi, alamat  || '')
+    .replace(/\{wa\}/gi,     hp      || '')
     .trim();
 }
 
@@ -197,7 +198,7 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   const namaSapa  = nama ? nama.split(' ')[0] : 'kak';
   const produkTxt = produk ? ` untuk *${produk}*` : '';
   const defaultPesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
-  const pesan = tmpl ? renderTemplate(tmpl, { nama, produk }) : defaultPesan;
+  const pesan = tmpl ? renderTemplate(tmpl, { nama, produk, alamat, hp }) : defaultPesan;
 
   const br = await fetch(`${BAILEYS_URL}/send`, {
     method: 'POST',
