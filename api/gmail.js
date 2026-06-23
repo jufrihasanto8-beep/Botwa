@@ -230,7 +230,7 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   } else {
     const c = await sbPost('conversations', {
       user_id: userId, customer_id: customerId || null,
-      state: convState, eskalasi: false, created_at: now, updated_at: now,
+      state: convState, created_at: now, updated_at: now,
     });
     convId = c[0]?.id;
   }
