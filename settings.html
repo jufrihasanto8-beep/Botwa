@@ -1113,7 +1113,7 @@ async function loadGrupList() {
   btn.textContent = 'Memuat...';
   btn.disabled = true;
   try {
-    const r = await fetch(`${BAILEYS_URL}/groups?secret=${WEBHOOK_SECRET}&session_id=${uid}`);
+    const r = await fetch(`/api/baileys-proxy?path=/groups&session_id=${uid}`);
     const data = await r.json();
     if (!data.ok) throw new Error(data.error);
     _allGroups = data.groups;
