@@ -983,7 +983,10 @@ async function renderChat() {
   lastMsgTimestamp = msgs.length ? msgs[msgs.length - 1].created_at : null;
 
   area.innerHTML = '<div class="day-divider">Hari ini</div>';
-  msgs.forEach(m => appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, false, m.created_at, m.role));
+  msgs.forEach(m => {
+    if (m.role === 'system') appendSystemNote(m.isi, m.created_at);
+    else appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, false, m.created_at, m.role);
+  });
   area.scrollTop = area.scrollHeight;
 
   // Customer Memory card
@@ -1027,6 +1030,17 @@ async function renderChat() {
     cmEmpty.style.display = 'block';
     cmRows.style.display  = 'none';
   }
+}
+
+function appendSystemNote(text, ts=null) {
+  const area = document.getElementById('messages-area');
+  area.querySelector('.no-chat')?.remove();
+  const t = ts ? new Date(ts).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'}) : '';
+  const div = document.createElement('div');
+  div.style.cssText = 'text-align:center;margin:8px 0';
+  div.innerHTML = `<span style="display:inline-block;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:#f59e0b;font-size:11px;padding:4px 12px;border-radius:20px">${(text||'').replace(/</g,'&lt;')}</span>${t ? `<div style="font-size:10px;color:#475569;margin-top:2px">${t}</div>` : ''}`;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
 }
 
 function appendBubble(type, text, scroll=true, ts=null, role=null) {
@@ -1359,7 +1373,8 @@ async function poll() {
       if (lastMsgTimestamp) {
         // Append hanya pesan baru
         msgs.forEach(m => {
-          appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, true, m.created_at, m.role);
+          if (m.role === 'system') appendSystemNote(m.isi, m.created_at);
+          else appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, true, m.created_at, m.role);
           lastMsgTimestamp = m.created_at;
           lastMsgCount++;
         });
