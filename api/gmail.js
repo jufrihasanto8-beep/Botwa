@@ -81,7 +81,7 @@ async function getAccessToken(refreshToken) {
 
 // ── Gmail API helpers ─────────────────────────────────────
 async function searchEmails(accessToken) {
-  const q = encodeURIComponent('from:support@orderonline.id is:unread subject:"Pesanan Baru"');
+  const q = encodeURIComponent('from:support@orderonline.id is:unread');
   const r = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=10`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
