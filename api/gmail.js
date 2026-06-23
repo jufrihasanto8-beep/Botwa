@@ -281,12 +281,15 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
         }).catch(() => {});
       }
     } else {
-      await sbPost('conv_messages', {
+      const saveResult = await sbPost('conv_messages', {
         conversation_id: convId, role: 'assistant', isi: pesan,
-      }).catch(() => {});
+      }).catch(e => ({ _err: e.message }));
+      const saveErr = saveResult?._err || null;
+      if (saveErr) console.error('[gmail] conv_messages save error:', saveErr);
+      return { waNumber, convId, ok: true, not_registered: false, send_error: null, conv_saved: !saveErr, conv_error: saveErr };
     }
   }
-  return { waNumber, convId, ok: !sendFailed, not_registered: notRegistered, send_error: sendFailed ? errMsg : null };
+  return { waNumber, convId, ok: !sendFailed, not_registered: notRegistered, send_error: sendFailed ? errMsg : null, conv_saved: false };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -412,6 +415,8 @@ module.exports = async function handler(req, res) {
                 skip_reason: leadResult.reason || null,
                 not_registered: leadResult.not_registered || false,
                 send_error: leadResult.send_error || null,
+                conv_saved: leadResult.conv_saved || false,
+                conv_error: leadResult.conv_error || null,
               });
             } catch(e) {
               log.errors.push({ msg_id: msg.id, error: e.message });
