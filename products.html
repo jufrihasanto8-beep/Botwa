@@ -901,15 +901,37 @@ function formatPromo(promo) {
 }
 
 /* ── Bundling ── */
-function tambahPaket(qty = '', harga = '') {
+function setPrioritas(btn) {
+  // Toggle: kalau sudah aktif → non-aktifkan, kalau belum → set sebagai satu-satunya prioritas
+  const isActive = btn.dataset.aktif === '1';
+  document.querySelectorAll('#bundling-rows .btn-prioritas').forEach(b => {
+    b.dataset.aktif = '0';
+    b.textContent = '☆';
+    b.style.color = '#94a3b8';
+    b.style.borderColor = 'rgba(255,255,255,.1)';
+    b.closest('div').style.borderColor = 'transparent';
+  });
+  if (!isActive) {
+    btn.dataset.aktif = '1';
+    btn.textContent = '⭐';
+    btn.style.color = '#fbbf24';
+    btn.style.borderColor = 'rgba(251,191,36,.4)';
+    btn.closest('div').style.outline = '1px solid rgba(251,191,36,.25)';
+    btn.closest('div').style.borderRadius = '8px';
+  }
+}
+
+function tambahPaket(qty = '', harga = '', prioritas = false) {
   const wrap = document.getElementById('bundling-rows');
   const row  = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:center' + (prioritas ? ';outline:1px solid rgba(251,191,36,.25);border-radius:8px' : '');
   row.innerHTML = `
     <input type="number" placeholder="Jumlah (qty)" value="${qty}"
       style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
     <input type="number" placeholder="Harga (Rp)" value="${harga}"
       style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
+    <button type="button" class="btn-prioritas" data-aktif="${prioritas ? '1' : '0'}" onclick="setPrioritas(this)" title="Jadikan paket prioritas (direkomendasikan bot duluan)"
+      style="padding:6px 9px;border:1px solid ${prioritas ? 'rgba(251,191,36,.4)' : 'rgba(255,255,255,.1)'};background:none;color:${prioritas ? '#fbbf24' : '#94a3b8'};border-radius:6px;cursor:pointer;font-size:14px">${prioritas ? '⭐' : '☆'}</button>
     <button type="button" onclick="this.closest('div').remove()"
       style="padding:7px 10px;border:1px solid rgba(248,113,113,.2);background:none;color:#f87171;border-radius:6px;cursor:pointer;font-size:13px">✕</button>
   `;
@@ -920,17 +942,19 @@ function getBundlingData() {
   const rows = document.querySelectorAll('#bundling-rows > div');
   const result = [];
   rows.forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    const qty   = parseInt(inputs[0].value);
-    const harga = parseInt(inputs[1].value);
-    if (qty > 0 && harga > 0) result.push({ qty, harga });
+    const inputs   = row.querySelectorAll('input');
+    const btn      = row.querySelector('.btn-prioritas');
+    const qty      = parseInt(inputs[0].value);
+    const harga    = parseInt(inputs[1].value);
+    const prioritas = btn?.dataset.aktif === '1';
+    if (qty > 0 && harga > 0) result.push({ qty, harga, ...(prioritas ? { prioritas: true } : {}) });
   });
   return result.length ? result.sort((a, b) => a.qty - b.qty) : null;
 }
 
 function loadBundling(data) {
   document.getElementById('bundling-rows').innerHTML = '';
-  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga));
+  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga, !!p.prioritas));
 }
 
 /* ── Modal Produk ── */
