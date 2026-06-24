@@ -142,7 +142,38 @@ function parseOrderEmail(body) {
 function parseAlamat(raw) {
   if (!raw) return { jsonb: null, lengkap: false };
 
-  // Bersihkan tanda "-" tunggal di setiap bagian
+  // Coba parse format prose dengan keyword embedded
+  // Contoh: "Dusun X desa Y kecamatan Z kabupaten A provinsi B"
+  const kecamatanMatch = raw.match(/\bkecamatan\s+(.+?)(?=\s+(?:kabupaten|kota|provinsi)|,|$)/i);
+  const kabupatenMatch = raw.match(/\b(?:kabupaten|kota)\s+(.+?)(?=\s+provinsi|,|$)/i);
+  const provinsiMatch  = raw.match(/\bprovinsi\s+(\w+(?:\s+\w+)?)/i); // maks 2 kata (semua nama provinsi RI ≤ 2 kata)
+  const desaMatch      = raw.match(/\b(?:desa|kelurahan|kel\.?)\s+(.+?)(?=\s+(?:kecamatan|kabupaten|provinsi)|,|$)/i);
+
+  if (kecamatanMatch || kabupatenMatch || provinsiMatch) {
+    const kecamatan = kecamatanMatch?.[1]?.trim() || '';
+    const kabupaten = kabupatenMatch?.[1]?.trim() || '';
+    const provinsi  = provinsiMatch?.[1]?.trim() || '';
+    const kelurahan = desaMatch?.[1]?.trim() || '';
+
+    // Jalan = teks sebelum keyword admin pertama (desa/kelurahan/kecamatan/kabupaten/provinsi)
+    const firstKeywordIdx = raw.search(/\b(?:desa|kelurahan|kel\.?|kecamatan|kabupaten|kota|provinsi)\b/i);
+    let jalan = firstKeywordIdx > 0 ? raw.slice(0, firstKeywordIdx).trim().replace(/,+$/, '') : '';
+
+    // Teks setelah provinsi (landmark/patokan) → tambahkan ke jalan
+    if (provinsiMatch) {
+      const afterIdx = raw.toLowerCase().indexOf(provinsiMatch[0].toLowerCase()) + provinsiMatch[0].length;
+      const afterProv = raw.slice(afterIdx).replace(/^[\s,]+/, '').trim();
+      if (afterProv) jalan = jalan ? `${jalan}, ${afterProv}` : afterProv;
+    }
+
+    if (!jalan) jalan = raw; // fallback kalau tidak ada teks sebelum keyword
+
+    const jsonb = { jalan, kelurahan, kecamatan, kabupaten, provinsi };
+    const lengkap = !!(jalan && kabupaten && jalan.length > 3 && kabupaten.length > 2);
+    return { jsonb, lengkap };
+  }
+
+  // Fallback: split by comma (format: "jalan, kecamatan, kabupaten, provinsi")
   const parts = raw.split(',').map(p => p.trim()).filter(p => p && p !== '-');
 
   let jalan = '', kecamatan = '', kabupaten = '', provinsi = '';
