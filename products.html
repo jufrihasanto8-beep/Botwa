@@ -878,6 +878,10 @@ function renderGrid() {
         ${keluhan.length ? `<div style="margin-bottom:10px;">${keluhan.slice(0,4).map(k=>`<span class="prod-tag">${k}</span>`).join('')}${keluhan.length>4?`<span class="prod-tag">+${keluhan.length-4}</span>`:''}</div>` : ''}
         <div class="prod-meta">Ongkir: <span>${promo}</span></div>
         <div class="prod-meta">Berat: <span>${p.berat_gram || 500}g</span> · Persona CS: <span>${p.persona_cs_nama || 'Sari'}</span></div>
+        ${Array.isArray(p.harga_bundling) && p.harga_bundling.length ? `
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          ${p.harga_bundling.map(b => `<span style="font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid ${b.prioritas ? 'rgba(251,191,36,.5)' : 'rgba(255,255,255,.1)'};background:${b.prioritas ? 'rgba(251,191,36,.08)' : 'rgba(255,255,255,.04)'};color:${b.prioritas ? '#fbbf24' : '#94a3b8'}">${b.prioritas ? '⭐ ' : ''}${b.qty} box = ${rp(b.harga)}</span>`).join('')}
+        </div>` : ''}
         ${p.cara_pakai ? `<div class="prod-meta" style="margin-top:8px;font-size:12px;">${p.cara_pakai.slice(0,80)}...</div>` : ''}
       </div>
       <div class="prod-footer">
