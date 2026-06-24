@@ -217,8 +217,10 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
   const namaToko   = product?.persona_cs_nama ? 'toko kami' : 'Adsy Store';
   const namaProduk = product?.nama || 'produk kami';
   const harga      = product?.harga ? `Rp ${product.harga.toLocaleString('id-ID')}` : '(akan dikonfirmasi)';
-  const bundlingTxt = Array.isArray(product?.harga_bundling) && product.harga_bundling.length
-    ? product.harga_bundling.map(p => `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}`).join(' | ')
+  const hasBundling   = Array.isArray(product?.harga_bundling) && product.harga_bundling.length > 0;
+  const paketPrioritas = hasBundling ? product.harga_bundling.find(p => p.prioritas) : null;
+  const bundlingTxt   = hasBundling
+    ? product.harga_bundling.map(p => `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.prioritas ? ' ⭐PRIORITAS' : ''}`).join(' | ')
     : null;
 
   const pertanyaan = Array.isArray(product?.pertanyaan_diagnosa)
@@ -272,10 +274,10 @@ Sumber chat     : ${sumber === 'ctwa' ? 'CTWA (dari iklan)' : sumber === 'form' 
 - Setelah keluhan tergali & edukasi singkat → langsung tanya wilayah & proses order
 - Alur: jawab pertanyaan → gali keluhan singkat → edukasi ringkas → wilayah → order` : ''}
 Produk          : ${namaProduk}
-Harga           : ${harga}${bundlingTxt ? `
-Paket bundling  : ${bundlingTxt}
-⚡ TAWARKAN PAKET: Prioritaskan tawarkan paket bundling saat customer mau order. Rekomendasikan paket terbesar yang relevan dengan keluhannya.
-⚡ HARGA ORDER: Kalau customer pilih qty yang ada di paket bundling, WAJIB pakai harga bundling di [ORDER_DATA], BUKAN harga satuan × qty. Contoh: customer pilih 4 box → harga=400000 (bukan 480000). Kalau customer pilih qty yang tidak ada di paket bundling → pakai harga satuan × qty.` : ''}
+${hasBundling ? `Penawaran paket : ${bundlingTxt}
+⚡ PENAWARAN AWAL: Saat customer siap order, LANGSUNG rekomendasikan${paketPrioritas ? ` paket ${paketPrioritas.qty} box (Rp ${paketPrioritas.harga.toLocaleString('id-ID')}) — ini paket PRIORITAS, tawarkan ini duluan dengan alasan yang relevan ke keluhannya` : ' paket yang paling cocok dengan keluhannya'}. JANGAN sebut harga per box/satuan — yang ada hanya paket di atas.
+⚡ HARGA ORDER: WAJIB pakai harga dari paket bundling di [ORDER_DATA]. Kalau customer pilih qty yang tidak ada di paket → pakai harga satuan × qty.
+⚡ TIDAK ADA harga satuan/per box yang perlu disebutkan ke customer.` : `Harga           : ${harga}`}
 Cocok untuk     : ${keluhan}
 Cara pakai      : ${product?.cara_pakai || '(lihat kemasan)'}
 Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
@@ -346,13 +348,13 @@ ATURAN HARGA, ONGKIR & COD
 - Promo ongkir diterapkan SISTEM (berlaku COD & transfer).
 
 FORMAT TAMPIL HARGA (pakai persis ini saat tampilkan total)
-${namaProduk} ${harga} 😊
+${hasBundling ? `Paket ${namaProduk} — setelah customer pilih paket, tampilkan total:` : `${namaProduk} ${harga} 😊`}
 
 💳 Transfer
-${namaProduk} ${harga} + ongkir ~{ongkir_asli}~ {ongkir_promo} = TOTAL
+${namaProduk} {qty} box ${hasBundling ? '{harga_paket}' : harga} + ongkir ~{ongkir_asli}~ {ongkir_promo} = TOTAL
 
 📦 COD
-${namaProduk} ${harga} + ongkir ~{ongkir_asli}~ {ongkir_promo} + admin {fee} = TOTAL
+${namaProduk} {qty} box ${hasBundling ? '{harga_paket}' : harga} + ongkir ~{ongkir_asli}~ {ongkir_promo} + admin {fee} = TOTAL
 
 Via {ekspedisi} ya kak 🚗
 Kakak enaknya COD atau transfer? 🙏
@@ -495,6 +497,17 @@ function getPromoPotongan(promo, provinsi, ongkirAsli = 0) {
   if (promo.tipe === 'potong') return calc(promo.nilai);
   if (promo.tipe === 'potong_wilayah') return isDalamJawa(provinsi) ? calc(promo.nilai_jawa) : calc(promo.nilai_luar);
   return 0;
+}
+
+// Cari harga bundling untuk qty tertentu. Kalau tidak match → fallback harga satuan × qty
+function resolveHargaBundling(product, qty = 1) {
+  const satuan = product?.harga || 0;
+  const bundling = product?.harga_bundling;
+  if (!Array.isArray(bundling) || !bundling.length) return satuan * qty;
+  const exact = bundling.find(p => p.qty === qty);
+  if (exact) return exact.harga;
+  // Tidak ada paket yang cocok → satuan × qty
+  return satuan * qty;
 }
 
 function formatPromoOngkir(promo) {
@@ -780,7 +793,7 @@ async function mengantarFetch(path) {
 }
 
 /* ── HITUNG ONGKIR: step 4–8 blueprint §4 ───────────────── */
-async function hitungOngkir(wilayah, product) {
+async function hitungOngkir(wilayah, product, qty = 1) {
   try {
     // Step 1: Cari di tabel lokal wilayah_id
     // Coba kelurahan+kecamatan dulu (paling spesifik), fallback ke kecamatan/kabupaten
@@ -948,7 +961,7 @@ async function hitungOngkir(wilayah, product) {
     else if (promo?.tipe === 'potong_wilayah') ongkirPromo = Math.max(0, ongkirAsli - getPromoPotongan(promo, provinsi, ongkirAsli));
     else if (promo?.tipe === 'gratis_sd')   ongkirPromo = Math.max(0, ongkirAsli - (promo.nilai || 0));
 
-    const harga = product?.harga || 0;
+    const harga = resolveHargaBundling(product, qty);
 
     // Step 7: Hitung total
     const totalTransfer = harga + ongkirPromo;
@@ -2454,7 +2467,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             convState.alamat = alamatStr;
           }
 
-          const hasil = await hitungOngkir(wilayah, product);
+          const qtyState = parseInt(convState.qty) || 1;
+          const hasil = await hitungOngkir(wilayah, product, qtyState);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
             convState.ongkir = hasil;
@@ -2904,10 +2918,13 @@ ${ongkirInfo}`;
       // Fallback ongkir detail dari customers.alamat kalau state kosong
       const ekspedisi   = ongkirData?.ekspedisi   || custAlamat?.ekspedisi   || 'KURIR';
       const ekspLabel   = ekspedisi.toUpperCase();
-      const harga       = ongkirData?.harga       || custAlamat?.harga       || product?.harga || 0;
+      // Resolve harga bundling sesuai qty yang confirmed (lebih akurat dari ongkirData.harga yg dihitung saat WILAYAH_OK)
+      const harga       = resolveHargaBundling(product, qty) || ongkirData?.harga || custAlamat?.harga || product?.harga || 0;
       const ongkirAsli  = ongkirData?.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
       const ongkirPromo = ongkirData?.ongkirPromo || custAlamat?.ongkirPromo || 0;
-      const feeCOD      = ongkirData?.feeCOD      || custAlamat?.feeCOD      || 0;
+      // Recalculate feeCOD pakai harga bundling yang benar
+      const feeCODCalc  = isCOD ? Math.ceil((harga + ongkirPromo) * 0.05) : 0;
+      const feeCOD      = feeCODCalc || ongkirData?.feeCOD || custAlamat?.feeCOD || 0;
 
       // Simpan area & ekspedisi yang sudah confirmed ke ongkir state agar tersimpan permanen di Supabase
       const confirmedOngkir = { ...ongkirData, area, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD };
