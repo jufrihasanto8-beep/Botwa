@@ -335,7 +335,9 @@ ATURAN HARGA, ONGKIR & COD
 - ⛔ HANYA KOTA/KABUPATEN = TANYA KECAMATAN DULU dengan natural, sebut 2-3 kecamatan sebagai contoh. Misal: "Bantulnya di Sewon, Kasihan, atau kecamatan mana kak? 😊". Sistem akan bantu deteksi otomatis.
 - ⛔ KECAMATAN SAJA = TANYA KELURAHAN/DESA DULU dengan natural, sebut 2-3 contoh kelurahan. Misal: "Di desa mana kak? Pendowoharjo, Bangunharjo, atau yang lain? 😊". Sistem akan inject pilihan kelurahan yang valid.
 - Sebelum [WILAYAH_OK] → wilayah HARUS sudah spesifik sampai KELURAHAN/DESA.
-- Setelah customer sebut kelurahan → langsung confirm + tulis [WILAYAH_OK] di pesan yang sama → sistem otomatis hitung ongkir + tampilkan total.
+- Setelah customer sebut kelurahan → langsung confirm + tulis [WILAYAH_OK] di pesan yang SAMA → sistem otomatis hitung ongkir + tampilkan total.
+  ⚠️ JANGAN tanya "sudah benar kak?" dulu sebelum tulis [WILAYAH_OK:] — langsung confirm sekalian. Contoh: "Siap kak! Desa Sipodeceng, Kec. Baranti, Kab. Sidrap ya 😊 [WILAYAH_OK:Sipodeceng, Baranti, Sidrap, Sulawesi Selatan]"
+  ⚠️ Kalau kamu sudah terlanjur tampilkan ringkasan alamat dan tanya "sudah benar?", lalu customer jawab "benar/ya/iya/betul/oke/siap/betul sekali/benar sekali" → WAJIB langsung tulis [WILAYAH_OK:kecamatan, kabupaten, provinsi] di balasan itu. Jangan balas hanya "Siap kak!" tanpa [WILAYAH_OK:].
 - Wilayah parsial (nama desa/kecamatan kecil yang unik) → tebak & konfirmasi provinsinya: "Pringsewu, Lampung ya kak?"
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
   Prinsip: kalau nama itu bisa jadi kota/kab di lebih dari satu provinsi, TANYA dulu.
@@ -2822,7 +2824,12 @@ ${ongkirInfo}`;
       return res.status(200).json({ ok: true, action: 'blocked_pending_kecamatan' });
     }
 
-    if (orderConfirmed) {
+    if (orderConfirmed && convState.order_placed && !convState.awaiting_order_confirm) {
+      // Order sudah selesai diproses sebelumnya — skip ORDER_CONFIRMED agar tidak kirim konfirmasi ulang
+      console.log(`[ORDER_CONFIRMED] Diabaikan — order sudah placed (conv ${conversation.id})`);
+    }
+
+    if (orderConfirmed && !convState.order_placed) {
       // Ambil state terbaru
       const convFull    = await sbGet('conversations', `?id=eq.${conversation.id}&limit=1`);
       const latestState = convFull[0]?.state || {};
