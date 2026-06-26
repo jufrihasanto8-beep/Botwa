@@ -147,8 +147,8 @@ module.exports = async function handler(req, res) {
   }
 
   // ── Generic CRUD: table + action ──
-  const { userId, table, action, id, payload } = body;
-  const ALLOWED = ['courier_whitelist'];
+  const { userId, table, action, id, payload, convId, convPatch } = body;
+  const ALLOWED = ['courier_whitelist', 'orders_new'];
   if (!userId || !table || !ALLOWED.includes(table)) {
     return res.status(400).json({ error: 'Parameter tidak valid' });
   }
@@ -157,6 +157,10 @@ module.exports = async function handler(req, res) {
     let data;
     if (action === 'insert') {
       data = await sbReq('POST', table, payload);
+      // Kalau ada convPatch sekaligus (closing manual), patch conversations juga
+      if (convId && convPatch) {
+        await sbReq('PATCH', `conversations?id=eq.${convId}`, convPatch);
+      }
     } else if (action === 'update') {
       if (!id) return res.status(400).json({ error: 'id wajib untuk update' });
       data = await sbReq('PATCH', `${table}?id=eq.${id}&user_id=eq.${userId}`, payload);
