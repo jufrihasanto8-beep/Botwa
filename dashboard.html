@@ -1477,7 +1477,7 @@ async function openClosingManual() {
   document.getElementById('cm-total-cod').value      = '';
   document.getElementById('cm-cod-row').style.display = 'none';
   document.getElementById('cm-bundling-info').textContent = '';
-  document.getElementById('cm-status').textContent   = '';
+  document.getElementById('cm-modal-err').textContent = '';
   document.getElementById('cm-total-preview').textContent = '';
 }
 
@@ -1597,7 +1597,7 @@ async function submitClosingManual() {
   const metode   = document.getElementById('cm-metode').value;
   const totalCOD = parseInt(document.getElementById('cm-total-cod').value) || 0;
   const catatan  = document.getElementById('cm-catatan').value.trim();
-  const statusEl = document.getElementById('cm-status');
+  const statusEl = document.getElementById('cm-modal-err');
 
   if (!prodId) { statusEl.textContent = 'Pilih produk dulu.'; return; }
   if (!harga)  { statusEl.textContent = 'Isi harga produk.'; return; }
@@ -1798,7 +1798,7 @@ async function submitClosingManual() {
         <textarea id="cm-catatan" rows="2" placeholder="Warna, ukuran, instruksi khusus..." class="cm-input" style="resize:vertical"></textarea>
       </div>
 
-      <div style="color:#ef4444;font-size:12px" id="cm-status"></div>
+      <div style="color:#ef4444;font-size:12px" id="cm-modal-err"></div>
     </div>
 
     <!-- Footer -->
