@@ -451,6 +451,7 @@ Bisa isi lebih dari satu rekening."></textarea>
 
         <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:16px;display:flex;flex-direction:column;gap:16px">
 
+          <!-- API Key -->
           <div class="form-group">
             <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:6px">API Key Mengantar</label>
             <div style="display:flex;gap:8px">
@@ -461,15 +462,35 @@ Bisa isi lebih dari satu rekening."></textarea>
             <div style="font-size:11px;color:#64748b;margin-top:6px">Dapatkan API key dari dashboard Mengantar → Settings → API</div>
           </div>
 
+          <!-- Pickup Address -->
           <div class="form-group">
-            <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:6px">Pickup Address ID</label>
-            <div style="display:flex;gap:8px;margin-bottom:6px">
-              <input type="text" id="f-mengantar-origin" placeholder="Contoh: 62e27d67ecf5ae2893bc070a"
-                style="flex:1;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-family:monospace">
-              <button class="btn" onclick="cariMengantarOrigin()" id="btn-cari-origin" style="padding:8px 14px;white-space:nowrap">🔍 Cari Alamat</button>
+            <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:8px">Alamat Pickup</label>
+
+            <!-- Card info jika sudah tersimpan -->
+            <div id="origin-card" style="display:none;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:14px 16px;margin-bottom:10px;position:relative">
+              <div style="display:flex;align-items:flex-start;gap:12px">
+                <div style="font-size:22px;line-height:1;margin-top:2px">🏠</div>
+                <div style="flex:1;min-width:0">
+                  <div id="origin-card-name" style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:3px"></div>
+                  <div id="origin-card-phone" style="font-size:12px;color:#94a3b8;margin-bottom:3px"></div>
+                  <div id="origin-card-addr" style="font-size:12px;color:#94a3b8;line-height:1.5"></div>
+                  <div id="origin-card-id" style="font-size:10px;color:#475569;font-family:monospace;margin-top:6px"></div>
+                </div>
+                <button onclick="gantiOrigin()" style="flex-shrink:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#94a3b8;font-size:11px;padding:4px 10px;cursor:pointer">Ganti</button>
+              </div>
             </div>
-            <div id="origin-list" style="display:none;background:#0d1117;border:1px solid rgba(255,255,255,.12);border-radius:8px;overflow:hidden;margin-bottom:6px"></div>
-            <div style="font-size:11px;color:#64748b">Klik "Cari Alamat" untuk ambil daftar alamat pickup dari Mengantar, lalu pilih yang sesuai.</div>
+
+            <!-- Form cari (tersembunyi jika card aktif) -->
+            <div id="origin-form">
+              <input type="hidden" id="f-mengantar-origin">
+              <button onclick="cariMengantarOrigin()" id="btn-cari-origin"
+                style="width:100%;padding:10px;background:rgba(59,130,246,.1);border:1px dashed rgba(59,130,246,.35);border-radius:8px;color:#93c5fd;font-size:13px;cursor:pointer;transition:all .15s"
+                onmouseover="this.style.background='rgba(59,130,246,.18)'" onmouseout="this.style.background='rgba(59,130,246,.1)'">
+                🔍 Pilih Alamat Pickup dari Mengantar
+              </button>
+              <!-- Dropdown hasil pencarian -->
+              <div id="origin-list" style="display:none;background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:10px;overflow:hidden;margin-top:8px;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
+            </div>
           </div>
 
           <div style="display:flex;align-items:center;gap:10px">
@@ -1232,13 +1253,53 @@ async function saveGroupJid() {
 }
 
 /* ── MENGANTAR SETTINGS ── */
+function showOriginCard(addr) {
+  // addr: { id, nama, telp, alamat }
+  document.getElementById('origin-card-name').textContent  = addr.nama  || '';
+  document.getElementById('origin-card-phone').textContent = addr.telp  || '';
+  document.getElementById('origin-card-addr').textContent  = addr.alamat|| '';
+  document.getElementById('origin-card-id').textContent    = addr.id    || '';
+  document.getElementById('f-mengantar-origin').value      = addr.id    || '';
+  document.getElementById('origin-card').style.display     = 'block';
+  document.getElementById('origin-form').style.display     = 'none';
+}
+
+function gantiOrigin() {
+  document.getElementById('origin-card').style.display = 'none';
+  document.getElementById('origin-form').style.display = 'block';
+  document.getElementById('origin-list').style.display  = 'none';
+}
+
 async function loadMengantarSettings() {
   const userId = Auth.getUser()?.id;
   try {
     const data = await SB.get('users', `?id=eq.${userId}&select=mengantar_key,mengantar_origin_id&limit=1`);
     const row = data[0] || {};
-    document.getElementById('f-mengantar-key').value    = row.mengantar_key       || '';
-    document.getElementById('f-mengantar-origin').value = row.mengantar_origin_id || '';
+    document.getElementById('f-mengantar-key').value = row.mengantar_key || '';
+
+    if (row.mengantar_origin_id && row.mengantar_key) {
+      // Coba fetch detail alamat untuk tampilkan card
+      try {
+        const res  = await fetch(`/api/save-settings?action=mengantar-origins&key=${encodeURIComponent(row.mengantar_key)}`);
+        const json = await res.json();
+        if (json.ok) {
+          const raw  = json.data?.data || json.data || [];
+          const rows = Array.isArray(raw) ? raw : [];
+          const found = rows.find(r => (r._id || r.id) === row.mengantar_origin_id);
+          if (found) {
+            showOriginCard({
+              id:    found._id || found.id,
+              nama:  found.PICKUP_NAME || found.name || found.nama || '',
+              telp:  found.PICKUP_PIC_PHONE || found.phone || '',
+              alamat: found.PICKUP_FULL_AUTOFILL || found.PICKUP_ADDRESS || found.address || '',
+            });
+            return;
+          }
+        }
+      } catch {}
+      // Fallback: tampilkan card dengan ID saja
+      showOriginCard({ id: row.mengantar_origin_id, nama: 'Alamat Pickup', telp: '', alamat: '' });
+    }
   } catch(e) { console.error('loadMengantarSettings error', e); }
 }
 
@@ -1264,8 +1325,8 @@ async function cariMengantarOrigin() {
     const json = await res.json();
     if (!json.ok) throw new Error(`Mengantar ${json.status}: ${json.raw || json.error}`);
 
-    // Response dari proxy: { ok, data } — data bisa array atau nested
-    const raw  = json.data ?? json;
+    // Response dari proxy: { ok, data: { success, data: [...] } }
+    const raw  = json.data?.data ?? json.data ?? json;
     const rows = Array.isArray(raw) ? raw : (raw.data || raw.origins || raw.result || []);
     if (!rows.length) {
       listEl.style.display = 'block';
@@ -1274,19 +1335,21 @@ async function cariMengantarOrigin() {
     }
 
     listEl.style.display = 'block';
-    listEl.innerHTML = rows.map((r, i) => {
+    listEl.innerHTML = rows.map((r, idx) => {
       const id    = r._id || r.id || '';
       const nama  = r.PICKUP_NAME || r.name || r.nama || r.alias || 'Tanpa Nama';
       const telp  = r.PICKUP_PIC_PHONE || r.phone || r.phoneNumber || '';
-      const alamat= r.PICKUP_ADDRESS || r.address || r.alamat || '';
-      const kota  = r.PICKUP_FULL_AUTOFILL || [r.PICKUP_REGION, r.PICKUP_CITY, r.PICKUP_DISTRICT, r.PICKUP_SUBDISTRICT].filter(Boolean).join(', ');
-      return `<div onclick="pilihOrigin('${id}','${nama.replace(/'/g,"\\'")}',this)"
-        style="padding:12px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);transition:background .1s"
-        onmouseover="this.style.background='rgba(59,130,246,.1)'" onmouseout="this.style.background=(this.dataset.sel?'rgba(59,130,246,.15)':'')">
-        <div style="font-weight:600;color:#e2e8f0;font-size:13px">${nama}</div>
-        ${telp ? `<div style="font-size:11px;color:#64748b;margin-top:2px">${telp}</div>` : ''}
-        ${alamat ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px">${alamat}${kota ? ', '+kota : ''}</div>` : ''}
-        <div style="font-size:10px;color:#475569;margin-top:4px;font-family:monospace">${id}</div>
+      const alamat= r.PICKUP_FULL_AUTOFILL || r.PICKUP_ADDRESS || r.address || r.alamat || '';
+      const esc   = s => s.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      return `<div onclick="pilihOrigin('${esc(id)}','${esc(nama)}','${esc(telp)}','${esc(alamat)}')"
+        style="padding:14px 16px;cursor:pointer;${idx>0?'border-top:1px solid rgba(255,255,255,.06)':''}transition:background .12s;display:flex;align-items:center;gap:12px"
+        onmouseover="this.style.background='rgba(59,130,246,.12)'" onmouseout="this.style.background=''">
+        <div style="font-size:20px;line-height:1;flex-shrink:0">🏠</div>
+        <div style="min-width:0">
+          <div style="font-weight:600;color:#e2e8f0;font-size:13px">${nama}</div>
+          ${telp ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px">${telp}</div>` : ''}
+          ${alamat ? `<div style="font-size:11px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${alamat}</div>` : ''}
+        </div>
       </div>`;
     }).join('');
   } catch(e) {
@@ -1298,15 +1361,8 @@ async function cariMengantarOrigin() {
   }
 }
 
-function pilihOrigin(id, nama, el) {
-  // Hilangkan highlight sebelumnya
-  el.closest('#origin-list').querySelectorAll('[data-sel]').forEach(x => {
-    delete x.dataset.sel;
-    x.style.background = '';
-  });
-  el.dataset.sel = '1';
-  el.style.background = 'rgba(59,130,246,.15)';
-  document.getElementById('f-mengantar-origin').value = id;
+function pilihOrigin(id, nama, telp, alamat) {
+  showOriginCard({ id, nama, telp, alamat });
 }
 
 async function saveMengantarSettings() {
