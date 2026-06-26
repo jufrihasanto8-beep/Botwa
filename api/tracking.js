@@ -430,24 +430,24 @@ async function handleCreateMengantar(req, res) {
         orderItems.push({ orderId: o.id, item });
       }
 
-      // 5. POST ke Mengantar (multipart form-data)
+      // 5. POST ke Mengantar (JSON body)
       try {
-        const form = new FormData();
-        form.append('courier', kurir);
-        form.append('pickup', JSON.stringify({
+        const pickupPayload = {
           address_id: mngOriginId,
           type: 'scheduledPickup',
           volume: 'volumeMobil',
           ...(timeId ? { time_id: timeId } : {}),
-        }));
-        form.append('orders', JSON.stringify(orderItems.map(x => x.item)));
+        };
+        const ordersPayload = orderItems.map(x => x.item);
+        console.log('[createMengantar] payload kurir', kurir, JSON.stringify({ courier: kurir, pickup: pickupPayload, orders: ordersPayload }));
 
         const mResp = await fetch(`https://app.mengantar.com/api/public/${mngKey}/order`, {
           method: 'POST',
-          body: form,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ courier: kurir, pickup: pickupPayload, orders: ordersPayload }),
         });
         const mText = await mResp.text();
-        console.log('[createMengantar] HTTP', mResp.status, 'kurir', kurir, mText.slice(0, 600));
+        console.log('[createMengantar] HTTP', mResp.status, 'kurir', kurir, mText.slice(0, 800));
         let mJson;
         try { mJson = JSON.parse(mText); } catch { mJson = { success: false, message: `Non-JSON (${mResp.status}): ${mText.slice(0, 200)}` }; }
 
@@ -480,10 +480,10 @@ async function handleCreateMengantar(req, res) {
         } else {
           const errMsg = mJson.message || mJson.error || mJson.msg
             || (mJson.errors?.[0]?.message) || (mJson.errors?.[0])
-            || `Mengantar: ${JSON.stringify(mJson).slice(0, 200)}`;
+            || JSON.stringify(mJson).slice(0, 300);
           orderItems.forEach(x => results.push({
             orderId: x.orderId, kurir, success: false,
-            error: String(errMsg),
+            error: String(errMsg) + ` [raw: ${mText.slice(0,150)}]`,
           }));
         }
       } catch(e) {
