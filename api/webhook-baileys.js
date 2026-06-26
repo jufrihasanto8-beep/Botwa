@@ -338,6 +338,8 @@ ATURAN HARGA, ONGKIR & COD
 - Setelah customer sebut kelurahan → langsung confirm + tulis [WILAYAH_OK] di pesan yang SAMA → sistem otomatis hitung ongkir + tampilkan total.
   ⚠️ JANGAN tanya "sudah benar kak?" dulu sebelum tulis [WILAYAH_OK:] — langsung confirm sekalian. Contoh: "Siap kak! Desa Sipodeceng, Kec. Baranti, Kab. Sidrap ya 😊 [WILAYAH_OK:Sipodeceng, Baranti, Sidrap, Sulawesi Selatan]"
   ⚠️ Kalau kamu sudah terlanjur tampilkan ringkasan alamat dan tanya "sudah benar?", lalu customer jawab "benar/ya/iya/betul/oke/siap/betul sekali/benar sekali" → WAJIB langsung tulis [WILAYAH_OK:kecamatan, kabupaten, provinsi] di balasan itu. Jangan balas hanya "Siap kak!" tanpa [WILAYAH_OK:].
+  ⚠️ Kalau kamu sudah tahu kelurahan/kecamatan/kabupaten dari percakapan sebelumnya (kamu sendiri sudah sebut di pesan lalu), tapi belum tulis [WILAYAH_OK:] → WAJIB tulis [WILAYAH_OK:] di pesan berikutnya sekarang juga. Jangan tunggu customer konfirmasi lagi. Jangan balas "noted" atau hal lain tanpa [WILAYAH_OK:].
+  ⚠️ Customer marah/tidak mau ditanya ulang → JANGAN tanya lagi. Pakai wilayah yang sudah disebutkan customer, langsung tulis [WILAYAH_OK:] dan lanjut proses order.
 - Wilayah parsial (nama desa/kecamatan kecil yang unik) → tebak & konfirmasi provinsinya: "Pringsewu, Lampung ya kak?"
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
   Prinsip: kalau nama itu bisa jadi kota/kab di lebih dari satu provinsi, TANYA dulu.
@@ -373,7 +375,8 @@ Urutan WAJIB diikuti:
 6. Ada jalan/gang → boleh proaktif tawarkan patokan dari maps.
 7. Setelah semua data terkumpul (nama ✓, alamat ✓, metode bayar ✓) dan total sudah ditampilkan → langsung tulis di akhir balasan:
    [ORDER_CONFIRMED]
-   [ORDER_DATA:alamat="ALAMAT LENGKAP DARI CUSTOMER" keluhan="KELUHAN UTAMA CUSTOMER" metode="COD atau Transfer" qty=1]
+   [ORDER_DATA:alamat="ALAMAT LENGKAP DARI CUSTOMER" keluhan="KELUHAN UTAMA CUSTOMER" metode="COD atau Transfer" qty=JUMLAH_YANG_DIPESAN]
+   ⚠️ qty WAJIB diisi angka sesuai jumlah box yang dipesan customer (contoh: qty=4). JANGAN biarkan qty=1 kalau customer pesan lebih dari 1.
    Isi ORDER_DATA dengan data AKTUAL yang sudah dikumpulkan dari customer. Jangan dikosongkan.
    Sistem akan otomatis kirim konfirmasi detail ke customer — JANGAN tulis ulang ringkasan order di pesanmu.
 ⛔ DILARANG tulis [ORDER_CONFIRMED] kecuali SEMUA kondisi ini terpenuhi:
@@ -1112,10 +1115,15 @@ async function cekWilayahRisk(kodepos) {
 /* ── BUILD INJEKSI ONGKIR untuk Claude ───────────────────── */
 function buildOngkirInjeksi(hasil, product, konteks = '') {
   const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
-  // Single tilde ~ untuk strikethrough WhatsApp (bukan double ~~)
-  const ongkirDisplay = hasil.ongkirAsli !== hasil.ongkirPromo
-    ? `~${fmt(hasil.ongkirAsli)}~ ${fmt(hasil.ongkirPromo)}`
-    : fmt(hasil.ongkirPromo);
+  const ongkirAsli  = hasil.ongkirAsli;
+  const ongkirPromo = hasil.ongkirPromo;
+  const ongkirDisplay = ongkirAsli !== ongkirPromo
+    ? `~${fmt(ongkirAsli)}~ ${fmt(ongkirPromo)}`
+    : fmt(ongkirPromo);
+
+  const areaFull = hasil.area
+    ? [hasil.area.kecamatan, hasil.area.kota, hasil.area.provinsi].filter(Boolean).join(', ')
+    : '';
 
   // Tabel semua kurir yang tersedia
   const tabelKurir = (hasil.allRates || []).map(r => {
@@ -1123,14 +1131,43 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
     return `- ${r.nama}: ongkir ${fmt(r.ongkir)}${potongan} → TF total ${fmt(r.totalTF)} | COD total ${fmt(r.totalCOD)}`;
   }).join('\n');
 
-  const areaFull = hasil.area
-    ? [hasil.area.kecamatan, hasil.area.kota, hasil.area.provinsi].filter(Boolean).join(', ')
-    : '';
+  const hasBundling = Array.isArray(product?.harga_bundling) && product.harga_bundling.length > 0;
+  const paketPrioritas = hasBundling ? product.harga_bundling.find(p => p.prioritas) : null;
 
-  return `[SISTEM] ${konteks}Ongkir sudah dihitung. Rekomendasi termurah: ${hasil.ekspedisi}.
-${areaFull ? `Area yang dicocokkan sistem: ${areaFull}. Sebutkan nama area ini ke customer saat konfirmasi, contoh: "Oke kak, ongkir ke ${areaFull} ya 😊"` : ''}
+  let hargaSection;
 
-Tampilkan PERSIS ini ke customer (jangan ubah angka):
+  if (hasBundling) {
+    const defaultPaket  = paketPrioritas || product.harga_bundling[0];
+    const defaultHarga  = defaultPaket.harga;
+    const defaultFeeCOD = Math.ceil((defaultHarga + ongkirPromo) * 0.05);
+    const defaultTotalTF  = defaultHarga + ongkirPromo;
+    const defaultTotalCOD = defaultHarga + ongkirPromo + defaultFeeCOD;
+
+    // Tabel semua paket (hanya ditampilkan ke Claude, TIDAK ke customer kecuali ditanya)
+    const tabelSemuaPaket = product.harga_bundling.map(p => {
+      const hp     = p.harga;
+      const fee    = Math.ceil((hp + ongkirPromo) * 0.05);
+      const tTF    = hp + ongkirPromo;
+      const tCOD   = hp + ongkirPromo + fee;
+      return `- Paket ${p.qty} box${p.prioritas ? ' ⭐' : ''}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`;
+    }).join('\n');
+
+    hargaSection = `Tampilkan HANYA paket PRIORITAS ini ke customer (jangan ubah angka):
+
+Paket ${defaultPaket.qty} box ${product?.nama || 'Produk'}:
+💳 Transfer: ${fmt(defaultHarga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(defaultTotalTF)}
+📦 COD: ${fmt(defaultHarga)} + ongkir ${ongkirDisplay} + admin ${fmt(defaultFeeCOD)} = TOTAL ${fmt(defaultTotalCOD)}
+
+Via ${hasil.ekspedisi} ya kak 🚗
+
+Setelah tampilkan harga, tanya metode bayar: "Kakak enaknya COD atau Transfer? 😊"
+
+PAKET LAIN (jangan sebut ke customer kecuali customer nanya ada paket/harga lain):
+${tabelSemuaPaket}`;
+
+  } else {
+    // Produk tanpa bundling — tampilkan harga satuan normal
+    hargaSection = `Tampilkan PERSIS ini ke customer (jangan ubah angka):
 
 ${product?.nama || 'Produk'} ${fmt(hasil.harga)}
 
@@ -1142,7 +1179,13 @@ ${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + adm
 
 Via ${hasil.ekspedisi} ya kak 🚗
 
-SETELAH tampilkan harga di atas, tanya dengan santai: "Biasanya kakak lebih suka pakai kurir apa kak? Bisa aku cekkan juga 😊"
+SETELAH tampilkan harga di atas, tanya dengan santai: "Biasanya kakak lebih suka pakai kurir apa kak? Bisa aku cekkan juga 😊"`;
+  }
+
+  return `[SISTEM] ${konteks}Ongkir sudah dihitung. Rekomendasi termurah: ${hasil.ekspedisi}.
+${areaFull ? `Area yang dicocokkan sistem: ${areaFull}. Sebutkan nama area ini ke customer saat konfirmasi, contoh: "Oke kak, ongkir ke ${areaFull} ya 😊"` : ''}
+
+${hargaSection}
 
 DATA SEMUA KURIR TERSEDIA (untuk jawab kalau customer tanya kurir lain — jangan sebut ke customer kecuali ditanya):
 ${tabelKurir}
@@ -1598,7 +1641,8 @@ Isi field yang berubah saja, sisanya null.` }],
           // Tidak ubah state — tetap awaiting_order_confirm
           // Fall through ke Claude di bawah (sudah ada inject konteks awaiting_order_confirm di system prompt)
         } else if (isConfirm) {
-          // ✅ Closing!
+          // ✅ Closing! — ambil nomor urut SEBELUM set status selesai supaya tidak ikut terhitung
+          const nomorUrutClosing = await getOrderNumber(userId);
           await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
           await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
 
@@ -1728,9 +1772,8 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
               const snap      = convState.order_snapshot || {};
               const ongkirSnap = convState.ongkir || {};
               const csNama    = product?.persona_cs_nama || 'CS';
-              const nomorUrut = await getOrderNumber(userId);
               const closingMsg = buildClosingMessage({
-                nomorUrut, customer,
+                nomorUrut: nomorUrutClosing, customer,
                 alamat:  snap.alamat  || convState.alamat || '-',
                 ongkir:  ongkirSnap,
                 product,
@@ -1740,7 +1783,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
                 csNama,
               });
               await sendWA(userId, userGroupJid, closingMsg, true);
-              console.log(`Recap order #${nomorUrut} terkirim ke grup (setelah customer konfirmasi)`);
+              console.log(`Recap order #${nomorUrutClosing} terkirim ke grup (setelah customer konfirmasi)`);
             } catch(e) {
               console.error('Send recap ke grup error:', e.message);
             }
@@ -2401,13 +2444,19 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         const keluhanM = s.match(/keluhan="([^"]+)"/);
         const metodeM  = s.match(/metode="([^"]+)"/);
         const qtyM     = s.match(/qty=(\d+)/);
+        const parsedQty = parseInt(qtyM?.[1] || '1');
         orderDataParsed = {
           alamat:  alamatM?.[1]  || '',
           keluhan: keluhanM?.[1] || '',
           metode:  metodeM?.[1]  || 'COD',
-          qty:     parseInt(qtyM?.[1] || '1'),
+          qty:     parsedQty,
         };
         console.log('ORDER_DATA parsed:', JSON.stringify(orderDataParsed));
+        // Simpan qty ke state supaya WILAYAH_OK & fallback bisa pakai nilai yang benar
+        if (parsedQty > 1 || !convState.qty) {
+          await updateConvState(conversation.id, { qty: parsedQty });
+          convState.qty = parsedQty;
+        }
       } catch(e) { console.error('ORDER_DATA parse error:', e.message); }
     }
 
@@ -2469,7 +2518,16 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             convState.alamat = alamatStr;
           }
 
-          const qtyState = parseInt(convState.qty) || 1;
+          // Coba deteksi qty dari pesan AI (misal: "4 box", "2 pcs", "qty=4")
+          let qtyFromReply = null;
+          const qtyReplyMatch = rawReply.match(/\b(\d+)\s*(?:box|pcs|buah|paket)\b/i) || rawReply.match(/qty=(\d+)/i);
+          if (qtyReplyMatch) qtyFromReply = parseInt(qtyReplyMatch[1]);
+          const qtyState = qtyFromReply || parseInt(convState.qty) || 1;
+          if (qtyFromReply && qtyFromReply !== parseInt(convState.qty)) {
+            await updateConvState(conversation.id, { qty: qtyFromReply });
+            convState.qty = qtyFromReply;
+            console.log(`[WILAYAH_OK] qty deteksi dari reply: ${qtyFromReply}`);
+          }
           const hasil = await hitungOngkir(wilayah, product, qtyState);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
