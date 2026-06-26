@@ -1551,40 +1551,39 @@ let areaFilling = false;
 async function autofillArea() {
   const kel = document.getElementById('cm-kelurahan').value.trim();
   const kec = document.getElementById('cm-kecamatan').value.trim();
-  const query = [kel, kec].filter(Boolean).join(', ');
-  if (query.length < 3 || areaFilling) return;
+  // Minimal kecamatan harus diisi agar hasil tidak ambigu
+  if (!kec || areaFilling) return;
   areaFilling = true;
 
-  // Tampil loading hint
   const hint = document.getElementById('cm-area-hint');
   if (hint) { hint.textContent = '⏳ Mencari area...'; hint.style.display = 'block'; }
 
   try {
-    const res  = await fetch(`/api/save-settings?action=area-autofill&q=${encodeURIComponent(query)}`);
+    const params = new URLSearchParams({ action: 'area-autofill', kec });
+    if (kel) params.set('kel', kel);
+    const res  = await fetch(`/api/save-settings?${params}`);
     const json = await res.json();
-    console.log('[autofillArea] response:', JSON.stringify(json).slice(0, 500));
     if (!json.ok) { if (hint) hint.textContent = ''; return; }
 
     const list = Array.isArray(json.data) ? json.data : [];
-    if (!list.length) { if (hint) { hint.textContent = 'Area tidak ditemukan'; setTimeout(() => { if(hint) hint.textContent=''; }, 2000); } return; }
+    if (!list.length) {
+      if (hint) { hint.textContent = 'Area tidak ditemukan'; setTimeout(() => { if(hint) hint.textContent=''; }, 2000); }
+      return;
+    }
 
-    // Cari match terbaik — cocokkan kelurahan+kecamatan yang diketik
-    const match = list.find(r =>
-      (kec && r.kecamatan?.toLowerCase().includes(kec.toLowerCase())) ||
-      (kel && r.kelurahan?.toLowerCase().includes(kel.toLowerCase()))
-    ) || list[0];
+    // Backend sudah filter pakai kombinasi kel+kec, ambil baris pertama
+    const match = list[0];
 
-    // Field dari wilayah_id sudah pasti: kelurahan, kecamatan, kabupaten, provinsi
     if (match.kabupaten) document.getElementById('cm-kabupaten').value = match.kabupaten;
     if (match.provinsi)  document.getElementById('cm-provinsi').value  = match.provinsi;
     if (match.kodepos)   document.getElementById('cm-kodepos').value   = match.kodepos;
-    if (match.kelurahan && !document.getElementById('cm-kelurahan').value) document.getElementById('cm-kelurahan').value = match.kelurahan;
-    if (match.kecamatan && !document.getElementById('cm-kecamatan').value) document.getElementById('cm-kecamatan').value = match.kecamatan;
 
-    if (hint) { hint.textContent = `✓ ${match.kabupaten || ''}${match.provinsi ? ', '+match.provinsi : ''}`; setTimeout(() => { if(hint) hint.textContent=''; }, 2500); }
+    if (hint) {
+      hint.textContent = `✓ ${match.kabupaten || ''}${match.provinsi ? ', '+match.provinsi : ''}`;
+      setTimeout(() => { if(hint) hint.textContent=''; }, 2500);
+    }
 
   } catch(e) {
-    console.error('[autofillArea]', e);
     if (hint) hint.textContent = '';
   } finally {
     areaFilling = false;
