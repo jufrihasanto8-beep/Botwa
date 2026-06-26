@@ -585,6 +585,7 @@ body.light .cm-empty{color:#94a3b8}
         <div id="ch-status-area"></div>
         <div class="ch-acts">
           <button class="act-btn" title="Ambil alih dari AI" onclick="manualEscalate()" id="btn-ambil">🙋</button>
+          <button class="act-btn" title="Closing Manual" onclick="openClosingManual()" id="btn-closing-manual">✍️</button>
           <button class="act-btn" title="Tandai selesai" onclick="markSelesai()" id="btn-selesai">✅</button>
           <button class="act-btn" title="Hapus chat" onclick="clearChat()">🗑</button>
         </div>
@@ -1411,6 +1412,174 @@ window.addEventListener('load', async () => {
 
   setInterval(poll, 5000);
 });
+/* ── CLOSING MANUAL ── */
+let cmProducts = [];
+
+async function openClosingManual() {
+  if (!activeConvId || !activeConv) return;
+
+  // Load products kalau belum
+  if (!cmProducts.length) {
+    cmProducts = await sbGet('products', `?user_id=eq.${userId}&select=id,nama,harga,berat_gram&order=nama.asc`);
+  }
+
+  const prodOpts = cmProducts.map(p =>
+    `<option value="${p.id}" data-harga="${p.harga||0}" data-berat="${p.berat_gram||1000}">${esc(p.nama)} — Rp ${(p.harga||0).toLocaleString('id')}</option>`
+  ).join('');
+
+  document.getElementById('cm-overlay').style.display = 'flex';
+  document.getElementById('cm-prod').innerHTML = `<option value="">-- Pilih Produk --</option>${prodOpts}`;
+  document.getElementById('cm-harga').value  = '';
+  document.getElementById('cm-qty').value    = '1';
+  document.getElementById('cm-metode').value = 'COD';
+  document.getElementById('cm-status').textContent = '';
+}
+
+function closeClosingManual() {
+  document.getElementById('cm-overlay').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const prodSel = document.getElementById('cm-prod');
+  if (prodSel) {
+    prodSel.addEventListener('change', () => {
+      const opt = prodSel.selectedOptions[0];
+      const harga = opt?.dataset?.harga || '';
+      document.getElementById('cm-harga').value = harga;
+      updateCMTotal();
+    });
+  }
+  document.getElementById('cm-qty')?.addEventListener('input', updateCMTotal);
+  document.getElementById('cm-harga')?.addEventListener('input', updateCMTotal);
+});
+
+function updateCMTotal() {
+  const qty   = parseInt(document.getElementById('cm-qty')?.value) || 1;
+  const harga = parseInt(document.getElementById('cm-harga')?.value) || 0;
+  const total = qty * harga;
+  const el = document.getElementById('cm-total-preview');
+  if (el) el.textContent = total ? `Total: Rp ${total.toLocaleString('id')}` : '';
+}
+
+async function submitClosingManual() {
+  const prodId  = document.getElementById('cm-prod').value;
+  const qty     = parseInt(document.getElementById('cm-qty').value) || 1;
+  const harga   = parseInt(document.getElementById('cm-harga').value) || 0;
+  const metode  = document.getElementById('cm-metode').value;
+  const catatan = document.getElementById('cm-catatan').value.trim();
+  const statusEl = document.getElementById('cm-status');
+
+  if (!prodId) { statusEl.textContent = 'Pilih produk dulu.'; return; }
+  if (!harga)  { statusEl.textContent = 'Isi harga produk.'; return; }
+
+  const btn = document.getElementById('cm-btn-submit');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+  statusEl.textContent = '';
+
+  try {
+    const prod    = cmProducts.find(p => p.id === prodId) || {};
+    const total   = harga * qty;
+    const custId  = activeConv?.customer_id || null;
+    const convState = activeConv?.state || {};
+
+    // Ambil nomor urut
+    const existing = await sbGet('orders_new', `?user_id=eq.${userId}&select=nomor_urut&order=created_at.desc&limit=100`);
+    const maxNo = existing.reduce((m, r) => Math.max(m, parseInt(r.nomor_urut)||0), 0);
+    const nomorUrut = String(maxNo + 1).padStart(2, '0');
+
+    // Insert orders_new
+    const orderPayload = {
+      user_id:       userId,
+      customer_id:   custId,
+      product_id:    prodId,
+      qty,
+      harga,
+      total,
+      metode,
+      catatan,
+      nomor_urut:    nomorUrut,
+      status:        'baru',
+      status_tracking: 'baru',
+      source:        'manual',
+      alamat:        convState.alamat || null,
+      ekspedisi:     convState.ongkir?.kurir || null,
+    };
+    await sbPost('orders_new', orderPayload);
+
+    // Update conversation: selesai + simpan order_snapshot di state
+    const snapshot = { product: prod.nama, qty, harga, total, metode, nomor_urut: nomorUrut };
+    const newState = { ...convState, order_snapshot: snapshot, status: 'selesai' };
+    await sbPatch('conversations', `?id=eq.${activeConvId}`, {
+      status: 'selesai',
+      state:  newState,
+    });
+
+    showToast(`✅ Closing manual berhasil — Order #${nomorUrut}`);
+    closeClosingManual();
+    activeConv.status = 'selesai';
+    await renderChat();
+    await renderInbox();
+  } catch(e) {
+    statusEl.textContent = 'Gagal: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Simpan Closing';
+  }
+}
 </script>
+
+<!-- Modal Closing Manual -->
+<div id="cm-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--white,#1e293b);border-radius:14px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden">
+    <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:700">✍️ Closing Manual</div>
+      <button onclick="closeClosingManual()" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+
+      <div>
+        <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">Produk</label>
+        <select id="cm-prod" style="width:100%;padding:9px 10px;background:var(--bg,#0d1117);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:inherit;font-size:13px">
+          <option value="">-- Pilih Produk --</option>
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">Qty</label>
+          <input type="number" id="cm-qty" value="1" min="1" style="width:100%;padding:9px 10px;background:var(--bg,#0d1117);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:inherit;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">Harga Satuan</label>
+          <input type="number" id="cm-harga" placeholder="150000" min="0" style="width:100%;padding:9px 10px;background:var(--bg,#0d1117);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:inherit;font-size:13px">
+        </div>
+      </div>
+
+      <div id="cm-total-preview" style="font-size:12px;font-weight:600;color:#3b82f6;margin-top:-6px"></div>
+
+      <div>
+        <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">Metode Bayar</label>
+        <select id="cm-metode" style="width:100%;padding:9px 10px;background:var(--bg,#0d1117);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:inherit;font-size:13px">
+          <option value="COD">COD</option>
+          <option value="Transfer">Transfer</option>
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">Catatan (opsional)</label>
+        <textarea id="cm-catatan" rows="2" placeholder="Misal: warna merah, ukuran L, dll..." style="width:100%;padding:9px 10px;background:var(--bg,#0d1117);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:inherit;font-size:13px;resize:vertical"></textarea>
+      </div>
+
+      <div style="color:#ef4444;font-size:12px" id="cm-status"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px">
+        <button onclick="closeClosingManual()" style="padding:8px 16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#94a3b8;font-size:13px;cursor:pointer">Batal</button>
+        <button id="cm-btn-submit" onclick="submitClosingManual()" style="padding:8px 18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Simpan Closing</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
