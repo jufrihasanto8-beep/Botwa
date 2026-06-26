@@ -78,6 +78,27 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .btn-save:disabled{opacity:.6;cursor:not-allowed}
 .btn-cancel{padding:8px 16px;background:transparent;color:var(--text-2);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer}
 
+/* Mengantar Modal */
+.mng-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;align-items:center;justify-content:center}
+.mng-overlay.open{display:flex}
+.mng-modal{background:var(--white);border-radius:14px;width:500px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.mng-modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.mng-modal-head h3{font-size:15px;font-weight:700;color:var(--text)}
+.mng-modal-body{padding:16px 20px;overflow-y:auto;flex:1}
+.mng-modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.mng-summary{font-size:13px;color:var(--text-2);margin-bottom:14px;padding:10px 14px;background:rgba(59,130,246,.06);border-radius:8px;border:1px solid rgba(59,130,246,.15)}
+.mng-result-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+.mng-result-item:last-child{border-bottom:none}
+.mng-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.mng-result-name{font-weight:600;color:var(--text)}
+.mng-result-sub{color:var(--text-2);font-size:12px;margin-top:2px}
+.mng-resi{color:#16a34a;font-weight:700;font-size:12px;margin-top:3px}
+.mng-error{color:#dc2626;font-size:12px;margin-top:3px}
+.btn-mengantar{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#f97316;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-mengantar:hover{background:#ea6c00}
+.btn-mengantar:disabled{opacity:.6;cursor:not-allowed}
+.mng-loading{text-align:center;padding:30px;color:var(--text-2);font-size:13px}
+
 /* Date range picker */
 .drp-trigger{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
 .drp-trigger:hover{border-color:#3b82f6}
@@ -276,6 +297,7 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
+      <button id="btn-mengantar" class="btn-mengantar" onclick="openMengantar()" style="display:none">🚚 Kirim ke Mengantar (<span id="mng-count">0</span>)</button>
       <button id="btn-delete" class="btn-export" onclick="deleteSelected()" style="background:#ef4444;display:none">🗑 Hapus (<span id="del-count">0</span>)</button>
       <button class="btn-export btn-csv" onclick="exportCSV()">⬇ CSV</button>
       <button class="btn-export btn-xlsx" onclick="exportExcel()">⬇ Excel (.xlsx)</button>
@@ -328,6 +350,23 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
   </div>
 
 </div>
+</div>
+
+<!-- Mengantar Modal -->
+<div class="mng-overlay" id="mng-overlay" onclick="if(event.target===this&&!mngProcessing)closeMengantar()">
+  <div class="mng-modal">
+    <div class="mng-modal-head">
+      <h3>🚚 Kirim ke Mengantar</h3>
+      <button class="edit-modal-close" onclick="if(!mngProcessing)closeMengantar()">✕</button>
+    </div>
+    <div class="mng-modal-body" id="mng-modal-body">
+      <!-- diisi JS -->
+    </div>
+    <div class="mng-modal-foot" id="mng-modal-foot">
+      <button class="btn-cancel" onclick="closeMengantar()" id="mng-btn-cancel">Batal</button>
+      <button class="btn-save" id="mng-btn-submit" onclick="submitMengantar()" style="background:#f97316">Kirim Sekarang</button>
+    </div>
+  </div>
 </div>
 
 <!-- Edit Modal -->
@@ -666,8 +705,11 @@ function updateSelectAll() {
   cbAll.indeterminate = chk.length > 0 && chk.length < all.length;
 
   const btnDel = document.getElementById('btn-delete');
+  const btnMng = document.getElementById('btn-mengantar');
   document.getElementById('del-count').textContent = chk.length;
+  document.getElementById('mng-count').textContent = chk.length;
   btnDel.style.display = chk.length > 0 ? 'inline-flex' : 'none';
+  btnMng.style.display = chk.length > 0 ? 'inline-flex' : 'none';
 }
 
 async function deleteSelected() {
@@ -697,6 +739,7 @@ async function deleteSelected() {
     // Hapus dari allOrders lokal
     allOrders = allOrders.filter(o => !ids.includes(String(o.id)));
     document.getElementById('btn-delete').style.display = 'none';
+    document.getElementById('btn-mengantar').style.display = 'none';
     document.getElementById('cb-all').checked = false;
     render();
   } catch(e) {
@@ -810,6 +853,144 @@ function exportExcel() {
 }
 
 init();
+
+// ── KIRIM KE MENGANTAR ────────────────────────────────────
+let mngProcessing = false;
+let mngSelectedIds = [];
+
+function openMengantar() {
+  const chk = document.querySelectorAll('.row-cb:checked');
+  mngSelectedIds = Array.from(chk).map(el => el.value).filter(Boolean);
+  if (!mngSelectedIds.length) return;
+
+  // Build preview order list
+  const list = filterByRange(allOrders);
+  const rows = list.map((c, i) => getOrderRow(c, i)).filter(r => mngSelectedIds.includes(r.id));
+
+  // Group by kurir
+  const grouped = {};
+  rows.forEach(r => {
+    const k = r.instruksi || 'KURIR';
+    if (!grouped[k]) grouped[k] = [];
+    grouped[k].push(r);
+  });
+
+  const groupHtml = Object.entries(grouped).map(([kurir, items]) => `
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px">${kurir} — ${items.length} order</div>
+      ${items.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <span style="font-size:16px">${r.isCOD ? '📦' : '💳'}</span>
+        <div>
+          <div style="font-weight:600">${escH(r.nama)}</div>
+          <div style="color:var(--text-2)">${escH(r.kecamatan)}, ${escH(r.kabupaten)} · ${r.isCOD ? 'COD' : 'TF'} ${rp(r.total)}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+  `).join('');
+
+  document.getElementById('mng-modal-body').innerHTML = `
+    <div class="mng-summary">
+      <b>${mngSelectedIds.length} order</b> akan dikirim ke Mengantar dengan pickup <b>scheduledPickup jam 15:00</b>.
+    </div>
+    ${groupHtml}
+  `;
+  const submitBtn = document.getElementById('mng-btn-submit');
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Kirim Sekarang';
+  submitBtn.style.background = '#f97316';
+  submitBtn.onclick = submitMengantar;
+  document.getElementById('mng-btn-cancel').style.display = '';
+  document.getElementById('mng-overlay').classList.add('open');
+}
+
+function closeMengantar() {
+  if (mngProcessing) return;
+  document.getElementById('mng-overlay').classList.remove('open');
+  mngSelectedIds = [];
+  mngProcessing = false;
+}
+
+async function submitMengantar() {
+  if (!mngSelectedIds.length || mngProcessing) return;
+  mngProcessing = true;
+
+  const btn = document.getElementById('mng-btn-submit');
+  const cancelBtn = document.getElementById('mng-btn-cancel');
+  btn.disabled = true;
+  btn.textContent = 'Memproses...';
+  cancelBtn.style.display = 'none';
+
+  document.getElementById('mng-modal-body').innerHTML = `
+    <div class="mng-loading">
+      <div style="font-size:32px;margin-bottom:12px">🚚</div>
+      <div>Sedang mengirim order ke Mengantar...</div>
+      <div style="font-size:11px;color:var(--text-2);margin-top:6px">Mohon tunggu, jangan tutup halaman ini</div>
+    </div>
+  `;
+
+  try {
+    const resp = await fetch('/api/tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create-mengantar', order_ids: mngSelectedIds, user_id: uid }),
+    });
+    const json = await resp.json();
+
+    if (!resp.ok) throw new Error(json.error || 'Server error');
+
+    const results = json.results || [];
+    const sukses  = results.filter(r => r.success);
+    const gagal   = results.filter(r => !r.success);
+
+    // Ambil nama customer untuk tiap orderId
+    const list = filterByRange(allOrders);
+    const rowMap = {};
+    list.map((c, i) => getOrderRow(c, i)).forEach(r => { rowMap[r.id] = r; });
+
+    const resultHtml = results.map(r => {
+      const row = rowMap[r.orderId] || {};
+      return `<div class="mng-result-item">
+        <span class="mng-icon">${r.success ? '✅' : '❌'}</span>
+        <div>
+          <div class="mng-result-name">${escH(row.nama || r.orderId || '-')}</div>
+          <div class="mng-result-sub">${r.kurir} · ${escH(row.kecamatan || '')}${row.kabupaten ? ', ' + escH(row.kabupaten) : ''}</div>
+          ${r.success
+            ? `<div class="mng-resi">${r.cnote_no ? 'Resi: ' + r.cnote_no : 'Order dibuat (resi menyusul)'}${r.unpaid ? ' · ⚠️ Unpaid (saldo kurang)' : ''}</div>`
+            : `<div class="mng-error">Gagal: ${escH(r.error || '-')}</div>`
+          }
+        </div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('mng-modal-body').innerHTML = `
+      <div class="mng-summary" style="${gagal.length ? 'border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.04)' : ''}">
+        ✅ <b>${sukses.length} order berhasil</b>${gagal.length ? ` · ❌ <b>${gagal.length} gagal</b>` : ''} dikirim ke Mengantar
+      </div>
+      ${resultHtml}
+    `;
+
+    btn.textContent = 'Tutup';
+    btn.disabled = false;
+    btn.onclick = closeMengantar;
+    btn.style.background = '#16a34a';
+
+    // Reload data supaya status & resi terupdate
+    if (sukses.length) await init();
+
+  } catch(e) {
+    document.getElementById('mng-modal-body').innerHTML = `
+      <div class="mng-summary" style="border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.04)">
+        ❌ Terjadi error: ${escH(e.message)}
+      </div>
+    `;
+    btn.textContent = 'Tutup';
+    btn.disabled = false;
+    btn.onclick = closeMengantar;
+  } finally {
+    mngProcessing = false;
+    cancelBtn.style.display = 'none';
+  }
+}
 
 // ── EDIT ORDER ────────────────────────────────────────────
 let editRowId = null;

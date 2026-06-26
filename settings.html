@@ -242,6 +242,7 @@ body.light .grup-item-nama{color:#0f172a}
       <a href="#" onclick="showSection('ai',this)">🤖 AI Key</a>
       <a href="#" onclick="showSection('gmail',this)">📧 Integrasi Gmail</a>
       <a href="#" onclick="showSection('group',this)">💬 Grup WA Recap</a>
+      <a href="#" onclick="showSection('mengantar',this)">🚚 Mengantar</a>
     </div>
 
     <div class="settings-body">
@@ -440,6 +441,36 @@ Bisa isi lebih dari satu rekening."></textarea>
           <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
             <button class="btn-primary" onclick="saveGroupJid()">Simpan</button>
             <span id="group-jid-status" style="font-size:12px;color:#22c55e;display:none">✓ Tersimpan!</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section" id="sec-mengantar">
+        <div class="section-title">🚚 Mengantar</div>
+        <div class="section-desc">API key dan alamat pickup Mengantar milikmu. Dipakai untuk kirim order langsung ke Mengantar dari halaman Detail Order.</div>
+
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:16px;display:flex;flex-direction:column;gap:16px">
+
+          <div class="form-group">
+            <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:6px">API Key Mengantar</label>
+            <div style="display:flex;gap:8px">
+              <input type="password" id="f-mengantar-key" placeholder="Masukkan API key Mengantar..."
+                autocomplete="off" style="flex:1;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-family:monospace">
+              <button class="btn" onclick="toggleMengantarKey()" style="padding:8px 14px">👁</button>
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:6px">Dapatkan API key dari dashboard Mengantar → Settings → API</div>
+          </div>
+
+          <div class="form-group">
+            <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:6px">Pickup Address ID</label>
+            <input type="text" id="f-mengantar-origin" placeholder="Contoh: 62e27d67ecf5ae2893bc070a"
+              style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-family:monospace">
+            <div style="font-size:11px;color:#64748b;margin-top:6px">ID alamat gudang/pickup di Mengantar. Cek di dashboard Mengantar → Alamat saya → salin _id-nya.</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn-primary" onclick="saveMengantarSettings()">Simpan</button>
+            <span id="mengantar-status" style="font-size:12px;color:#22c55e;display:none">✓ Tersimpan!</span>
           </div>
         </div>
       </div>
@@ -676,6 +707,7 @@ window.showSection = function(name, el) {
   if (name === 'ai') loadAnthropicKey();
   if (name === 'gmail') { loadGmailStatus(); loadTemplateFormLead(); }
   if (name === 'group') loadGroupJid();
+  if (name === 'mengantar') loadMengantarSettings();
 };
 
 /* ── GMAIL INTEGRATION ── */
@@ -1188,6 +1220,39 @@ async function saveGroupJid() {
       body: JSON.stringify({ group_jid: _selectedGroupJid || null, group_nama: _selectedGroupJid ? nama : null }),
     });
     const st = document.getElementById('group-jid-status');
+    st.style.display = 'inline';
+    setTimeout(() => st.style.display = 'none', 2500);
+  } catch(e) {
+    alert('Gagal simpan: ' + e.message);
+  }
+}
+
+/* ── MENGANTAR SETTINGS ── */
+async function loadMengantarSettings() {
+  try {
+    const data = await SB.get('users', `?id=eq.${userId}&select=mengantar_key,mengantar_origin_id&limit=1`);
+    const row = data[0] || {};
+    document.getElementById('f-mengantar-key').value    = row.mengantar_key       || '';
+    document.getElementById('f-mengantar-origin').value = row.mengantar_origin_id || '';
+  } catch(e) { console.error('loadMengantarSettings error', e); }
+}
+
+function toggleMengantarKey() {
+  const el = document.getElementById('f-mengantar-key');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+async function saveMengantarSettings() {
+  const key    = document.getElementById('f-mengantar-key').value.trim();
+  const origin = document.getElementById('f-mengantar-origin').value.trim();
+  try {
+    const res = await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, mengantar_key: key, mengantar_origin_id: origin }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const st = document.getElementById('mengantar-status');
     st.style.display = 'inline';
     setTimeout(() => st.style.display = 'none', 2500);
   } catch(e) {
