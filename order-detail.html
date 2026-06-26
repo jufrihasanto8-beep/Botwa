@@ -56,6 +56,28 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .btn-xlsx{background:#3b82f6;}.btn-xlsx:hover{background:#2563eb}
 .theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 
+/* Edit Modal */
+.edit-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center}
+.edit-overlay.open{display:flex}
+.edit-modal{background:var(--white);border-radius:14px;width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.edit-modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.edit-modal-head h3{font-size:15px;font-weight:700;color:var(--text)}
+.edit-modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);line-height:1;padding:4px}
+.edit-modal-body{padding:16px 20px;overflow-y:auto;flex:1}
+.edit-section{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px}
+.edit-section:first-child{margin-top:0}
+.edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.edit-grid.full{grid-template-columns:1fr}
+.edit-field label{display:block;font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:4px}
+.edit-field input,.edit-field select,.edit-field textarea{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border .15s}
+.edit-field input:focus,.edit-field select:focus,.edit-field textarea:focus{border-color:#3b82f6}
+.edit-field textarea{resize:vertical;min-height:64px}
+.edit-modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.btn-save{padding:8px 20px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.btn-save:hover{background:#2563eb}
+.btn-save:disabled{opacity:.6;cursor:not-allowed}
+.btn-cancel{padding:8px 16px;background:transparent;color:var(--text-2);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer}
+
 /* Date range picker */
 .drp-trigger{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
 .drp-trigger:hover{border-color:#3b82f6}
@@ -279,6 +301,7 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
       <thead>
         <tr>
           <th class="th-cb"><input type="checkbox" id="cb-all" onchange="toggleAll(this)"></th>
+          <th style="width:40px"></th>
           <th>Tanggal</th>
           <th>Produk</th>
           <th>Nama</th>
@@ -305,6 +328,58 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
   </div>
 
 </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="edit-overlay" id="edit-overlay" onclick="if(event.target===this)closeEdit()">
+  <div class="edit-modal">
+    <div class="edit-modal-head">
+      <h3>✏️ Edit Order</h3>
+      <button class="edit-modal-close" onclick="closeEdit()">✕</button>
+    </div>
+    <div class="edit-modal-body">
+      <div class="edit-section">Data Customer</div>
+      <div class="edit-grid">
+        <div class="edit-field"><label>Nama</label><input id="ef-nama" type="text"></div>
+        <div class="edit-field"><label>No Telpon</label><input id="ef-notelp" type="text"></div>
+      </div>
+
+      <div class="edit-section">Alamat Pengiriman</div>
+      <div class="edit-grid full">
+        <div class="edit-field"><label>Jalan / Alamat</label><input id="ef-jalan" type="text"></div>
+      </div>
+      <div class="edit-grid">
+        <div class="edit-field"><label>Kelurahan/Desa</label><input id="ef-kelurahan" type="text"></div>
+        <div class="edit-field"><label>Kecamatan</label><input id="ef-kecamatan" type="text"></div>
+        <div class="edit-field"><label>Kabupaten/Kota</label><input id="ef-kabupaten" type="text"></div>
+        <div class="edit-field"><label>Provinsi</label><input id="ef-provinsi" type="text"></div>
+        <div class="edit-field"><label>Kode Pos</label><input id="ef-kodepos" type="text"></div>
+      </div>
+
+      <div class="edit-section">Detail Order</div>
+      <div class="edit-grid">
+        <div class="edit-field"><label>Qty</label><input id="ef-qty" type="number" min="1"></div>
+        <div class="edit-field"><label>Tipe</label>
+          <select id="ef-metode">
+            <option value="cod">COD</option>
+            <option value="transfer">Transfer</option>
+          </select>
+        </div>
+        <div class="edit-field"><label>Kurir</label><input id="ef-ekspedisi" type="text"></div>
+        <div class="edit-field"><label>Total Pembayaran</label><input id="ef-total" type="number" min="0"></div>
+      </div>
+
+      <div class="edit-section">Catatan</div>
+      <div class="edit-grid full">
+        <div class="edit-field"><label>Keluhan</label><textarea id="ef-keluhan"></textarea></div>
+        <div class="edit-field"><label>Keterangan</label><textarea id="ef-keterangan"></textarea></div>
+      </div>
+    </div>
+    <div class="edit-modal-foot">
+      <button class="btn-cancel" onclick="closeEdit()">Batal</button>
+      <button class="btn-save" id="btn-save-edit" onclick="saveEdit()">Simpan</button>
+    </div>
+  </div>
 </div>
 
 <script src="js/config.js"></script>
@@ -502,13 +577,14 @@ function getOrderRow(c, idx) {
   const rincian = parts.join('+') + '=' + total;
 
   // Instruksi pengiriman
-  const instruksi = ekspedisi ? `${ekspedisi}-MENG` : '—';
+  const instruksi = ekspedisi || '—';
 
   // Keterangan dari catatan customer
   const keterangan = cu.catatan ? cu.catatan.split('\n')[0] : '';
 
   return {
     id: c.id,
+    customer_id: c.customer_id,
     tanggal: c.created_at,
     no: idx + 1,
     nama: cu.nama || '—',
@@ -518,7 +594,8 @@ function getOrderRow(c, idx) {
     produkNama: prod.nama || '—',
     jumlah: prod.nama ? `${prod.nama} ×${qty}` : `×${qty}`,
     qty, metode, total, instruksi, keterangan, rincian, keluhan,
-    isCOD
+    isCOD,
+    _raw: c, _cu: cu
   };
 }
 
@@ -556,6 +633,7 @@ function renderTable(rows) {
 
   tbody.innerHTML = rows.map((r, i) => `<tr>
     <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()"></td>
+    <td style="text-align:center"><button onclick="openEdit('${escH(r.id)}')" style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;color:#64748b;font-size:14px" title="Edit order">✏️</button></td>
     <td class="td-no">${fmtDt(r.tanggal)}</td>
     <td><div class="td-wrap-sm td-bold" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
     <td><div class="td-name" title="${escH(r.nama)}">${escH(r.nama)}</div></td>
@@ -732,6 +810,116 @@ function exportExcel() {
 }
 
 init();
+
+// ── EDIT ORDER ────────────────────────────────────────────
+let editRowId = null;
+
+function openEdit(id) {
+  const list = filterByRange(allOrders);
+  const rows = list.map((c, i) => getOrderRow(c, i));
+  const r = rows.find(x => x.id === id);
+  if (!r) return;
+
+  editRowId = id;
+
+  document.getElementById('ef-nama').value       = r.nama === '—' ? '' : r.nama;
+  document.getElementById('ef-notelp').value      = r.notelp ? r.notelp.replace(/@.*$/, '').replace(/^62/, '0') : '';
+  document.getElementById('ef-jalan').value       = r.alamat;
+  document.getElementById('ef-kelurahan').value   = r.kelurahan;
+  document.getElementById('ef-kecamatan').value   = r.kecamatan;
+  document.getElementById('ef-kabupaten').value   = r.kabupaten;
+  document.getElementById('ef-provinsi').value    = r.provinsi;
+  document.getElementById('ef-kodepos').value     = r.kodepos;
+  document.getElementById('ef-qty').value         = r.qty;
+  document.getElementById('ef-metode').value      = r.isCOD ? 'cod' : 'transfer';
+  document.getElementById('ef-ekspedisi').value   = r.instruksi === '—' ? '' : r.instruksi;
+  document.getElementById('ef-total').value       = r._raw.total || 0;
+  document.getElementById('ef-keluhan').value     = r.keluhan;
+  document.getElementById('ef-keterangan').value  = r._cu.catatan || '';
+
+  document.getElementById('edit-overlay').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('edit-overlay').classList.remove('open');
+  editRowId = null;
+}
+
+async function saveEdit() {
+  if (!editRowId) return;
+  const btn = document.getElementById('btn-save-edit');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+
+  try {
+    const list = filterByRange(allOrders);
+    const rawOrder = list.find(c => c.id === editRowId);
+    if (!rawOrder) throw new Error('Order tidak ditemukan');
+
+    const nama    = document.getElementById('ef-nama').value.trim();
+    const notelp  = document.getElementById('ef-notelp').value.trim();
+    const jalan   = document.getElementById('ef-jalan').value.trim();
+    const kel     = document.getElementById('ef-kelurahan').value.trim();
+    const kec     = document.getElementById('ef-kecamatan').value.trim();
+    const kab     = document.getElementById('ef-kabupaten').value.trim();
+    const prov    = document.getElementById('ef-provinsi').value.trim();
+    const kodepos = document.getElementById('ef-kodepos').value.trim();
+    const qty     = parseInt(document.getElementById('ef-qty').value) || 1;
+    const metode  = document.getElementById('ef-metode').value;
+    const ekspedisi = document.getElementById('ef-ekspedisi').value.trim().toUpperCase();
+    const total   = parseInt(document.getElementById('ef-total').value) || 0;
+    const keluhan = document.getElementById('ef-keluhan').value.trim();
+    const keterangan = document.getElementById('ef-keterangan').value.trim();
+
+    // Format nomor WA: 08xx → 628xx
+    const notelp62 = notelp.startsWith('0') ? '62' + notelp.slice(1) : notelp;
+
+    // Patch orders_new
+    const alamatBaru = {
+      ...(rawOrder.alamat || {}),
+      jalan, kelurahan: kel, kecamatan: kec, kabupaten: kab, provinsi: prov, kodepos
+    };
+    const r1 = await fetch(`${SB_URL}/rest/v1/orders_new?id=eq.${editRowId}`, {
+      method: 'PATCH',
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ qty, metode, ekspedisi, total, alamat: alamatBaru, keluhan })
+    });
+    if (!r1.ok) throw new Error('Gagal update order: ' + await r1.text());
+
+    // Patch customers (nama, wa_number, catatan)
+    if (rawOrder.customer_id) {
+      const custPatch = {};
+      if (nama) custPatch.nama = nama;
+      if (notelp62) custPatch.wa_number = notelp62;
+      if (keterangan !== undefined) custPatch.catatan = keterangan;
+      if (Object.keys(custPatch).length) {
+        await fetch(`${SB_URL}/rest/v1/customers?id=eq.${rawOrder.customer_id}`, {
+          method: 'PATCH',
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(custPatch)
+        });
+      }
+    }
+
+    // Update local data
+    const orderIdx = allOrders.findIndex(o => o.id === editRowId);
+    if (orderIdx !== -1) {
+      allOrders[orderIdx] = { ...allOrders[orderIdx], qty, metode, ekspedisi, total, alamat: alamatBaru, keluhan };
+    }
+    const custIdx = Object.values(custMap).findIndex(c => c.id === rawOrder.customer_id);
+    if (rawOrder.customer_id && custMap[rawOrder.customer_id]) {
+      custMap[rawOrder.customer_id] = { ...custMap[rawOrder.customer_id], nama, wa_number: notelp62, catatan: keterangan };
+    }
+
+    closeEdit();
+    render();
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Simpan';
+  }
+}
 
 // Bot status check
 async function checkBotStatus() {
