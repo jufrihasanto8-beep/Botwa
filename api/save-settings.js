@@ -68,7 +68,7 @@ module.exports = async function handler(req, res) {
         const kodeposMng = mngItem.kodePos || mngItem.kodepos || mngItem.zip || mngItem.zipCode || mngItem.postal_code || mngItem.postalCode || '';
 
         const data = sbData.map(r => ({ ...r, kodepos: r.kodepos || kodeposMng }));
-        return res.status(200).json({ ok: true, data });
+        return res.status(200).json({ ok: true, data, _mng: mngItem });
       } catch(e) {
         return res.status(500).json({ error: e.message });
       }
