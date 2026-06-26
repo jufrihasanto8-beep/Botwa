@@ -30,16 +30,28 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     const { userId, user_id, action, key } = req.query || {};
 
-    // Proxy: autofill area (kecamatan → kabupaten, provinsi, kodepos)
+    // Autofill area: wilayah_id (kabupaten/provinsi) + Mengantar (kodepos)
     if (action === 'area-autofill') {
-      const q = req.query.q || '';
+      const q = (req.query.q || '').trim();
       if (!q) return res.status(400).json({ error: 'q wajib' });
       try {
-        const r = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(q)}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' }
-        });
-        const json = await r.json();
-        return res.status(200).json({ ok: true, data: json });
+        const [byKel, byKec, mngRes] = await Promise.all([
+          sbReq('GET', `wilayah_id?kelurahan=ilike.*${encodeURIComponent(q)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`),
+          sbReq('GET', `wilayah_id?kecamatan=ilike.*${encodeURIComponent(q)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`),
+          fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(q)}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' }
+          }).then(r => r.json()).catch(() => null),
+        ]);
+
+        const sbData = byKel.length ? byKel : byKec;
+
+        // Ambil kodepos dari Mengantar
+        const mngList = mngRes?.data || (Array.isArray(mngRes) ? mngRes : []);
+        const kodepos = mngList[0]?.kodePos || mngList[0]?.zip || '';
+
+        // Gabungkan kodepos ke tiap row wilayah
+        const data = sbData.map(r => ({ ...r, kodepos: r.kodepos || kodepos }));
+        return res.status(200).json({ ok: true, data });
       } catch(e) {
         return res.status(500).json({ error: e.message });
       }
