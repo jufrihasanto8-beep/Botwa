@@ -128,15 +128,16 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
 
   if (existing.length) {
     const conv = existing[0];
-    // Kalau sudah di-closing manual → re-open
+    // Kalau sudah di-closing → tetap di Closing, tandai has_new_message
     if (conv.status === 'selesai') {
-      console.log(`Re-open conversation ${conv.id}`);
+      console.log(`Re-open conversation ${conv.id} — tetap di Closing, set has_new_message`);
       const reopenedAt = new Date().toISOString();
       const prevState = conv.state || {};
       const newState = {
         tahap: 'sambut',
         produk_locked: !!prevState.produk_locked,
         reopened_at: reopenedAt,
+        has_new_message: true, // tampil badge "Pelanggan Baru" di tab Closing
         // Preserve konteks penting agar bot ingat data customer
         wilayah:      prevState.wilayah      || null,
         ongkir:       prevState.ongkir       || null,
@@ -144,23 +145,23 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
         alamat:       prevState.alamat        || null,
         metode_bayar: prevState.metode_bayar  || null,
         qty:          prevState.qty           || null,
-        // Clear state transient agar tidak salah konteks
+        // Clear state transient
         proposed_wilayah:       null,
         pending_kecamatan:      null,
         followed_up:            false,
         followed_up_days:       [],
-        order_placed:           !!prevState.order_placed, // preserve — jangan reset kalau sudah order
-        awaiting_order_confirm: false, // clear — jangan minta konfirmasi lagi
+        order_placed:           false, // reset — bisa order lagi
+        awaiting_order_confirm: false,
         awaiting_order_correction: false,
         foto_terkirim:          false,
       };
       const updated = await sbPatch('conversations', `?id=eq.${conv.id}`, {
-        status: 'baru',
+        status: 'selesai', // tetap di tab Closing
         last_msg_at: reopenedAt,
         ringkasan: null,
         state: newState,
       });
-      return updated[0] || { ...conv, status: 'baru', state: newState };
+      return updated[0] || { ...conv, status: 'selesai', state: newState };
     }
     return conv;
   }
