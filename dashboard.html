@@ -1480,25 +1480,75 @@ function closeClosingManual() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const prodSel = document.getElementById('cm-prod');
-  if (prodSel) {
-    prodSel.addEventListener('change', () => {
-      const opt = prodSel.selectedOptions[0];
-      const harga = opt?.dataset?.harga || '';
-      document.getElementById('cm-harga').value = harga;
-      updateCMTotal();
-    });
-  }
+  // Produk → auto-isi harga satuan dari product
+  document.getElementById('cm-prod')?.addEventListener('change', () => {
+    const opt = document.getElementById('cm-prod').selectedOptions[0];
+    document.getElementById('cm-harga').value = opt?.dataset?.harga || '';
+    updateCMTotal();
+  });
+
+  // Qty/harga berubah → update total preview saja, harga satuan TIDAK berubah
   document.getElementById('cm-qty')?.addEventListener('input', updateCMTotal);
   document.getElementById('cm-harga')?.addEventListener('input', updateCMTotal);
+  document.getElementById('cm-metode')?.addEventListener('change', updateCMTotal);
+
+  // Autofill area saat kecamatan diketik
+  let areaTimer;
+  document.getElementById('cm-kecamatan')?.addEventListener('input', () => {
+    clearTimeout(areaTimer);
+    areaTimer = setTimeout(() => autofillArea(), 600);
+  });
 });
 
 function updateCMTotal() {
-  const qty   = parseInt(document.getElementById('cm-qty')?.value) || 1;
-  const harga = parseInt(document.getElementById('cm-harga')?.value) || 0;
-  const total = qty * harga;
-  const el = document.getElementById('cm-total-preview');
-  if (el) el.textContent = total ? `Total: Rp ${total.toLocaleString('id')}` : '';
+  const qty    = parseInt(document.getElementById('cm-qty')?.value) || 1;
+  const harga  = parseInt(document.getElementById('cm-harga')?.value) || 0;
+  const metode = document.getElementById('cm-metode')?.value || 'COD';
+  const total  = qty * harga;
+  const el     = document.getElementById('cm-total-preview');
+  if (!el) return;
+  if (!total) { el.textContent = ''; return; }
+  const label = metode === 'COD' ? `Total COD (yang ditagih ke pembeli)` : `Total Transfer`;
+  el.textContent = `${label}: Rp ${total.toLocaleString('id')}`;
+}
+
+let areaFilling = false;
+async function autofillArea() {
+  const kec = document.getElementById('cm-kecamatan').value.trim();
+  if (kec.length < 3 || areaFilling) return;
+  areaFilling = true;
+  try {
+    const res  = await fetch(`/api/save-settings?action=area-autofill&q=${encodeURIComponent(kec)}`);
+    const json = await res.json();
+    if (!json.ok) return;
+    const rows = json.data?.data || json.data || [];
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) return;
+
+    // Ambil hasil pertama yang cocok dengan kecamatan
+    const match = list.find(r => {
+      const district = (r.district || r.subdistrict || r.kecamatan || '').toLowerCase();
+      return district.includes(kec.toLowerCase());
+    }) || list[0];
+
+    if (!match) return;
+
+    // Isi kabupaten, provinsi, kodepos kalau masih kosong
+    const kab  = match.city      || match.kabupaten || match.regency || '';
+    const prov = match.province  || match.provinsi  || match.region  || '';
+    const kpos = match.zip       || match.postal_code || match.kodepos || '';
+
+    if (kab  && !document.getElementById('cm-kabupaten').value) document.getElementById('cm-kabupaten').value = kab;
+    if (prov && !document.getElementById('cm-provinsi').value)  document.getElementById('cm-provinsi').value  = prov;
+    if (kpos && !document.getElementById('cm-kodepos').value)   document.getElementById('cm-kodepos').value   = kpos;
+
+    // Isi kelurahan jika kosong dan ada subdistrict
+    const kel = match.subdistrict || match.kelurahan || '';
+    if (kel && !document.getElementById('cm-kelurahan').value) document.getElementById('cm-kelurahan').value = kel;
+
+  } catch(e) { /* silent */ } finally {
+    areaFilling = false;
+  }
 }
 
 async function submitClosingManual() {
