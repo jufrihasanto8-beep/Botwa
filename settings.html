@@ -117,6 +117,37 @@ body.light .kurir-card-icon{background:rgba(59,130,246,.08)}
 body.light .toggle-slider{background:#cbd5e1}
 body.light .kurir-add-row input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
 
+/* ── Light theme: form inputs & settings surfaces ── */
+body.light .form-group input,
+body.light .form-group textarea,
+body.light .form-group select{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+body.light .form-group input::placeholder,
+body.light .form-group textarea::placeholder{color:#94a3b8}
+body.light .form-group label{color:#64748b}
+body.light .settings-nav{background:#f8fafc;border-right-color:#e2e8f0}
+body.light .settings-nav a{color:#64748b}
+body.light .settings-nav a:hover{background:rgba(0,0,0,.04);color:#0f172a}
+body.light .settings-nav a.active{background:rgba(59,130,246,.08);color:#2563eb}
+body.light .settings-body{background:#f1f5f9}
+body.light .section-title{color:#0f172a}
+body.light .section-desc{color:#64748b}
+body.light .account-info{background:#fff;border-color:#e2e8f0}
+body.light .btn{background:rgba(0,0,0,.04);border-color:#e2e8f0;color:#475569}
+body.light .btn:hover{background:rgba(0,0,0,.07);color:#0f172a}
+body.light .save-bar{border-top-color:#e2e8f0}
+body.light .divider{background:#e2e8f0}
+body.light .hint{color:#94a3b8}
+/* Mengantar card & dropdown light */
+body.light #origin-card{background:rgba(59,130,246,.05);border-color:rgba(59,130,246,.2)}
+body.light #origin-card-name{color:#0f172a}
+body.light #origin-card-phone,
+body.light #origin-card-addr{color:#475569}
+body.light #origin-card-id{color:#94a3b8}
+body.light #origin-card button{background:rgba(0,0,0,.05);border-color:#e2e8f0;color:#64748b}
+body.light #origin-list{background:#fff;border-color:#e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,.1)}
+body.light #origin-list > div{color:#0f172a}
+body.light #origin-list > div:hover{background:rgba(59,130,246,.06)!important}
+
 /* ── WA status ── */
 .wa-status-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .wa-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
@@ -453,30 +484,30 @@ Bisa isi lebih dari satu rekening."></textarea>
 
           <!-- API Key -->
           <div class="form-group">
-            <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:6px">API Key Mengantar</label>
+            <label>API Key Mengantar</label>
             <div style="display:flex;gap:8px">
               <input type="password" id="f-mengantar-key" placeholder="Masukkan API key Mengantar..."
-                autocomplete="off" style="flex:1;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-family:monospace">
-              <button class="btn" onclick="toggleMengantarKey()" style="padding:8px 14px">👁</button>
+                autocomplete="off" style="font-family:monospace">
+              <button class="btn" onclick="toggleMengantarKey()" style="padding:8px 14px;flex-shrink:0">👁</button>
             </div>
-            <div style="font-size:11px;color:#64748b;margin-top:6px">Dapatkan API key dari dashboard Mengantar → Settings → API</div>
+            <div class="hint">Dapatkan API key dari dashboard Mengantar → Settings → API</div>
           </div>
 
           <!-- Pickup Address -->
           <div class="form-group">
-            <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:8px">Alamat Pickup</label>
+            <label>Alamat Pickup</label>
 
             <!-- Card info jika sudah tersimpan -->
             <div id="origin-card" style="display:none;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:14px 16px;margin-bottom:10px;position:relative">
               <div style="display:flex;align-items:flex-start;gap:12px">
                 <div style="font-size:22px;line-height:1;margin-top:2px">🏠</div>
                 <div style="flex:1;min-width:0">
-                  <div id="origin-card-name" style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:3px"></div>
-                  <div id="origin-card-phone" style="font-size:12px;color:#94a3b8;margin-bottom:3px"></div>
-                  <div id="origin-card-addr" style="font-size:12px;color:#94a3b8;line-height:1.5"></div>
-                  <div id="origin-card-id" style="font-size:10px;color:#475569;font-family:monospace;margin-top:6px"></div>
+                  <div id="origin-card-name" style="font-size:14px;font-weight:700;margin-bottom:3px"></div>
+                  <div id="origin-card-phone" style="font-size:12px;margin-bottom:3px;opacity:.7"></div>
+                  <div id="origin-card-addr" style="font-size:12px;line-height:1.5;opacity:.7"></div>
+                  <div id="origin-card-id" style="font-size:10px;font-family:monospace;margin-top:6px;opacity:.4"></div>
                 </div>
-                <button onclick="gantiOrigin()" style="flex-shrink:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#94a3b8;font-size:11px;padding:4px 10px;cursor:pointer">Ganti</button>
+                <button onclick="gantiOrigin()" class="btn btn-sm">Ganti</button>
               </div>
             </div>
 
@@ -1346,9 +1377,9 @@ async function cariMengantarOrigin() {
         onmouseover="this.style.background='rgba(59,130,246,.12)'" onmouseout="this.style.background=''">
         <div style="font-size:20px;line-height:1;flex-shrink:0">🏠</div>
         <div style="min-width:0">
-          <div style="font-weight:600;color:#e2e8f0;font-size:13px">${nama}</div>
-          ${telp ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px">${telp}</div>` : ''}
-          ${alamat ? `<div style="font-size:11px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${alamat}</div>` : ''}
+          <div style="font-weight:600;font-size:13px">${nama}</div>
+          ${telp ? `<div style="font-size:11px;margin-top:2px;opacity:.6">${telp}</div>` : ''}
+          ${alamat ? `<div style="font-size:11px;margin-top:2px;opacity:.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${alamat}</div>` : ''}
         </div>
       </div>`;
     }).join('');
