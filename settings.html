@@ -1233,6 +1233,7 @@ async function saveGroupJid() {
 
 /* ── MENGANTAR SETTINGS ── */
 async function loadMengantarSettings() {
+  const userId = Auth.getUser()?.id;
   try {
     const data = await SB.get('users', `?id=eq.${userId}&select=mengantar_key,mengantar_origin_id&limit=1`);
     const row = data[0] || {};
@@ -1275,10 +1276,12 @@ async function cariMengantarOrigin() {
     listEl.style.display = 'block';
     listEl.innerHTML = rows.map((r, i) => {
       const id    = r._id || r.id || '';
-      const nama  = r.name || r.nama || r.alias || r.label || 'Tanpa Nama';
-      const telp  = r.phone || r.telp || r.phoneNumber || '';
-      const alamat= r.address || r.alamat || r.street || '';
-      const kota  = [r.district, r.city, r.province].filter(Boolean).join(', ');
+      const nama  = r.name || r.nama || r.alias || r.label || r.store_name || r.storeName
+                 || r.warehouse_name || r.warehouseName || r.contact_name || r.contactName
+                 || r.sender_name || r.senderName || r.tag || r.title || Object.values(r).find(v => typeof v === 'string' && v.length > 2 && v !== id) || 'Tanpa Nama';
+      const telp  = r.phone || r.telp || r.phoneNumber || r.phone_number || r.mobile || '';
+      const alamat= r.address || r.alamat || r.street || r.full_address || r.fullAddress || '';
+      const kota  = [r.district, r.city, r.province, r.kota, r.kecamatan].filter(Boolean).join(', ');
       return `<div onclick="pilihOrigin('${id}','${nama.replace(/'/g,"\\'")}',this)"
         style="padding:12px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);transition:background .1s"
         onmouseover="this.style.background='rgba(59,130,246,.1)'" onmouseout="this.style.background=(this.dataset.sel?'rgba(59,130,246,.15)':'')">
@@ -1309,6 +1312,7 @@ function pilihOrigin(id, nama, el) {
 }
 
 async function saveMengantarSettings() {
+  const userId = Auth.getUser()?.id;
   const key    = document.getElementById('f-mengantar-key').value.trim();
   const origin = document.getElementById('f-mengantar-origin').value.trim();
   try {
