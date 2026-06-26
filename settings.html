@@ -1261,6 +1261,7 @@ async function cariMengantarOrigin() {
     const res = await fetch(`/api/save-settings?action=mengantar-origins&key=${encodeURIComponent(key)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
+    if (!json.ok) throw new Error(`Mengantar ${json.status}: ${json.raw || json.error}`);
 
     // Response dari proxy: { ok, data } — data bisa array atau nested
     const raw  = json.data ?? json;
