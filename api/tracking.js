@@ -388,10 +388,12 @@ async function handleCreateMengantar(req, res) {
         const cu   = custMap[o.customer_id] || {};
         const prod = prodMap[o.product_id]  || {};
         const al   = o.alamat || {};
-        const isCOD = (o.metode || '').toLowerCase() === 'cod';
-        const qty   = o.qty || 1;
-        const harga = o.harga || prod.harga || 0;
-        const berat = ((prod.berat_gram || 1000) / 1000) * qty;
+        const isCOD      = (o.metode || '').toLowerCase() === 'cod';
+        const qty        = o.qty || 1;
+        const hargaSatuan = prod.harga || o.harga || 0;  // utamakan harga dari tabel products
+        const harga      = hargaSatuan;
+        const totalNilai = hargaSatuan * qty;             // total = harga × qty
+        const berat      = ((prod.berat_gram || 1000) / 1000); // berat per unit (kg)
 
         // Lookup dest ID (cache di alamat.mengantar_dest_id)
         let destId = al.mengantar_dest_id || null;
@@ -408,26 +410,25 @@ async function handleCreateMengantar(req, res) {
         const alamatStr = [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos]
           .filter(Boolean).join(', ');
 
-        const beratSatuan = (prod.berat_gram || 1000) / 1000; // kg per unit
         const item = {
-          customerName:          cu.nama || '-',
-          customerPhone:         (cu.wa_number || '').replace(/^62/, '0'),
-          customerAddress:       alamatStr || '-',
-          parcelContent:         prod.nama || 'Produk',
-          weight:                beratSatuan * qty,  // total weight
-          quantity:              qty,
+          customerName:           cu.nama || '-',
+          customerPhone:          (cu.wa_number || '').replace(/^62/, '0'),
+          customerAddress:        alamatStr || '-',
+          parcelContent:          prod.nama || 'Produk',
+          weight:                 berat * qty,   // total weight (kg)
+          quantity:               qty,
           dontIncludeSubdistrict: false,
           customProducts: [{
             name:   prod.nama || 'Produk',
             qty:    qty,
-            price:  harga,
-            weight: beratSatuan,  // weight per unit — wajib ada agar validasi Mengantar lolos
+            price:  hargaSatuan,
+            weight: berat,        // weight per unit
           }],
         };
 
-        if (destId) item.customerAddressDataId = destId;
-        if (isCOD)  item.COD = o.total || 0;
-        else        item.goodsValue = harga * qty;
+        if (destId)   item.customerAddressDataId = destId;
+        if (isCOD)    item.COD         = totalNilai;
+        else          item.goodsValue  = totalNilai;
 
         orderItems.push({ orderId: o.id, item });
       }
