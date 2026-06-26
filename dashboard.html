@@ -1614,11 +1614,6 @@ async function submitClosingManual() {
     const custId  = activeConv?.customer_id || null;
     const convState = activeConv?.state || {};
 
-    // Ambil nomor urut
-    const existing = await sbGet('orders_new', `?user_id=eq.${userId}&select=nomor_urut&order=created_at.desc&limit=100`);
-    const maxNo = existing.reduce((m, r) => Math.max(m, parseInt(r.nomor_urut)||0), 0);
-    const nomorUrut = String(maxNo + 1).padStart(2, '0');
-
     const alamatObj = {
       jalan:     document.getElementById('cm-jalan').value.trim(),
       kelurahan: document.getElementById('cm-kelurahan').value.trim(),
@@ -1635,20 +1630,19 @@ async function submitClosingManual() {
     const orderPayload = {
       user_id:         userId,
       customer_id:     custId,
+      conversation_id: activeConvId || null,
       product_id:      prodId,
       qty,
       harga,
+      ongkir:          0,
       total,
-      metode,
-      catatan,
-      nomor_urut:      nomorUrut,
-      status:          'baru',
-      status_tracking: 'baru',
-      source:          'manual',
+      metode:          metode.toLowerCase(),
+      ekspedisi:       kurir || '',
       alamat:          alamatObj,
-      ekspedisi:       kurir || null,
+      keluhan:         catatan || '',
+      status:          'pending',
     };
-    const snapshot = { product: prod.nama, qty, harga, total, metode, nomor_urut: nomorUrut };
+    const snapshot = { product: prod.nama, qty, harga, total, metode };
     const newState = { ...convState, order_snapshot: snapshot, status: 'selesai' };
 
     const saveRes = await fetch('/api/save-settings', {
@@ -1665,7 +1659,7 @@ async function submitClosingManual() {
     }).then(r => r.json());
     if (!saveRes.ok) throw new Error(saveRes.error || 'Gagal simpan order');
 
-    showToast(`✅ Closing manual berhasil — Order #${nomorUrut}`);
+    showToast('✅ Closing manual berhasil');
     closeClosingManual();
     activeConv.status = 'selesai';
     await renderChat();
