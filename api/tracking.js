@@ -340,9 +340,6 @@ async function getTimeId15(mngKey) {
 async function handleCreateMengantar(req, res) {
   const { order_ids, user_id } = req.body || {};
   if (!order_ids?.length || !user_id) return res.status(400).json({ error: 'order_ids dan user_id wajib' });
-  if (!MENGANTAR_KEY) return res.status(500).json({ error: 'MENGANTAR_KEY tidak dikonfigurasi' });
-
-  const ORIGIN_ID = process.env.MENGANTAR_ORIGIN_ID || '5fc63315f8f44b34aa4c44c7';
 
   try {
     // 1. Fetch orders + customers + products + user
