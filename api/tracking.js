@@ -390,7 +390,7 @@ async function handleCreateMengantar(req, res) {
         const al   = o.alamat || {};
         const isCOD      = (o.metode || '').toLowerCase() === 'cod';
         const qty        = o.qty || 1;
-        const hargaSatuan = prod.harga || o.harga || 0;  // utamakan harga dari tabel products
+        const hargaSatuan = o.harga || prod.harga || 0;   // utamakan harga dari orders_new (sudah resolve bundling)
         const harga      = hargaSatuan;
         const totalNilai = hargaSatuan * qty;             // total = harga × qty
         const berat      = ((prod.berat_gram || 1000) / 1000); // berat per unit (kg)

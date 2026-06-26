@@ -2895,6 +2895,7 @@ ${ongkirInfo}`;
     if (orderConfirmed && convState.order_placed && !convState.awaiting_order_confirm) {
       // Order sudah selesai diproses sebelumnya — skip ORDER_CONFIRMED agar tidak kirim konfirmasi ulang
       console.log(`[ORDER_CONFIRMED] Diabaikan — order sudah placed (conv ${conversation.id})`);
+      return res.status(200).json({ ok: true, action: 'order_already_placed' });
     }
 
     if (orderConfirmed && !convState.order_placed) {
@@ -2939,7 +2940,8 @@ ${ongkirInfo}`;
         // 3. Hitung ongkir (Mengantar) — kalau gagal, area lokal di atas tetap dipakai
         if (wilayahFallback && product) {
           console.log(`[ORDER_CONFIRMED] ongkir kosong, re-hitung dari wilayah: ${wilayahFallback}`);
-          const rekalkulasi = await hitungOngkir(wilayahFallback, product, 1, userMngOriginId).catch(() => null);
+          const qtyFallback = parseInt(latestState.qty || orderDataParsed?.qty || convState.qty || 1) || 1;
+          const rekalkulasi = await hitungOngkir(wilayahFallback, product, qtyFallback, userMngOriginId).catch(() => null);
           if (rekalkulasi) {
             ongkirData = rekalkulasi;
             await updateConvState(conversation.id, { ongkir: rekalkulasi }).catch(() => {});
@@ -2997,9 +2999,9 @@ ${ongkirInfo}`;
       const harga       = resolveHargaBundling(product, qty) || ongkirData?.harga || custAlamat?.harga || product?.harga || 0;
       const ongkirAsli  = ongkirData?.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
       const ongkirPromo = ongkirData?.ongkirPromo || custAlamat?.ongkirPromo || 0;
-      // Recalculate feeCOD pakai harga bundling yang benar
+      // Recalculate feeCOD pakai harga bundling yang benar — Transfer selalu 0
       const feeCODCalc  = isCOD ? Math.ceil((harga + ongkirPromo) * 0.05) : 0;
-      const feeCOD      = feeCODCalc || ongkirData?.feeCOD || custAlamat?.feeCOD || 0;
+      const feeCOD      = isCOD ? (feeCODCalc || ongkirData?.feeCOD || custAlamat?.feeCOD || 0) : 0;
 
       // Simpan area & ekspedisi yang sudah confirmed ke ongkir state agar tersimpan permanen di Supabase
       const confirmedOngkir = { ...ongkirData, area, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD };
