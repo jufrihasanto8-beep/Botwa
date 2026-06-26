@@ -408,18 +408,20 @@ async function handleCreateMengantar(req, res) {
         const alamatStr = [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos]
           .filter(Boolean).join(', ');
 
+        const beratSatuan = (prod.berat_gram || 1000) / 1000; // kg per unit
         const item = {
           customerName:          cu.nama || '-',
           customerPhone:         (cu.wa_number || '').replace(/^62/, '0'),
           customerAddress:       alamatStr || '-',
           parcelContent:         prod.nama || 'Produk',
-          weight:                berat,
+          weight:                beratSatuan * qty,  // total weight
           quantity:              qty,
           dontIncludeSubdistrict: false,
           customProducts: [{
-            name:  prod.nama || 'Produk',
-            qty:   qty,
-            price: harga,
+            name:   prod.nama || 'Produk',
+            qty:    qty,
+            price:  harga,
+            weight: beratSatuan,  // weight per unit — wajib ada agar validasi Mengantar lolos
           }],
         };
 
@@ -483,7 +485,7 @@ async function handleCreateMengantar(req, res) {
             || JSON.stringify(mJson).slice(0, 300);
           orderItems.forEach(x => results.push({
             orderId: x.orderId, kurir, success: false,
-            error: String(errMsg) + ` [raw: ${mText.slice(0,150)}]`,
+            error: String(errMsg),
           }));
         }
       } catch(e) {
