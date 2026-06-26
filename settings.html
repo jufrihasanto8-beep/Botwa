@@ -1276,12 +1276,10 @@ async function cariMengantarOrigin() {
     listEl.style.display = 'block';
     listEl.innerHTML = rows.map((r, i) => {
       const id    = r._id || r.id || '';
-      const nama  = r.name || r.nama || r.alias || r.label || r.store_name || r.storeName
-                 || r.warehouse_name || r.warehouseName || r.contact_name || r.contactName
-                 || r.sender_name || r.senderName || r.tag || r.title || Object.values(r).find(v => typeof v === 'string' && v.length > 2 && v !== id) || 'Tanpa Nama';
-      const telp  = r.phone || r.telp || r.phoneNumber || r.phone_number || r.mobile || '';
-      const alamat= r.address || r.alamat || r.street || r.full_address || r.fullAddress || '';
-      const kota  = [r.district, r.city, r.province, r.kota, r.kecamatan].filter(Boolean).join(', ');
+      const nama  = r.PICKUP_NAME || r.name || r.nama || r.alias || 'Tanpa Nama';
+      const telp  = r.PICKUP_PIC_PHONE || r.phone || r.phoneNumber || '';
+      const alamat= r.PICKUP_ADDRESS || r.address || r.alamat || '';
+      const kota  = r.PICKUP_FULL_AUTOFILL || [r.PICKUP_REGION, r.PICKUP_CITY, r.PICKUP_DISTRICT, r.PICKUP_SUBDISTRICT].filter(Boolean).join(', ');
       return `<div onclick="pilihOrigin('${id}','${nama.replace(/'/g,"\\'")}',this)"
         style="padding:12px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);transition:background .1s"
         onmouseover="this.style.background='rgba(59,130,246,.1)'" onmouseout="this.style.background=(this.dataset.sel?'rgba(59,130,246,.15)':'')">
