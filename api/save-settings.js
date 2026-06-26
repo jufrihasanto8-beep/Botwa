@@ -40,32 +40,34 @@ module.exports = async function handler(req, res) {
         let sbData = [];
         if (kel && kec) {
           sbData = await sbReq('GET',
-            `wilayah_id?kelurahan=ilike.*${encodeURIComponent(kel)}*&kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
+            `wilayah_id?kelurahan=ilike.*${encodeURIComponent(kel)}*&kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi,kodepos&limit=5`
           );
         }
         // Fallback: hanya kecamatan kalau kombinasi tidak ketemu
         if (!sbData.length && kec) {
           sbData = await sbReq('GET',
-            `wilayah_id?kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
+            `wilayah_id?kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi,kodepos&limit=5`
           );
         }
         // Fallback: hanya kelurahan
         if (!sbData.length && kel) {
           sbData = await sbReq('GET',
-            `wilayah_id?kelurahan=ilike.*${encodeURIComponent(kel)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
+            `wilayah_id?kelurahan=ilike.*${encodeURIComponent(kel)}*&select=kelurahan,kecamatan,kabupaten,provinsi,kodepos&limit=5`
           );
         }
 
-        // Ambil kodepos dari Mengantar pakai query kombinasi
+        // Ambil kodepos dari Mengantar pakai query kombinasi (sebagai fallback jika wilayah_id tidak punya)
         const mngQ = [kel, kec].filter(Boolean).join(', ');
         const mngRes = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(mngQ)}`, {
           headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' }
         }).then(r => r.json()).catch(() => null);
 
         const mngList = mngRes?.data || (Array.isArray(mngRes) ? mngRes : []);
-        const kodepos = mngList[0]?.kodePos || mngList[0]?.zip || '';
+        const mngItem = mngList[0] || {};
+        // Coba semua kemungkinan field name kodepos dari Mengantar
+        const kodeposMng = mngItem.kodePos || mngItem.kodepos || mngItem.zip || mngItem.zipCode || mngItem.postal_code || mngItem.postalCode || '';
 
-        const data = sbData.map(r => ({ ...r, kodepos: r.kodepos || kodepos }));
+        const data = sbData.map(r => ({ ...r, kodepos: r.kodepos || kodeposMng }));
         return res.status(200).json({ ok: true, data });
       } catch(e) {
         return res.status(500).json({ error: e.message });
