@@ -1258,14 +1258,13 @@ async function cariMengantarOrigin() {
   listEl.innerHTML = '';
 
   try {
-    const res = await fetch(`https://app.mengantar.com/api/public/${key}/origin`, {
-      headers: { 'Accept': 'application/json' }
-    });
+    const res = await fetch(`/api/save-settings?action=mengantar-origins&key=${encodeURIComponent(key)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
-    // Mengantar returns array directly or nested in data/origins
-    const rows = Array.isArray(json) ? json : (json.data || json.origins || json.result || []);
+    // Response dari proxy: { ok, data } — data bisa array atau nested
+    const raw  = json.data ?? json;
+    const rows = Array.isArray(raw) ? raw : (raw.data || raw.origins || raw.result || []);
     if (!rows.length) {
       listEl.style.display = 'block';
       listEl.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:12px">Tidak ada alamat pickup ditemukan.</div>';
