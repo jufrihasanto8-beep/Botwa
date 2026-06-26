@@ -446,9 +446,10 @@ async function handleCreateMengantar(req, res) {
           method: 'POST',
           body: form,
         });
-        const mJson = await mResp.json();
-
-        console.log('[createMengantar] response kurir', kurir, JSON.stringify(mJson).slice(0, 500));
+        const mText = await mResp.text();
+        console.log('[createMengantar] HTTP', mResp.status, 'kurir', kurir, mText.slice(0, 600));
+        let mJson;
+        try { mJson = JSON.parse(mText); } catch { mJson = { success: false, message: `Non-JSON (${mResp.status}): ${mText.slice(0, 200)}` }; }
 
         if (mJson.success && Array.isArray(mJson.data)) {
           // Update orders_new dengan cnote_no dan status dikirim
