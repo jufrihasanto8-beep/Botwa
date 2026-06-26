@@ -1648,15 +1648,22 @@ async function submitClosingManual() {
       alamat:          alamatObj,
       ekspedisi:       kurir || null,
     };
-    await sbPost('orders_new', orderPayload);
-
-    // Update conversation: selesai + simpan order_snapshot di state
     const snapshot = { product: prod.nama, qty, harga, total, metode, nomor_urut: nomorUrut };
     const newState = { ...convState, order_snapshot: snapshot, status: 'selesai' };
-    await sbPatch('conversations', `?id=eq.${activeConvId}`, {
-      status: 'selesai',
-      state:  newState,
-    });
+
+    const saveRes = await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        table:    'orders_new',
+        action:   'insert',
+        payload:  orderPayload,
+        convId:   activeConvId,
+        convPatch: { status: 'selesai', state: newState },
+      }),
+    }).then(r => r.json());
+    if (!saveRes.ok) throw new Error(saveRes.error || 'Gagal simpan order');
 
     showToast(`✅ Closing manual berhasil — Order #${nomorUrut}`);
     closeClosingManual();
