@@ -34,13 +34,24 @@ module.exports = async function handler(req, res) {
     if (action === 'mengantar-origins') {
       if (!key) return res.status(400).json({ error: 'key wajib' });
       try {
-        const mRes = await fetch(`https://app.mengantar.com/api/public/${key}/origin`, {
-          headers: { 'Accept': 'application/json' },
-        });
-        const mText = await mRes.text();
-        if (!mRes.ok) return res.status(200).json({ ok: false, status: mRes.status, raw: mText });
-        let json; try { json = JSON.parse(mText); } catch { json = mText; }
-        return res.status(200).json({ ok: true, data: json });
+        const BASE = `https://app.mengantar.com/api/public/${key}`;
+        const CANDIDATES = ['address', 'warehouse', 'pickup', 'origin', 'sender'];
+        let found = null;
+        for (const slug of CANDIDATES) {
+          const mRes = await fetch(`${BASE}/${slug}`, { headers: { 'Accept': 'application/json' } });
+          const mText = await mRes.text();
+          if (mRes.ok) {
+            let json; try { json = JSON.parse(mText); } catch { json = mText; }
+            found = { slug, json };
+            break;
+          }
+          // 404 → coba berikutnya; error lain → stop
+          if (mRes.status !== 404) {
+            return res.status(200).json({ ok: false, status: mRes.status, slug, raw: mText });
+          }
+        }
+        if (!found) return res.status(200).json({ ok: false, error: 'Tidak ada endpoint yang cocok', tried: CANDIDATES });
+        return res.status(200).json({ ok: true, slug: found.slug, data: found.json });
       } catch(e) {
         return res.status(500).json({ error: e.message });
       }
