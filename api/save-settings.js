@@ -40,19 +40,19 @@ module.exports = async function handler(req, res) {
         let sbData = [];
         if (kel && kec) {
           sbData = await sbReq('GET',
-            `wilayah_id?kelurahan=ilike.*${encodeURIComponent(kel)}*&kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi,kodepos&limit=5`
+            `wilayah_id?kelurahan=ilike.*${encodeURIComponent(kel)}*&kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
           );
         }
         // Fallback: hanya kecamatan kalau kombinasi tidak ketemu
         if (!sbData.length && kec) {
           sbData = await sbReq('GET',
-            `wilayah_id?kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi,kodepos&limit=5`
+            `wilayah_id?kecamatan=ilike.*${encodeURIComponent(kec)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
           );
         }
         // Fallback: hanya kelurahan
         if (!sbData.length && kel) {
           sbData = await sbReq('GET',
-            `wilayah_id?kelurahan=ilike.*${encodeURIComponent(kel)}*&select=kelurahan,kecamatan,kabupaten,provinsi,kodepos&limit=5`
+            `wilayah_id?kelurahan=ilike.*${encodeURIComponent(kel)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
           );
         }
 
