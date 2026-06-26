@@ -65,10 +65,10 @@ module.exports = async function handler(req, res) {
         const mngList = mngRes?.data || (Array.isArray(mngRes) ? mngRes : []);
         const mngItem = mngList[0] || {};
         // Coba semua kemungkinan field name kodepos dari Mengantar
-        const kodeposMng = mngItem.kodePos || mngItem.kodepos || mngItem.zip || mngItem.zipCode || mngItem.postal_code || mngItem.postalCode || '';
+        const kodeposMng = mngItem.ZIP_CODE || mngItem.posCode || '';
 
         const data = sbData.map(r => ({ ...r, kodepos: r.kodepos || kodeposMng }));
-        return res.status(200).json({ ok: true, data, _mng: mngItem });
+        return res.status(200).json({ ok: true, data });
       } catch(e) {
         return res.status(500).json({ error: e.message });
       }
