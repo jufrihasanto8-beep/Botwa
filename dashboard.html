@@ -274,6 +274,7 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .ctag.live{background:rgba(34,197,94,.1);color:#86efac}
 .ctag.eskalasi{background:rgba(239,68,68,.1);color:#fca5a5}
 .ctag.ai{background:rgba(99,102,241,.1);color:#a5b4fc}
+.ctag.new-msg{background:rgba(245,158,11,.15);color:#fbbf24;font-weight:700}
 .conv-unread{width:8px;height:8px;background:#3b82f6;border-radius:50%;position:absolute;right:12px;top:50%;transform:translateY(-50%)}
 .empty-inbox{text-align:center;padding:40px 16px;color:#475569}
 
@@ -571,7 +572,7 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
     <button class="ftab active" onclick="setTab('all',this)" id="ftab-all">Semua <span class="fn" id="fn-all">0</span></button>
     <button class="ftab eskalasi" onclick="setTab('eskalasi',this)">Eskalasi <span class="fn" id="fn-esc">0</span></button>
     <button class="ftab" onclick="setTab('live',this)">Live <span class="fn" id="fn-live">0</span></button>
-    <button class="ftab" onclick="setTab('selesai',this)">Selesai <span class="fn" id="fn-selesai">0</span></button>
+    <button class="ftab" onclick="setTab('selesai',this)">Closing <span class="fn" id="fn-selesai">0</span></button>
     <select class="filter-sort" onchange="setSortOrder(this.value)">
       <option value="desc">Terbaru</option>
       <option value="asc">Terlama</option>
@@ -882,7 +883,15 @@ async function renderInbox() {
 
   if (tabFilter === 'eskalasi') convs = convs.filter(c => c.status === 'eskalasi');
   else if (tabFilter === 'live') convs = convs.filter(c => c.status === 'baru' || c.status === 'diproses');
-  else if (tabFilter === 'selesai') convs = convs.filter(c => c.status === 'selesai');
+  else if (tabFilter === 'selesai') {
+    convs = convs.filter(c => c.status === 'selesai');
+    // Yang ada pesan baru (pelanggan balik) tampil paling atas
+    convs.sort((a, b) => {
+      const an = a.state?.has_new_message ? 1 : 0;
+      const bn = b.state?.has_new_message ? 1 : 0;
+      return bn - an;
+    });
+  }
 
   if (searchFilter) {
     convs = convs.filter(c => {
@@ -916,8 +925,9 @@ async function renderInbox() {
     const isEsc   = conv.status === 'eskalasi';
     const isLive  = conv.status === 'baru' || conv.status === 'diproses';
     const isDone  = conv.status === 'selesai';
-    const tags    = `<span class="ctag wa">WA</span>${isLive?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone?'<span class="ctag ai">Selesai</span>':''}`;
-    const unreadDot = conv.status === 'baru' ? '<div class="conv-unread"></div>' : '';
+    const isNew   = isDone && conv.state?.has_new_message;
+    const tags    = `<span class="ctag wa">WA</span>${isLive?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone&&!isNew?'<span class="ctag ai">Closing</span>':''}${isNew?'<span class="ctag new-msg">Pelanggan Baru</span>':''}`;
+    const unreadDot = (conv.status === 'baru' || isNew) ? '<div class="conv-unread"></div>' : '';
     return `<div class="conv-item${activeConvId===conv.id?' active':''}" onclick="selectConv('${conv.id}')">
       <div class="conv-av" style="background:${color}">${initials(nama)}</div>
       <div class="conv-info">
@@ -1478,6 +1488,9 @@ async function openClosingManual() {
   document.getElementById('cm-cod-row').style.display = 'none';
   document.getElementById('cm-bundling-info').textContent = '';
   document.getElementById('cm-modal-err').textContent = '';
+  document.getElementById('cm-ongkir').value = '';
+  const oi = document.getElementById('cm-ongkir-info'); if (oi) oi.textContent = '';
+  _cmDestId = null;
   document.getElementById('cm-total-preview').textContent = '';
 }
 
@@ -1487,8 +1500,8 @@ function closeClosingManual() {
 
 document.addEventListener('DOMContentLoaded', () => {
   // Produk → auto-isi harga produk sesuai qty
-  document.getElementById('cm-prod')?.addEventListener('change', () => { updateHargaFromBundling(); updateCMTotal(); });
-  document.getElementById('cm-qty')?.addEventListener('input', () => { updateHargaFromBundling(); updateCMTotal(); });
+  document.getElementById('cm-prod')?.addEventListener('change', () => { updateHargaFromBundling(); updateCMTotal(); fetchOngkirMengantar(); });
+  document.getElementById('cm-qty')?.addEventListener('input', () => { updateHargaFromBundling(); updateCMTotal(); fetchOngkirMengantar(); });
   document.getElementById('cm-harga')?.addEventListener('input', updateCMTotal);
   document.getElementById('cm-metode')?.addEventListener('change', updateCMTotal);
 
@@ -1534,26 +1547,36 @@ function updateHargaFromBundling() {
 
 function updateCMTotal() {
   const harga  = parseInt(document.getElementById('cm-harga')?.value) || 0;
+  const ongkir = parseInt(document.getElementById('cm-ongkir')?.value) || 0;
   const metode = document.getElementById('cm-metode')?.value || 'COD';
   const el     = document.getElementById('cm-total-preview');
   if (!el) return;
   if (!harga) { el.textContent = ''; return; }
   if (metode === 'COD') {
-    el.textContent = `Harga produk: Rp ${harga.toLocaleString('id')} · Isi Total COD di bawah (harga + ongkir + admin COD)`;
+    const feeCOD    = Math.ceil((harga + ongkir) * 0.05);
+    const totalCOD  = harga + ongkir + feeCOD;
+    // Auto-isi Total COD kalau ongkir sudah ada
+    if (ongkir) document.getElementById('cm-total-cod').value = totalCOD;
+    el.textContent = ongkir
+      ? `Harga ${harga.toLocaleString('id')} + Ongkir ${ongkir.toLocaleString('id')} + Admin ${feeCOD.toLocaleString('id')} = Rp ${totalCOD.toLocaleString('id')}`
+      : `Harga produk: Rp ${harga.toLocaleString('id')} · Menunggu ongkir...`;
     document.getElementById('cm-cod-row').style.display = 'block';
   } else {
-    el.textContent = `Total Transfer: Rp ${harga.toLocaleString('id')}`;
+    const totalTransfer = harga + ongkir;
+    el.textContent = `Total Transfer: Rp ${totalTransfer.toLocaleString('id')}`;
     document.getElementById('cm-cod-row').style.display = 'none';
   }
 }
 
 let areaFilling = false;
+let _cmDestId = null; // simpan mengantar_dest_id setelah autofill
+
 async function autofillArea() {
   const kel = document.getElementById('cm-kelurahan').value.trim();
   const kec = document.getElementById('cm-kecamatan').value.trim();
-  // Minimal kecamatan harus diisi agar hasil tidak ambigu
   if (!kec || areaFilling) return;
   areaFilling = true;
+  _cmDestId = null;
 
   const hint = document.getElementById('cm-area-hint');
   if (hint) { hint.textContent = '⏳ Mencari area...'; hint.style.display = 'block'; }
@@ -1571,9 +1594,7 @@ async function autofillArea() {
       return;
     }
 
-    // Backend sudah filter pakai kombinasi kel+kec, ambil baris pertama
     const match = list[0];
-
     if (match.kabupaten) document.getElementById('cm-kabupaten').value = match.kabupaten;
     if (match.provinsi)  document.getElementById('cm-provinsi').value  = match.provinsi;
     if (match.kodepos)   document.getElementById('cm-kodepos').value   = match.kodepos;
@@ -1583,10 +1604,42 @@ async function autofillArea() {
       setTimeout(() => { if(hint) hint.textContent=''; }, 2500);
     }
 
+    // Simpan dest_id untuk hitung ongkir
+    if (match.mengantar_dest_id) {
+      _cmDestId = match.mengantar_dest_id;
+      fetchOngkirMengantar();
+    }
+
   } catch(e) {
     if (hint) hint.textContent = '';
   } finally {
     areaFilling = false;
+  }
+}
+
+async function fetchOngkirMengantar() {
+  const prodId = document.getElementById('cm-prod').value;
+  const qty    = parseInt(document.getElementById('cm-qty').value) || 1;
+  if (!_cmDestId || !prodId) return;
+
+  const ongkirEl  = document.getElementById('cm-ongkir-info');
+  if (ongkirEl) ongkirEl.textContent = '⏳ Mengambil ongkir...';
+
+  try {
+    const res  = await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'hitung-ongkir', userId, dest_id: _cmDestId, product_id: prodId, qty }),
+    });
+    const json = await res.json();
+    if (!json.ok) { if (ongkirEl) ongkirEl.textContent = json.error || 'Ongkir tidak tersedia'; return; }
+
+    // Isi field ongkir
+    document.getElementById('cm-ongkir').value = json.ongkir_promo ?? json.ongkir ?? 0;
+    if (ongkirEl) ongkirEl.textContent = `${json.kurir} — Rp ${(json.ongkir_promo ?? json.ongkir ?? 0).toLocaleString('id')}`;
+    updateCMTotal();
+  } catch(e) {
+    if (ongkirEl) ongkirEl.textContent = '';
   }
 }
 
@@ -1609,38 +1662,43 @@ async function submitClosingManual() {
   statusEl.textContent = '';
 
   try {
-    const prod  = cmProducts.find(p => p.id === prodId) || {};
-    const total = metode === 'COD' ? totalCOD : harga;
+    const prod    = cmProducts.find(p => p.id === prodId) || {};
+    const ongkir  = parseInt(document.getElementById('cm-ongkir').value) || 0;
+    const feeCOD  = metode === 'COD' ? Math.ceil((harga + ongkir) * 0.05) : 0;
+    const total   = metode === 'COD' ? totalCOD : harga + ongkir;
     const custId  = activeConv?.customer_id || null;
     const convState = activeConv?.state || {};
 
     const alamatObj = {
-      jalan:     document.getElementById('cm-jalan').value.trim(),
-      kelurahan: document.getElementById('cm-kelurahan').value.trim(),
-      kecamatan: document.getElementById('cm-kecamatan').value.trim(),
-      kabupaten: document.getElementById('cm-kabupaten').value.trim(),
-      provinsi:  document.getElementById('cm-provinsi').value.trim(),
-      kodepos:   document.getElementById('cm-kodepos').value.trim(),
-      nama:      document.getElementById('cm-nama').value.trim(),
-      telp:      document.getElementById('cm-hp').value.trim(),
+      jalan:              document.getElementById('cm-jalan').value.trim(),
+      kelurahan:          document.getElementById('cm-kelurahan').value.trim(),
+      kecamatan:          document.getElementById('cm-kecamatan').value.trim(),
+      kabupaten:          document.getElementById('cm-kabupaten').value.trim(),
+      provinsi:           document.getElementById('cm-provinsi').value.trim(),
+      kodepos:            document.getElementById('cm-kodepos').value.trim(),
+      nama:               document.getElementById('cm-nama').value.trim(),
+      telp:               document.getElementById('cm-hp').value.trim(),
+      mengantar_dest_id:  _cmDestId || null,
     };
     const kurir = document.getElementById('cm-kurir').value.trim();
 
     // Insert orders_new
     const orderPayload = {
-      user_id:         userId,
-      customer_id:     custId,
-      conversation_id: activeConvId || null,
-      product_id:      prodId,
+      user_id:            userId,
+      customer_id:        custId,
+      conversation_id:    activeConvId || null,
+      product_id:         prodId,
       qty,
       harga,
-      ongkir:          0,
+      ongkir,
+      ongkir_after_promo: ongkir,
+      fee_cod:            feeCOD,
       total,
-      metode:          metode.toLowerCase(),
-      ekspedisi:       kurir || '',
-      alamat:          alamatObj,
-      keluhan:         catatan || '',
-      status:          'pending',
+      metode:             metode.toLowerCase(),
+      ekspedisi:          kurir || '',
+      alamat:             alamatObj,
+      keluhan:            catatan || '',
+      status:             'pending',
     };
     const snapshot = { product: prod.nama, qty, harga, total, metode };
     const newState = { ...convState, order_snapshot: snapshot, status: 'selesai' };
@@ -1710,11 +1768,6 @@ async function submitClosingManual() {
 
       <div id="cm-total-preview" style="font-size:12px;color:#3b82f6;margin-top:-4px"></div>
 
-      <div id="cm-cod-row" style="display:none">
-        <label class="cm-label">Total COD <span style="font-weight:400;text-transform:none;font-size:11px">(harga produk + ongkir + admin COD)</span></label>
-        <input type="number" id="cm-total-cod" placeholder="Contoh: 285000" min="0" class="cm-input">
-      </div>
-
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
           <label class="cm-label">Metode Bayar</label>
@@ -1737,6 +1790,19 @@ async function submitClosingManual() {
             <option value="iDexpress">iDexpress</option>
             <option value="Pos">Pos Indonesia</option>
           </select>
+        </div>
+      </div>
+
+      <!-- Ongkir dari Mengantar -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="cm-label">Ongkir <span style="font-weight:400;font-size:11px;text-transform:none">(auto dari Mengantar)</span></label>
+          <input type="number" id="cm-ongkir" placeholder="0" min="0" class="cm-input" oninput="updateCMTotal()">
+          <div id="cm-ongkir-info" style="font-size:11px;margin-top:4px;opacity:.6"></div>
+        </div>
+        <div id="cm-cod-row" style="display:none">
+          <label class="cm-label">Total COD <span style="font-weight:400;text-transform:none;font-size:11px">(harga + ongkir + admin)</span></label>
+          <input type="number" id="cm-total-cod" placeholder="Auto / edit manual" min="0" class="cm-input">
         </div>
       </div>
 
