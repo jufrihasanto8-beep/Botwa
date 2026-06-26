@@ -1565,30 +1565,23 @@ async function autofillArea() {
     console.log('[autofillArea] response:', JSON.stringify(json).slice(0, 500));
     if (!json.ok) { if (hint) hint.textContent = ''; return; }
 
-    const raw  = json.data?.data || json.data || json.data?.result || [];
-    const list = Array.isArray(raw) ? raw : (Array.isArray(json.data) ? json.data : []);
-    if (!list.length) { if (hint) { hint.textContent = 'Area tidak ditemukan'; setTimeout(() => hint.textContent = '', 2000); } return; }
+    const list = Array.isArray(json.data) ? json.data : [];
+    if (!list.length) { if (hint) { hint.textContent = 'Area tidak ditemukan'; setTimeout(() => { if(hint) hint.textContent=''; }, 2000); } return; }
 
-    // Coba match kecamatan dulu, fallback ke item pertama
-    const match = list.find(r => {
-      const d = (r.district || r.subdistrict || r.kecamatan || r.name || '').toLowerCase();
-      return kec ? d.includes(kec.toLowerCase()) : true;
-    }) || list[0];
+    // Cari match terbaik — cocokkan kelurahan+kecamatan yang diketik
+    const match = list.find(r =>
+      (kec && r.kecamatan?.toLowerCase().includes(kec.toLowerCase())) ||
+      (kel && r.kelurahan?.toLowerCase().includes(kel.toLowerCase()))
+    ) || list[0];
 
-    console.log('[autofillArea] match:', JSON.stringify(match));
+    // Field dari wilayah_id sudah pasti: kelurahan, kecamatan, kabupaten, provinsi
+    if (match.kabupaten) document.getElementById('cm-kabupaten').value = match.kabupaten;
+    if (match.provinsi)  document.getElementById('cm-provinsi').value  = match.provinsi;
+    if (match.kodepos)   document.getElementById('cm-kodepos').value   = match.kodepos;
+    if (match.kelurahan && !document.getElementById('cm-kelurahan').value) document.getElementById('cm-kelurahan').value = match.kelurahan;
+    if (match.kecamatan && !document.getElementById('cm-kecamatan').value) document.getElementById('cm-kecamatan').value = match.kecamatan;
 
-    // Coba semua kemungkinan nama field
-    const kabVal  = match.city || match.kabupaten || match.regency || match.kota || match.CITY || '';
-    const provVal = match.province || match.provinsi || match.region || match.PROVINCE || '';
-    const kposVal = match.zip || match.postal_code || match.kodepos || match.zipCode || match.ZIP || '';
-    const kelVal  = match.subdistrict || match.kelurahan || match.village || match.SUBDISTRICT || '';
-
-    if (kabVal)  document.getElementById('cm-kabupaten').value = kabVal;
-    if (provVal) document.getElementById('cm-provinsi').value  = provVal;
-    if (kposVal) document.getElementById('cm-kodepos').value   = kposVal;
-    if (kelVal && !document.getElementById('cm-kelurahan').value) document.getElementById('cm-kelurahan').value = kelVal;
-
-    if (hint) { hint.textContent = kabVal ? `✓ ${kabVal}` : ''; setTimeout(() => { if(hint) hint.textContent = ''; }, 2000); }
+    if (hint) { hint.textContent = `✓ ${match.kabupaten || ''}${match.provinsi ? ', '+match.provinsi : ''}`; setTimeout(() => { if(hint) hint.textContent=''; }, 2500); }
 
   } catch(e) {
     console.error('[autofillArea]', e);
@@ -1709,7 +1702,7 @@ async function submitClosingManual() {
           <input type="number" id="cm-qty" value="1" min="1" class="cm-input">
         </div>
         <div>
-          <label class="cm-label">Harga Produk (total sesuai qty)</label>
+          <label class="cm-label">Harga Produk</label>
           <input type="number" id="cm-harga" placeholder="0" min="0" class="cm-input">
         </div>
       </div>
