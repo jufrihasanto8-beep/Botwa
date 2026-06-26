@@ -275,10 +275,236 @@ Tulis pesannya langsung.` }],
   }
 }
 
+/* ── Normalisasi kurir untuk CREATE ORDER Mengantar ─────────── */
+function kurirCreate(eks) {
+  const e = (eks || '').toUpperCase();
+  if (e.includes('JNE'))                               return 'JNE';
+  if (e.includes('JNT') || e.includes('J&T'))          return 'JT';
+  if (e.includes('SICEPAT') || e.includes('SI CEPAT')) return 'SiCepat';
+  if (e.includes('SAP'))                               return 'Sap';
+  if (e.includes('LION'))                              return 'lion';
+  if (e.includes('NINJA'))                             return 'Ninja';
+  if (e.includes('ANTERAJA'))                          return 'anteraja';
+  if (e.includes('IDX') || e.includes('IDEXPRESS'))    return 'iDexpress';
+  return eks;
+}
+
+/* ── Lookup destination ID dari Mengantar ───────────────────── */
+async function lookupDestId(alamat) {
+  const { kelurahan, kecamatan, kabupaten } = alamat || {};
+  if (!kecamatan) return null;
+  const queries = [
+    [kelurahan, kecamatan, kabupaten].filter(Boolean).join(', '),
+    [kecamatan, kabupaten].filter(Boolean).join(', '),
+    kecamatan,
+  ];
+  const headers = {
+    'User-Agent': 'Mozilla/5.0',
+    'Accept': 'application/json',
+    'Referer': 'https://www.mengantar.com/',
+    'Origin': 'https://www.mengantar.com',
+  };
+  for (const q of queries) {
+    try {
+      const r = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(q)}`, { headers });
+      const json = await r.json();
+      const results = json.data || json;
+      if (Array.isArray(results) && results.length) return results[0]._id || results[0].id;
+    } catch(e) { /* coba query berikutnya */ }
+  }
+  return null;
+}
+
+/* ── Fetch time slots, pilih yang jam 15:00 ─────────────────── */
+async function getTimeId15(mngKey) {
+  try {
+    const r = await fetch(`https://app.mengantar.com/api/public/${mngKey}/time`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    const json = await r.json();
+    const times = json.data || json;
+    if (!Array.isArray(times) || !times.length) return null;
+    // Pilih slot jam 15 (atau terdekat setelah 14:00)
+    const find = times.find(t => {
+      const label = (t.label || t.name || t.time || '').toString();
+      return label.includes('15') || label.includes('3 PM') || label.includes('15:00');
+    });
+    return (find || times[times.length - 1])._id || (find || times[times.length - 1]).id;
+  } catch(e) {
+    console.error('[createOrder] Gagal fetch time slots:', e.message);
+    return null;
+  }
+}
+
+/* ── CREATE ORDER ke Mengantar ───────────────────────────────── */
+async function handleCreateMengantar(req, res) {
+  const { order_ids, user_id } = req.body || {};
+  if (!order_ids?.length || !user_id) return res.status(400).json({ error: 'order_ids dan user_id wajib' });
+  if (!MENGANTAR_KEY) return res.status(500).json({ error: 'MENGANTAR_KEY tidak dikonfigurasi' });
+
+  const ORIGIN_ID = process.env.MENGANTAR_ORIGIN_ID || '5fc63315f8f44b34aa4c44c7';
+
+  try {
+    // 1. Fetch orders + customers + products + user
+    const orders = await sbGet('orders_new',
+      `?id=in.(${order_ids.join(',')})&user_id=eq.${user_id}&select=*`
+    );
+    if (!orders.length) return res.status(404).json({ error: 'Order tidak ditemukan' });
+
+    const custIds = [...new Set(orders.map(o => o.customer_id))];
+    const prodIds = [...new Set(orders.map(o => o.product_id).filter(Boolean))];
+
+    const [customers, products, userRows] = await Promise.all([
+      sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,nama,wa_number`),
+      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama,harga,berat_gram`) : Promise.resolve([]),
+      sbGet('users', `?id=eq.${user_id}&select=id,mengantar_key,mengantar_origin_id&limit=1`),
+    ]);
+
+    const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
+    const prodMap = Object.fromEntries(products.map(p => [p.id, p]));
+
+    // Pakai key & origin_id per user, fallback ke env global
+    const userRow      = userRows[0] || {};
+    const mngKey       = userRow.mengantar_key       || MENGANTAR_KEY;
+    const mngOriginId  = userRow.mengantar_origin_id || process.env.MENGANTAR_ORIGIN_ID || '5fc63315f8f44b34aa4c44c7';
+
+    if (!mngKey) return res.status(400).json({ error: 'Mengantar API key belum dikonfigurasi. Isi di Settings → Mengantar.' });
+
+    // 2. Fetch time_id jam 15:00
+    const timeId = await getTimeId15(mngKey);
+
+    // 3. Group orders by kurir
+    const grouped = {};
+    for (const o of orders) {
+      const kurir = kurirCreate(o.ekspedisi) || 'JNE';
+      if (!grouped[kurir]) grouped[kurir] = [];
+      grouped[kurir].push(o);
+    }
+
+    const results = [];
+
+    // 4. Proses per kurir
+    for (const [kurir, kurirOrders] of Object.entries(grouped)) {
+      const orderItems = [];
+
+      for (const o of kurirOrders) {
+        const cu   = custMap[o.customer_id] || {};
+        const prod = prodMap[o.product_id]  || {};
+        const al   = o.alamat || {};
+        const isCOD = (o.metode || '').toLowerCase() === 'cod';
+        const qty   = o.qty || 1;
+        const harga = o.harga || prod.harga || 0;
+        const berat = ((prod.berat_gram || 1000) / 1000) * qty;
+
+        // Lookup dest ID (cache di alamat.mengantar_dest_id)
+        let destId = al.mengantar_dest_id || null;
+        if (!destId) {
+          destId = await lookupDestId(al);
+          // Simpan ke orders_new untuk cache
+          if (destId) {
+            await sbPatch('orders_new', `?id=eq.${o.id}`, {
+              alamat: { ...al, mengantar_dest_id: destId }
+            }).catch(() => {});
+          }
+        }
+
+        const alamatStr = [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos]
+          .filter(Boolean).join(', ');
+
+        const item = {
+          customerName:          cu.nama || '-',
+          customerPhone:         (cu.wa_number || '').replace(/^62/, '0'),
+          customerAddress:       alamatStr || '-',
+          parcelContent:         prod.nama || 'Produk',
+          weight:                berat,
+          quantity:              qty,
+          dontIncludeSubdistrict: false,
+          customProducts: [{
+            name:  prod.nama || 'Produk',
+            qty:   qty,
+            price: harga,
+          }],
+        };
+
+        if (destId) item.customerAddressDataId = destId;
+        if (isCOD)  item.COD = o.total || 0;
+        else        item.goodsValue = harga * qty;
+
+        orderItems.push({ orderId: o.id, item });
+      }
+
+      // 5. POST ke Mengantar (multipart form-data)
+      try {
+        const form = new FormData();
+        form.append('courier', kurir);
+        form.append('pickup', JSON.stringify({
+          address_id: mngOriginId,
+          type: 'scheduledPickup',
+          volume: 'volumeMobil',
+          ...(timeId ? { time_id: timeId } : {}),
+        }));
+        form.append('orders', JSON.stringify(orderItems.map(x => x.item)));
+
+        const mResp = await fetch(`https://app.mengantar.com/api/public/${mngKey}/order`, {
+          method: 'POST',
+          body: form,
+        });
+        const mJson = await mResp.json();
+
+        if (mJson.success && Array.isArray(mJson.data)) {
+          // Update orders_new dengan cnote_no dan status dikirim
+          for (let i = 0; i < mJson.data.length; i++) {
+            const mOrder = mJson.data[i];
+            const orderId = orderItems[i]?.orderId;
+            const cnote = mOrder.cnote_no || '';
+            if (orderId) {
+              await sbPatch('orders_new', `?id=eq.${orderId}`, {
+                no_resi:    cnote,
+                ekspedisi:  kurir,
+                status:     'dikirim',
+                status_tracking: 'dikirim',
+              }).catch(() => {});
+            }
+            results.push({
+              orderId,
+              kurir,
+              success: true,
+              cnote_no: cnote,
+              unpaid:   mOrder.unpaid || false,
+            });
+          }
+          // Catat errors dari Mengantar
+          if (mJson.errors?.length) {
+            mJson.errors.forEach(e => results.push({ kurir, success: false, error: e }));
+          }
+        } else {
+          orderItems.forEach(x => results.push({
+            orderId: x.orderId, kurir, success: false,
+            error: mJson.message || mJson.error || 'Gagal dari Mengantar'
+          }));
+        }
+      } catch(e) {
+        orderItems.forEach(x => results.push({ orderId: x.orderId, kurir, success: false, error: e.message }));
+      }
+    }
+
+    return res.status(200).json({ ok: true, results });
+
+  } catch(e) {
+    console.error('[createOrder] Error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 /* ── MAIN HANDLER ─────────────────────────────────────────── */
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Route: create mengantar order
+  if (req.method === 'POST' && req.body?.action === 'create-mengantar') {
+    return handleCreateMengantar(req, res);
+  }
 
   // Verifikasi cron secret
   const CRON_SECRET = process.env.CRON_SECRET;
