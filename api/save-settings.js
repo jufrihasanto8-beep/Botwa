@@ -37,8 +37,9 @@ module.exports = async function handler(req, res) {
         const mRes = await fetch(`https://app.mengantar.com/api/public/${key}/origin`, {
           headers: { 'Accept': 'application/json' },
         });
-        if (!mRes.ok) throw new Error(`Mengantar HTTP ${mRes.status}`);
-        const json = await mRes.json();
+        const mText = await mRes.text();
+        if (!mRes.ok) return res.status(200).json({ ok: false, status: mRes.status, raw: mText });
+        let json; try { json = JSON.parse(mText); } catch { json = mText; }
         return res.status(200).json({ ok: true, data: json });
       } catch(e) {
         return res.status(500).json({ error: e.message });
