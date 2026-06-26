@@ -463,9 +463,13 @@ Bisa isi lebih dari satu rekening."></textarea>
 
           <div class="form-group">
             <label style="font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:6px">Pickup Address ID</label>
-            <input type="text" id="f-mengantar-origin" placeholder="Contoh: 62e27d67ecf5ae2893bc070a"
-              style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-family:monospace">
-            <div style="font-size:11px;color:#64748b;margin-top:6px">ID alamat gudang/pickup di Mengantar. Cek di dashboard Mengantar → Alamat saya → salin _id-nya.</div>
+            <div style="display:flex;gap:8px;margin-bottom:6px">
+              <input type="text" id="f-mengantar-origin" placeholder="Contoh: 62e27d67ecf5ae2893bc070a"
+                style="flex:1;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-family:monospace">
+              <button class="btn" onclick="cariMengantarOrigin()" id="btn-cari-origin" style="padding:8px 14px;white-space:nowrap">🔍 Cari Alamat</button>
+            </div>
+            <div id="origin-list" style="display:none;background:#0d1117;border:1px solid rgba(255,255,255,.12);border-radius:8px;overflow:hidden;margin-bottom:6px"></div>
+            <div style="font-size:11px;color:#64748b">Klik "Cari Alamat" untuk ambil daftar alamat pickup dari Mengantar, lalu pilih yang sesuai.</div>
           </div>
 
           <div style="display:flex;align-items:center;gap:10px">
@@ -1240,6 +1244,68 @@ async function loadMengantarSettings() {
 function toggleMengantarKey() {
   const el = document.getElementById('f-mengantar-key');
   el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+async function cariMengantarOrigin() {
+  const key = document.getElementById('f-mengantar-key').value.trim();
+  if (!key) { alert('Isi API Key Mengantar dulu ya.'); return; }
+
+  const btn = document.getElementById('btn-cari-origin');
+  const listEl = document.getElementById('origin-list');
+  btn.disabled = true;
+  btn.textContent = '⏳ Mengambil...';
+  listEl.style.display = 'none';
+  listEl.innerHTML = '';
+
+  try {
+    const res = await fetch(`https://app.mengantar.com/api/public/${key}/origin`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    // Mengantar returns array directly or nested in data/origins
+    const rows = Array.isArray(json) ? json : (json.data || json.origins || json.result || []);
+    if (!rows.length) {
+      listEl.style.display = 'block';
+      listEl.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:12px">Tidak ada alamat pickup ditemukan.</div>';
+      return;
+    }
+
+    listEl.style.display = 'block';
+    listEl.innerHTML = rows.map((r, i) => {
+      const id    = r._id || r.id || '';
+      const nama  = r.name || r.nama || r.alias || r.label || 'Tanpa Nama';
+      const telp  = r.phone || r.telp || r.phoneNumber || '';
+      const alamat= r.address || r.alamat || r.street || '';
+      const kota  = [r.district, r.city, r.province].filter(Boolean).join(', ');
+      return `<div onclick="pilihOrigin('${id}','${nama.replace(/'/g,"\\'")}',this)"
+        style="padding:12px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);transition:background .1s"
+        onmouseover="this.style.background='rgba(59,130,246,.1)'" onmouseout="this.style.background=(this.dataset.sel?'rgba(59,130,246,.15)':'')">
+        <div style="font-weight:600;color:#e2e8f0;font-size:13px">${nama}</div>
+        ${telp ? `<div style="font-size:11px;color:#64748b;margin-top:2px">${telp}</div>` : ''}
+        ${alamat ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px">${alamat}${kota ? ', '+kota : ''}</div>` : ''}
+        <div style="font-size:10px;color:#475569;margin-top:4px;font-family:monospace">${id}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    listEl.style.display = 'block';
+    listEl.innerHTML = `<div style="padding:12px;color:#f87171;font-size:12px">Gagal fetch: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 Cari Alamat';
+  }
+}
+
+function pilihOrigin(id, nama, el) {
+  // Hilangkan highlight sebelumnya
+  el.closest('#origin-list').querySelectorAll('[data-sel]').forEach(x => {
+    delete x.dataset.sel;
+    x.style.background = '';
+  });
+  el.dataset.sel = '1';
+  el.style.background = 'rgba(59,130,246,.15)';
+  document.getElementById('f-mengantar-origin').value = id;
 }
 
 async function saveMengantarSettings() {
