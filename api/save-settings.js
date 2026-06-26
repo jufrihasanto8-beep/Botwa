@@ -30,6 +30,21 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     const { userId, user_id, action, key } = req.query || {};
 
+    // Proxy: autofill area (kecamatan → kabupaten, provinsi, kodepos)
+    if (action === 'area-autofill') {
+      const q = req.query.q || '';
+      if (!q) return res.status(400).json({ error: 'q wajib' });
+      try {
+        const r = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(q)}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' }
+        });
+        const json = await r.json();
+        return res.status(200).json({ ok: true, data: json });
+      } catch(e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     // Proxy: fetch Mengantar origin addresses (bypass CORS)
     if (action === 'mengantar-origins') {
       if (!key) return res.status(400).json({ error: 'key wajib' });
