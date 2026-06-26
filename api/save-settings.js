@@ -28,10 +28,27 @@ module.exports = async function handler(req, res) {
 
   // ── GET: baca courier_whitelist pakai service key (bypass RLS) ──
   if (req.method === 'GET') {
-    const userId = req.query?.userId || req.query?.user_id;
-    if (!userId) return res.status(400).json({ error: 'userId wajib' });
+    const { userId, user_id, action, key } = req.query || {};
+
+    // Proxy: fetch Mengantar origin addresses (bypass CORS)
+    if (action === 'mengantar-origins') {
+      if (!key) return res.status(400).json({ error: 'key wajib' });
+      try {
+        const mRes = await fetch(`https://app.mengantar.com/api/public/${key}/origin`, {
+          headers: { 'Accept': 'application/json' },
+        });
+        if (!mRes.ok) throw new Error(`Mengantar HTTP ${mRes.status}`);
+        const json = await mRes.json();
+        return res.status(200).json({ ok: true, data: json });
+      } catch(e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    const uid = userId || user_id;
+    if (!uid) return res.status(400).json({ error: 'userId wajib' });
     try {
-      const data = await sbReq('GET', `courier_whitelist?user_id=eq.${userId}&order=nama.asc`);
+      const data = await sbReq('GET', `courier_whitelist?user_id=eq.${uid}&order=nama.asc`);
       return res.status(200).json({ ok: true, data });
     } catch(e) {
       return res.status(500).json({ error: e.message });
