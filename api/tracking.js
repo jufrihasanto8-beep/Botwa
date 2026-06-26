@@ -448,6 +448,8 @@ async function handleCreateMengantar(req, res) {
         });
         const mJson = await mResp.json();
 
+        console.log('[createMengantar] response kurir', kurir, JSON.stringify(mJson).slice(0, 500));
+
         if (mJson.success && Array.isArray(mJson.data)) {
           // Update orders_new dengan cnote_no dan status dikirim
           for (let i = 0; i < mJson.data.length; i++) {
@@ -472,16 +474,20 @@ async function handleCreateMengantar(req, res) {
           }
           // Catat errors dari Mengantar
           if (mJson.errors?.length) {
-            mJson.errors.forEach(e => results.push({ kurir, success: false, error: e }));
+            mJson.errors.forEach(err => results.push({ kurir, success: false, error: String(err?.message || err) }));
           }
         } else {
+          const errMsg = mJson.message || mJson.error || mJson.msg
+            || (mJson.errors?.[0]?.message) || (mJson.errors?.[0])
+            || `Mengantar: ${JSON.stringify(mJson).slice(0, 200)}`;
           orderItems.forEach(x => results.push({
             orderId: x.orderId, kurir, success: false,
-            error: mJson.message || mJson.error || 'Gagal dari Mengantar'
+            error: String(errMsg),
           }));
         }
       } catch(e) {
-        orderItems.forEach(x => results.push({ orderId: x.orderId, kurir, success: false, error: e.message }));
+        const errMsg = e?.message || e?.toString() || 'Unknown error';
+        orderItems.forEach(x => results.push({ orderId: x.orderId, kurir, success: false, error: errMsg }));
       }
     }
 
