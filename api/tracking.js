@@ -480,9 +480,8 @@ async function handleCreateMengantar(req, res) {
             mJson.errors.forEach(err => results.push({ kurir, success: false, error: String(err?.message || err) }));
           }
         } else {
-          const errMsg = mJson.message || mJson.error || mJson.msg
-            || (mJson.errors?.[0]?.message) || (mJson.errors?.[0])
-            || JSON.stringify(mJson).slice(0, 300);
+          const errDetail = mJson.errors?.length ? ` | ${JSON.stringify(mJson.errors).slice(0, 300)}` : '';
+          const errMsg = (mJson.message || mJson.error || mJson.msg || JSON.stringify(mJson).slice(0, 200)) + errDetail;
           orderItems.forEach(x => results.push({
             orderId: x.orderId, kurir, success: false,
             error: String(errMsg),
