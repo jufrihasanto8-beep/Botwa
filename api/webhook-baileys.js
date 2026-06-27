@@ -684,6 +684,29 @@ function extractProposedWilayah(aiMsg) {
 
 // extractConfirmedWilayah dihapus — pakai [WILAYAH_OK:] marker saja
 
+/* ── EXTRACT LOKASI PAKAI HAIKU (untuk reply customer setelah AI tanya alamat) ── */
+async function extractLokasiHaiku(text, apiKey) {
+  const key = apiKey || ANTHROPIC_KEY;
+  if (!key) return null;
+  const prompt = `Dari teks berikut, ekstrak nama kelurahan/desa, kecamatan, dan kabupaten/kota di Indonesia jika ada.
+Teks: "${text}"
+Jawab dengan JSON saja tanpa penjelasan: {"kelurahan":"...","kecamatan":"...","kabupaten":"..."} atau null jika tidak ada nama wilayah Indonesia yang jelas.
+Isi field yang ada saja, kosongkan yang tidak disebutkan. Jangan mengarang.`;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 80, messages: [{ role: 'user', content: prompt }] }),
+    });
+    const data = await res.json();
+    const raw = data.content?.[0]?.text?.trim() || '';
+    if (!raw || raw === 'null') return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.kecamatan && !parsed.kabupaten && !parsed.kelurahan) return null;
+    return parsed;
+  } catch { return null; }
+}
+
 /* ── SEARCH WILAYAH LOKAL (tabel wilayah_id di Supabase) ─── */
 async function cariWilayah(keyword, limit = 50) {
   try {
@@ -2352,123 +2375,84 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     let autoOngkirResult = null;
     let proposedWilayah = convState.proposed_wilayah;
 
-    // PENTING: Kalau customer kirim pesan BUKAN konfirmasi, coba cari wilayah dari pesannya
-    // Tapi hanya proses kalau ada kata kunci intent lokasi (biar tidak terlalu agresif)
-    const intentLokasi = /\b(kirim|alamat|tujuan|lokasi|daerah|wilayah|kecamatan|kelurahan|kota|kabupaten|ganti|pindah|bukan|salah)\b/i.test(message);
+    // ── Deteksi lokasi dari pesan customer (hanya aktif kalau flag waiting_for_location nyala) ──
+    // Flag di-set setelah AI nanya alamat/wilayah ke customer
+    if (convState.waiting_for_location && !convState.ongkir && !isConfirmation(message)) {
+      console.log(`[location] waiting_for_location aktif, extract dari: "${message.slice(0,80)}"`);
+      const lokasi = await extractLokasiHaiku(message, userAnthropicKey);
+      console.log(`[location] Haiku extract:`, lokasi);
 
-    const sapaanUmum = /^(kak|min|halo|hai|hi|hei|p|permisi|ada|bang|bos|gan|mba|mbak|bu|pak|om|teh|neng|mas)\s*[?!.]*$/i.test(message.trim());
-    if (!isConfirmation(message) && !sapaanUmum && message.length >= 5 && message.length <= 200 && (intentLokasi || !convState.ongkir)) {
-      // Coba cari wilayah dari pesan customer langsung
-      const pesanBersih = cleanKelInput(message) || message.replace(/[?!.,]+/g, '').trim();
-      let cariHasil = await cariWilayah(pesanBersih, 20);
+      if (lokasi?.kecamatan || lokasi?.kabupaten || lokasi?.kelurahan) {
+        // Bangun query ke wilayah_id dari hasil extract
+        const queryParts = [lokasi.kelurahan, lokasi.kecamatan, lokasi.kabupaten].filter(Boolean);
+        let cariHasil = await cariWilayah(queryParts.join(', '), 20);
 
-      // Kalau gagal (full address tanpa koma), strip noise address words dan coba per token
-      if (!cariHasil.length && message.length > 20) {
-        const stripped = pesanBersih
-          .replace(/\b(perum|perumahan|komplek|komp|villa|griya|jl|jln|jalan|blok|no|nomor|rt|rw|gg|gang|dsn|dusun|desa|kavling|kav|permai|indah|asri|baru|raya|dalam)\b/g, '')
-          .replace(/\b\d+[a-z]?\b/g, '') // hapus nomor
-          .replace(/\b[a-z]\b/g, '')      // hapus huruf tunggal
-          .replace(/\s+/g, ' ').trim();
-        const tokens = stripped.split(/\s+/).filter(w => w.length >= 4);
-        console.log(`[address-parse] Coba per token: ${tokens.join(', ')}`);
-        for (const token of tokens) {
-          const r = await cariWilayah(token, 10);
-          if (r.length > 0) {
-            const kU = [...new Set(r.map(x => `${x.kecamatan}||${x.kabupaten}`))];
-            if (kU.length === 1) { cariHasil = r; console.log(`[address-parse] Match dari token "${token}"`); break; }
-          }
+        // Fallback: coba kecamatan+kabupaten saja
+        if (!cariHasil.length && lokasi.kecamatan && lokasi.kabupaten) {
+          cariHasil = await cariWilayah(`${lokasi.kecamatan}, ${lokasi.kabupaten}`, 20);
         }
-      }
-
-      const kecUnik = [...new Set(cariHasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
-
-      if (cariHasil.length > 0) {
-        // Cek apakah wilayah baru BEDA dari wilayah saat ini
-        const wilayahLama = convState.wilayah?.toLowerCase() || '';
-        const w = cariHasil[0];
-        const wilayahBaru = `${w.kecamatan}, ${w.kabupaten}, ${w.provinsi}`;
-        const wilayahBaruLower = wilayahBaru.toLowerCase();
-        const adalahWilayahBaru = !wilayahLama || !wilayahBaruLower.includes(wilayahLama.split(',')[0]?.trim());
-
-        if (adalahWilayahBaru && convState.ongkir) {
-          // Wilayah BEDA → clear ongkir lama
-          console.log(`Clear ongkir karena wilayah baru: "${wilayahBaru}" (lama: "${convState.wilayah}")`);
-          await updateConvState(conversation.id, { ongkir: null, wilayah: null });
-          convState.ongkir = null;
-          convState.wilayah = null;
+        // Fallback: coba kelurahan saja (customer jawab "Pendowoharjo" tanpa kecamatan)
+        if (!cariHasil.length && lokasi.kelurahan) {
+          cariHasil = await cariWilayah(lokasi.kelurahan, 20);
         }
+        // Fallback: coba kecamatan saja
+        if (!cariHasil.length && lokasi.kecamatan) {
+          cariHasil = await cariWilayah(lokasi.kecamatan, 20);
+        }
+
+        const kecUnik = [...new Set(cariHasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
+        const kelUnik = [...new Set(cariHasil.map(r => r.kelurahan))];
 
         if (kecUnik.length === 1) {
-          const kelUnik = [...new Set(cariHasil.map(r => r.kelurahan))];
+          const w = cariHasil[0];
+          const wilayahBaru = `${w.kecamatan}, ${w.kabupaten}, ${w.provinsi}`;
 
-          // Simpan area ke customers.alamat lebih awal (tidak nunggu WILAYAH_OK)
+          // Simpan ke customers.alamat
           if (customer?.id) {
-            const alamatEarly = {
+            const alamatBaru = {
               ...(customer.alamat || {}),
               ...(w.kelurahan ? { kelurahan: w.kelurahan } : {}),
-              ...(w.kecamatan ? { kecamatan: w.kecamatan } : {}),
-              ...(w.kabupaten ? { kabupaten: w.kabupaten } : {}),
-              ...(w.provinsi  ? { provinsi:  w.provinsi  } : {}),
+              kecamatan: w.kecamatan, kabupaten: w.kabupaten, provinsi: w.provinsi,
             };
-            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatEarly })
-              .catch(e => console.error('[proposedWilayah] Gagal save customer.alamat:', e.message));
-            customer.alamat = alamatEarly;
+            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru }).catch(() => {});
+            customer.alamat = alamatBaru;
           }
 
-          if (kelUnik.length === 1 && !convState.ongkir) {
-            // Kelurahan SPESIFIK → langsung hitung ongkir, tidak perlu konfirmasi lagi
-            console.log(`[address-parse] Kelurahan spesifik "${w.kelurahan}, ${w.kecamatan}" — langsung hitung ongkir`);
-            const hasilLangsung = await hitungOngkir(wilayahBaru, product, parseInt(convState.qty) || 1, userMngOriginId).catch(() => null);
-            if (hasilLangsung) {
-              await updateConvState(conversation.id, { wilayah: wilayahBaru, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasilLangsung });
+          if (kelUnik.length === 1) {
+            // Kelurahan spesifik → langsung hitung ongkir
+            const hasilOngkir = await hitungOngkir(wilayahBaru, product, parseInt(convState.qty) || 1, userMngOriginId).catch(() => null);
+            if (hasilOngkir) {
+              await updateConvState(conversation.id, { wilayah: wilayahBaru, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasilOngkir, waiting_for_location: false });
               convState.wilayah = wilayahBaru;
-              convState.ongkir  = hasilLangsung;
-              convState.pending_kecamatan = null;
+              convState.ongkir  = hasilOngkir;
+              convState.waiting_for_location = false;
               proposedWilayah = null;
-              autoOngkirResult = { wilayah: wilayahBaru, hasil: hasilLangsung, fromAddress: true };
-              console.log(`[address-parse] autoOngkirResult set: ${wilayahBaru}`);
-              // Simpan ongkir ke customers.alamat
-              if (customer?.id) {
-                const alamatOngkir = {
-                  ...(customer.alamat || {}),
-                  ...(hasilLangsung.area?.kelurahan ? { kelurahan: hasilLangsung.area.kelurahan } : {}),
-                  ...(hasilLangsung.area?.kecamatan ? { kecamatan: hasilLangsung.area.kecamatan } : {}),
-                  ...(hasilLangsung.area?.kota      ? { kabupaten: hasilLangsung.area.kota }      : {}),
-                  ...(hasilLangsung.area?.provinsi  ? { provinsi:  hasilLangsung.area.provinsi }  : {}),
-                  ...(hasilLangsung.area?.kodePos   ? { kodepos:   hasilLangsung.area.kodePos }   : {}),
-                  ekspedisi: hasilLangsung.ekspedisi, ongkirAsli: hasilLangsung.ongkirAsli,
-                  ongkirPromo: hasilLangsung.ongkirPromo, feeCOD: hasilLangsung.feeCOD, harga: hasilLangsung.harga,
-                };
-                await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatOngkir })
-                  .catch(e => console.error('[address-parse] Gagal save alamat+ongkir:', e.message));
-                customer.alamat = alamatOngkir;
-              }
+              autoOngkirResult = { wilayah: wilayahBaru, hasil: hasilOngkir, fromAddress: true };
+              console.log(`[location] Ongkir berhasil: ${wilayahBaru}`);
             } else {
-              // hitungOngkir gagal → fallback ke proposed_wilayah
-              await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
+              // Hitung ongkir gagal → proposed, AI akan konfirmasi
+              await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru, waiting_for_location: false });
               convState.proposed_wilayah = wilayahBaru;
+              convState.waiting_for_location = false;
               proposedWilayah = wilayahBaru;
             }
           } else {
-            // Satu kecamatan tapi banyak kelurahan → simpan proposed, biar Claude tanya kelurahan
-            console.log(`Wilayah terdeteksi dari pesan customer: "${wilayahBaru}" (${kelUnik.length} kelurahan)`);
-            await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
+            // Banyak kelurahan → simpan proposed, AI tanya kelurahan spesifik
+            console.log(`[location] ${kelUnik.length} kelurahan di ${wilayahBaru}, simpan proposed`);
+            await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru, waiting_for_location: true });
             convState.proposed_wilayah = wilayahBaru;
             proposedWilayah = wilayahBaru;
           }
+        } else if (kecUnik.length > 1) {
+          // Ambigu → biarkan AI tanya lebih spesifik, flag tetap aktif
+          console.log(`[location] Ambigu: ${kecUnik.length} kecamatan ditemukan, tunggu AI tanya lebih spesifik`);
         } else {
-          // Banyak kecamatan → clear proposed, biar AI tanya
-          console.log(`Pesan "${pesanBersih}" punya ${kecUnik.length} kecamatan, tunggu AI konfirmasi`);
-          await updateConvState(conversation.id, { proposed_wilayah: null });
-          convState.proposed_wilayah = null;
-          proposedWilayah = null;
+          // Tidak ketemu di DB → flag tetap aktif, AI akan tanya ulang
+          console.log(`[location] Tidak ketemu di wilayah_id: ${JSON.stringify(lokasi)}`);
         }
-      } else if (proposedWilayah && intentLokasi) {
-        // Tidak ketemu wilayah tapi ada intent lokasi + proposed lama → clear
-        console.log(`Clear proposed_wilayah lama: "${proposedWilayah}"`);
-        await updateConvState(conversation.id, { proposed_wilayah: null });
-        convState.proposed_wilayah = null;
-        proposedWilayah = null;
+      } else {
+        // Haiku tidak nemukan lokasi (customer balas hal lain) → flag tetap aktif
+        console.log(`[location] Tidak ada lokasi dalam pesan, waiting_for_location tetap aktif`);
       }
     }
 
@@ -2513,9 +2497,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     // ── Fallback: customer konfirmasi tapi proposed_wilayah null → coba extract dari last AI message ──
     if (!proposedWilayah && !convState.ongkir && !convState.wilayah && isConfirmation(message)) {
-      const lastAiMsg = [...history].reverse().find(h => h.role === 'assistant');
-      if (lastAiMsg?.content) {
-        const extracted = extractProposedWilayah(lastAiMsg.content);
+      const lastAiFallback = [...history].reverse().find(h => h.role === 'assistant');
+      if (lastAiFallback?.content) {
+        const extracted = extractProposedWilayah(lastAiFallback.content);
         if (extracted) {
           console.log(`[fallback-confirm] Extract wilayah dari last AI message: "${extracted}"`);
           history.push({ role: 'user', content: `[SISTEM] Customer mengkonfirmasi wilayah. Wilayah yang disebutkan sebelumnya: "${extracted}". WAJIB tulis [WILAYAH_OK:${extracted}] di balasanmu sekarang.` });
@@ -3203,6 +3187,15 @@ ${ongkirInfo}`;
 
     // ── Simpan & kirim balasan ─────────────────────────────────
     await saveMessage(conversation.id, 'ai', reply);
+
+    // ── Set flag waiting_for_location kalau AI baru nanya alamat/wilayah ──
+    if (!convState.ongkir && !convState.waiting_for_location) {
+      const aiNanyaLokasi = /\b(kota|kecamatan|kelurahan|alamat|wilayah|daerah|kirim ke|lokasi|tinggal di|domisili)\b/i.test(reply) && /\?/.test(reply);
+      if (aiNanyaLokasi) {
+        await updateConvState(conversation.id, { waiting_for_location: true });
+        console.log(`[location] Flag waiting_for_location di-set`);
+      }
+    }
 
     // ── Auto-kirim gambar produk kalau customer tanya foto ────
     const tanyaFoto = /\b(foto|gambar|pic|photo|tampilan|bentuk|wujud|lihat produk|gambarnya|fotonya|kirim dong|kirimnya|mana fotonya|mana gambarnya|belum terkirim|belum muncul|kirim ulang|kirim lagi)\b/i.test(message);
