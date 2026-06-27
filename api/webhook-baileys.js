@@ -1354,18 +1354,22 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Ambil rekening dari users table ───────────────────────
-    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_origin_id&limit=1`).catch(() => []);
+    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_origin_id,ai_model_config&limit=1`).catch(() => []);
     const userRekening      = userRows[0]?.rekening           || null;
     const userAnthropicKey  = userRows[0]?.anthropic_key      || ANTHROPIC_KEY;
     const userGroupJid      = userRows[0]?.group_jid           || WA_GROUP_JID;
     const userMngOriginId   = userRows[0]?.mengantar_origin_id || MENGANTAR_ORIGIN_ID;
+    const userModelConfig   = userRows[0]?.ai_model_config     || {};
 
     // ── Routing: cari produk dari referral/isi chat ────────────
     const { product, sumber } = await resolveProduct(userId, referral, message);
     console.log(`Produk: ${product?.nama || 'tidak diketahui'} (${sumber})`);
 
-    // CTWA → Haiku (volume tinggi, hemat biaya), Form/Inbound → Sonnet (lebih pintar)
-    const chatModel = sumber === 'ctwa' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6';
+    // Model AI per tipe — dari setting user, fallback ke default
+    const MODEL_SONNET = 'claude-sonnet-4-6';
+    const MODEL_HAIKU  = 'claude-haiku-4-5-20251001';
+    const defaultModel = { ctwa: MODEL_HAIKU, form: MODEL_SONNET, inbound: MODEL_SONNET };
+    const chatModel = userModelConfig[sumber] || defaultModel[sumber] || MODEL_SONNET;
 
     // ── Deteksi leads dari form web (pesan mengandung "isi form" + nama) ───
     let sumberFinal = sumber;
