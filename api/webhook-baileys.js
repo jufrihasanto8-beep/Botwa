@@ -1855,6 +1855,21 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       }
     }
 
+    // ── Auto-load wilayah dari customer.alamat jika convState.wilayah belum ada (repeat customer) ──
+    if (!convState.wilayah && product && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten) {
+      const alamatParts = [customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean);
+      const wilayahAuto = alamatParts.join(', ');
+      try {
+        const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1, userMngOriginId);
+        if (hasilAuto) {
+          await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
+          convState.wilayah = wilayahAuto;
+          convState.ongkir  = hasilAuto;
+          console.log(`[auto-load] Wilayah dari customer.alamat: ${wilayahAuto}`);
+        }
+      } catch(e) { console.error('[auto-load] Gagal:', e.message); }
+    }
+
     // ── Refresh ongkir jika wilayah sudah diketahui (ambil promo terbaru) ──
     if (convState.wilayah && product) {
       try {
@@ -1895,6 +1910,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       if (customer?.nama && customer.nama !== wa_number) ctx += `\n- Nama: ${customer.nama}`;
       if (savedKeluhan) ctx += `\n- Keluhan: ${savedKeluhan}`;
       if (savedAlamat)  ctx += `\n- Alamat: ${savedAlamat}`;
+      if (convState.wilayah) ctx += `\n- Wilayah pengiriman: ${convState.wilayah} (SUDAH DIKETAHUI — jangan tanya alamat/wilayah lagi)`;
       systemPrompt += ctx;
     }
 
