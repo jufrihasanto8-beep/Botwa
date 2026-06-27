@@ -661,6 +661,10 @@ function extractProposedWilayah(aiMsg) {
     // Pattern 3: "X ya kak?" di akhir (tanda tanya = pertanyaan)
     if (!m) m = line.match(/([A-Za-z][A-Za-z\s,]{5,60}?)\s+ya\s+kak\s*\?/i);
 
+    // Pattern 4: "X ya 😊" — bot konfirmasi wilayah tanpa kata "kak" (misal: "Bangunjiwo, Kasihan, Bantul ya 😊")
+    // Harus ada koma (agar tidak terlalu agresif menangkap kalimat biasa)
+    if (!m) m = line.match(/([A-Za-z][A-Za-zÀ-ÿ\s,\.]{5,60}?,\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s,\.]{2,40}?)\s+ya\s*[😊🙏😄🙂✅]/u);
+
     if (m) {
       const candidate = m[1].trim().replace(/[,?!]+$/, '');
       const wordCount = candidate.split(/\s+/).length;
@@ -2402,7 +2406,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     if (proposedWilayah && isConfirmation(message) && !convState.ongkir && !convState.pending_kecamatan) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
-      const hasil = await hitungOngkir(proposedWilayah, product, 1, userMngOriginId);
+      const hasil = await hitungOngkir(proposedWilayah, product, parseInt(convState.qty) || 1, userMngOriginId);
       if (hasil) {
         await updateConvState(conversation.id, {
           wilayah: proposedWilayah,
@@ -2431,6 +2435,22 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
             .catch(e => console.error('[autoOngkir] Gagal save customer.alamat:', e.message));
           customer.alamat = alamatBaru;
+        }
+      } else {
+        // hitungOngkir gagal tapi wilayah sudah dikonfirmasi → inject hint ke Claude agar tulis [WILAYAH_OK:]
+        console.warn(`[autoOngkir] hitungOngkir gagal untuk "${proposedWilayah}", inject hint WILAYAH_OK ke Claude`);
+        history.push({ role: 'user', content: `[SISTEM] Customer mengkonfirmasi wilayah "${proposedWilayah}". WAJIB tulis [WILAYAH_OK:${proposedWilayah}] di balasanmu sekarang agar sistem bisa hitung ongkir.` });
+      }
+    }
+
+    // ── Fallback: customer konfirmasi tapi proposed_wilayah null → coba extract dari last AI message ──
+    if (!proposedWilayah && !convState.ongkir && !convState.wilayah && isConfirmation(message)) {
+      const lastAiMsg = [...history].reverse().find(h => h.role === 'assistant');
+      if (lastAiMsg?.content) {
+        const extracted = extractProposedWilayah(lastAiMsg.content);
+        if (extracted) {
+          console.log(`[fallback-confirm] Extract wilayah dari last AI message: "${extracted}"`);
+          history.push({ role: 'user', content: `[SISTEM] Customer mengkonfirmasi wilayah. Wilayah yang disebutkan sebelumnya: "${extracted}". WAJIB tulis [WILAYAH_OK:${extracted}] di balasanmu sekarang.` });
         }
       }
     }

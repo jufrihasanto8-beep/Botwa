@@ -104,11 +104,85 @@ Tulis pesannya langsung, tanpa penjelasan.`;
     }
   }
 
+  // ── ACTION: analytics insights ──
+  if (action === 'analytics-insights') {
+    const userKey = await getUserAnthropicKey(userId);
+    const apiKey  = userKey || ANTHROPIC_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
+    const { prompt: insightPrompt } = body;
+    if (!insightPrompt) return res.status(400).json({ error: 'prompt wajib' });
+    try {
+      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content: insightPrompt }] }),
+      }, 20000);
+      const data = await response.json();
+      if (data.error) return res.status(500).json({ error: data.error.message });
+      return res.status(200).json({ text: data.content?.[0]?.text?.trim() || '' });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (!messages?.length) return res.status(400).json({ error: 'messages wajib' });
+
+  const { convState = {}, customerAlamat = {} } = body || {};
 
   const userKey = await getUserAnthropicKey(userId);
   const apiKey  = userKey || ANTHROPIC_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
+
+  // ── Detect skenario stuck ongkir ──────────────────────────────
+  const fmt = n => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
+
+  // Cek apakah ongkir sudah ada di state
+  const ongkirState = convState.ongkir || null;
+  const wilayahState = convState.wilayah || null;
+  const proposedWilayah = convState.proposed_wilayah || null;
+
+  // Skenario A: ongkir sudah ada → inject data total ke system prompt
+  let ongkirContext = '';
+  if (ongkirState && product) {
+    const harga = product.harga || 0;
+    const ongkirAsli  = ongkirState.ongkirAsli  || 0;
+    const ongkirPromo = ongkirState.ongkirPromo ?? ongkirAsli;
+    const feeCOD      = ongkirState.feeCOD      || 0;
+    const totalTF     = ongkirState.totalTransfer || (harga + ongkirPromo);
+    const totalCOD    = ongkirState.totalCOD     || (harga + ongkirPromo + feeCOD);
+    const kurir       = ongkirState.ekspedisi    || 'KURIR';
+    const wilayah     = ongkirState.area?.kecamatan
+      ? [ongkirState.area.kelurahan, ongkirState.area.kecamatan, ongkirState.area.kota || ongkirState.area.kabupaten].filter(Boolean).join(', ')
+      : wilayahState || 'wilayah customer';
+    const ongkirDisplay = ongkirAsli !== ongkirPromo
+      ? `~${fmt(ongkirAsli)}~ ${fmt(ongkirPromo)}`
+      : fmt(ongkirPromo);
+
+    ongkirContext = `\n\nDATA ONGKIR (sudah dihitung sistem, WAJIB tampilkan di saran):
+- Wilayah tujuan: ${wilayah}
+- Ekspedisi: ${kurir}
+- Ongkir: ${ongkirDisplay}
+- Transfer: ${product.nama} ${fmt(harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(totalTF)}
+- COD: ${product.nama} ${fmt(harga)} + ongkir ${ongkirDisplay} + admin ${fmt(feeCOD)} = TOTAL ${fmt(totalCOD)}
+
+Kalau customer belum pilih metode bayar → tanya "Mau COD atau Transfer kak? 😊" + tampilkan total keduanya.
+Kalau customer sudah pilih → tampilkan total yang sesuai + kasih info rekening (kalau Transfer).
+Format angka: tanpa desimal, pakai titik ribuan.`;
+
+  } else if (wilayahState || proposedWilayah || customerAlamat?.kecamatan) {
+    // Skenario B: wilayah diketahui tapi ongkir belum ada
+    const lok = wilayahState || proposedWilayah
+      || [customerAlamat.kelurahan, customerAlamat.kecamatan, customerAlamat.kabupaten].filter(Boolean).join(', ');
+    ongkirContext = `\n\nSITUASI: Wilayah customer sudah diketahui (${lok}) tapi ongkir belum berhasil dihitung sistem.
+SARAN: Minta maaf singkat dan tanyakan lagi dengan ramah, contoh: "Maaf kak sistem lagi cek ongkir ke ${lok}, sebentar ya 🙏" ATAU sarankan customer untuk balas ulang dengan nama kecamatan saja supaya sistem bisa hitung otomatis.`;
+
+  } else {
+    // Skenario C: wilayah belum diketahui sama sekali
+    const sudahTanyaAlamat = messages?.some(m => m.role === 'assistant' && /alamat|kecamatan|wilayah|daerah|lokasi/i.test(m.content || ''));
+    if (sudahTanyaAlamat) {
+      ongkirContext = `\n\nSITUASI: Bot sudah tanya alamat tapi customer belum kasih. Ingatkan lagi dengan ramah — minta kecamatan & kabupaten/kota saja (bukan alamat lengkap) supaya sistem bisa hitung ongkir.`;
+    }
+  }
 
   // Bersihkan messages sebelum dikirim ke Claude
   const cleaned = messages
@@ -158,7 +232,7 @@ Rules:
 - DILARANG markdown (*bold*, _italic_, dll) — ini WhatsApp
 - Panggil "Kak", emoji secukupnya
 - Jangan ulangi apa yang sudah dibahas
-- Baca seluruh konteks percakapan dan buat balasan yang RELEVAN dengan pesan terakhir`;
+- Baca seluruh konteks percakapan dan buat balasan yang RELEVAN dengan pesan terakhir${ongkirContext}`;
 
   try {
     const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
