@@ -174,11 +174,10 @@ Kalau customer sudah pilih COD → tampilkan total COD + minta data lengkap yang
 Kalau customer sudah pilih Transfer → tampilkan total Transfer.
 Format angka: tanpa desimal, pakai titik ribuan.`;
 
-  } else if (wilayahState || proposedWilayah) {
-    // Skenario B: wilayah diketahui dari state tapi ongkir belum ada (stuck)
-    // Catatan: JANGAN trigger dari customerAlamat saja — bisa alamat lama, tidak relevan
-    const lok = wilayahState || proposedWilayah;
-    ongkirContext = `\n\nSITUASI: Wilayah customer sudah diketahui (${lok}) tapi ongkir belum berhasil dihitung sistem.
+  } else if (proposedWilayah && !wilayahState) {
+    // Skenario B: wilayah belum dikonfirmasi (proposed) dan ongkir belum dihitung
+    // Hanya trigger kalau wilayah BELUM confirmed — jangan ganggu kalau wilayah sudah confirmed
+    ongkirContext = `\n\nSITUASI: Wilayah customer sudah diketahui (${proposedWilayah}) tapi ongkir belum berhasil dihitung sistem.
 Saran balasan: minta customer balas ulang dengan kecamatan saja (lebih pendek) supaya sistem bisa hitung otomatis. Contoh: "Kak boleh ketik ulang kecamatannya saja ya, biar aku bisa cek ongkirnya 😊"`;
 
   }
