@@ -2164,7 +2164,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             convState.wilayah = wilayahKonfirm;
             convState.pending_kecamatan = null;
 
-            const hasilOngkir = await hitungOngkir(wilayahKonfirm, product, 1, userMngOriginId).catch(() => null);
+            const hasilOngkir = await hitungOngkir(wilayahKonfirm, product, parseInt(convState.qty) || 1, userMngOriginId).catch(() => null);
             if (hasilOngkir) {
               await updateConvState(conversation.id, { ongkir: hasilOngkir });
               convState.ongkir = hasilOngkir;
@@ -2212,7 +2212,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
               await updateConvState(conversation.id, { wilayah: wKonfirm, pending_kecamatan: null, proposed_wilayah: null });
               convState.wilayah = wKonfirm;
               convState.pending_kecamatan = null;
-              const ho = await hitungOngkir(wKonfirm, product, 1, userMngOriginId).catch(()=>null);
+              const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1, userMngOriginId).catch(()=>null);
               if (ho) {
                 await updateConvState(conversation.id, { ongkir: ho });
                 convState.ongkir = ho;
@@ -2228,17 +2228,57 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
                 history.push({ role:'user', content: `[SISTEM] Wilayah: ${wKonfirm}. Konfirmasi ke customer dan tulis [WILAYAH_OK:${wKonfirm}] di akhir pesan.` });
               }
             } else {
-              // Banyak kelurahan → simpan pending dan tanya kelurahan
-              await updateConvState(conversation.id, {
-                pending_kecamatan: { kecamatan: first.kecamatan, kabupaten: first.kabupaten, provinsi: first.provinsi },
+              // Banyak kelurahan → cek dulu apakah keyword customer cocok salah satu kelurahan
+              const kwCleanGlobal = cleanKelInput(message);
+              const autoMatchKel = kelurahanList.find(kel => {
+                const kelN = kel.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const kwN  = kwCleanGlobal.replace(/[^a-z0-9]/g, '');
+                return kelN === kwN || kelN.startsWith(kwN) || kwN.startsWith(kelN);
               });
-              const contohKel = kelurahanList.slice(0, 3).join(', ');
-              const hint = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten}, ${first.provinsi} ditemukan.\n`
-                + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
-                + `Tanyakan kelurahannya dengan NATURAL — sebut 2-3 contoh (misal: ${contohKel}). Gaya WA santai, 1-2 kalimat.\n`
-                + `Setelah customer sebut kelurahan yang valid, tulis [WILAYAH_OK:kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
-              history.push({ role: 'user', content: hint });
-              console.log(`Tawarkan ${kelurahanList.length} kelurahan di Kec. ${first.kecamatan}`);
+
+              if (autoMatchKel) {
+                // Nama kelurahan cocok dengan keyword → auto-confirm, tidak perlu tanya lagi
+                const wKonfirm = `${autoMatchKel}, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}`;
+                console.log(`[autoMatchKel] keyword "${kwCleanGlobal}" → kelurahan "${autoMatchKel}" di Kec. ${first.kecamatan}`);
+                if (customer?.id) {
+                  const alamatArea = { ...(customer.alamat||{}), kelurahan:autoMatchKel, kecamatan:first.kecamatan, kabupaten:first.kabupaten, provinsi:first.provinsi };
+                  await sbPatch('customers',`?id=eq.${customer.id}`,{alamat:alamatArea}).catch(()=>{});
+                  customer.alamat = alamatArea;
+                }
+                await updateConvState(conversation.id, { wilayah: wKonfirm, pending_kecamatan: null, proposed_wilayah: null });
+                convState.wilayah = wKonfirm;
+                convState.pending_kecamatan = null;
+                // Kasih hint ke Claude supaya langsung konfirmasi, tidak tanya kelurahan lagi
+                history.push({ role: 'user', content:
+                  `[SISTEM] Sistem mendeteksi otomatis: Kelurahan ${autoMatchKel}, Kec. ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}. Konfirmasi ke customer dengan natural dan tulis [WILAYAH_OK:${wKonfirm}] di akhir pesan. Jangan tanya kelurahan lagi.`
+                });
+                const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1, userMngOriginId).catch(()=>null);
+                if (ho) {
+                  await updateConvState(conversation.id, { ongkir: ho });
+                  convState.ongkir = ho;
+                  if (customer?.id) {
+                    const al = { ...(customer.alamat||{}), kodepos:ho.area?.kodePos||'', ekspedisi:ho.ekspedisi, ongkirAsli:ho.ongkirAsli, ongkirPromo:ho.ongkirPromo, feeCOD:ho.feeCOD, harga:ho.harga };
+                    await sbPatch('customers',`?id=eq.${customer.id}`,{alamat:al}).catch(()=>{});
+                    customer.alamat = al;
+                  }
+                  precomputedOngkir = ho;
+                  precomputedFirst  = { ...first, kelurahan: autoMatchKel };
+                } else {
+                  pendingKecResolvedWilayah = wKonfirm;
+                }
+              } else {
+                // Tidak ada kelurahan yang cocok → simpan pending dan tanya kelurahan
+                await updateConvState(conversation.id, {
+                  pending_kecamatan: { kecamatan: first.kecamatan, kabupaten: first.kabupaten, provinsi: first.provinsi },
+                });
+                const contohKel = kelurahanList.slice(0, 3).join(', ');
+                const hint = `[SISTEM] Kecamatan "${first.kecamatan}", ${first.kabupaten}, ${first.provinsi} ditemukan.\n`
+                  + `Semua kelurahan valid: ${kelurahanList.join(', ')}\n`
+                  + `Tanyakan kelurahannya dengan NATURAL — sebut 2-3 contoh (misal: ${contohKel}). Gaya WA santai, 1-2 kalimat.\n`
+                  + `Setelah customer sebut kelurahan yang valid, tulis [WILAYAH_OK:kelurahan, ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}].`;
+                history.push({ role: 'user', content: hint });
+                console.log(`Tawarkan ${kelurahanList.length} kelurahan di Kec. ${first.kecamatan}`);
+              }
             }
 
           } else if (pendingKec?.kecamatan) {
@@ -2425,12 +2465,14 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     if (precomputedOngkir && !autoOngkirResult) {
       const histWithPrecomputed = [
         ...history,
-        { role: 'assistant', content: rawReply },
+        { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/g, '').trim() },
         { role: 'user', content: buildOngkirInjeksi(precomputedOngkir, product,
             `Lanjutkan balasan di atas dan langsung tampilkan total harga ke customer sekarang juga. Wilayah customer: ${precomputedFirst?.kelurahan}, ${precomputedFirst?.kecamatan}, ${precomputedFirst?.kabupaten}. `) },
       ];
       const ongkirReply = await callClaude(systemPrompt, histWithPrecomputed, chatModel, userAnthropicKey);
       if (ongkirReply) rawReply = ongkirReply;
+      // Strip [WILAYAH_OK:] dari rawReply supaya handler di bawah tidak proses ulang
+      rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/g, '').trim();
     }
 
     // ── Kalau Claude lupa nulis [WILAYAH_OK:] padahal kelurahan sudah resolved → append otomatis
@@ -2472,7 +2514,8 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     }
 
     // ── Handle [WILAYAH_OK:] → cek spesifisitas dulu, baru hitung ongkir ────────
-    if (wilayahOkMatch && !autoOngkirResult) {
+    // Skip kalau precomputedOngkir sudah handle (supaya tidak proses ulang & strip harga)
+    if (wilayahOkMatch && !autoOngkirResult && !precomputedOngkir) {
       const wilayah = wilayahOkMatch[1].trim();
       console.log(`[WILAYAH_OK] detected: ${wilayah}`);
 
