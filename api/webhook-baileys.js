@@ -1855,7 +1855,8 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       }
     }
 
-    // ── Auto-load wilayah dari customer.alamat jika convState.wilayah belum ada (repeat customer) ──
+    // ── Auto-load wilayah dari customer.alamat jika convState.wilayah belum ada (repeat customer / form lead) ──
+    let autoLoadedOngkir = null;
     if (!convState.wilayah && product && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten) {
       const alamatParts = [customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean);
       const wilayahAuto = alamatParts.join(', ');
@@ -1865,13 +1866,15 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
           await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
           convState.wilayah = wilayahAuto;
           convState.ongkir  = hasilAuto;
+          autoLoadedOngkir  = hasilAuto;
           console.log(`[auto-load] Wilayah dari customer.alamat: ${wilayahAuto}`);
         }
       } catch(e) { console.error('[auto-load] Gagal:', e.message); }
     }
 
     // ── Refresh ongkir jika wilayah sudah diketahui (ambil promo terbaru) ──
-    if (convState.wilayah && product) {
+    // Skip kalau baru di-load oleh auto-load (tidak perlu hitung 2x)
+    if (convState.wilayah && product && !autoLoadedOngkir) {
       try {
         const freshOngkir = await hitungOngkir(convState.wilayah, product, 1, userMngOriginId);
         if (freshOngkir) {
@@ -2075,6 +2078,15 @@ Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'}
 Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRekening || '(belum diisi)'}.`;
       }
       history.push({ role: 'user', content: notif });
+    }
+
+    // ── Hint ke Claude jika auto-load ongkir baru berhasil → suruh tampilkan total ──
+    if (autoLoadedOngkir) {
+      history.push({ role: 'user', content:
+        buildOngkirInjeksi(autoLoadedOngkir, product,
+          `Wilayah customer sudah diketahui dari data sebelumnya: ${convState.wilayah}. `) +
+        `\n\nLangsung tampilkan total harga COD & Transfer ke customer sekarang, lalu tanya metode bayar. JANGAN tanya alamat lagi.`
+      });
     }
 
     // ── WEBHOOK-LEVEL: Auto-search wilayah via tabel lokal wilayah_id ──
