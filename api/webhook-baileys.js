@@ -666,7 +666,12 @@ function extractProposedWilayah(aiMsg) {
     if (!m) m = line.match(/([A-Za-z][A-Za-zÀ-ÿ\s,\.]{5,60}?,\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s,\.]{2,40}?)\s+ya\s*[😊🙏😄🙂✅]/u);
 
     if (m) {
-      const candidate = m[1].trim().replace(/[,?!]+$/, '');
+      let candidate = m[1].trim().replace(/[,?!]+$/, '');
+      // Kalau candidate diawali kata bukan-wilayah (misal "Baik kak, Sewon, Bantul") → strip prefix sebelum koma pertama
+      if (BUKAN_WILAYAH.test(candidate)) {
+        const firstComma = candidate.indexOf(',');
+        if (firstComma > 0) candidate = candidate.slice(firstComma + 1).trim();
+      }
       const wordCount = candidate.split(/\s+/).length;
       // Filter dasar saja, validasi utama via Supabase
       if (candidate.length >= 3 && wordCount <= 8 && !BUKAN_WILAYAH.test(candidate)) {
@@ -2346,10 +2351,29 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     const intentLokasi = /\b(kirim|alamat|tujuan|lokasi|daerah|wilayah|kecamatan|kelurahan|kota|kabupaten|ganti|pindah|bukan|salah)\b/i.test(message);
 
     const sapaanUmum = /^(kak|min|halo|hai|hi|hei|p|permisi|ada|bang|bos|gan|mba|mbak|bu|pak|om|teh|neng|mas)\s*[?!.]*$/i.test(message.trim());
-    if (!isConfirmation(message) && !sapaanUmum && message.length >= 5 && message.length <= 60 && (intentLokasi || !convState.ongkir)) {
+    if (!isConfirmation(message) && !sapaanUmum && message.length >= 5 && message.length <= 200 && (intentLokasi || !convState.ongkir)) {
       // Coba cari wilayah dari pesan customer langsung
       const pesanBersih = cleanKelInput(message) || message.replace(/[?!.,]+/g, '').trim();
-      const cariHasil = await cariWilayah(pesanBersih, 20);
+      let cariHasil = await cariWilayah(pesanBersih, 20);
+
+      // Kalau gagal (full address tanpa koma), strip noise address words dan coba per token
+      if (!cariHasil.length && message.length > 20) {
+        const stripped = pesanBersih
+          .replace(/\b(perum|perumahan|komplek|komp|villa|griya|jl|jln|jalan|blok|no|nomor|rt|rw|gg|gang|dsn|dusun|desa|kavling|kav|permai|indah|asri|baru|raya|dalam)\b/g, '')
+          .replace(/\b\d+[a-z]?\b/g, '') // hapus nomor
+          .replace(/\b[a-z]\b/g, '')      // hapus huruf tunggal
+          .replace(/\s+/g, ' ').trim();
+        const tokens = stripped.split(/\s+/).filter(w => w.length >= 4);
+        console.log(`[address-parse] Coba per token: ${tokens.join(', ')}`);
+        for (const token of tokens) {
+          const r = await cariWilayah(token, 10);
+          if (r.length > 0) {
+            const kU = [...new Set(r.map(x => `${x.kecamatan}||${x.kabupaten}`))];
+            if (kU.length === 1) { cariHasil = r; console.log(`[address-parse] Match dari token "${token}"`); break; }
+          }
+        }
+      }
+
       const kecUnik = [...new Set(cariHasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
 
       if (cariHasil.length > 0) {
@@ -2369,11 +2393,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         }
 
         if (kecUnik.length === 1) {
-          // Satu kecamatan ketemu → simpan sebagai proposed_wilayah
-          console.log(`Wilayah terdeteksi dari pesan customer: "${wilayahBaru}"`);
-          await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
-          convState.proposed_wilayah = wilayahBaru;
-          proposedWilayah = wilayahBaru;
+          const kelUnik = [...new Set(cariHasil.map(r => r.kelurahan))];
 
           // Simpan area ke customers.alamat lebih awal (tidak nunggu WILAYAH_OK)
           if (customer?.id) {
@@ -2387,6 +2407,48 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatEarly })
               .catch(e => console.error('[proposedWilayah] Gagal save customer.alamat:', e.message));
             customer.alamat = alamatEarly;
+          }
+
+          if (kelUnik.length === 1 && !convState.ongkir) {
+            // Kelurahan SPESIFIK → langsung hitung ongkir, tidak perlu konfirmasi lagi
+            console.log(`[address-parse] Kelurahan spesifik "${w.kelurahan}, ${w.kecamatan}" — langsung hitung ongkir`);
+            const hasilLangsung = await hitungOngkir(wilayahBaru, product, parseInt(convState.qty) || 1, userMngOriginId).catch(() => null);
+            if (hasilLangsung) {
+              await updateConvState(conversation.id, { wilayah: wilayahBaru, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasilLangsung });
+              convState.wilayah = wilayahBaru;
+              convState.ongkir  = hasilLangsung;
+              convState.pending_kecamatan = null;
+              proposedWilayah = null;
+              autoOngkirResult = { wilayah: wilayahBaru, hasil: hasilLangsung, fromAddress: true };
+              console.log(`[address-parse] autoOngkirResult set: ${wilayahBaru}`);
+              // Simpan ongkir ke customers.alamat
+              if (customer?.id) {
+                const alamatOngkir = {
+                  ...(customer.alamat || {}),
+                  ...(hasilLangsung.area?.kelurahan ? { kelurahan: hasilLangsung.area.kelurahan } : {}),
+                  ...(hasilLangsung.area?.kecamatan ? { kecamatan: hasilLangsung.area.kecamatan } : {}),
+                  ...(hasilLangsung.area?.kota      ? { kabupaten: hasilLangsung.area.kota }      : {}),
+                  ...(hasilLangsung.area?.provinsi  ? { provinsi:  hasilLangsung.area.provinsi }  : {}),
+                  ...(hasilLangsung.area?.kodePos   ? { kodepos:   hasilLangsung.area.kodePos }   : {}),
+                  ekspedisi: hasilLangsung.ekspedisi, ongkirAsli: hasilLangsung.ongkirAsli,
+                  ongkirPromo: hasilLangsung.ongkirPromo, feeCOD: hasilLangsung.feeCOD, harga: hasilLangsung.harga,
+                };
+                await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatOngkir })
+                  .catch(e => console.error('[address-parse] Gagal save alamat+ongkir:', e.message));
+                customer.alamat = alamatOngkir;
+              }
+            } else {
+              // hitungOngkir gagal → fallback ke proposed_wilayah
+              await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
+              convState.proposed_wilayah = wilayahBaru;
+              proposedWilayah = wilayahBaru;
+            }
+          } else {
+            // Satu kecamatan tapi banyak kelurahan → simpan proposed, biar Claude tanya kelurahan
+            console.log(`Wilayah terdeteksi dari pesan customer: "${wilayahBaru}" (${kelUnik.length} kelurahan)`);
+            await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru });
+            convState.proposed_wilayah = wilayahBaru;
+            proposedWilayah = wilayahBaru;
           }
         } else {
           // Banyak kecamatan → clear proposed, biar AI tanya
@@ -2495,8 +2557,11 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     if (autoOngkirResult) {
       // Inject hasil ongkir langsung ke Claude — skip nunggu marker
-      const { wilayah, hasil } = autoOngkirResult;
-      const injeksi = buildOngkirInjeksi(hasil, product, `Customer konfirmasi wilayah: ${wilayah}. `);
+      const { wilayah, hasil, fromAddress } = autoOngkirResult;
+      const prefix = fromAddress
+        ? `Sistem berhasil detect wilayah dari alamat customer: ${wilayah}. Langsung tampilkan total harga — JANGAN konfirmasi wilayah dulu, JANGAN tanya "apakah alamatnya sudah benar". `
+        : `Customer konfirmasi wilayah: ${wilayah}. `;
+      const injeksi = buildOngkirInjeksi(hasil, product, prefix);
 
       const historyWithOngkir = [
         ...history,

@@ -136,15 +136,18 @@ Tulis pesannya langsung, tanpa penjelasan.`;
   // ── Detect skenario stuck ongkir ──────────────────────────────
   const fmt = n => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
 
-  // Cek apakah ongkir sudah ada di state
-  const ongkirState = convState.ongkir || null;
-  const wilayahState = convState.wilayah || null;
+  const ongkirState     = convState.ongkir || null;
+  const wilayahState    = convState.wilayah || null;
   const proposedWilayah = convState.proposed_wilayah || null;
+  const orderPlaced     = convState.order_placed || false;
 
-  // Skenario A: ongkir sudah ada → inject data total ke system prompt
   let ongkirContext = '';
-  if (ongkirState && product) {
-    const harga = product.harga || 0;
+
+  if (orderPlaced) {
+    // Order sudah selesai — tidak perlu inject apapun, biarkan AI baca konteks normal
+  } else if (ongkirState) {
+    // Skenario A: ongkir sudah ada di state → inject data total ke system prompt
+    const harga = product?.harga || ongkirState.harga || 0;
     const ongkirAsli  = ongkirState.ongkirAsli  || 0;
     const ongkirPromo = ongkirState.ongkirPromo ?? ongkirAsli;
     const feeCOD      = ongkirState.feeCOD      || 0;
@@ -157,31 +160,27 @@ Tulis pesannya langsung, tanpa penjelasan.`;
     const ongkirDisplay = ongkirAsli !== ongkirPromo
       ? `~${fmt(ongkirAsli)}~ ${fmt(ongkirPromo)}`
       : fmt(ongkirPromo);
+    const prodNama = product?.nama || 'Produk';
 
     ongkirContext = `\n\nDATA ONGKIR (sudah dihitung sistem, WAJIB tampilkan di saran):
 - Wilayah tujuan: ${wilayah}
 - Ekspedisi: ${kurir}
 - Ongkir: ${ongkirDisplay}
-- Transfer: ${product.nama} ${fmt(harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(totalTF)}
-- COD: ${product.nama} ${fmt(harga)} + ongkir ${ongkirDisplay} + admin ${fmt(feeCOD)} = TOTAL ${fmt(totalCOD)}
+- Transfer: ${prodNama} ${fmt(harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(totalTF)}
+- COD: ${prodNama} ${fmt(harga)} + ongkir ${ongkirDisplay} + admin ${fmt(feeCOD)} = TOTAL ${fmt(totalCOD)}
 
-Kalau customer belum pilih metode bayar → tanya "Mau COD atau Transfer kak? 😊" + tampilkan total keduanya.
-Kalau customer sudah pilih → tampilkan total yang sesuai + kasih info rekening (kalau Transfer).
+Kalau customer belum pilih metode bayar → tampilkan total keduanya + tanya "Mau COD atau Transfer kak? 😊"
+Kalau customer sudah pilih COD → tampilkan total COD + minta data lengkap yang belum ada.
+Kalau customer sudah pilih Transfer → tampilkan total Transfer.
 Format angka: tanpa desimal, pakai titik ribuan.`;
 
-  } else if (wilayahState || proposedWilayah || customerAlamat?.kecamatan) {
-    // Skenario B: wilayah diketahui tapi ongkir belum ada
-    const lok = wilayahState || proposedWilayah
-      || [customerAlamat.kelurahan, customerAlamat.kecamatan, customerAlamat.kabupaten].filter(Boolean).join(', ');
+  } else if (wilayahState || proposedWilayah) {
+    // Skenario B: wilayah diketahui dari state tapi ongkir belum ada (stuck)
+    // Catatan: JANGAN trigger dari customerAlamat saja — bisa alamat lama, tidak relevan
+    const lok = wilayahState || proposedWilayah;
     ongkirContext = `\n\nSITUASI: Wilayah customer sudah diketahui (${lok}) tapi ongkir belum berhasil dihitung sistem.
-SARAN: Minta maaf singkat dan tanyakan lagi dengan ramah, contoh: "Maaf kak sistem lagi cek ongkir ke ${lok}, sebentar ya 🙏" ATAU sarankan customer untuk balas ulang dengan nama kecamatan saja supaya sistem bisa hitung otomatis.`;
+Saran balasan: minta customer balas ulang dengan kecamatan saja (lebih pendek) supaya sistem bisa hitung otomatis. Contoh: "Kak boleh ketik ulang kecamatannya saja ya, biar aku bisa cek ongkirnya 😊"`;
 
-  } else {
-    // Skenario C: wilayah belum diketahui sama sekali
-    const sudahTanyaAlamat = messages?.some(m => m.role === 'assistant' && /alamat|kecamatan|wilayah|daerah|lokasi/i.test(m.content || ''));
-    if (sudahTanyaAlamat) {
-      ongkirContext = `\n\nSITUASI: Bot sudah tanya alamat tapi customer belum kasih. Ingatkan lagi dengan ramah — minta kecamatan & kabupaten/kota saja (bukan alamat lengkap) supaya sistem bisa hitung ongkir.`;
-    }
   }
 
   // Bersihkan messages sebelum dikirim ke Claude
