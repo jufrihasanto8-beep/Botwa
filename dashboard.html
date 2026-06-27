@@ -1164,7 +1164,13 @@ async function callClaudeFromFrontend(system, messages, product) {
   const res = await fetch('/api/ai-suggest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, product, userId }),
+    body: JSON.stringify({
+      messages,
+      product,
+      userId,
+      convState: activeConv?.state || {},
+      customerAlamat: activeCustomer?.alamat || {},
+    }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
