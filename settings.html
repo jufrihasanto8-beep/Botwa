@@ -117,6 +117,15 @@ body.light .kurir-card-icon{background:rgba(59,130,246,.08)}
 body.light .toggle-slider{background:#cbd5e1}
 body.light .kurir-add-row input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
 
+/* ── Tipe Sumber cards ── */
+.sumber-card{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#161b22;border:1.5px solid rgba(255,255,255,.07);border-radius:10px;cursor:pointer;transition:all .15s;user-select:none}
+.sumber-card:hover{border-color:rgba(59,130,246,.25);background:#1a2130}
+.sumber-card.selected{border-color:#3b82f6;background:rgba(59,130,246,.09)}
+.sumber-icon{font-size:20px;flex-shrink:0;width:32px;text-align:center}
+body.light .sumber-card{background:#fff;border-color:#e2e8f0}
+body.light .sumber-card:hover{background:#f0f7ff;border-color:#bfdbfe}
+body.light .sumber-card.selected{border-color:#3b82f6;background:#eff6ff}
+
 /* ── Light theme: form inputs & settings surfaces ── */
 body.light .form-group input,
 body.light .form-group textarea,
@@ -387,44 +396,38 @@ Bisa isi lebih dari satu rekening."></textarea>
           <div id="anthropic-key-status" style="font-size:12px;color:#64748b;margin-top:8px"></div>
         </div>
 
-        <!-- Model per tipe percakapan -->
+        <!-- Tipe lead default -->
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(99,102,241,.15)">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">Model AI per Tipe Chat</div>
-          <div style="font-size:12px;color:#64748b;margin-bottom:14px">Sonnet lebih pintar & natural, Haiku lebih hemat & cepat. CTWA biasanya volume tinggi jadi cocok Haiku.</div>
-          <div style="display:grid;gap:10px">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">Tipe Lead</div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:14px">Pilih dari mana customer kamu biasanya masuk. Semua chat akan ditangani sesuai tipe ini.</div>
+          <div style="display:grid;gap:8px" id="sumber-cards">
+            <label class="sumber-card" data-val="ctwa">
+              <input type="radio" name="default_sumber" value="ctwa" style="display:none">
+              <div class="sumber-icon">📢</div>
               <div>
-                <div style="font-size:13px;font-weight:500">📢 CTWA</div>
-                <div style="font-size:11px;color:#64748b">Customer dari klik iklan Meta</div>
+                <div style="font-size:13px;font-weight:600">CTWA</div>
+                <div style="font-size:11px;color:#94a3b8">Customer dari klik iklan Meta / WhatsApp</div>
               </div>
-              <select id="model-ctwa" style="background:#0d1117;border:1px solid rgba(99,102,241,.3);color:#e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;min-width:170px">
-                <option value="claude-haiku-4-5-20251001">Haiku — hemat & cepat</option>
-                <option value="claude-sonnet-4-6">Sonnet — lebih pintar</option>
-              </select>
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            </label>
+            <label class="sumber-card" data-val="form">
+              <input type="radio" name="default_sumber" value="form" style="display:none">
+              <div class="sumber-icon">📋</div>
               <div>
-                <div style="font-size:13px;font-weight:500">📋 Form Lead</div>
-                <div style="font-size:11px;color:#64748b">Customer isi form orderonline.id</div>
+                <div style="font-size:13px;font-weight:600">Form Lead</div>
+                <div style="font-size:11px;color:#94a3b8">Customer isi form order (orderonline.id, dll)</div>
               </div>
-              <select id="model-form" style="background:#0d1117;border:1px solid rgba(99,102,241,.3);color:#e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;min-width:170px">
-                <option value="claude-sonnet-4-6">Sonnet — lebih pintar</option>
-                <option value="claude-haiku-4-5-20251001">Haiku — hemat & cepat</option>
-              </select>
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            </label>
+            <label class="sumber-card" data-val="inbound">
+              <input type="radio" name="default_sumber" value="inbound" style="display:none">
+              <div class="sumber-icon">💬</div>
               <div>
-                <div style="font-size:13px;font-weight:500">💬 Inbound</div>
-                <div style="font-size:11px;color:#64748b">Customer chat duluan sendiri</div>
+                <div style="font-size:13px;font-weight:600">Inbound</div>
+                <div style="font-size:11px;color:#94a3b8">Customer chat duluan sendiri</div>
               </div>
-              <select id="model-inbound" style="background:#0d1117;border:1px solid rgba(99,102,241,.3);color:#e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;min-width:170px">
-                <option value="claude-sonnet-4-6">Sonnet — lebih pintar</option>
-                <option value="claude-haiku-4-5-20251001">Haiku — hemat & cepat</option>
-              </select>
-            </div>
+            </label>
           </div>
-          <button class="btn btn-primary" onclick="saveModelConfig()" style="width:100%;margin-top:14px">Simpan Pilihan Model</button>
-          <div id="model-config-status" style="font-size:12px;color:#64748b;margin-top:8px;text-align:center"></div>
+          <button class="btn btn-primary" onclick="saveSumber()" style="width:100%;margin-top:14px">Simpan</button>
+          <div id="sumber-status" style="font-size:12px;color:#64748b;margin-top:8px;text-align:center"></div>
         </div>
       </div>
 
@@ -1003,36 +1006,46 @@ async function hapusRekening() {
 async function loadAnthropicKey() {
   const userId = Auth.getUser()?.id;
   try {
-    const data = await SB.get('users', `?id=eq.${userId}&select=anthropic_key,ai_model_config&limit=1`);
+    const data = await SB.get('users', `?id=eq.${userId}&select=anthropic_key,default_sumber&limit=1`);
     const key = data[0]?.anthropic_key || '';
     const el = document.getElementById('f-anthropic-key');
     if (el) {
       el.value = key;
       document.getElementById('anthropic-key-status').textContent = key ? '✅ API key tersimpan' : 'Belum ada API key — bot pakai key default sistem';
     }
-    // Load model config
-    const cfg = data[0]?.ai_model_config || {};
-    const setModel = (id, val, def) => { const el = document.getElementById(id); if (el && val) el.value = val; else if (el) el.value = def; };
-    setModel('model-ctwa',    cfg.ctwa,    'claude-haiku-4-5-20251001');
-    setModel('model-form',    cfg.form,    'claude-sonnet-4-6');
-    setModel('model-inbound', cfg.inbound, 'claude-sonnet-4-6');
+    // Load default_sumber — highlight selected card
+    const sumber = data[0]?.default_sumber || 'inbound';
+    document.querySelectorAll('.sumber-card').forEach(card => {
+      card.classList.toggle('selected', card.dataset.val === sumber);
+      const radio = card.querySelector('input[type=radio]');
+      if (radio) radio.checked = card.dataset.val === sumber;
+    });
   } catch(e) { console.error('loadAnthropicKey:', e.message); }
 }
 
-async function saveModelConfig() {
+// Clicking a sumber-card selects it visually
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.sumber-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.sumber-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      const radio = card.querySelector('input[type=radio]');
+      if (radio) radio.checked = true;
+    });
+  });
+});
+
+async function saveSumber() {
   const userId = Auth.getUser()?.id;
-  const status = document.getElementById('model-config-status');
+  const status = document.getElementById('sumber-status');
+  const checked = document.querySelector('input[name="default_sumber"]:checked');
+  if (!checked) { status.textContent = '⚠️ Pilih salah satu tipe dulu'; return; }
   status.textContent = 'Menyimpan...';
-  const payload = {
-    ctwa:    document.getElementById('model-ctwa').value,
-    form:    document.getElementById('model-form').value,
-    inbound: document.getElementById('model-inbound').value,
-  };
   try {
     const res = await fetch('/api/save-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, table: 'ai_model_config', payload }),
+      body: JSON.stringify({ user_id: userId, default_sumber: checked.value }),
     });
     const json = await res.json();
     status.textContent = json.ok ? '✅ Tersimpan' : '❌ ' + (json.error || 'Gagal');
