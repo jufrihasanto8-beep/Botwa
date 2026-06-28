@@ -96,7 +96,7 @@ body.light .prod-sw-all.active{background:rgba(59,130,246,.08);color:#2563eb}
 
   // ── Load produk dari Supabase ─────────────────────────────
   async function loadProds() {
-    const userId = window.Auth?.getUser?.()?.id;
+    const userId = (typeof Auth !== 'undefined' ? Auth : window.Auth)?.getUser?.()?.id;
     if (!userId) { console.log('[ProdSW] no userId'); return; }
     try {
       const r = await fetch(
