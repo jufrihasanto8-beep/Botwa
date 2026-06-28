@@ -1,8 +1,9 @@
 /**
  * prod-switcher.js — Product switcher sidebar (shared across all pages)
- * Inject otomatis setelah #sb-bot-status, load produk dari Supabase
+ * Load SETELAH app.js supaya Auth sudah tersedia
  */
 (function () {
+
   // ── CSS ──────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
@@ -28,46 +29,48 @@ body.light .prod-sw-all.active{background:rgba(59,130,246,.08);color:#2563eb}
   `;
   document.head.appendChild(style);
 
-  // ── Inject placeholder HTML setelah bot-status ───────────
-  function injectPlaceholder() {
-    const botStatus = document.getElementById('sb-bot-status');
-    if (!botStatus || document.getElementById('prod-switcher-shared')) return;
-    const div = document.createElement('div');
-    div.id = 'prod-switcher-shared';
-    div.className = 'prod-switcher';
-    botStatus.insertAdjacentElement('afterend', div);
-  }
+  // ── State ─────────────────────────────────────────────────
+  const COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#10b981','#f97316','#ec4899'];
+  let allUserProducts = [];
+  let activeProductFilter = sessionStorage.getItem('ps_active') || null;
+  if (activeProductFilter === 'null') activeProductFilter = null;
 
   // ── Helpers ───────────────────────────────────────────────
-  const COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#10b981','#f97316','#ec4899'];
-  function prodInitials(nama) {
+  function initials(nama) {
     return (nama||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
   }
 
-  // State global — disimpan di sessionStorage biar persist antar halaman
-  let activeProductFilter = sessionStorage.getItem('active_product_filter') || null;
-  let allUserProducts = [];
+  // ── Inject div setelah #sb-bot-status ────────────────────
+  function injectEl() {
+    if (document.getElementById('prod-sw-root')) return;
+    const anchor = document.getElementById('sb-bot-status');
+    if (!anchor) return;
+    const el = document.createElement('div');
+    el.id = 'prod-sw-root';
+    el.className = 'prod-switcher';
+    anchor.insertAdjacentElement('afterend', el);
+  }
 
-  // ── Render switcher ───────────────────────────────────────
-  function renderProdSwitcher() {
-    const el = document.getElementById('prod-switcher-shared');
-    if (!el || !allUserProducts.length) { if (el) el.innerHTML = ''; return; }
+  // ── Render ────────────────────────────────────────────────
+  function render() {
+    const el = document.getElementById('prod-sw-root');
+    if (!el || !allUserProducts.length) return;
 
-    let html = `<div class="prod-switcher-label">Produk Aktif</div>`;
+    let html = '<div class="prod-switcher-label">Produk Aktif</div>';
 
     if (allUserProducts.length > 1) {
-      html += `<div class="prod-sw-all ${activeProductFilter === null || activeProductFilter === 'null' ? 'active' : ''}" onclick="window.__switchProduct(null)">
+      const allActive = !activeProductFilter;
+      html += `<div class="prod-sw-all ${allActive ? 'active' : ''}" onclick="window.__switchProd(null)">
         <span style="width:34px;height:34px;border-radius:8px;background:rgba(148,163,184,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">📋</span>
         <span style="font-size:12px;font-weight:500">Semua Produk</span>
       </div>`;
     }
 
     allUserProducts.forEach((p, i) => {
-      const color   = COLORS[i % COLORS.length];
-      const inits   = prodInitials(p.nama);
+      const color    = COLORS[i % COLORS.length];
       const isActive = allUserProducts.length === 1 || activeProductFilter === p.id;
-      html += `<div class="prod-sw-card ${isActive ? 'active' : ''}" onclick="window.__switchProduct('${p.id}')">
-        <div class="prod-sw-av" style="background:${color}">${inits}</div>
+      html += `<div class="prod-sw-card ${isActive ? 'active' : ''}" onclick="window.__switchProd('${p.id}')">
+        <div class="prod-sw-av" style="background:${color}">${initials(p.nama)}</div>
         <div class="prod-sw-info">
           <div class="prod-sw-name">${p.nama}</div>
           <div class="prod-sw-status"><div class="prod-sw-dot"></div> Agent aktif</div>
@@ -78,65 +81,65 @@ body.light .prod-sw-all.active{background:rgba(59,130,246,.08);color:#2563eb}
     el.innerHTML = html;
   }
 
-  // ── Switch handler (global, bisa dipanggil dari HTML) ─────
-  window.__switchProduct = function(productId) {
+  // ── Global switch handler ─────────────────────────────────
+  window.__switchProd = function(productId) {
     activeProductFilter = productId;
-    sessionStorage.setItem('active_product_filter', productId || 'null');
-    renderProdSwitcher();
-
-    // Kalau halaman punya renderInbox (dashboard), panggil filter-nya
-    if (typeof window.renderInbox === 'function') {
-      window.__activeProductFilter = productId;
-      window.renderInbox();
-    }
-
-    // Event buat halaman lain yang mau listen
+    sessionStorage.setItem('ps_active', productId || 'null');
+    render();
+    window.__activeProductFilter = productId;
+    if (typeof window.renderInbox === 'function') window.renderInbox();
     window.dispatchEvent(new CustomEvent('productSwitch', { detail: { productId } }));
   };
 
-  // Expose activeProductFilter ke halaman lain
-  Object.defineProperty(window, '__activeProductFilter', {
-    get: () => activeProductFilter,
-    set: v => { activeProductFilter = v; },
-    configurable: true,
-  });
+  // Expose active filter ke halaman lain
+  window.__activeProductFilter = activeProductFilter;
 
-  // ── Load dari Supabase ────────────────────────────────────
-  async function loadProdSwitcher() {
+  // ── Load produk dari Supabase ─────────────────────────────
+  async function loadProds() {
     const userId = window.Auth?.getUser?.()?.id;
-    if (!userId || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) return;
-
+    if (!userId) return;
     try {
       const r = await fetch(
         `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id`,
-        { headers: { 'apikey': window.SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY } }
+        { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
       );
       if (r.ok) allUserProducts = await r.json();
     } catch(e) {}
 
-    // Kalau filter tersimpan tidak ada di produk list, reset ke null
-    if (activeProductFilter && activeProductFilter !== 'null') {
-      if (!allUserProducts.find(p => p.id === activeProductFilter)) {
-        activeProductFilter = null;
-        sessionStorage.removeItem('active_product_filter');
-      }
-    } else if (activeProductFilter === 'null') {
+    // Reset filter kalau produk yang dipilih sudah tidak ada
+    if (activeProductFilter && !allUserProducts.find(p => p.id === activeProductFilter)) {
       activeProductFilter = null;
+      sessionStorage.removeItem('ps_active');
+      window.__activeProductFilter = null;
     }
 
-    renderProdSwitcher();
+    injectEl();
+    render();
   }
 
-  // ── Init saat DOM siap ────────────────────────────────────
-  function init() {
-    injectPlaceholder();
-    loadProdSwitcher();
+  // ── Init: tunggu #sb-bot-status (support sidebar dinamis) ─
+  function tryInit() {
+    if (document.getElementById('sb-bot-status')) {
+      injectEl();
+      loadProds();
+    } else {
+      // Sidebar di-render dinamis (cases/contacts/aiinsights)
+      const obs = new MutationObserver(() => {
+        if (document.getElementById('sb-bot-status')) {
+          obs.disconnect();
+          injectEl();
+          loadProds();
+        }
+      });
+      obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => obs.disconnect(), 5000);
+    }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    // Kalau DOM sudah ready (script di bawah), tunggu sebentar biar bot-status ter-render
-    setTimeout(init, 0);
-  }
+  // Expose manual trigger buat halaman yang butuh
+  window.__loadProdSwitcher = loadProds;
+
+  // Jalankan setelah semua sync script selesai
+  setTimeout(tryInit, 0);
+
 })();
