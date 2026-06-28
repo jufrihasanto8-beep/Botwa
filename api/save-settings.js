@@ -102,6 +102,42 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // Test ongkir (tidak perlu userId)
+    if (action === 'test-ongkir') {
+      const { origin_id, wilayah, weight = 1 } = req.query;
+      if (!origin_id || !wilayah) return res.status(400).json({ error: 'origin_id dan wilayah wajib' });
+      const MNG_H = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' };
+      const mngGet = async (path, ms = 20000) => {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), ms);
+        try {
+          const r = await fetch(`https://app.mengantar.com/api/${path}`, { headers: MNG_H, signal: ctrl.signal });
+          clearTimeout(tid);
+          if (!r.ok) return { error: `HTTP ${r.status}` };
+          return r.json();
+        } catch(e) { clearTimeout(tid); return { error: e.message }; }
+      };
+      const parts = wilayah.split(',').map(s => s.trim()).filter(Boolean);
+      const searches = await Promise.all(parts.map(async q => {
+        const t = Date.now();
+        const json = await mngGet(`address/autofill?keyword=${encodeURIComponent(q)}`);
+        const arr = Array.isArray(json) ? json : (json?.data || []);
+        return { q, ms: Date.now()-t, count: arr.length, first: arr[0]||null, error: json?.error };
+      }));
+      const best = searches.find(s => s.count > 0);
+      if (!best) return res.status(200).json({ ok: false, searches, error: 'Semua keyword tidak ditemukan' });
+      const areaId = best.first._id || best.first.id;
+      const t2 = Date.now();
+      const rates = await mngGet(`order/allEstimatePublic?origin_id=${origin_id}&destination_id=${areaId}&weight=${weight}`, 30000);
+      const ms2 = Date.now()-t2;
+      if (!rates?.success) return res.status(200).json({ ok: false, searches, areaId, allEstimateMs: ms2, error: 'allEstimatePublic gagal', raw: rates });
+      const kurir = Object.entries(rates.data||{})
+        .filter(([,i]) => !i.unsupported && (i.price||0) > 0)
+        .map(([name,i]) => ({ name, price: i.price, est: i.estimatedDate||'' }))
+        .sort((a,b) => a.price - b.price);
+      return res.status(200).json({ ok: true, searches, areaId, allEstimateMs: ms2, kurir });
+    }
+
     const uid = userId || user_id;
     if (!uid) return res.status(400).json({ error: 'userId wajib' });
     try {
@@ -110,42 +146,6 @@ module.exports = async function handler(req, res) {
     } catch(e) {
       return res.status(500).json({ error: e.message });
     }
-  }
-
-  // ── GET: test-ongkir ──
-  if (req.method === 'GET' && req.query?.action === 'test-ongkir') {
-    const { origin_id, wilayah, weight = 1 } = req.query;
-    if (!origin_id || !wilayah) return res.status(400).json({ error: 'origin_id dan wilayah wajib' });
-    const MNG_H = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' };
-    const mngGet = async (path, ms = 20000) => {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), ms);
-      try {
-        const r = await fetch(`https://app.mengantar.com/api/${path}`, { headers: MNG_H, signal: ctrl.signal });
-        clearTimeout(tid);
-        if (!r.ok) return { error: `HTTP ${r.status}` };
-        return r.json();
-      } catch(e) { clearTimeout(tid); return { error: e.message }; }
-    };
-    const parts = wilayah.split(',').map(s => s.trim()).filter(Boolean);
-    const searches = await Promise.all(parts.map(async q => {
-      const t = Date.now();
-      const json = await mngGet(`address/autofill?keyword=${encodeURIComponent(q)}`);
-      const arr = Array.isArray(json) ? json : (json?.data || []);
-      return { q, ms: Date.now()-t, count: arr.length, first: arr[0]||null, error: json?.error };
-    }));
-    const best = searches.find(s => s.count > 0);
-    if (!best) return res.status(200).json({ ok: false, searches, error: 'Semua keyword tidak ditemukan' });
-    const areaId = best.first._id || best.first.id;
-    const t2 = Date.now();
-    const rates = await mngGet(`order/allEstimatePublic?origin_id=${origin_id}&destination_id=${areaId}&weight=${weight}`, 30000);
-    const ms2 = Date.now()-t2;
-    if (!rates?.success) return res.status(200).json({ ok: false, searches, areaId, allEstimateMs: ms2, error: 'allEstimatePublic gagal', raw: rates });
-    const kurir = Object.entries(rates.data||{})
-      .filter(([,i]) => !i.unsupported && (i.price||0) > 0)
-      .map(([name,i]) => ({ name, price: i.price, est: i.estimatedDate||'' }))
-      .sort((a,b) => a.price - b.price);
-    return res.status(200).json({ ok: true, searches, areaId, allEstimateMs: ms2, kurir });
   }
 
   if (req.method !== 'POST') return res.status(405).end();
