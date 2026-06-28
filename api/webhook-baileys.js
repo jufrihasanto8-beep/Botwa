@@ -815,96 +815,139 @@ function bulatkan(nilai, kelipatan = 500) {
   return (nilai - bawah) <= (atas - nilai) ? bawah : atas;
 }
 
-/* ── HITUNG ONGKIR via Mengantar v1 API (pakai MENGANTAR_KEY) ── */
-async function hitungOngkir(wilayah, product, qty = 1, userMngKey = null) {
-  const apiKey = userMngKey || MENGANTAR_KEY;
-  if (!apiKey) {
-    console.warn('[hitungOngkir] MENGANTAR_KEY tidak diset, skip cek ongkir');
+/* ── MENGANTAR PUBLIC API ─────────────────────────────────── */
+const MENGANTAR_ORIGIN_ID = process.env.MENGANTAR_ORIGIN_ID || '5fc63315f8f44b34aa4c44c7';
+const MENGANTAR_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+  'Accept': 'application/json',
+  'Referer': 'https://www.mengantar.com/',
+  'Origin': 'https://www.mengantar.com',
+};
+
+async function mengantarFetch(path) {
+  const res = await fetchWithTimeout(`https://app.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS }, 10000);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`[mengantarFetch] HTTP ${res.status} — ${body.slice(0, 200)}`);
     return null;
   }
-  const MNG_AUTH = { 'Authorization': `Bearer ${apiKey}` };
-  console.log(`[hitungOngkir] START wilayah="${wilayah}" qty=${qty}`);
+  const text = await res.text();
+  try { return JSON.parse(text); } catch(e) {
+    console.error(`[mengantarFetch] JSON parse error — ${text.slice(0, 200)}`);
+    return null;
+  }
+}
 
+/* ── HITUNG ONGKIR via Mengantar public API ───────────────── */
+async function hitungOngkir(wilayah, product, qty = 1, userMngKey = null) {
+  console.log(`[hitungOngkir] START wilayah="${wilayah}" qty=${qty}`);
   try {
-    // Step 1: Cari data lokal (wilayah_id) untuk bangun query yang lebih akurat
-    const lokalMatch = await cariWilayah(wilayah, 5);
-    let lokal = null;
-    if (lokalMatch.length === 1) {
-      lokal = lokalMatch[0];
-    } else if (lokalMatch.length > 1) {
-      // Pilih yang paling mirip dengan input
+    // Step 1: Cari di tabel lokal wilayah_id
+    const lokalMatch = await cariWilayah(wilayah, 3);
+    let lokal = lokalMatch[0] || null;
+    if (lokalMatch.length > 1) {
       const kw = wilayah.toLowerCase();
-      lokal = lokalMatch.reduce((best, r) => {
+      const scored = lokalMatch.map(r => {
         let score = 0;
-        if (r.kelurahan.toLowerCase().includes(kw) || kw.includes(r.kelurahan.toLowerCase())) score += 30;
-        if (r.kecamatan.toLowerCase().includes(kw) || kw.includes(r.kecamatan.toLowerCase())) score += 20;
-        if (r.kabupaten.toLowerCase().includes(kw) || kw.includes(r.kabupaten.toLowerCase())) score += 10;
-        return score > (best._score || 0) ? { ...r, _score: score } : best;
-      }, lokalMatch[0]);
+        if (r.kelurahan.toLowerCase() === kw) score += 50;
+        else if (r.kelurahan.toLowerCase().includes(kw)) score += 30;
+        if (r.kecamatan.toLowerCase() === kw) score += 40;
+        else if (r.kecamatan.toLowerCase().includes(kw)) score += 20;
+        if (r.kabupaten.toLowerCase().includes(kw)) score += 10;
+        return { row: r, score };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      lokal = scored[0].row;
     }
 
-    // Step 2: Cari area di Mengantar v1 API — coba beberapa query, dari paling spesifik
+    // Step 2: Bangun query Mengantar
     const stripKab = s => (s || '').replace(/^(kabupaten|kota|kab\.?)\s*/i, '').trim();
-    const queries = lokal ? [
-      [lokal.kelurahan, lokal.kecamatan, stripKab(lokal.kabupaten)].filter(Boolean).join(', '), // paling spesifik
+    let queryMengantar = wilayah;
+    let queryDisplay   = wilayah;
+    if (lokal) {
+      queryMengantar = formatWilayahMengantar(lokal);
+      queryDisplay   = formatWilayah(lokal);
+      console.log(`[hitungOngkir] lokal: "${lokal.kelurahan}, ${lokal.kecamatan}, ${lokal.kabupaten}" → query: "${queryMengantar}"`);
+    }
+
+    // Step 3: Cari destination_id — dengan fallback query bertahap
+    const queryFallbacks = lokal ? [
+      queryMengantar,
+      [lokal.kelurahan, lokal.kecamatan].filter(Boolean).join(', '),
       [lokal.kecamatan, stripKab(lokal.kabupaten)].filter(Boolean).join(', '),
       lokal.kecamatan,
-    ] : [wilayah];
+    ] : [queryMengantar];
 
-    let areaId = null, areaNama = null;
-    for (const q of queries) {
-      const res = await fetchWithTimeout(
-        `https://api.mengantar.com/v1/areas?search=${encodeURIComponent(q)}&limit=5`,
-        { headers: MNG_AUTH }, 10000
-      );
-      if (!res.ok) {
-        console.error(`[hitungOngkir] v1/areas HTTP ${res.status} untuk "${q}"`);
-        continue;
-      }
-      const json = await res.json().catch(() => null);
-      const areas = json?.data || [];
-      console.log(`[hitungOngkir] v1/areas "${q}" → ${areas.length} results`);
-      if (areas.length) {
-        areaId  = areas[0].id;
-        areaNama = areas[0].name;
-        console.log(`[hitungOngkir] area: id=${areaId} name="${areaNama}"`);
-        break;
-      }
+    let areas = [];
+    for (const q of queryFallbacks) {
+      const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(q)}`);
+      if (!searchJson) { console.warn(`[hitungOngkir] autofill null untuk "${q}"`); continue; }
+      const res = Array.isArray(searchJson) ? searchJson : (searchJson.data || []);
+      console.log(`[hitungOngkir] autofill "${q}" → ${res.length} results`);
+      if (res.length) { areas = res; console.log(`[hitungOngkir] area[0]: ${JSON.stringify(res[0]).slice(0,120)}`); break; }
     }
 
-    if (!areaId) {
-      console.error(`[hitungOngkir] Tidak bisa find area untuk "${wilayah}"`);
+    if (!areas.length) {
+      console.error(`[hitungOngkir] Semua autofill fallback gagal untuk "${queryMengantar}"`);
       return null;
     }
 
-    // Step 3: Ambil tarif kurir
+    // Step 3b: Pilih area terbaik (scoring)
+    const normStr = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    let bestArea = areas[0], bestScore = -1;
+    for (const a of areas) {
+      let score = 0;
+      if (lokal) {
+        if (normStr(a.subdistrict) === normStr(lokal.kelurahan)) score += 50;
+        else if ((a.subdistrict || '').toLowerCase().includes(lokal.kelurahan.toLowerCase())) score += 30;
+        if (normStr(a.district) === normStr(lokal.kecamatan)) score += 30;
+        else if ((a.district || '').toLowerCase().includes(lokal.kecamatan.toLowerCase())) score += 15;
+        if (normStr(a.city || a.regency || '') === normStr(lokal.kabupaten)) score += 20;
+      } else {
+        const kwParts = wilayah.toLowerCase().split(',').map(s => s.trim());
+        const aFull = [a.subdistrict, a.district, a.city || a.regency, a.province].filter(Boolean).join(' ').toLowerCase();
+        for (const part of kwParts) {
+          if (aFull.includes(part)) score += 10;
+          if (normStr(a.city || a.regency || '') === normStr(part)) score += 20;
+          if (normStr(a.subdistrict || '') === normStr(part)) score += 30;
+        }
+      }
+      if (score > bestScore) { bestScore = score; bestArea = a; }
+    }
+
+    const areaId  = bestArea._id || bestArea.id;
+    const areaNama = bestArea.subdistrict || bestArea.name || wilayah;
+    console.log(`[hitungOngkir] best area: "${areaNama}" id=${areaId} score=${bestScore}`);
+    if (!areaId) { console.error('[hitungOngkir] areaId null'); return null; }
+
+    // Step 3c: Ambil estimasi tarif
     const weight = ((product?.berat_gram || 1000) / 1000) * qty;
-    const ratesRes = await fetchWithTimeout(
-      `https://api.mengantar.com/v1/rates?destination_id=${areaId}&weight=${weight}`,
-      { headers: MNG_AUTH }, 10000
+    const ratesJson = await mengantarFetch(
+      `order/allEstimatePublic?origin_id=${MENGANTAR_ORIGIN_ID}&destination_id=${areaId}&weight=${weight}`
     );
-    if (!ratesRes.ok) {
-      console.error(`[hitungOngkir] v1/rates HTTP ${ratesRes.status}`);
+    if (!ratesJson) { console.error(`[hitungOngkir] allEstimatePublic null`); return null; }
+    console.log(`[hitungOngkir] rates success=${ratesJson.success}`);
+    if (!ratesJson.success) {
+      console.error(`[hitungOngkir] allEstimatePublic gagal: ${JSON.stringify(ratesJson).slice(0,200)}`);
       return null;
     }
-    const ratesJson = await ratesRes.json().catch(() => null);
-    let rates = (ratesJson?.data || []).filter(r => (r.price || 0) > 0);
-    console.log(`[hitungOngkir] rates: ${rates.map(r => `${r.courier_name}:${r.price}`).join(', ')}`);
+
+    const rawData = ratesJson.data || {};
+    let rates = Object.entries(rawData)
+      .filter(([name, info]) => !name.toLowerCase().includes('cargo') && !info.unsupported && (info.price || 0) > 0)
+      .map(([name, info]) => ({ courier_name: name, price: info.price }));
     if (!rates.length) return null;
 
-    // Step 4: Filter whitelist kurir user
+    // Step 4: Filter whitelist
     const whitelist = await sbGet('courier_whitelist',
       `?user_id=eq.${product?.user_id || ''}&aktif=eq.true`
     ).catch(() => []);
-
+    console.log(`[hitungOngkir] whitelist=${whitelist.map(w=>w.nama).join(',')} rates=${rates.map(r=>`${r.courier_name}:${r.price}`).join(',')}`);
     if (whitelist.length) {
-      const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       const filtered = rates.filter(r => {
         const rn = norm(r.courier_name);
-        return whitelist.some(w => {
-          const wn = norm(w.nama);
-          return rn === wn || rn.startsWith(wn) || wn.startsWith(rn);
-        });
+        return whitelist.some(w => { const wn = norm(w.nama); return rn === wn || rn.startsWith(wn) || wn.startsWith(rn); });
       });
       if (filtered.length) rates = filtered;
     }
@@ -915,9 +958,9 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngKey = null) {
     const ekspedisi  = best.courier_name;
     const ongkirAsli = best.price;
 
-    // Step 6: Terapkan promo ongkir
+    // Step 6: Promo ongkir
     const promo    = product?.promo_ongkir;
-    const provinsi = lokal?.provinsi || '';
+    const provinsi = lokal?.provinsi || bestArea.province || '';
     let ongkirPromo = ongkirAsli;
     if (promo?.tipe === 'gratis_penuh')        ongkirPromo = 0;
     else if (promo?.tipe === 'potong')         ongkirPromo = Math.max(0, ongkirAsli - getPromoPotongan(promo, null, ongkirAsli));
@@ -926,8 +969,8 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngKey = null) {
 
     const harga = resolveHargaBundling(product, qty);
 
-    // Step 7: Hitung & bulatkan total
-    const feeCOD            = Math.ceil((harga + ongkirPromo) * 0.05);
+    // Step 7: Hitung total
+    const feeCOD             = Math.ceil((harga + ongkirPromo) * 0.05);
     const totalTransferBulat = bulatkan(harga + ongkirPromo);
     const totalCODBulat      = bulatkan(harga + ongkirPromo + feeCOD);
     const feeCODBulat        = totalCODBulat - harga - ongkirPromo;
@@ -938,28 +981,25 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngKey = null) {
       else if (promo?.tipe === 'potong')         rPromo = Math.max(0, r.price - getPromoPotongan(promo, null, r.price));
       else if (promo?.tipe === 'potong_wilayah') rPromo = Math.max(0, r.price - getPromoPotongan(promo, provinsi, r.price));
       else if (promo?.tipe === 'gratis_sd')      rPromo = Math.max(0, r.price - (promo.nilai || 0));
-      const rFeeCOD   = Math.ceil((harga + rPromo) * 0.05);
+      const rFeeCOD = Math.ceil((harga + rPromo) * 0.05);
       return { nama: r.courier_name, ongkir: r.price, ongkirPromo: rPromo, totalTF: bulatkan(harga + rPromo), totalCOD: bulatkan(harga + rPromo + rFeeCOD) };
     });
 
     return {
-      ekspedisi,
-      ongkirAsli,
-      ongkirPromo,
+      ekspedisi, ongkirAsli, ongkirPromo,
       totalTransfer: totalTransferBulat,
       totalCOD: totalCODBulat,
       feeCOD: feeCODBulat,
-      harga,
-      allRates,
+      harga, allRates,
       area: {
-        kelurahan: lokal?.kelurahan || '',
-        kecamatan: lokal?.kecamatan || '',
-        kota:      lokal?.kabupaten || '',
-        provinsi:  lokal?.provinsi  || '',
-        kodePos:   lokal?.kodepos   || '',
+        kelurahan: lokal?.kelurahan || bestArea.SUBDISTRICT_NAME || bestArea.subdistrict || '',
+        kecamatan: lokal?.kecamatan || bestArea.DISTRICT_NAME    || bestArea.district    || '',
+        kota:      lokal?.kabupaten || bestArea.CITY_NAME        || bestArea.city        || bestArea.regency || '',
+        provinsi:  lokal?.provinsi  || bestArea.PROVINCE_NAME    || bestArea.province    || '',
+        kodePos:   bestArea.ZIP_CODE || bestArea.postal_code || bestArea.posCode || '',
       },
     };
-  } catch (e) {
+  } catch(e) {
     console.error('[hitungOngkir] error:', e.message);
     return null;
   }
@@ -1781,7 +1821,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
           const wilayahGeo = [geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
           const alamatGeo  = [geo.kelurahan, geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
           console.log(`Reverse geocode: ${wilayahGeo}`);
-          const hasilGeo = await hitungOngkir(wilayahGeo, product, 1, userMngKey).catch(() => null);
+          const hasilGeo = await hitungOngkir(wilayahGeo, product, 1).catch(() => null);
           if (hasilGeo) {
             await updateConvState(conversation.id, { wilayah: wilayahGeo, ongkir: hasilGeo, alamat: alamatGeo });
             convState.ongkir  = hasilGeo;
@@ -1814,7 +1854,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       const alamatParts = [customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean);
       const wilayahAuto = alamatParts.join(', ');
       try {
-        const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1, userMngKey);
+        const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1);
         if (hasilAuto) {
           await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
           convState.wilayah = wilayahAuto;
@@ -1829,7 +1869,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
     // Skip kalau baru di-load oleh auto-load (tidak perlu hitung 2x)
     if (convState.wilayah && product && !autoLoadedOngkir) {
       try {
-        const freshOngkir = await hitungOngkir(convState.wilayah, product, 1, userMngKey);
+        const freshOngkir = await hitungOngkir(convState.wilayah, product, 1);
         if (freshOngkir) {
           await updateConvState(conversation.id, { ongkir: freshOngkir });
           convState.ongkir = freshOngkir;
@@ -1972,7 +2012,7 @@ JANGAN langsung kirim ulang ringkasan pesanan kalau customer tidak minta.`;
         // Hitung ongkir otomatis dari wilayah KTP
         let hasilKTP = null;
         if (wilayahKTP && !convState.ongkir) {
-          hasilKTP = await hitungOngkir(wilayahKTP, product, 1, userMngKey).catch(() => null);
+          hasilKTP = await hitungOngkir(wilayahKTP, product, 1).catch(() => null);
           if (hasilKTP) {
             stateKTP.wilayah = wilayahKTP;
             stateKTP.ongkir  = hasilKTP;
@@ -2145,7 +2185,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             convState.wilayah = wilayahKonfirm;
             convState.pending_kecamatan = null;
 
-            const hasilOngkir = await hitungOngkir(wilayahKonfirm, product, parseInt(convState.qty) || 1, userMngKey).catch(() => null);
+            const hasilOngkir = await hitungOngkir(wilayahKonfirm, product, parseInt(convState.qty) || 1).catch(() => null);
             if (hasilOngkir) {
               await updateConvState(conversation.id, { ongkir: hasilOngkir });
               convState.ongkir = hasilOngkir;
@@ -2193,7 +2233,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
               await updateConvState(conversation.id, { wilayah: wKonfirm, pending_kecamatan: null, proposed_wilayah: null });
               convState.wilayah = wKonfirm;
               convState.pending_kecamatan = null;
-              const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1, userMngKey).catch(()=>null);
+              const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1).catch(()=>null);
               if (ho) {
                 await updateConvState(conversation.id, { ongkir: ho });
                 convState.ongkir = ho;
@@ -2233,7 +2273,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
                 history.push({ role: 'user', content:
                   `[SISTEM] Sistem mendeteksi otomatis: Kelurahan ${autoMatchKel}, Kec. ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}. Konfirmasi ke customer dengan natural dan tulis [WILAYAH_OK:${wKonfirm}] di akhir pesan. Jangan tanya kelurahan lagi.`
                 });
-                const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1, userMngKey).catch(()=>null);
+                const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1).catch(()=>null);
                 if (ho) {
                   await updateConvState(conversation.id, { ongkir: ho });
                   convState.ongkir = ho;
@@ -2335,7 +2375,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
           if (kelUnik.length === 1) {
             // Kelurahan spesifik → langsung hitung ongkir
-            const hasilOngkir = await hitungOngkir(wilayahBaru, product, parseInt(convState.qty) || 1, userMngKey).catch(() => null);
+            const hasilOngkir = await hitungOngkir(wilayahBaru, product, parseInt(convState.qty) || 1).catch(() => null);
             if (hasilOngkir) {
               await updateConvState(conversation.id, { wilayah: wilayahBaru, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasilOngkir, waiting_for_location: false });
               convState.wilayah = wilayahBaru;
@@ -2373,7 +2413,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     if (proposedWilayah && isConfirmation(message) && !convState.ongkir && !convState.pending_kecamatan) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
-      const hasil = await hitungOngkir(proposedWilayah, product, parseInt(convState.qty) || 1, userMngKey);
+      const hasil = await hitungOngkir(proposedWilayah, product, parseInt(convState.qty) || 1);
       if (hasil) {
         await updateConvState(conversation.id, {
           wilayah: proposedWilayah,
@@ -2600,7 +2640,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             convState.qty = qtyFromReply;
             console.log(`[WILAYAH_OK] qty deteksi dari reply: ${qtyFromReply}`);
           }
-          const hasil = await hitungOngkir(wilayah, product, qtyState, userMngKey);
+          const hasil = await hitungOngkir(wilayah, product, qtyState);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
             convState.ongkir = hasil;
@@ -2728,7 +2768,7 @@ ${ongkirInfo}`;
         console.log(`[WILAYAH_OK] "${wilayah}" tidak ditemukan di local DB — fallback Mengantar`);
         await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
         convState.pending_kecamatan = null;
-        const hasil = await hitungOngkir(wilayah, product, 1, userMngKey);
+        const hasil = await hitungOngkir(wilayah, product, 1);
         if (hasil) {
           await updateConvState(conversation.id, { ongkir: hasil });
           convState.ongkir = hasil;
@@ -2772,7 +2812,7 @@ ${ongkirInfo}`;
     if (cekOngkirMatch && !autoOngkirResult && !wilayahOkMatch) {
       const wilayah = cekOngkirMatch[1].trim();
       await updateConvState(conversation.id, { wilayah });
-      const hasil = await hitungOngkir(wilayah, product, 1, userMngKey);
+      const hasil = await hitungOngkir(wilayah, product, 1);
       if (hasil) {
         await updateConvState(conversation.id, { ongkir: hasil });
         convState.ongkir = hasil; // update local state
@@ -3003,7 +3043,7 @@ ${ongkirInfo}`;
         if (wilayahFallback && product) {
           console.log(`[ORDER_CONFIRMED] ongkir kosong, re-hitung dari wilayah: ${wilayahFallback}`);
           const qtyFallback = parseInt(latestState.qty || orderDataParsed?.qty || convState.qty || 1) || 1;
-          const rekalkulasi = await hitungOngkir(wilayahFallback, product, qtyFallback, userMngKey).catch(() => null);
+          const rekalkulasi = await hitungOngkir(wilayahFallback, product, qtyFallback).catch(() => null);
           if (rekalkulasi) {
             ongkirData = rekalkulasi;
             await updateConvState(conversation.id, { ongkir: rekalkulasi }).catch(() => {});
