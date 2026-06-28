@@ -131,25 +131,53 @@ module.exports = async function handler(req, res) {
           return r.json();
         } catch(e) { clearTimeout(tid); return { error: e.message }; }
       };
+
+      // Cari semua keyword secara paralel, kumpulkan semua hasil
       const parts = wilayah.split(',').map(s => s.trim()).filter(Boolean);
       const searches = await Promise.all(parts.map(async q => {
         const t = Date.now();
         const json = await mngGet(`address/autofill?keyword=${encodeURIComponent(q)}`);
         const arr = Array.isArray(json) ? json : (json?.data || []);
-        return { q, ms: Date.now()-t, count: arr.length, first: arr[0]||null, error: json?.error };
+        return { q, ms: Date.now()-t, count: arr.length, first: arr[0]||null, error: json?.error, areas: arr };
       }));
-      const best = searches.find(s => s.count > 0);
-      if (!best) return res.status(200).json({ ok: false, searches, error: 'Semua keyword tidak ditemukan' });
-      const areaId = best.first._id || best.first.id;
+
+      // Gabungkan semua hasil unik dari semua keyword
+      const seenIds = new Set();
+      const allAreas = searches.flatMap(s => s.areas || []).filter(a => {
+        const id = a._id || a.id;
+        if (!id || seenIds.has(id)) return false;
+        seenIds.add(id); return true;
+      });
+      if (!allAreas.length) return res.status(200).json({ ok: false, searches: searches.map(s => ({ q: s.q, ms: s.ms, count: s.count, first: s.first, error: s.error })), error: 'Semua keyword tidak ditemukan' });
+
+      // Scoring — cocokkan semua field area vs bagian wilayah
+      const partsLower = parts.map(s => s.toLowerCase().replace(/^(kabupaten|kota|kab\.?)\s*/i, ''));
+      const [wKel='', wKec='', wKab='', wProv=''] = partsLower;
+      const score = a => {
+        const sub  = (a.SUBDISTRICT_NAME || '').toLowerCase();
+        const dist = (a.DISTRICT_NAME    || '').toLowerCase();
+        const city = (a.CITY_NAME        || '').toLowerCase().replace(/^(kabupaten|kota|kab\.?)\s*/i, '');
+        const prov = (a.PROVINCE_NAME    || '').toLowerCase();
+        let s = 0;
+        if (wKel && sub.includes(wKel))  s += 4;
+        if (wKec && dist.includes(wKec)) s += 3;
+        if (wKab && city.includes(wKab)) s += 2;
+        if (wProv && prov.includes(wProv)) s += 1;
+        return s;
+      };
+      allAreas.sort((a, b) => score(b) - score(a));
+      const bestArea = allAreas[0];
+      const areaId = bestArea._id || bestArea.id;
+
       const t2 = Date.now();
       const rates = await mngGet(`order/allEstimatePublic?origin_id=${origin_id}&destination_id=${areaId}&weight=${weight}`, 30000);
       const ms2 = Date.now()-t2;
-      if (!rates?.success) return res.status(200).json({ ok: false, searches, areaId, allEstimateMs: ms2, error: 'allEstimatePublic gagal', raw: rates });
+      if (!rates?.success) return res.status(200).json({ ok: false, searches: searches.map(s => ({ q: s.q, ms: s.ms, count: s.count, first: s.first, error: s.error })), areaId, bestAreaLabel: [bestArea.SUBDISTRICT_NAME, bestArea.DISTRICT_NAME, bestArea.CITY_NAME, bestArea.PROVINCE_NAME].filter(Boolean).join(', '), allEstimateMs: ms2, error: 'allEstimatePublic gagal', raw: rates });
       const kurir = Object.entries(rates.data||{})
         .filter(([,i]) => !i.unsupported && (i.price||0) > 0)
         .map(([name,i]) => ({ name, price: i.price, est: i.estimatedDate||'' }))
         .sort((a,b) => a.price - b.price);
-      return res.status(200).json({ ok: true, searches, areaId, allEstimateMs: ms2, kurir });
+      return res.status(200).json({ ok: true, searches: searches.map(s => ({ q: s.q, ms: s.ms, count: s.count, first: s.first, error: s.error })), areaId, bestAreaLabel: [bestArea.SUBDISTRICT_NAME, bestArea.DISTRICT_NAME, bestArea.CITY_NAME, bestArea.PROVINCE_NAME].filter(Boolean).join(', '), allEstimateMs: ms2, kurir });
     }
 
     const uid = userId || user_id;
