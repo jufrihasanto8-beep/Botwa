@@ -822,16 +822,21 @@ const MENGANTAR_HEADERS = {
   'Accept': 'application/json',
 };
 
-async function mengantarFetch(path) {
-  const res = await fetchWithTimeout(`https://api-public.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS }, 10000);
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error(`[mengantarFetch] HTTP ${res.status} — ${body.slice(0, 200)}`);
-    return null;
-  }
-  const text = await res.text();
-  try { return JSON.parse(text); } catch(e) {
-    console.error(`[mengantarFetch] JSON parse error — ${text.slice(0, 200)}`);
+async function mengantarFetch(path, timeoutMs = 20000) {
+  try {
+    const res = await fetchWithTimeout(`https://api-public.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS }, timeoutMs);
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(`[mengantarFetch] HTTP ${res.status} — ${body.slice(0, 200)}`);
+      return null;
+    }
+    const text = await res.text();
+    try { return JSON.parse(text); } catch(e) {
+      console.error(`[mengantarFetch] JSON parse error — ${text.slice(0, 200)}`);
+      return null;
+    }
+  } catch(e) {
+    console.error(`[mengantarFetch] ${path.split('?')[0]} — ${e.message}`);
     return null;
   }
 }
@@ -880,14 +885,20 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
       ...wilayah.split(',').map(s => s.trim()).filter(Boolean),
     ];
 
-    let areas = [];
-    for (const q of queryFallbacks) {
-      const searchJson = await mengantarFetch(`public/abc/address/search?keyword=${encodeURIComponent(q)}`);
-      if (!searchJson) { console.warn(`[hitungOngkir] search null untuk "${q}"`); continue; }
-      const res = Array.isArray(searchJson) ? searchJson : (searchJson.data || []);
-      console.log(`[hitungOngkir] search "${q}" → ${res.length} results`);
-      if (res.length) { areas = res; console.log(`[hitungOngkir] area[0]: ${JSON.stringify(res[0]).slice(0,120)}`); break; }
-    }
+    // Kirim semua query fallback secara parallel, ambil hasil pertama yang ada data
+    const searchResults = await Promise.all(
+      queryFallbacks.map(q =>
+        mengantarFetch(`public/abc/address/search?keyword=${encodeURIComponent(q)}`, 15000)
+          .then(json => {
+            const res = Array.isArray(json) ? json : (json?.data || []);
+            console.log(`[hitungOngkir] search "${q}" → ${res.length} results`);
+            return res;
+          })
+          .catch(() => [])
+      )
+    );
+    let areas = searchResults.find(r => r.length > 0) || [];
+    if (areas.length) console.log(`[hitungOngkir] area[0]: ${JSON.stringify(areas[0]).slice(0,120)}`);
 
     if (!areas.length) {
       console.error(`[hitungOngkir] Semua search fallback gagal untuk "${queryMengantar}"`);
