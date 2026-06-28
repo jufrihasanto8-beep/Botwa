@@ -1683,8 +1683,8 @@ Isi field yang berubah saja, sisanya null.` }],
           awaiting_order_correction: false,
           order_snapshot: snap,
         });
-        await saveMessage(conversation.id, 'ai', confirmUlang);
-        await sendWA(waSession, reply_jid, confirmUlang);
+        const { wamid: wamid_cu } = await sendWA(waSession, reply_jid, confirmUlang).catch(()=>({}));
+        await saveMessage(conversation.id, 'ai', confirmUlang, wamid_cu);
         return res.status(200).json({ ok: true, action: 'confirm_resent' });
 
         } // end else (bukan pertanyaan biasa)
@@ -1741,8 +1741,8 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
             closingCustomer = `Siap kak! Pesanan sedang kami proses 🚀\n\nNanti kami kabarin kalau barang udah dikirim ya kak.\nTerima kasih sudah belanja! 🙏`;
           }
 
-          await saveMessage(conversation.id, 'ai', closingCustomer);
-          await sendWA(waSession, reply_jid, closingCustomer);
+          const { wamid: wamid_cl } = await sendWA(waSession, reply_jid, closingCustomer).catch(()=>({}));
+          await saveMessage(conversation.id, 'ai', closingCustomer, wamid_cl);
 
           // ── Guard: cek dulu apakah order untuk conversation ini sudah ada (anti-double) ──
           const existingOrder = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&limit=1`).catch(() => []);
@@ -1871,8 +1871,8 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
             awaiting_order_correction: true,
           });
           const tanyaKoreksi = `Maaf kak! 🙏 Bagian mana yang perlu diperbaiki?\nSilakan sebutkan ya kak (misal: alamatnya, nama, jumlah pesanan, dll).`;
-          await saveMessage(conversation.id, 'ai', tanyaKoreksi);
-          await sendWA(waSession, reply_jid, tanyaKoreksi);
+          const { wamid: wamid_tk } = await sendWA(waSession, reply_jid, tanyaKoreksi).catch(()=>({}));
+          await saveMessage(conversation.id, 'ai', tanyaKoreksi, wamid_tk);
           return res.status(200).json({ ok: true, action: 'awaiting_correction' });
         }
         // Kalau ambigu (tidak jelas iya/tidak) → lanjut ke Claude biasa
@@ -3056,8 +3056,8 @@ ${ongkirInfo}`;
       const replyGuard = await callClaude(systemPrompt, histGuard, chatModel, userAnthropicKey);
       if (replyGuard) {
         const replyClean = replyGuard.replace(/\[ORDER_CONFIRMED\]/g, '').replace(/\[ORDER_DATA:[^\]]+\]/g, '').trim();
-        await saveMessage(conversation.id, 'ai', replyClean);
-        await sendWA(waSession, reply_jid, replyClean);
+        const { wamid: wamid_rc } = await sendWA(waSession, reply_jid, replyClean).catch(()=>({}));
+        await saveMessage(conversation.id, 'ai', replyClean, wamid_rc);
       }
       return res.status(200).json({ ok: true, action: 'blocked_pending_kecamatan' });
     }
@@ -3193,8 +3193,8 @@ ${ongkirInfo}`;
           isCOD, ekspLabel,
           harga, ongkirAsli, ongkirPromo, feeCOD,
         });
-        await saveMessage(conversation.id, 'ai', confirmMsg);
-        await sendWA(waSession, reply_jid, confirmMsg);
+        const { wamid: wamid_cm } = await sendWA(waSession, reply_jid, confirmMsg).catch(()=>({}));
+        await saveMessage(conversation.id, 'ai', confirmMsg, wamid_cm);
         console.log(`Konfirmasi pesanan terkirim ke customer ${wa_number} — menunggu konfirmasi`);
       } catch(e) {
         console.error('Send konfirmasi ke customer error:', e.message);
@@ -3209,7 +3209,8 @@ ${ongkirInfo}`;
     console.log(`Reply untuk ${wa_number}${orderConfirmed?' [ORDER]':''}: ${reply.slice(0, 80)}`);
 
     // ── Simpan & kirim balasan ─────────────────────────────────
-    await saveMessage(conversation.id, 'ai', reply);
+    // ── Simpan & kirim — wamid dari Baileys untuk fitur edit/hapus ──
+    // (sendWA dipanggil di bawah, setelah flag waiting_for_location)
 
     // ── Set flag waiting_for_location kalau AI baru nanya alamat/wilayah ──
     if (!convState.ongkir && !convState.waiting_for_location) {
@@ -3227,8 +3228,9 @@ ${ongkirInfo}`;
 
     if (tanyaFoto) console.log(`[FOTO] adaGambar=${!!adaGambarProduk} url=${adaGambarProduk||'null'}`);
 
-    // Kirim teks reply dulu
-    await sendWA(waSession, reply_jid, reply);
+    // Kirim teks reply dulu — capture wamid untuk fitur edit/hapus
+    const { wamid: wamid_reply } = await sendWA(waSession, reply_jid, reply).catch(()=>({}));
+    await saveMessage(conversation.id, 'ai', reply, wamid_reply);
 
     // Kalau customer tanya foto dan ada gambar produk → selalu kirim (tidak peduli sudah pernah)
     if (tanyaFoto && adaGambarProduk) {
