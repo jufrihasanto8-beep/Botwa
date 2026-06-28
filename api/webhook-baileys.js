@@ -869,12 +869,16 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     }
 
     // Step 3: Cari destination_id — dengan fallback query bertahap
+    // API baru lebih cocok dengan keyword tunggal (satu kata/frasa) daripada comma-separated
     const queryFallbacks = lokal ? [
-      queryMengantar,
-      [lokal.kelurahan, lokal.kecamatan].filter(Boolean).join(', '),
-      [lokal.kecamatan, stripKab(lokal.kabupaten)].filter(Boolean).join(', '),
+      lokal.kelurahan,
+      [lokal.kelurahan, lokal.kecamatan].filter(Boolean).join(' '),
       lokal.kecamatan,
-    ] : [queryMengantar];
+      [lokal.kecamatan, stripKab(lokal.kabupaten)].filter(Boolean).join(' '),
+    ] : [
+      // Kalau tidak ada lokal: pecah per bagian comma, coba satu per satu dari depan
+      ...wilayah.split(',').map(s => s.trim()).filter(Boolean),
+    ];
 
     let areas = [];
     for (const q of queryFallbacks) {
