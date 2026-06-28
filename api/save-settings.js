@@ -226,12 +226,12 @@ module.exports = async function handler(req, res) {
     try {
       // Ambil origin_id dari user + data produk sekaligus
       const [userRows, prodRows] = await Promise.all([
-        sbReq('GET', `users?id=eq.${userId}&select=mengantar_origin_id,mengantar_key`),
+        sbReq('GET', `users?id=eq.${userId}&select=mengantar_area_id,mengantar_key`),
         sbReq('GET', `products?id=eq.${product_id}&select=harga,harga_bundling,berat_gram,promo_ongkir`),
       ]);
       const user = userRows[0] || {};
       const prod = prodRows[0] || {};
-      const originId = user.mengantar_origin_id || process.env.MENGANTAR_ORIGIN_ID;
+      const originId = user.mengantar_area_id || process.env.MENGANTAR_ORIGIN_ID;
       if (!originId) return res.status(400).json({ error: 'origin_id belum diset' });
 
       const beratKg = ((prod.berat_gram || 1000) / 1000) * qty;
