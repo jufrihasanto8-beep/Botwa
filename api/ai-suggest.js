@@ -18,7 +18,6 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
 }
 
 const SB_HEADERS = { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` };
-const MNG_HEADERS = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' };
 
 async function sbGet(path) {
   const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${path}`, { headers: SB_HEADERS }, 5000);
@@ -33,45 +32,48 @@ async function getUserAnthropicKey(userId) {
   } catch { return null; }
 }
 
-// Hitung ongkir dari wilayah string — dipanggil ketika wilayahState ada tapi ongkirState null
+// Hitung ongkir dari wilayah string via Mengantar v1 API
 async function hitungOngkirByWilayah(wilayah, product, userId, qty = 1) {
   try {
     const fmt = n => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
 
-    // Ambil origin_id + whitelist user
     const [userRows, whitelist] = await Promise.all([
-      sbGet(`users?id=eq.${userId}&select=mengantar_origin_id,mengantar_key&limit=1`),
+      sbGet(`users?id=eq.${userId}&select=mengantar_key&limit=1`),
       sbGet(`courier_whitelist?user_id=eq.${userId}&aktif=eq.true`),
     ]);
-    const originId = userRows[0]?.mengantar_origin_id || process.env.MENGANTAR_ORIGIN_ID;
-    if (!originId) return null;
+    const apiKey = userRows[0]?.mengantar_key || process.env.MENGANTAR_KEY;
+    console.log(`[ai-suggest] hitungOngkir: wilayah="${wilayah}" apiKey=${apiKey ? 'set' : 'null'}`);
+    if (!apiKey) return null;
 
-    // Autofill Mengantar → dapat dest_id
-    const autofillRes = await fetchWithTimeout(
-      `https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(wilayah)}`,
-      { headers: MNG_HEADERS }, 8000
+    const MNG_AUTH = { 'Authorization': `Bearer ${apiKey}` };
+
+    // Cari area via v1 API
+    const areasRes = await fetchWithTimeout(
+      `https://api.mengantar.com/v1/areas?search=${encodeURIComponent(wilayah)}&limit=3`,
+      { headers: MNG_AUTH }, 8000
     ).then(r => r.json()).catch(() => null);
-    const destId = (autofillRes?.data || autofillRes)?.[0]?._id;
-    if (!destId) return null;
-
-    // Hitung berat
-    const beratKg = ((product?.berat_gram || 1000) / 1000) * qty;
+    const areaId = areasRes?.data?.[0]?.id;
+    console.log(`[ai-suggest] v1/areas "${wilayah}" → areaId=${areaId}`);
+    if (!areaId) return null;
 
     // Ambil rates
+    const beratKg = ((product?.berat_gram || 1000) / 1000) * qty;
     const ratesRes = await fetchWithTimeout(
-      `https://app.mengantar.com/api/order/allEstimatePublic?origin_id=${originId}&destination_id=${destId}&weight=${beratKg}`,
-      { headers: MNG_HEADERS }, 8000
+      `https://api.mengantar.com/v1/rates?destination_id=${areaId}&weight=${beratKg}`,
+      { headers: MNG_AUTH }, 8000
     ).then(r => r.json()).catch(() => null);
-    if (!ratesRes?.success || !ratesRes.data) return null;
+    let rates = (ratesRes?.data || []).filter(r => (r.price || 0) > 0);
+    if (!rates.length) return null;
 
-    // Pilih kurir terbaik dari whitelist
+    // Filter whitelist
     const namaSet = new Set((whitelist || []).map(w => (w.nama || '').toLowerCase()));
-    const rates = Object.entries(ratesRes.data)
-      .filter(([name, info]) => !name.toLowerCase().includes('cargo') && !info.unsupported && (info.price || 0) > 0)
-      .map(([name, info]) => ({ name, price: info.price }))
-      .sort((a, b) => a.price - b.price);
-    const whitelisted = rates.filter(r => namaSet.size === 0 || namaSet.has(r.name.toLowerCase()));
-    const best = (whitelisted.length ? whitelisted : rates)[0];
+    if (namaSet.size > 0) {
+      const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const filtered = rates.filter(r => namaSet.has(norm(r.courier_name)));
+      if (filtered.length) rates = filtered;
+    }
+    rates.sort((a, b) => a.price - b.price);
+    const best = rates[0];
     if (!best) return null;
 
     // Promo ongkir
@@ -94,7 +96,7 @@ async function hitungOngkirByWilayah(wilayah, product, userId, qty = 1) {
       : fmt(ongkirPromo);
 
     return {
-      kurir: best.name,
+      kurir: best.courier_name,
       ongkirAsli: best.price,
       ongkirPromo,
       ongkirDisplay,
@@ -221,6 +223,8 @@ Tulis pesannya langsung, tanpa penjelasan.`;
   const wilayahState    = convState.wilayah || null;
   const proposedWilayah = convState.proposed_wilayah || null;
   const orderPlaced     = convState.order_placed || false;
+
+  console.log(`[ai-suggest] userId=${userId} wilayah=${wilayahState} ongkir=${!!ongkirState} proposed=${proposedWilayah} product=${product?.nama}`);
 
   let ongkirContext = '';
 
