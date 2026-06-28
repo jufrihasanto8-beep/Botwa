@@ -17,15 +17,96 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   }
 }
 
+const SB_HEADERS = { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` };
+const MNG_HEADERS = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' };
+
+async function sbGet(path) {
+  const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${path}`, { headers: SB_HEADERS }, 5000);
+  return res.json();
+}
+
 async function getUserAnthropicKey(userId) {
   if (!userId) return null;
   try {
-    const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=anthropic_key&limit=1`, {
-      headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` },
-    }, 5000);
-    const data = await res.json();
+    const data = await sbGet(`users?id=eq.${userId}&select=anthropic_key&limit=1`);
     return data[0]?.anthropic_key || null;
   } catch { return null; }
+}
+
+// Hitung ongkir dari wilayah string — dipanggil ketika wilayahState ada tapi ongkirState null
+async function hitungOngkirByWilayah(wilayah, product, userId, qty = 1) {
+  try {
+    const fmt = n => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
+
+    // Ambil origin_id + whitelist user
+    const [userRows, whitelist] = await Promise.all([
+      sbGet(`users?id=eq.${userId}&select=mengantar_origin_id,mengantar_key&limit=1`),
+      sbGet(`courier_whitelist?user_id=eq.${userId}&aktif=eq.true`),
+    ]);
+    const originId = userRows[0]?.mengantar_origin_id || process.env.MENGANTAR_ORIGIN_ID;
+    if (!originId) return null;
+
+    // Autofill Mengantar → dapat dest_id
+    const autofillRes = await fetchWithTimeout(
+      `https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(wilayah)}`,
+      { headers: MNG_HEADERS }, 8000
+    ).then(r => r.json()).catch(() => null);
+    const destId = (autofillRes?.data || autofillRes)?.[0]?._id;
+    if (!destId) return null;
+
+    // Hitung berat
+    const beratKg = ((product?.berat_gram || 1000) / 1000) * qty;
+
+    // Ambil rates
+    const ratesRes = await fetchWithTimeout(
+      `https://app.mengantar.com/api/order/allEstimatePublic?origin_id=${originId}&destination_id=${destId}&weight=${beratKg}`,
+      { headers: MNG_HEADERS }, 8000
+    ).then(r => r.json()).catch(() => null);
+    if (!ratesRes?.success || !ratesRes.data) return null;
+
+    // Pilih kurir terbaik dari whitelist
+    const namaSet = new Set((whitelist || []).map(w => (w.nama || '').toLowerCase()));
+    const rates = Object.entries(ratesRes.data)
+      .filter(([name, info]) => !name.toLowerCase().includes('cargo') && !info.unsupported && (info.price || 0) > 0)
+      .map(([name, info]) => ({ name, price: info.price }))
+      .sort((a, b) => a.price - b.price);
+    const whitelisted = rates.filter(r => namaSet.size === 0 || namaSet.has(r.name.toLowerCase()));
+    const best = (whitelisted.length ? whitelisted : rates)[0];
+    if (!best) return null;
+
+    // Promo ongkir
+    let promo = product?.promo_ongkir || {};
+    if (typeof promo === 'string') try { promo = JSON.parse(promo); } catch { promo = {}; }
+    let ongkirPromo = best.price;
+    if (promo.tipe === 'gratis_penuh') ongkirPromo = 0;
+    else if (promo.tipe === 'potong' || promo.tipe === 'gratis_sd') ongkirPromo = Math.max(0, best.price - (promo.nilai || 0));
+
+    // Harga bundling
+    let bundling = product?.harga_bundling || [];
+    if (typeof bundling === 'string') try { bundling = JSON.parse(bundling); } catch { bundling = []; }
+    let harga = (product?.harga || 0) * qty;
+    const exact = Array.isArray(bundling) && bundling.find(b => b.qty == qty);
+    if (exact) harga = exact.harga;
+
+    const feeCOD = Math.ceil((harga + ongkirPromo) * 0.05);
+    const ongkirDisplay = best.price !== ongkirPromo
+      ? `~${fmt(best.price)}~ ${fmt(ongkirPromo)}`
+      : fmt(ongkirPromo);
+
+    return {
+      kurir: best.name,
+      ongkirAsli: best.price,
+      ongkirPromo,
+      ongkirDisplay,
+      feeCOD,
+      harga,
+      totalTF: harga + ongkirPromo,
+      totalCOD: harga + ongkirPromo + feeCOD,
+    };
+  } catch(e) {
+    console.error('[ai-suggest] hitungOngkirByWilayah error:', e.message);
+    return null;
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -174,11 +255,31 @@ Kalau customer sudah pilih COD → tampilkan total COD + minta data lengkap yang
 Kalau customer sudah pilih Transfer → tampilkan total Transfer.
 Format angka: tanpa desimal, pakai titik ribuan.`;
 
+  } else if (wilayahState && !ongkirState) {
+    // Skenario B: wilayah confirmed tapi ongkir belum dihitung → hitung sekarang
+    const qty = convState.qty || 1;
+    const hasilOngkir = await hitungOngkirByWilayah(wilayahState, product, userId, qty);
+    if (hasilOngkir) {
+      const fmt = n => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
+      const prodNama = product?.nama || 'Produk';
+      ongkirContext = `\n\nDATA ONGKIR (baru dihitung, WAJIB tampilkan di saran):
+- Wilayah tujuan: ${wilayahState}
+- Ekspedisi: ${hasilOngkir.kurir}
+- Ongkir: ${hasilOngkir.ongkirDisplay}
+- Transfer: ${prodNama} ${fmt(hasilOngkir.harga)} + ongkir ${hasilOngkir.ongkirDisplay} = TOTAL ${fmt(hasilOngkir.totalTF)}
+- COD: ${prodNama} ${fmt(hasilOngkir.harga)} + ongkir ${hasilOngkir.ongkirDisplay} + admin ${fmt(hasilOngkir.feeCOD)} = TOTAL ${fmt(hasilOngkir.totalCOD)}
+
+Kalau customer belum pilih metode bayar → tampilkan total keduanya + tanya "Mau COD atau Transfer kak? 😊"
+Format angka: tanpa desimal, pakai titik ribuan.`;
+    } else {
+      ongkirContext = `\n\nSITUASI: Wilayah customer (${wilayahState}) diketahui tapi ongkir gagal dihitung.
+JANGAN tebak atau estimasi ongkir. Sarankan balasan: "Sebentar ya kak, aku cek ongkirnya dulu 😊"`;
+    }
+
   } else if (proposedWilayah && !wilayahState) {
-    // Skenario B: wilayah belum dikonfirmasi (proposed) dan ongkir belum dihitung
-    // Hanya trigger kalau wilayah BELUM confirmed — jangan ganggu kalau wilayah sudah confirmed
-    ongkirContext = `\n\nSITUASI: Wilayah customer sudah diketahui (${proposedWilayah}) tapi ongkir belum berhasil dihitung sistem.
-Saran balasan: minta customer balas ulang dengan kecamatan saja (lebih pendek) supaya sistem bisa hitung otomatis. Contoh: "Kak boleh ketik ulang kecamatannya saja ya, biar aku bisa cek ongkirnya 😊"`;
+    // Skenario C: wilayah belum dikonfirmasi (proposed) dan ongkir belum dihitung
+    ongkirContext = `\n\nSITUASI: Wilayah customer (${proposedWilayah}) belum terkonfirmasi dan ongkir belum dihitung.
+Saran balasan: minta customer balas ulang dengan kecamatan saja supaya sistem bisa hitung otomatis. Contoh: "Kak boleh ketik ulang kecamatannya saja ya, biar aku bisa cek ongkirnya 😊"`;
 
   }
 
@@ -222,9 +323,22 @@ Saran balasan: minta customer balas ulang dengan kecamatan saja (lebih pendek) s
   }
   if (!alternating.length) return res.status(400).json({ error: 'Tidak ada pesan customer yang valid' });
 
+  // Build info harga produk (bundling jika ada, satuan jika tidak)
+  let produkInfo = '';
+  if (product) {
+    let bundling = product.harga_bundling || [];
+    if (typeof bundling === 'string') try { bundling = JSON.parse(bundling); } catch { bundling = []; }
+    if (Array.isArray(bundling) && bundling.length) {
+      const bundlingTxt = bundling.map(b => `${b.qty} box = Rp ${Number(b.harga).toLocaleString('id-ID')}${b.prioritas ? ' (PRIORITAS)' : ''}`).join(', ');
+      produkInfo = `Produk: ${product.nama} | Paket: ${bundlingTxt} | JANGAN sebut harga satuan`;
+    } else {
+      produkInfo = `Produk: ${product.nama}, Harga: Rp ${Number(product.harga || 0).toLocaleString('id-ID')}`;
+    }
+  }
+
   const sysPrompt = `Kamu CS toko yang membalas pesan WhatsApp customer. Nama kamu "Sari".
 Tugas: buat SATU balasan terbaik untuk melanjutkan percakapan ini.
-${product ? `Produk: ${product.nama}, Harga: Rp ${product.harga?.toLocaleString('id-ID')}` : ''}
+${produkInfo}
 Rules:
 - Pendek (1-3 kalimat), hangat, natural, tidak formal
 - DILARANG markdown (*bold*, _italic_, dll) — ini WhatsApp
