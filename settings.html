@@ -557,6 +557,7 @@ Bisa isi lebih dari satu rekening."></textarea>
             <!-- Form cari (tersembunyi jika card aktif) -->
             <div id="origin-form">
               <input type="hidden" id="f-mengantar-origin">
+              <input type="hidden" id="f-mengantar-area">
               <button onclick="cariMengantarOrigin()" id="btn-cari-origin"
                 style="width:100%;padding:10px;background:rgba(59,130,246,.1);border:1px dashed rgba(59,130,246,.35);border-radius:8px;color:#93c5fd;font-size:13px;cursor:pointer;transition:all .15s"
                 onmouseover="this.style.background='rgba(59,130,246,.18)'" onmouseout="this.style.background='rgba(59,130,246,.1)'">
@@ -1365,12 +1366,13 @@ async function saveGroupJid() {
 
 /* ── MENGANTAR SETTINGS ── */
 function showOriginCard(addr) {
-  // addr: { id, nama, telp, alamat }
+  // addr: { id (warehouse), areaId (address _id), nama, telp, alamat }
   document.getElementById('origin-card-name').textContent  = addr.nama  || '';
   document.getElementById('origin-card-phone').textContent = addr.telp  || '';
   document.getElementById('origin-card-addr').textContent  = addr.alamat|| '';
-  document.getElementById('origin-card-id').textContent    = addr.id    || '';
+  document.getElementById('origin-card-id').textContent    = `Warehouse: ${addr.id || '-'} | Area: ${addr.areaId || '⏳'}`;
   document.getElementById('f-mengantar-origin').value      = addr.id    || '';
+  document.getElementById('f-mengantar-area').value        = addr.areaId || '';
   document.getElementById('origin-card').style.display     = 'block';
   document.getElementById('origin-form').style.display     = 'none';
 }
@@ -1489,32 +1491,34 @@ async function pilihOrigin(id, nama, telp, alamat) {
       parts[parts.length - 2] || parts[0], // kecamatan
     ].filter(Boolean);
 
-    let addressId = id; // fallback ke warehouse id
+    let areaId = null;
     for (const kw of keywords) {
       const res = await fetch(`/api/save-settings?action=cari-origin&keyword=${encodeURIComponent(kw)}`);
       const json = await res.json();
       if (json.results?.length) {
-        addressId = json.results[0]._id || json.results[0].id || id;
-        console.log(`[pilihOrigin] warehouse_id=${id} → address_id=${addressId} (keyword="${kw}")`);
+        areaId = json.results[0]._id || json.results[0].id || null;
+        console.log(`[pilihOrigin] warehouse_id=${id} → area_id=${areaId} (keyword="${kw}")`);
         break;
       }
     }
-    showOriginCard({ id: addressId, nama, telp, alamat });
+    // id = warehouse ID (untuk buat order), areaId = address _id (untuk cek ongkir)
+    showOriginCard({ id, areaId, nama, telp, alamat });
   } catch(e) {
-    console.warn('[pilihOrigin] cari-origin gagal, pakai warehouse id:', e.message);
-    showOriginCard({ id, nama, telp, alamat });
+    console.warn('[pilihOrigin] cari-origin gagal:', e.message);
+    showOriginCard({ id, areaId: null, nama, telp, alamat });
   }
 }
 
 async function saveMengantarSettings() {
   const userId = Auth.getUser()?.id;
   const key    = document.getElementById('f-mengantar-key').value.trim();
-  const origin = document.getElementById('f-mengantar-origin').value.trim();
+  const origin = document.getElementById('f-mengantar-origin').value.trim(); // warehouse ID
+  const area   = document.getElementById('f-mengantar-area').value.trim();   // address _id untuk ongkir
   try {
     const res = await fetch('/api/save-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, mengantar_key: key, mengantar_origin_id: origin }),
+      body: JSON.stringify({ user_id: userId, mengantar_key: key, mengantar_origin_id: origin, ...(area ? { mengantar_area_id: area } : {}) }),
     });
     if (!res.ok) throw new Error(await res.text());
     const st = document.getElementById('mengantar-status');
