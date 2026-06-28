@@ -102,6 +102,20 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // Cari origin_id dari alamat toko
+    if (action === 'cari-origin') {
+      const { keyword } = req.query;
+      if (!keyword) return res.status(400).json({ error: 'keyword wajib' });
+      try {
+        const r = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(keyword)}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' }
+        });
+        const json = await r.json();
+        const arr = Array.isArray(json) ? json : (json?.data || []);
+        return res.status(200).json({ ok: true, results: arr.slice(0, 10) });
+      } catch(e) { return res.status(500).json({ error: e.message }); }
+    }
+
     // Test ongkir (tidak perlu userId)
     if (action === 'test-ongkir') {
       const { origin_id, wilayah, weight = 1 } = req.query;
