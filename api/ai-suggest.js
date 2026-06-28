@@ -43,10 +43,10 @@ async function hitungOngkirByWilayah(wilayah, product, userId, qty = 1) {
     const fmt = n => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
 
     const [userRows, whitelist] = await Promise.all([
-      sbGet(`users?id=eq.${userId}&select=mengantar_origin_id&limit=1`),
+      sbGet(`users?id=eq.${userId}&select=mengantar_area_id&limit=1`),
       sbGet(`courier_whitelist?user_id=eq.${userId}&aktif=eq.true`),
     ]);
-    const originId = userRows[0]?.mengantar_origin_id || process.env.MENGANTAR_ORIGIN_ID;
+    const originId = userRows[0]?.mengantar_area_id || process.env.MENGANTAR_ORIGIN_ID;
     console.log(`[ai-suggest] hitungOngkir: wilayah="${wilayah}" originId=${originId || 'null'}`);
     if (!originId) return null;
 
