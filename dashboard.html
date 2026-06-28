@@ -181,6 +181,27 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .bot-online{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#22c55e;padding:6px 10px;background:rgba(34,197,94,.08);border-radius:6px;margin:8px 14px}
 .bot-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* ── PRODUCT SWITCHER ── */
+.prod-switcher{padding:4px 10px 8px}
+.prod-switcher-label{font-size:9px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.5px;padding:0 4px;margin-bottom:5px}
+.prod-card{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:10px;border:1.5px solid rgba(255,255,255,.07);cursor:pointer;transition:all .15s;margin-bottom:5px;background:rgba(255,255,255,.02)}
+.prod-card:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.04)}
+.prod-card.active{border-color:#22c55e;background:rgba(34,197,94,.06)}
+.prod-av{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0;letter-spacing:-.5px}
+.prod-info{flex:1;min-width:0}
+.prod-name{font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prod-status{font-size:10px;color:#22c55e;margin-top:1px;display:flex;align-items:center;gap:3px}
+.prod-status-dot{width:5px;height:5px;background:#22c55e;border-radius:50%}
+.prod-status.offline{color:#64748b}.prod-status.offline .prod-status-dot{background:#64748b}
+.prod-all{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;font-size:11px;font-weight:500;color:#94a3b8;cursor:pointer;transition:all .12s;margin-bottom:6px;border:1.5px solid transparent}
+.prod-all:hover{background:rgba(255,255,255,.04);color:#e2e8f0}
+.prod-all.active{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3);color:#93c5fd}
+body.light .prod-card{border-color:rgba(0,0,0,.1);background:rgba(0,0,0,.02)}
+body.light .prod-card:hover{border-color:rgba(0,0,0,.2);background:rgba(0,0,0,.04)}
+body.light .prod-card.active{border-color:#22c55e;background:rgba(34,197,94,.06)}
+body.light .prod-name{color:#0f172a}
+body.light .prod-all{color:#64748b}
+body.light .prod-all.active{background:rgba(59,130,246,.08);color:#2563eb}
 
 /* ── MAIN ── */
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
@@ -450,6 +471,9 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
   </div>
   <div class="bot-online" id="sb-bot-status">
     <div class="bot-dot"></div> Bot online
+  </div>
+  <div class="prod-switcher" id="prod-switcher">
+    <!-- dirender JS -->
   </div>
   <div class="sb-nav">
     <a class="sb-item" href="analytics.html"><span class="si"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg></span> Ringkasan</a>
@@ -752,6 +776,8 @@ let tabFilter = 'all', searchFilter = '', sortOrder = 'desc';
 let lastMsgCount = 0, allConvs = [];
 let aiSuggestText = '';
 let slaInterval = null;
+let activeProductFilter = null; // null = semua produk
+let allUserProducts = [];
 
 // ── THEME TOGGLE ────────────────────────────────────────
 function toggleTheme() {
@@ -876,10 +902,52 @@ async function loadStats() {
 }
 
 /* ── RENDER INBOX ── */
+// ── PRODUCT SWITCHER ─────────────────────────────────────
+const PROD_COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#10b981','#f97316','#ec4899'];
+function prodInitials(nama) {
+  return (nama || '?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+}
+async function loadProdSwitcher() {
+  const prods = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc`).catch(()=>[]);
+  allUserProducts = prods;
+  renderProdSwitcher();
+}
+function renderProdSwitcher() {
+  const el = document.getElementById('prod-switcher');
+  if (!el) return;
+  if (allUserProducts.length <= 1) { el.innerHTML = ''; return; } // 1 produk = tidak perlu switcher
+  let html = `<div class="prod-switcher-label">Produk Aktif</div>`;
+  html += `<div class="prod-all ${activeProductFilter === null ? 'active' : ''}" onclick="switchProduct(null)">
+    <span style="width:34px;height:34px;border-radius:8px;background:rgba(148,163,184,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">📋</span>
+    <span style="font-size:12px;font-weight:500">Semua Produk</span>
+  </div>`;
+  allUserProducts.forEach((p, i) => {
+    const color = PROD_COLORS[i % PROD_COLORS.length];
+    const initials = prodInitials(p.nama);
+    const isActive = activeProductFilter === p.id;
+    html += `<div class="prod-card ${isActive ? 'active' : ''}" onclick="switchProduct('${p.id}')">
+      <div class="prod-av" style="background:${color}">${initials}</div>
+      <div class="prod-info">
+        <div class="prod-name">${p.nama}</div>
+        <div class="prod-status"><div class="prod-status-dot"></div> Agent aktif</div>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+function switchProduct(productId) {
+  activeProductFilter = productId;
+  renderProdSwitcher();
+  renderInbox();
+}
+
 async function renderInbox() {
   let convs = await sbGet('conversations',
     `?user_id=eq.${userId}&order=last_msg_at.${sortOrder}.nullslast`);
   allConvs = convs;
+
+  // Filter per produk
+  if (activeProductFilter) convs = convs.filter(c => c.product_id === activeProductFilter);
 
   if (tabFilter === 'eskalasi') convs = convs.filter(c => c.status === 'eskalasi');
   else if (tabFilter === 'live') convs = convs.filter(c => c.status === 'baru' || c.status === 'diproses');
@@ -1428,6 +1496,7 @@ window.addEventListener('load', async () => {
   const btn = document.getElementById('theme-btn');
   if (btn) btn.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
 
+  await loadProdSwitcher();
   await renderInbox();
   await loadStats();
   checkWA();

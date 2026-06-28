@@ -320,19 +320,17 @@ body.light .grup-item-nama{color:#0f172a}
         </div>
       </div>
 
-      <!-- ── CONNECT WA ── -->
+      <!-- ── CONNECT WA (per produk) ── -->
       <div class="settings-section" id="sec-wa">
         <div class="section-title">Connect WhatsApp</div>
-        <div class="section-desc">Hubungkan nomor WhatsApp ke sistem AI CS via Baileys.</div>
-
-        <!-- Status card -->
-        <div id="wa-status-card" style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;margin-bottom:16px">
-          <div style="text-align:center;padding:20px;color:#64748b">Memuat status...</div>
+        <div class="section-desc">Setiap produk bisa punya nomor WhatsApp sendiri. Klik <strong>Hubungkan WA</strong> di tiap produk lalu scan QR dengan HP yang ingin dipakai.</div>
+        <div id="wa-products-list">
+          <div style="text-align:center;padding:24px;color:#64748b">Memuat produk...</div>
         </div>
-
-        <!-- QR area (muncul saat connecting) -->
-        <div id="wa-qr-area" style="display:none;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:28px;text-align:center">
-          <div style="font-size:13px;color:#64748b;margin-bottom:16px">Buka WhatsApp → <strong style="color:#e2e8f0">Perangkat Tertaut</strong> → Tautkan Perangkat → Scan QR</div>
+        <!-- QR Modal -->
+        <div id="wa-qr-area" style="display:none;background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:28px;text-align:center;margin-top:16px">
+          <div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:4px" id="wa-qr-prod-label">—</div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:16px">Buka WhatsApp → <strong style="color:#e2e8f0">Perangkat Tertaut</strong> → Tautkan Perangkat → Scan QR</div>
           <div id="wa-qr-container">
             <div style="font-size:36px;margin-bottom:8px">⏳</div>
             <div style="color:#64748b;font-size:13px">Memuat QR code...</div>
@@ -658,62 +656,85 @@ async function baileysFetch(path, opts = {}) {
   return fetch(`${BAILEYS_PROXY}?path=${encodeURIComponent(path)}`, opts);
 }
 
+// ── WA Multi-Produk ───────────────────────────────────────
+let activeQRSession = null; // wa_session_id yang sedang di-QR
+
 async function loadWAStatus() {
   waUserId = Auth.getUser()?.id;
-  const card = document.getElementById('wa-status-card');
-  let status = { status: 'not_found', waNumber: null };
+  const list = document.getElementById('wa-products-list');
+  if (!list) return;
+
+  // Ambil semua produk aktif user via window.SUPABASE_URL / SUPABASE_ANON_KEY (dari config.js)
+  let prods = [];
   try {
-    const res = await baileysFetch(`/session/status/${waUserId}`);
-    status = await res.json();
-  } catch(e) {
-    card.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:#fca5a5">
-      <span style="font-size:20px">⚠️</span>
-      <div><div style="font-weight:600">Tidak bisa terhubung ke Baileys server</div>
-      <div style="font-size:12px;color:#64748b;margin-top:2px">Pastikan VPS aktif</div></div></div>`;
-    return;
+    const r = await fetch(`${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${waUserId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id,wa_phone,wa_status`, {
+      headers: { 'Content-Type':'application/json','apikey':window.SUPABASE_ANON_KEY,'Authorization':'Bearer '+window.SUPABASE_ANON_KEY }
+    });
+    if (r.ok) prods = await r.json();
+  } catch(e) {}
+
+
+  // Fallback: kalau DB belum update, tampil 1 card generik
+  if (!prods.length) {
+    prods = [{ id: '__legacy__', nama: 'WhatsApp Utama', wa_session_id: waUserId, wa_phone: null, wa_status: null }];
   }
 
-  const isConnected = status.status === 'connected';
-  const dotClass = `dot-${status.status}`;
-  const statusLabel = {
-    connected:    '✅ Terhubung',
-    connecting:   '🔄 Menghubungkan...',
-    qr_ready:     '📷 Menunggu scan QR',
-    reconnecting: '🔄 Reconnecting...',
-    logged_out:   '❌ Logged out',
-    not_found:    'Belum terhubung',
-  }[status.status] || status.status;
+  const COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#10b981'];
+  const initials = n => (n||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
 
-  card.innerHTML = `
-    <div class="wa-status-row">
+  list.innerHTML = await Promise.all(prods.map(async (p, i) => {
+    const sid = p.wa_session_id || (p.id === '__legacy__' ? waUserId : null);
+    let status = { status: 'not_found', waNumber: null };
+    if (sid) {
+      try {
+        const r = await baileysFetch(`/session/status/${sid}`);
+        status = await r.json();
+      } catch(e) {}
+    }
+    const isConn = status.status === 'connected';
+    const color  = COLORS[i % COLORS.length];
+    const dotCls = `dot-${status.status || 'not_found'}`;
+    const statusLabel = { connected:'✅ Terhubung', connecting:'🔄 Menghubungkan...', qr_ready:'📷 Menunggu scan QR', reconnecting:'🔄 Reconnecting...', logged_out:'❌ Logged out', not_found:'Belum terhubung' }[status.status] || 'Belum terhubung';
+
+    return `<div style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:44px;height:44px;background:rgba(37,211,102,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📱</div>
-        <div>
-          <div style="font-weight:600;font-size:14px;color:#f1f5f9">${isConnected ? '+' + status.waNumber : 'WhatsApp'}</div>
-          <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-            <span class="wa-dot ${dotClass}"></span>
-            <span style="font-size:12px;color:#94a3b8">${statusLabel}</span>
+        <div style="width:44px;height:44px;border-radius:10px;background:${color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0">${initials(p.nama)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px;color:#f1f5f9">${p.nama}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+            <span class="wa-dot ${dotCls}"></span>
+            <span style="font-size:12px;color:#94a3b8">${isConn ? '+'+status.waNumber : statusLabel}</span>
           </div>
         </div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          ${isConn
+            ? `<button class="btn btn-sm" onclick="startQR('${sid}','${p.nama}')">🔗 Ganti</button>
+               <button class="btn-danger btn-sm" onclick="disconnectWA('${sid}')">Putus</button>`
+            : `<button class="btn-primary" style="font-size:12px;padding:6px 12px" onclick="startQR('${sid || ''}','${p.nama}','${p.id}')">+ Hubungkan WA</button>`
+          }
+        </div>
       </div>
-      <div style="display:flex;gap:8px">
-        ${isConnected
-          ? `<button class="btn btn-sm" onclick="startQR()">🔗 Ganti Nomor</button>
-             <button class="btn-danger btn-sm" onclick="disconnectWA()">Disconnect</button>`
-          : `<button class="btn-primary" onclick="startQR()">+ Hubungkan WA</button>`
-        }
-      </div>
-    </div>
-    ${isConnected ? `
-    <div style="display:flex;gap:24px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06)">
-      <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.3px">Nomor Aktif</div>
-           <div style="font-weight:600;color:#e2e8f0;margin-top:3px">+${status.waNumber}</div></div>
-      <div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.3px">Status AI</div>
-           <div style="font-weight:600;color:#86efac;margin-top:3px">● ON</div></div>
-    </div>` : ''}`;
+    </div>`;
+  })).then(arr => arr.join(''));
 }
 
-async function startQR() {
+async function startQR(sessionId, prodNama, prodId) {
+  // Kalau belum ada wa_session_id (produk baru), generate dulu dan simpan ke DB
+  if (!sessionId || sessionId === 'null' || sessionId === 'undefined') {
+    if (prodId && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+      const newSid = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2);
+      await fetch(`${window.SUPABASE_URL}/rest/v1/products?id=eq.${prodId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type':'application/json','apikey':window.SUPABASE_ANON_KEY,'Authorization':'Bearer '+window.SUPABASE_ANON_KEY,'Prefer':'return=minimal' },
+        body: JSON.stringify({ wa_session_id: newSid }),
+      }).catch(() => {});
+      sessionId = newSid;
+    } else {
+      sessionId = waUserId; // fallback produk pertama
+    }
+  }
+  activeQRSession = sessionId;
+  document.getElementById('wa-qr-prod-label').textContent = prodNama || 'Produk';
   document.getElementById('wa-qr-area').style.display = 'block';
   document.getElementById('wa-qr-container').innerHTML = `<div style="font-size:36px;margin-bottom:8px">⏳</div><div style="color:#64748b;font-size:13px">Memulai sesi...</div>`;
 
@@ -721,13 +742,12 @@ async function startQR() {
     await baileysFetch(`/session/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: waUserId }),
+      body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: activeQRSession }),
     });
   } catch(e) {
     document.getElementById('wa-qr-container').innerHTML = `<div style="color:#fca5a5;font-size:13px">⚠️ Tidak bisa terhubung ke server</div>`;
     return;
   }
-
   pollWAQR();
 }
 
@@ -752,12 +772,12 @@ function pollWAQR() {
 
 async function loadWAQR() {
   const container = document.getElementById('wa-qr-container');
-  if (!container) return;
+  if (!container || !activeQRSession) return;
   try {
-    const res = await baileysFetch(`/session/status/${waUserId}`);
+    const res = await baileysFetch(`/session/status/${activeQRSession}`);
     const s = await res.json();
     if (s.status === 'qr_ready') {
-      const qrRes = await baileysFetch(`/qr-data/${waUserId}`);
+      const qrRes = await baileysFetch(`/qr-data/${activeQRSession}`);
       const qrData = await qrRes.json();
       container.innerHTML = qrData.qrDataUrl
         ? `<img src="${qrData.qrDataUrl}" style="width:240px;border-radius:12px;border:1px solid rgba(255,255,255,.08)">
@@ -774,16 +794,18 @@ async function loadWAQR() {
 function cancelQR() {
   if (waPollInterval) { clearInterval(waPollInterval); waPollInterval = null; }
   document.getElementById('wa-qr-area').style.display = 'none';
+  activeQRSession = null;
   loadWAStatus();
 }
 
-async function disconnectWA() {
+async function disconnectWA(sessionId) {
   if (!confirm('Disconnect nomor WhatsApp ini?')) return;
+  const sid = sessionId || waUserId;
   try {
     await baileysFetch(`/session/stop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: waUserId }),
+      body: JSON.stringify({ secret: BAILEYS_SECRET, session_id: sid }),
     });
     toast('✅ WhatsApp berhasil disconnect');
     loadWAStatus();
@@ -791,8 +813,9 @@ async function disconnectWA() {
 }
 
 async function getWAStatus() {
+  if (!activeQRSession) return null;
   try {
-    const res = await baileysFetch(`/session/status/${waUserId}`);
+    const res = await baileysFetch(`/session/status/${activeQRSession}`);
     return await res.json();
   } catch(e) { return null; }
 }

@@ -839,7 +839,7 @@ function resetFUConfig() {
    KATALOG PRODUK
 ══════════════════════════════════════ */
 async function loadProducts() {
-  allProducts = await sbGet('products', `?user_id=eq.${currentUserId}&order=created_at.desc`);
+  allProducts = await sbGet('products', `?user_id=eq.${currentUserId}&order=created_at.desc&select=*`);
   renderGrid();
 }
 
@@ -887,6 +887,10 @@ function renderGrid() {
       <div class="prod-footer">
         <button class="btn btn-sm" onclick="toggleAktif('${p.id}',${p.aktif})">${p.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>
         <button class="btn btn-sm" onclick="openEdit('${p.id}')">✏️ Edit</button>
+        ${p.wa_session_id
+          ? `<button class="btn btn-sm" style="color:#22c55e;border-color:rgba(34,197,94,.3)" onclick="location.href='settings.html#sec-wa'" title="WA Terhubung">📱 WA ✓</button>`
+          : `<button class="btn btn-sm" style="color:#f59e0b;border-color:rgba(245,158,11,.3)" onclick="location.href='settings.html#sec-wa'" title="Hubungkan WA">📱 Hubungkan WA</button>`
+        }
         <button class="btn-danger btn-sm" onclick="hapusProduk('${p.id}')">🗑️</button>
       </div>
     </div>`;
