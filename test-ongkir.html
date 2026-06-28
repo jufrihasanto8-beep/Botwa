@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Test Cek Ongkir</title>
+<style>
+  body { font-family: monospace; padding: 20px; background: #111; color: #eee; max-width: 800px; }
+  input, button { padding: 8px 12px; margin: 4px; border-radius: 6px; border: 1px solid #444; background: #222; color: #eee; }
+  button { background: #2563eb; color: white; cursor: pointer; border: none; }
+  button:hover { background: #1d4ed8; }
+  #log { background: #1a1a1a; border: 1px solid #333; padding: 16px; margin-top: 16px; border-radius: 8px; white-space: pre-wrap; min-height: 200px; font-size: 13px; }
+  .ok   { color: #4ade80; }
+  .err  { color: #f87171; }
+  .info { color: #60a5fa; }
+  .warn { color: #facc15; }
+  h2 { color: #a78bfa; margin-bottom: 4px; }
+  label { display: block; margin-top: 10px; color: #aaa; font-size: 12px; }
+  .note { color: #6b7280; font-size: 11px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<h2>🧪 Test Cek Ongkir</h2>
+<p class="note">Request lewat server Vercel → Mengantar (bukan langsung dari browser)</p>
+
+<label>Base URL Vercel</label>
+<input id="baseUrl" value="https://csadys.vercel.app" style="width:280px">
+
+<label>Origin ID (mengantar_origin_id dari Supabase users)</label>
+<input id="originId" placeholder="665e8f3a4d9a60571a024487" style="width:320px">
+
+<label>Wilayah tujuan</label>
+<input id="wilayah" placeholder="Roworejo, Negerikaton, Pesawaran, Lampung" style="width:420px">
+
+<label>Berat (kg)</label>
+<input id="berat" type="number" value="1" step="0.1" style="width:80px">
+
+<br><br>
+<button onclick="testOngkir()">🚀 Test Cek Ongkir</button>
+<button onclick="clearLog()" style="background:#444">🗑 Clear</button>
+
+<div id="log">Klik "Test Cek Ongkir" untuk mulai...</div>
+
+<script>
+function log(msg, type = '') {
+  const el = document.getElementById('log');
+  el.innerHTML += `<span class="${type}">${msg}\n</span>`;
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+async function testOngkir() {
+  clearLog();
+  const base     = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
+  const originId = document.getElementById('originId').value.trim();
+  const wilayah  = document.getElementById('wilayah').value.trim();
+  const berat    = parseFloat(document.getElementById('berat').value) || 1;
+
+  if (!originId) { log('⚠ Isi Origin ID dulu', 'warn'); return; }
+  if (!wilayah)  { log('⚠ Isi Wilayah dulu', 'warn'); return; }
+
+  const url = `${base}/api/test-ongkir?wilayah=${encodeURIComponent(wilayah)}&origin_id=${encodeURIComponent(originId)}&weight=${berat}`;
+  log(`→ GET ${url}`, 'info');
+
+  const t = Date.now();
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    const ms = Date.now() - t;
+    log(`✓ Response ${ms}ms\n`, 'ok');
+
+    // Steps
+    (json.steps || []).forEach(s => {
+      if (s.step === 'keywords') {
+        log(`[keywords] ${JSON.stringify(s.parts)}`, 'info');
+      } else if (s.step === 'autofill') {
+        s.results.forEach(r => {
+          const status = r.count > 0 ? 'ok' : 'warn';
+          log(`[autofill] "${r.q}" → ${r.count} results (${r.ms}ms)${r.error ? ' ERR:'+r.error : ''}`, status);
+          if (r.first) log(`  area[0]: ${JSON.stringify({ _id: r.first._id, sub: r.first.SUBDISTRICT_NAME, dist: r.first.DISTRICT_NAME, city: r.first.CITY_NAME, prov: r.first.PROVINCE_NAME })}`, 'info');
+        });
+      } else if (s.step === 'best_area') {
+        log(`[best_area] id=${s.areaId}`, 'ok');
+      } else if (s.step === 'allEstimatePublic') {
+        const cls = s.success ? 'ok' : 'err';
+        log(`[allEstimate] success=${s.success} (${s.ms}ms)${s.error ? ' ERR:'+s.error : ''}`, cls);
+      }
+    });
+
+    if (!json.ok) {
+      log(`\n✗ GAGAL: ${json.error}`, 'err');
+      if (json.raw) log(`raw: ${JSON.stringify(json.raw).slice(0,300)}`, 'err');
+      return;
+    }
+
+    log(`\n=== HASIL ONGKIR (${json.total} kurir) ===`, 'ok');
+    (json.kurir || []).forEach(r => {
+      log(`  ${r.name.padEnd(14)} Rp ${r.price.toLocaleString('id-ID').padStart(8)}   ${r.est}`, 'ok');
+    });
+
+  } catch(e) {
+    log(`✗ Fetch error: ${e.message}`, 'err');
+  }
+}
+</script>
+</body>
+</html>
