@@ -101,7 +101,7 @@ async function testOngkir() {
         log(`  "${s.q}" → ${s.count} results (${s.ms}ms)${s.error ? ' ERR:'+s.error : ''}`, cls);
         if (s.first) log(`    area[0]: id=${s.first._id} | ${[s.first.SUBDISTRICT_NAME, s.first.DISTRICT_NAME, s.first.CITY_NAME, s.first.PROVINCE_NAME].filter(Boolean).join(', ')}`, 'info');
       });
-      if (json.areaId) log(`[best_area] id=${json.areaId} (${json.allEstimateMs}ms)`, 'ok');
+      if (json.areaId) log(`[best_area] id=${json.areaId} → ${json.bestAreaLabel || '-'} (allEstimate: ${json.allEstimateMs}ms)`, 'ok');
     }
 
     if (!json.ok) {
