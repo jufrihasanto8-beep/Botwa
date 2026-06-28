@@ -472,9 +472,7 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
   <div class="bot-online" id="sb-bot-status">
     <div class="bot-dot"></div> Bot online
   </div>
-  <div class="prod-switcher" id="prod-switcher">
-    <!-- dirender JS -->
-  </div>
+  <!-- prod-switcher di-inject otomatis oleh js/prod-switcher.js -->
   <div class="sb-nav">
     <a class="sb-item" href="analytics.html"><span class="si"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg></span> Ringkasan</a>
     <div class="sb-item active" onclick="location.href='dashboard.html'">
@@ -761,6 +759,7 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
 </div><!-- /main -->
 
 <script src="js/config.js"></script>
+<script src="js/prod-switcher.js"></script>
 <script src="js/app.js"></script>
 <script>
 Auth.guard();
@@ -776,8 +775,7 @@ let tabFilter = 'all', searchFilter = '', sortOrder = 'desc';
 let lastMsgCount = 0, allConvs = [];
 let aiSuggestText = '';
 let slaInterval = null;
-let activeProductFilter = null; // null = semua produk
-let allUserProducts = [];
+let activeProductFilter = null; // null = semua produk (sync dari prod-switcher.js via window.__activeProductFilter)
 
 // ── THEME TOGGLE ────────────────────────────────────────
 function toggleTheme() {
@@ -902,56 +900,18 @@ async function loadStats() {
 }
 
 /* ── RENDER INBOX ── */
-// ── PRODUCT SWITCHER ─────────────────────────────────────
-const PROD_COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#10b981','#f97316','#ec4899'];
-function prodInitials(nama) {
-  return (nama || '?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-}
-async function loadProdSwitcher() {
-  const prods = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc`).catch(()=>[]);
-  allUserProducts = prods;
-  renderProdSwitcher();
-}
-function renderProdSwitcher() {
-  const el = document.getElementById('prod-switcher');
-  if (!el) return;
-  if (!allUserProducts.length) { el.innerHTML = ''; return; }
-  let html = `<div class="prod-switcher-label">Produk Aktif</div>`;
-  // "Semua Produk" hanya tampil kalau ada 2+ produk
-  if (allUserProducts.length > 1) {
-    html += `<div class="prod-all ${activeProductFilter === null ? 'active' : ''}" onclick="switchProduct(null)">
-      <span style="width:34px;height:34px;border-radius:8px;background:rgba(148,163,184,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">📋</span>
-      <span style="font-size:12px;font-weight:500">Semua Produk</span>
-    </div>`;
-  }
-  allUserProducts.forEach((p, i) => {
-    const color = PROD_COLORS[i % PROD_COLORS.length];
-    const initials = prodInitials(p.nama);
-    // 1 produk = selalu aktif, 2+ produk = cek filter
-    const isActive = allUserProducts.length === 1 || activeProductFilter === p.id;
-    html += `<div class="prod-card ${isActive ? 'active' : ''}" onclick="switchProduct('${p.id}')">
-      <div class="prod-av" style="background:${color}">${initials}</div>
-      <div class="prod-info">
-        <div class="prod-name">${p.nama}</div>
-        <div class="prod-status"><div class="prod-status-dot"></div> Agent aktif</div>
-      </div>
-    </div>`;
-  });
-  el.innerHTML = html;
-}
-function switchProduct(productId) {
-  activeProductFilter = productId;
-  renderProdSwitcher();
-  renderInbox();
-}
+// Product switcher dihandle oleh js/prod-switcher.js (shared)
+// Dengarkan event productSwitch untuk re-render inbox
+window.addEventListener('productSwitch', () => renderInbox());
 
 async function renderInbox() {
   let convs = await sbGet('conversations',
     `?user_id=eq.${userId}&order=last_msg_at.${sortOrder}.nullslast`);
   allConvs = convs;
 
-  // Filter per produk
-  if (activeProductFilter) convs = convs.filter(c => c.product_id === activeProductFilter);
+  // Filter per produk (pakai shared state dari prod-switcher.js)
+  const _prodFilter = window.__activeProductFilter || activeProductFilter;
+  if (_prodFilter) convs = convs.filter(c => c.product_id === _prodFilter);
 
   if (tabFilter === 'eskalasi') convs = convs.filter(c => c.status === 'eskalasi');
   else if (tabFilter === 'live') convs = convs.filter(c => c.status === 'baru' || c.status === 'diproses');
@@ -1500,7 +1460,6 @@ window.addEventListener('load', async () => {
   const btn = document.getElementById('theme-btn');
   if (btn) btn.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
 
-  await loadProdSwitcher();
   await renderInbox();
   await loadStats();
   checkWA();
