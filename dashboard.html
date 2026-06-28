@@ -915,16 +915,20 @@ async function loadProdSwitcher() {
 function renderProdSwitcher() {
   const el = document.getElementById('prod-switcher');
   if (!el) return;
-  if (allUserProducts.length <= 1) { el.innerHTML = ''; return; } // 1 produk = tidak perlu switcher
+  if (!allUserProducts.length) { el.innerHTML = ''; return; }
   let html = `<div class="prod-switcher-label">Produk Aktif</div>`;
-  html += `<div class="prod-all ${activeProductFilter === null ? 'active' : ''}" onclick="switchProduct(null)">
-    <span style="width:34px;height:34px;border-radius:8px;background:rgba(148,163,184,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">📋</span>
-    <span style="font-size:12px;font-weight:500">Semua Produk</span>
-  </div>`;
+  // "Semua Produk" hanya tampil kalau ada 2+ produk
+  if (allUserProducts.length > 1) {
+    html += `<div class="prod-all ${activeProductFilter === null ? 'active' : ''}" onclick="switchProduct(null)">
+      <span style="width:34px;height:34px;border-radius:8px;background:rgba(148,163,184,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">📋</span>
+      <span style="font-size:12px;font-weight:500">Semua Produk</span>
+    </div>`;
+  }
   allUserProducts.forEach((p, i) => {
     const color = PROD_COLORS[i % PROD_COLORS.length];
     const initials = prodInitials(p.nama);
-    const isActive = activeProductFilter === p.id;
+    // 1 produk = selalu aktif, 2+ produk = cek filter
+    const isActive = allUserProducts.length === 1 || activeProductFilter === p.id;
     html += `<div class="prod-card ${isActive ? 'active' : ''}" onclick="switchProduct('${p.id}')">
       <div class="prod-av" style="background:${color}">${initials}</div>
       <div class="prod-info">
