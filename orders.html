@@ -93,7 +93,7 @@ body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
 .drp-cancel{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;cursor:pointer}
 
 /* Stat cards */
-.stat-section{padding:16px 24px;display:grid;grid-template-columns:repeat(6,1fr);gap:10px;flex-shrink:0}
+.stat-section{padding:16px 24px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;flex-shrink:0}
 .stat-row2{padding:0 24px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
 .sc{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
 .sc-icon{font-size:18px;margin-bottom:10px;opacity:.8}
@@ -222,10 +222,22 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
   <!-- STAT CARDS ROW 1 -->
   <div class="stat-section">
     <div class="sc">
+      <div class="sc-icon">📥</div>
+      <div class="sc-label">Total Lead</div>
+      <div class="sc-val" id="s-lead">—</div>
+      <div class="sc-sub" id="s-lead-sub">— per hari</div>
+    </div>
+    <div class="sc">
       <div class="sc-icon">🛒</div>
-      <div class="sc-label">Total Orders</div>
+      <div class="sc-label">Total Closing</div>
       <div class="sc-val" id="s-total">—</div>
       <div id="s-total-badge"></div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon">🎯</div>
+      <div class="sc-label">Closing Rate</div>
+      <div class="sc-val green" id="s-rate">—</div>
+      <div class="sc-sub">closing ÷ lead</div>
     </div>
     <div class="sc">
       <div class="sc-icon">💰</div>
@@ -239,28 +251,16 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
       <div class="sc-val green" id="s-net">—</div>
       <div class="sc-sub">Gross – RTS</div>
     </div>
-    <div class="sc">
-      <div class="sc-icon">↩️</div>
-      <div class="sc-label">RTS</div>
-      <div class="sc-val" id="s-rts">0</div>
-      <div class="sc-sub">Rp <b id="s-rts-rp">0</b></div>
-    </div>
-    <div class="sc">
-      <div class="sc-icon">🔁</div>
-      <div class="sc-label">Duplikat</div>
-      <div class="sc-val" id="s-dup">0</div>
-      <div class="sc-sub">Rp <b id="s-dup-rp">0</b></div>
-    </div>
+  </div>
+
+  <!-- STAT CARDS ROW 2 -->
+  <div class="stat-row2">
     <div class="sc">
       <div class="sc-icon">🚚</div>
       <div class="sc-label">COD</div>
       <div class="sc-val" id="s-cod">0</div>
       <div class="sc-sub">Rp <b id="s-cod-rp">0</b></div>
     </div>
-  </div>
-
-  <!-- STAT CARDS ROW 2 -->
-  <div class="stat-row2">
     <div class="sc">
       <div class="sc-icon">🏦</div>
       <div class="sc-label">Transfer (TF)</div>
@@ -271,11 +271,6 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
       <div class="sc-icon">📊</div>
       <div class="sc-label">Rata-rata Order</div>
       <div class="sc-val green" id="s-avg">—</div>
-    </div>
-    <div class="sc">
-      <div class="sc-icon">👥</div>
-      <div class="sc-label">Pelanggan Unik</div>
-      <div class="sc-val" id="s-cust">—</div>
     </div>
     <div class="sc">
       <div class="sc-icon">📦</div>
@@ -509,6 +504,8 @@ function filterByRange(convs) {
   });
 }
 
+let allLeads = []; // semua conversations (untuk hitung lead)
+
 async function init() {
   const [convs, custs, prods] = await Promise.all([
     sbFetch('conversations', `?user_id=eq.${uid}&select=id,customer_id,product_id,status,state,last_msg_at,created_at&order=last_msg_at.desc`),
@@ -519,6 +516,7 @@ async function init() {
   custs.forEach(c => { custMap[c.id] = c; });
   prods.forEach(p => { prodMap[p.id] = p; });
 
+  allLeads = convs || [];
   // Filter hanya yang ada order (order_placed=true di state)
   allConvs = (convs||[]).filter(c => {
     try { return c.state?.order_placed === true; } catch { return false; }
@@ -536,7 +534,6 @@ function render() {
 
 function calcStats(list) {
   let gross = 0, codCount = 0, codRp = 0, tfCount = 0, tfRp = 0, totalQty = 0;
-  const custSet = new Set();
 
   list.forEach(c => {
     const st = c.state || {};
@@ -547,19 +544,24 @@ function calcStats(list) {
     const nilai = (harga * qty) + ongkir;
     gross += nilai;
     totalQty += qty;
-    custSet.add(c.customer_id);
 
     const metode = (st.metode_bayar || 'cod').toLowerCase();
     if (metode === 'transfer') { tfCount++; tfRp += nilai; }
     else { codCount++; codRp += nilai; }
   });
 
-  const total = list.length;
-  const net   = gross; // RTS = 0 for now
-  const avg   = total ? Math.round(gross / total) : 0;
-  const dup   = calcDuplikat(list);
+  const total  = list.length;
+  const net    = gross;
+  const avg    = total ? Math.round(gross / total) : 0;
 
-  // Prev period comparison (same duration, shifted back)
+  // Hitung lead (semua conversations) di range yang sama
+  const leadList = filterByRange(allLeads);
+  const totalLead = leadList.length;
+  const days = Math.max(1, Math.round((filterEnd - filterStart) / (1000*60*60*24)));
+  const leadPerHari = (totalLead / days).toFixed(1);
+  const closingRate = totalLead ? Math.round((total / totalLead) * 100) : 0;
+
+  // Prev period comparison
   const dur = filterEnd - filterStart;
   const prevStart = new Date(filterStart - dur);
   const prevEnd   = new Date(filterStart);
@@ -574,21 +576,19 @@ function calcStats(list) {
   });
   const prevTotal = prevList.length;
 
+  document.getElementById('s-lead').textContent = totalLead;
+  document.getElementById('s-lead-sub').textContent = leadPerHari + ' per hari';
   document.getElementById('s-total').textContent = total;
   document.getElementById('s-total-badge').innerHTML = makeBadge(total, prevTotal, true);
+  document.getElementById('s-rate').textContent = closingRate + '%';
   document.getElementById('s-gross').textContent = rp(gross);
   document.getElementById('s-gross-badge').innerHTML = makeBadge(gross, prevGross, false);
   document.getElementById('s-net').textContent = rp(net);
-  document.getElementById('s-rts').textContent = '0';
-  document.getElementById('s-rts-rp').textContent = '0';
-  document.getElementById('s-dup').textContent = dup;
-  document.getElementById('s-dup-rp').textContent = '0';
   document.getElementById('s-cod').textContent = codCount;
   document.getElementById('s-cod-rp').textContent = codRp.toLocaleString('id-ID');
   document.getElementById('s-tf').textContent = tfCount;
   document.getElementById('s-tf-rp').textContent = tfRp.toLocaleString('id-ID');
   document.getElementById('s-avg').textContent = avg ? rp(avg) : '—';
-  document.getElementById('s-cust').textContent = custSet.size;
   document.getElementById('s-qty').textContent = totalQty;
 }
 
