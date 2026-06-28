@@ -23,7 +23,7 @@
 <p class="note">Request lewat server Vercel → Mengantar (bukan langsung dari browser)</p>
 
 <label>Base URL Vercel</label>
-<input id="baseUrl" value="https://csadys.vercel.app" style="width:280px">
+<input id="baseUrl" value="https://csadsy.vercel.app" style="width:280px">
 
 <label>Origin ID (mengantar_origin_id dari Supabase users)</label>
 <input id="originId" placeholder="665e8f3a4d9a60571a024487" style="width:320px">
@@ -58,7 +58,7 @@ async function testOngkir() {
   if (!originId) { log('⚠ Isi Origin ID dulu', 'warn'); return; }
   if (!wilayah)  { log('⚠ Isi Wilayah dulu', 'warn'); return; }
 
-  const url = `${base}/api/test-ongkir?wilayah=${encodeURIComponent(wilayah)}&origin_id=${encodeURIComponent(originId)}&weight=${berat}`;
+  const url = `${base}/api/save-settings?action=test-ongkir&wilayah=${encodeURIComponent(wilayah)}&origin_id=${encodeURIComponent(originId)}&weight=${berat}`;
   log(`→ GET ${url}`, 'info');
 
   const t = Date.now();
