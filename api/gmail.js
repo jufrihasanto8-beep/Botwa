@@ -280,10 +280,14 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   const defaultPesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
   const pesan        = tmpl ? renderTemplate(tmpl, { nama, produk, alamat, hp }) : defaultPesan;
 
+  // Ambil wa_session_id dari produk pertama aktif user (gmail tidak tahu produk spesifik)
+  const prodRows = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []);
+  const waSession = prodRows[0]?.wa_session_id || userId;
+
   const br = await fetch(`${BAILEYS_URL}/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ secret: WEBHOOK_SECRET, session_id: userId,
+    body: JSON.stringify({ secret: WEBHOOK_SECRET, session_id: waSession,
                            wa_number: waNumber, message: pesan, is_outbound: true }),
   });
 

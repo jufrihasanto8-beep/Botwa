@@ -155,6 +155,16 @@ async function cekResi(resi, ekspedisi) {
   }
 }
 
+/* ── Helper: ambil wa_session_id dari produk ─────────────── */
+async function getWaSession(userId, productId) {
+  if (productId) {
+    const rows = await sbGet(`products?id=eq.${productId}&select=wa_session_id&limit=1`).catch(() => []);
+    if (rows[0]?.wa_session_id) return rows[0].wa_session_id;
+  }
+  const rows = await sbGet(`products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []);
+  return rows[0]?.wa_session_id || userId;
+}
+
 /* ── Kirim notif WA via Baileys ──────────────────────────── */
 async function kirimNotif(sessionId, waNumber, pesan) {
   if (!BAILEYS_URL || !waNumber) return;
@@ -613,7 +623,8 @@ module.exports = async function handler(req, res) {
         });
 
         if (pesan) {
-          await kirimNotif(order.user_id, waTarget, pesan);
+          const waSession = await getWaSession(order.user_id, order.product_id);
+          await kirimNotif(waSession, waTarget, pesan);
           notified++;
         }
 

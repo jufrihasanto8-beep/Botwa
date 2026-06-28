@@ -1364,12 +1364,41 @@ module.exports = async function handler(req, res) {
 
     console.log(`Pesan dari ${pushName} (${wa_number}): ${message.slice(0, 80)}`);
 
-    // ── Ambil userId dari session_id (= user UUID dari dashboard) ──
-    const userId = body.session_id;
-    if (!userId) {
+    // ── Resolve userId + product dari session_id ──────────────
+    // Multi-WA: coba cari produk langsung via wa_session_id (1 WA = 1 produk)
+    // Fallback: session_id = user_id (backward compat, produk pertama)
+    const sessionId = body.session_id;
+    if (!sessionId) {
       console.warn('session_id kosong');
       return res.status(200).json({ ok: false, reason: 'no_session_id' });
     }
+    let userId, product, sumber;
+    const prodBySession = await sbGet('products',
+      `?wa_session_id=eq.${encodeURIComponent(sessionId)}&aktif=eq.true&limit=1`
+    ).catch(() => []);
+    if (prodBySession.length) {
+      product = prodBySession[0];
+      userId  = product.user_id;
+      sumber  = 'inbound';
+      // Deteksi CTWA
+      if (referral?.ad_id || referral?.headline) {
+        const identifier = referral.ad_id || referral.headline;
+        const mapping = await sbGet('ad_mapping',
+          `?user_id=eq.${userId}&identifier=eq.${encodeURIComponent(identifier)}&aktif=eq.true&limit=1`
+        ).catch(() => []);
+        if (mapping.length) sumber = 'ctwa';
+      }
+      console.log(`[multi-wa] produk "${product.nama}" via wa_session_id`);
+    } else {
+      // Fallback lama: session_id = user_id
+      userId = sessionId;
+      const resolved = await resolveProduct(userId, referral, message);
+      product = resolved.product;
+      sumber  = resolved.sumber;
+    }
+
+    // session WA yang dipakai untuk kirim balas (wa_session_id produk, fallback ke userId)
+    const waSession = product?.wa_session_id || userId;
 
     // ── Ambil rekening dari users table ───────────────────────
     const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_origin_id,mengantar_area_id,default_sumber&limit=1`).catch(() => []);
@@ -1380,9 +1409,6 @@ module.exports = async function handler(req, res) {
     const userMngAreaId     = userRows[0]?.mengantar_area_id    || MENGANTAR_ORIGIN_ID; // address _id (cek ongkir)
     const userDefaultSumber = userRows[0]?.default_sumber       || null;
     console.log(`[user] warehouseId=${userMngOriginId} areaId=${userMngAreaId}`);
-
-    // ── Routing: cari produk dari referral/isi chat ────────────
-    const { product, sumber } = await resolveProduct(userId, referral, message);
     console.log(`Produk: ${product?.nama || 'tidak diketahui'} (${sumber})`);
 
     // Model AI: jika user set default_sumber di settings → pakai model sesuai itu
@@ -1658,7 +1684,7 @@ Isi field yang berubah saja, sisanya null.` }],
           order_snapshot: snap,
         });
         await saveMessage(conversation.id, 'ai', confirmUlang);
-        await sendWA(userId, reply_jid, confirmUlang);
+        await sendWA(waSession, reply_jid, confirmUlang);
         return res.status(200).json({ ok: true, action: 'confirm_resent' });
 
         } // end else (bukan pertanyaan biasa)
@@ -1716,7 +1742,7 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
           }
 
           await saveMessage(conversation.id, 'ai', closingCustomer);
-          await sendWA(userId, reply_jid, closingCustomer);
+          await sendWA(waSession, reply_jid, closingCustomer);
 
           // ── Guard: cek dulu apakah order untuk conversation ini sudah ada (anti-double) ──
           const existingOrder = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&limit=1`).catch(() => []);
@@ -1828,7 +1854,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
                 qty:     snap.qty     || 1,
                 csNama,
               });
-              await sendWA(userId, userGroupJid, closingMsg, true);
+              await sendWA(waSession, userGroupJid, closingMsg, true);
               console.log(`Recap order #${nomorUrutClosing} terkirim ke grup (setelah customer konfirmasi)`);
             } catch(e) {
               console.error('Send recap ke grup error:', e.message);
@@ -1846,7 +1872,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
           });
           const tanyaKoreksi = `Maaf kak! 🙏 Bagian mana yang perlu diperbaiki?\nSilakan sebutkan ya kak (misal: alamatnya, nama, jumlah pesanan, dll).`;
           await saveMessage(conversation.id, 'ai', tanyaKoreksi);
-          await sendWA(userId, reply_jid, tanyaKoreksi);
+          await sendWA(waSession, reply_jid, tanyaKoreksi);
           return res.status(200).json({ ok: true, action: 'awaiting_correction' });
         }
         // Kalau ambigu (tidak jelas iya/tidak) → lanjut ke Claude biasa
@@ -3031,7 +3057,7 @@ ${ongkirInfo}`;
       if (replyGuard) {
         const replyClean = replyGuard.replace(/\[ORDER_CONFIRMED\]/g, '').replace(/\[ORDER_DATA:[^\]]+\]/g, '').trim();
         await saveMessage(conversation.id, 'ai', replyClean);
-        await sendWA(userId, reply_jid, replyClean);
+        await sendWA(waSession, reply_jid, replyClean);
       }
       return res.status(200).json({ ok: true, action: 'blocked_pending_kecamatan' });
     }
@@ -3168,7 +3194,7 @@ ${ongkirInfo}`;
           harga, ongkirAsli, ongkirPromo, feeCOD,
         });
         await saveMessage(conversation.id, 'ai', confirmMsg);
-        await sendWA(userId, reply_jid, confirmMsg);
+        await sendWA(waSession, reply_jid, confirmMsg);
         console.log(`Konfirmasi pesanan terkirim ke customer ${wa_number} — menunggu konfirmasi`);
       } catch(e) {
         console.error('Send konfirmasi ke customer error:', e.message);
@@ -3202,7 +3228,7 @@ ${ongkirInfo}`;
     if (tanyaFoto) console.log(`[FOTO] adaGambar=${!!adaGambarProduk} url=${adaGambarProduk||'null'}`);
 
     // Kirim teks reply dulu
-    await sendWA(userId, reply_jid, reply);
+    await sendWA(waSession, reply_jid, reply);
 
     // Kalau customer tanya foto dan ada gambar produk → selalu kirim (tidak peduli sudah pernah)
     if (tanyaFoto && adaGambarProduk) {
@@ -3238,7 +3264,7 @@ ${ongkirInfo}`;
         })();
         const caption = manfaat ? `${product.nama} bermanfaat untuk mengatasi:\n\n✅ ${manfaat}` : product.nama;
         console.log(`[FOTO] caption="${caption}"`);
-        await sendWA(userId, reply_jid, null, false, product.gambar_url, caption);
+        await sendWA(waSession, reply_jid, null, false, product.gambar_url, caption);
         await updateConvState(conversation.id, { foto_terkirim: true });
         console.log(`[FOTO] Gambar terkirim: ${product.gambar_url}`);
       } catch(e) {

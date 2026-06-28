@@ -53,6 +53,17 @@ async function sbPost(table, body) {
   if (!res.ok) throw new Error(`sbPost ${table}: ${await res.text()}`);
 }
 
+// Ambil wa_session_id dari produk (fallback ke userId untuk backward compat)
+async function getWaSession(userId, productId) {
+  if (productId) {
+    const rows = await sbGet('products', `?id=eq.${productId}&select=wa_session_id&limit=1`).catch(() => []);
+    if (rows[0]?.wa_session_id) return rows[0].wa_session_id;
+  }
+  // fallback: produk pertama aktif user
+  const rows = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []);
+  return rows[0]?.wa_session_id || userId;
+}
+
 async function sendWA(sessionId, jid, message, imageUrl = null, caption = null) {
   if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
   const res = await fetchWithTimeout(`${BAILEYS_URL}/send`, {
@@ -209,11 +220,12 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, 
     if (imageUrl) message = null; // kalau ada gambar, teks masuk ke caption
   }
 
-  // Kirim
+  // Kirim (pakai wa_session_id produk, fallback ke user_id)
+  const waSession = await getWaSession(conv.user_id, conv.product_id);
   if (imageUrl) {
-    await sendWA(conv.user_id, jid, null, imageUrl, caption);
+    await sendWA(waSession, jid, null, imageUrl, caption);
   } else if (message) {
-    await sendWA(conv.user_id, jid, message);
+    await sendWA(waSession, jid, message);
   } else {
     return null; // tidak ada yang dikirim
   }
@@ -333,7 +345,8 @@ Kak, kami ingin memastikan pesanan berikut:
 
 Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
 
-        await sendWA(conv.user_id, jid, reminderMsg);
+        const waSessionReminder = await getWaSession(conv.user_id, conv.product_id);
+        await sendWA(waSessionReminder, jid, reminderMsg);
         await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: `[Reminder konfirmasi order] ${reminderMsg}` });
         await sbPatch('conversations', `?id=eq.${conv.id}`, {
           state: { ...state, confirm_reminder_sent_at: now.toISOString() },

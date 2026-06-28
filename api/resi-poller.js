@@ -51,6 +51,15 @@ async function valGet(path) {
   return res.json();
 }
 
+async function getWaSession(userId, productId) {
+  if (productId) {
+    const rows = await sbGet(`products?id=eq.${productId}&select=wa_session_id&limit=1`).catch(() => []);
+    if (rows[0]?.wa_session_id) return rows[0].wa_session_id;
+  }
+  const rows = await sbGet(`products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []);
+  return rows[0]?.wa_session_id || userId;
+}
+
 async function sendWA(sessionId, waNumber, message) {
   const res = await fetch(`${BAILEYS_URL}/send`, {
     method: 'POST',
@@ -162,8 +171,9 @@ Langsung tulis pesannya.` }],
     pesanResi = `${namaKak ? 'Kak ' + namaKak : 'Kak'}, pesanan sudah kami kirim nih 📦 Semoga produknya cepat sampai dan langsung terasa manfaatnya ya!\n\nResi: ${noResi} (${kurir || 'ekspedisi'})\nLacak di: ${urlLacak}`;
   }
 
-  await sendWA(orderRow.user_id, waNumber, pesanResi);
-  console.log(`[resi-poller] Resi ${noResi} terkirim ke ${waNumber}`);
+  const waSession = await getWaSession(orderRow.user_id, orderRow.product_id);
+  await sendWA(waSession, waNumber, pesanResi);
+  console.log(`[resi-poller] Resi ${noResi} terkirim ke ${waNumber} via session ${waSession}`);
   return { sent: true, wa: waNumber, resi: noResi };
 }
 
@@ -298,7 +308,7 @@ async function handleResiWebhook(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         secret: process.env.WEBHOOK_SECRET,
-        session_id: conv.user_id,
+        session_id: await getWaSession(conv.user_id, conv.product_id),
         wa_number: waNumber,
         message: pesan,
         is_outbound: true,
