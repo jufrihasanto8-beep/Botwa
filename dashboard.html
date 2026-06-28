@@ -328,8 +328,12 @@ body.light .prod-all.active{background:rgba(59,130,246,.08);color:#2563eb}
 .from-customer .bubble{background:#1e293b;border:1px solid rgba(255,255,255,.06);border-bottom-left-radius:4px;color:#e2e8f0}
 .from-bot .bubble,.from-agent .bubble{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(59,130,246,.25)}
 .msg-meta{font-size:10px;color:#374151;margin-top:3px}
-.from-bot .msg-meta,.from-agent .msg-meta{text-align:right;color:#475569}
+.from-bot .msg-meta,.from-agent .msg-meta{text-align:right;color:#475569;display:flex;align-items:center;justify-content:flex-end;gap:6px}
 .bot-label{font-size:10px;color:#6366f1;font-weight:600;margin-bottom:2px;text-align:right;display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.msg-actions{display:none;gap:3px}
+.msg-row:hover .msg-actions{display:flex}
+.msg-act-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;border-radius:4px;opacity:.7;transition:opacity .15s}
+.msg-act-btn:hover{opacity:1;background:rgba(255,255,255,.08)}
 .no-chat{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#374151}
 .no-chat-icon{font-size:48px;opacity:.3}
 
@@ -770,7 +774,7 @@ const SB_KEY  = window.SUPABASE_ANON_KEY;
 const PROXY   = '/api/baileys-proxy';
 const sbH     = { 'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY };
 
-let activeConvId = null, activeCustomer = null, activeConv = null;
+let activeConvId = null, activeCustomer = null, activeConv = null, activeSessionId = null;
 let tabFilter = 'all', searchFilter = '', sortOrder = 'desc';
 let lastMsgCount = 0, allConvs = [];
 let aiSuggestText = '';
@@ -1013,6 +1017,14 @@ async function renderChat() {
   const custs = activeConv.customer_id ? await sbGet('customers', `?id=eq.${activeConv.customer_id}&limit=1`) : [];
   activeCustomer = custs[0] || null;
 
+  // Ambil wa_session_id dari produk untuk keperluan edit/hapus WA
+  if (activeConv.product_id) {
+    const prods = await sbGet('products', `?id=eq.${activeConv.product_id}&select=wa_session_id&limit=1`).catch(()=>[]);
+    activeSessionId = prods[0]?.wa_session_id || userId;
+  } else {
+    activeSessionId = userId;
+  }
+
   const nama  = activeCustomer?.nama || activeCustomer?.wa_number || 'Customer';
   const color = avatarColor(nama);
   document.getElementById('ch-av').textContent   = initials(nama);
@@ -1037,14 +1049,14 @@ async function renderChat() {
   document.getElementById('ae-num').textContent  = formatPhone(activeCustomer?.wa_number);
 
   const msgs = await sbGet('conv_messages',
-    `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=200`);
+    `?conversation_id=eq.${activeConvId}&order=created_at.asc&limit=200&select=id,role,isi,wamid,created_at`);
   lastMsgCount = msgs.length;
   lastMsgTimestamp = msgs.length ? msgs[msgs.length - 1].created_at : null;
 
   area.innerHTML = '<div class="day-divider">Hari ini</div>';
   msgs.forEach(m => {
     if (m.role === 'system') appendSystemNote(m.isi, m.created_at);
-    else appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, false, m.created_at, m.role);
+    else appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, false, m.created_at, m.role, m.id, m.wamid);
   });
   area.scrollTop = area.scrollHeight;
 
@@ -1102,7 +1114,7 @@ function appendSystemNote(text, ts=null) {
   area.scrollTop = area.scrollHeight;
 }
 
-function appendBubble(type, text, scroll=true, ts=null, role=null) {
+function appendBubble(type, text, scroll=true, ts=null, role=null, msgId=null, wamid=null) {
   const area = document.getElementById('messages-area');
   area.querySelector('.no-chat')?.remove();
   const div  = document.createElement('div');
@@ -1115,15 +1127,83 @@ function appendBubble(type, text, scroll=true, ts=null, role=null) {
     div.innerHTML = `<div class="msg-av-s" style="background:${avatarColor(nama)}">${initials(nama)}</div>
       <div class="msg-wrap"><div class="bubble">${safe}</div><div class="msg-meta">${t}</div></div>`;
   } else {
+    const canAct = wamid ? `
+      <div class="msg-actions">
+        <button class="msg-act-btn" title="Edit pesan" onclick="editWAMsg('${msgId}','${wamid}',this)">✏️</button>
+        <button class="msg-act-btn" title="Hapus pesan" onclick="deleteWAMsg('${msgId}','${wamid}',this)">🗑️</button>
+      </div>` : '';
     div.innerHTML = `<div class="msg-wrap">
       <div class="bot-label">${label}</div>
-      <div class="bubble">${safe}</div>
-      <div class="msg-meta">${t}</div>
+      <div class="bubble" data-msg-id="${msgId||''}">${safe}</div>
+      <div class="msg-meta">${t}${canAct}</div>
     </div>`;
   }
   area.appendChild(div);
   if (scroll) area.scrollTop = area.scrollHeight;
   return div;
+}
+
+async function deleteWAMsg(msgId, wamid, btn) {
+  if (!confirm('Hapus pesan ini untuk semua orang?')) return;
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const waNum = activeCustomer?.reply_jid || activeCustomer?.wa_number;
+    const r = await fetch('/api/baileys-proxy?path=/delete-msg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: activeSessionId, wa_number: waNum, wamid }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Hapus dari DB
+      await fetch(`${window.SUPABASE_URL}/rest/v1/conv_messages?id=eq.${msgId}`, {
+        method: 'DELETE',
+        headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY },
+      });
+      // Hapus bubble dari UI
+      btn.closest('.msg-row')?.remove();
+    } else {
+      alert('Gagal hapus: ' + (d.error || 'unknown'));
+      btn.disabled = false; btn.textContent = '🗑️';
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+    btn.disabled = false; btn.textContent = '🗑️';
+  }
+}
+
+async function editWAMsg(msgId, wamid, btn) {
+  const bubble = btn.closest('.msg-wrap')?.querySelector('.bubble');
+  const currentText = (bubble?.innerText || '').trim();
+  const newText = prompt('Edit pesan:', currentText);
+  if (!newText || newText === currentText) return;
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const waNum = activeCustomer?.reply_jid || activeCustomer?.wa_number;
+    const r = await fetch('/api/baileys-proxy?path=/edit-msg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: activeSessionId, wa_number: waNum, wamid, new_text: newText }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Update DB
+      await fetch(`${window.SUPABASE_URL}/rest/v1/conv_messages?id=eq.${msgId}`, {
+        method: 'PATCH',
+        headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isi: newText }),
+      });
+      // Update bubble UI
+      if (bubble) bubble.innerHTML = newText.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+      btn.disabled = false; btn.textContent = '✏️';
+    } else {
+      alert('Gagal edit: ' + (d.error || 'unknown'));
+      btn.disabled = false; btn.textContent = '✏️';
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+    btn.disabled = false; btn.textContent = '✏️';
+  }
 }
 
 function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
