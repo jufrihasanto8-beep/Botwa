@@ -824,7 +824,7 @@ const MENGANTAR_HEADERS = {
 
 async function mengantarFetch(path, timeoutMs = 20000) {
   try {
-    const res = await fetchWithTimeout(`https://api-public.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS }, timeoutMs);
+    const res = await fetchWithTimeout(`https://app.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS }, timeoutMs);
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       console.error(`[mengantarFetch] HTTP ${res.status} — ${body.slice(0, 200)}`);
@@ -888,7 +888,7 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     // Kirim semua query fallback secara parallel, ambil hasil pertama yang ada data
     const searchResults = await Promise.all(
       queryFallbacks.map(q =>
-        mengantarFetch(`public/abc/address/search?keyword=${encodeURIComponent(q)}`, 15000)
+        mengantarFetch(`address/autofill?keyword=${encodeURIComponent(q)}`, 15000)
           .then(json => {
             const res = Array.isArray(json) ? json : (json?.data || []);
             console.log(`[hitungOngkir] search "${q}" → ${res.length} results`);
