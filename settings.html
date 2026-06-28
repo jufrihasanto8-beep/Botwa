@@ -1472,8 +1472,38 @@ async function cariMengantarOrigin() {
   }
 }
 
-function pilihOrigin(id, nama, telp, alamat) {
-  showOriginCard({ id, nama, telp, alamat });
+async function pilihOrigin(id, nama, telp, alamat) {
+  // Tampil dulu dengan warehouse id sementara
+  showOriginCard({ id: '⏳ Mencari address ID...', nama, telp, alamat });
+
+  // Cari address _id dari address/autofill pakai alamat warehouse
+  // Yang disimpan harus address _id (untuk allEstimatePublic), bukan warehouse _id
+  try {
+    // Coba beberapa keyword dari alamat (dari yang paling spesifik)
+    // Alamat warehouse biasanya: "Jl. ..., Kelurahan, Kecamatan, Kota"
+    // Kita ambil bagian terakhir (kecamatan/kota) yang lebih cocok di autofill
+    const parts = (alamat || nama).split(',').map(s => s.trim()).filter(Boolean);
+    const keywords = [
+      parts.slice(-3).join(', '),  // 3 bagian terakhir
+      parts.slice(-2).join(', '),  // 2 bagian terakhir
+      parts[parts.length - 2] || parts[0], // kecamatan
+    ].filter(Boolean);
+
+    let addressId = id; // fallback ke warehouse id
+    for (const kw of keywords) {
+      const res = await fetch(`/api/save-settings?action=cari-origin&keyword=${encodeURIComponent(kw)}`);
+      const json = await res.json();
+      if (json.results?.length) {
+        addressId = json.results[0]._id || json.results[0].id || id;
+        console.log(`[pilihOrigin] warehouse_id=${id} → address_id=${addressId} (keyword="${kw}")`);
+        break;
+      }
+    }
+    showOriginCard({ id: addressId, nama, telp, alamat });
+  } catch(e) {
+    console.warn('[pilihOrigin] cari-origin gagal, pakai warehouse id:', e.message);
+    showOriginCard({ id, nama, telp, alamat });
+  }
 }
 
 async function saveMengantarSettings() {
