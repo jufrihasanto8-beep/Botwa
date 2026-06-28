@@ -73,7 +73,7 @@ async function sendWA(sessionId, jid, message, imageUrl = null, caption = null) 
 }
 
 // ── Generate pesan AI dari konteks percakapan ─────────────
-async function generateAIFollowup(messages, namaKak, namaProduk, csNama, isLast = false, isFormLead = false) {
+async function generateAIFollowup(messages, namaKak, namaProduk, csNama, isLast = false, isFormLead = false, convState = {}, product = null) {
   if (!ANTHROPIC_KEY) return null;
 
   const recent = messages.slice(-6);
@@ -87,6 +87,27 @@ async function generateAIFollowup(messages, namaKak, namaProduk, csNama, isLast 
       ? 'Customer ini sudah isi form & niat beli (warm lead). Tone antusias, bantu segera, tunjukkan kamu prioritaskan mereka.'
       : 'Tone hangat, natural, sambung konteks.';
 
+  // Inject data ongkir kalau sudah ada di state
+  const ongkir = convState.ongkir || null;
+  let ongkirInfo = '';
+  if (ongkir) {
+    const fmt = n => `Rp ${Number(n||0).toLocaleString('id-ID')}`;
+    const qty = convState.qty || 1;
+    let bundling = product?.harga_bundling || [];
+    if (typeof bundling === 'string') try { bundling = JSON.parse(bundling); } catch { bundling = []; }
+    let harga = (product?.harga || ongkir.harga || 0) * qty;
+    const exact = Array.isArray(bundling) && bundling.find(b => b.qty == qty);
+    if (exact) harga = exact.harga;
+    const totalTF  = harga + (ongkir.ongkirPromo ?? ongkir.ongkirAsli ?? 0);
+    const totalCOD = totalTF + (ongkir.feeCOD || 0);
+    ongkirInfo = `\n\nDATA ONGKIR AKTUAL (gunakan angka ini, JANGAN mengarang):
+- Produk: ${namaProduk}, qty: ${qty}
+- Harga: ${fmt(harga)}
+- Ongkir via ${ongkir.ekspedisi || 'kurir'}: ${fmt(ongkir.ongkirPromo ?? ongkir.ongkirAsli)}
+- Total Transfer: ${fmt(totalTF)}
+- Total COD: ${fmt(totalCOD)}`;
+  }
+
   const prompt = `Kamu ${csNama || 'Sari'}, CS WhatsApp toko ${namaProduk || 'produk kami'}.
 
 Customer ${namaKak ? 'kak ' + namaKak : 'ini'} belum balas beberapa saat.
@@ -96,7 +117,7 @@ Akhir percakapan:
 ${transcript}
 ---
 
-${toneNote}
+${toneNote}${ongkirInfo}
 
 Buat SATU pesan follow-up WhatsApp:
 - 1-2 kalimat SAJA
@@ -105,6 +126,8 @@ Buat SATU pesan follow-up WhatsApp:
 - Panggil "Kak" atau nama depannya
 - 1 emoji saja
 - DILARANG markdown
+- ⛔ DILARANG sebut harga, total, rekening, atau angka apapun kecuali ada di DATA ONGKIR AKTUAL di atas
+- ⛔ DILARANG mengarang angka dari percakapan
 
 Tulis pesannya langsung tanpa penjelasan.`;
 
@@ -131,8 +154,15 @@ Tulis pesannya langsung tanpa penjelasan.`;
 }
 
 // ── Kirim follow-up ke satu conversation ─────────────────
-async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now) {
+async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, product = null) {
   const state       = conv.state || {};
+
+  // Skip kalau bot sedang nunggu jawaban lokasi dari customer
+  if (state.waiting_for_location) {
+    console.log(`[SKIP] conv ${conv.id}: waiting_for_location aktif`);
+    return null;
+  }
+
   const isFormLead  = conv.sumber === 'form' || state.is_form_lead === true;
   const jid         = customer.reply_jid || customer.wa_number;
   const namaKak  = customer.nama && customer.nama !== customer.wa_number
@@ -153,7 +183,7 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now) 
   const isLastDay = schedule?.is_last || false;
 
   if (tipe === 'ai') {
-    message = await generateAIFollowup(recentMsgs, namaKak, namaProduk, csNama, isLastDay, isFormLead);
+    message = await generateAIFollowup(recentMsgs, namaKak, namaProduk, csNama, isLastDay, isFormLead, state, product);
     if (!message) {
       message = namaKak
         ? `Kak ${namaKak}, masih ada yang bisa aku bantu? 😊`
@@ -394,11 +424,12 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         const customer = customers[0];
         if (!customer.reply_jid && !customer.wa_number) { totalSkipped++; continue; }
 
-        let namaProduk = '', csNama = 'Sari';
+        let namaProduk = '', csNama = 'Sari', product = null;
         if (conv.product_id) {
-          const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama&limit=1`);
-          namaProduk = prods[0]?.nama || '';
-          csNama     = prods[0]?.persona_cs_nama || 'Sari';
+          const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama,harga,harga_bundling,berat_gram,promo_ongkir&limit=1`);
+          product    = prods[0] || null;
+          namaProduk = product?.nama || '';
+          csNama     = product?.persona_cs_nama || 'Sari';
         }
 
         // Cek apakah ada schedule khusus untuk hari 1
@@ -407,7 +438,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         ).catch(() => []);
 
         const schedule = schedHari1[0] || { hari: 1, tipe: 'ai' };
-        const pesan = await kirimFollowup(conv, customer, namaProduk, csNama, schedule, now);
+        const pesan = await kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, product);
 
         if (pesan !== null) {
           totalSent++;
@@ -489,14 +520,15 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
             const customer = customers[0];
             if (!customer.reply_jid && !customer.wa_number) { totalSkipped++; continue; }
 
-            let namaProduk = '', csNama = 'Sari';
+            let namaProduk = '', csNama = 'Sari', product = null;
             if (conv.product_id) {
-              const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama&limit=1`);
-              namaProduk = prods[0]?.nama || '';
-              csNama     = prods[0]?.persona_cs_nama || 'Sari';
+              const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama,harga,harga_bundling,berat_gram,promo_ongkir&limit=1`);
+              product    = prods[0] || null;
+              namaProduk = product?.nama || '';
+              csNama     = product?.persona_cs_nama || 'Sari';
             }
 
-            const pesan = await kirimFollowup(conv, customer, namaProduk, csNama, sched, now);
+            const pesan = await kirimFollowup(conv, customer, namaProduk, csNama, sched, now, product);
 
             if (pesan !== null) {
               totalSent++;

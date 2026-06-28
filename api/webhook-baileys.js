@@ -777,7 +777,7 @@ function formatWilayah(row) {
 // Format wilayah untuk query ke Mengantar — strip prefix Kabupaten/Kota agar Mengantar bisa match
 function formatWilayahMengantar(row) {
   const stripKab = s => (s || '').replace(/^(kabupaten|kota|kab\.?)\s*/i, '').trim();
-  return [row.kelurahan, row.kecamatan, stripKab(row.kabupaten)].filter(Boolean).join(', ');
+  return [row.kelurahan, row.kecamatan, stripKab(row.kabupaten), row.provinsi].filter(Boolean).join(', ');
 }
 
 // Ambil semua kelurahan di satu kecamatan (untuk ditawarkan ke customer sebagai pilihan)
@@ -839,8 +839,8 @@ async function mengantarFetch(path) {
 }
 
 /* ── HITUNG ONGKIR via Mengantar public API ───────────────── */
-async function hitungOngkir(wilayah, product, qty = 1, userMngKey = null) {
-  console.log(`[hitungOngkir] START wilayah="${wilayah}" qty=${qty}`);
+async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
+  console.log(`[hitungOngkir] START wilayah="${wilayah}" qty=${qty} originId=${userMngOriginId || MENGANTAR_ORIGIN_ID}`);
   try {
     // Step 1: Cari di tabel lokal wilayah_id
     const lokalMatch = await cariWilayah(wilayah, 3);
@@ -922,8 +922,9 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngKey = null) {
 
     // Step 3c: Ambil estimasi tarif
     const weight = ((product?.berat_gram || 1000) / 1000) * qty;
+    const originId = userMngOriginId || MENGANTAR_ORIGIN_ID;
     const ratesJson = await mengantarFetch(
-      `order/allEstimatePublic?origin_id=${MENGANTAR_ORIGIN_ID}&destination_id=${areaId}&weight=${weight}`
+      `order/allEstimatePublic?origin_id=${originId}&destination_id=${areaId}&weight=${weight}`
     );
     if (!ratesJson) { console.error(`[hitungOngkir] allEstimatePublic null`); return null; }
     console.log(`[hitungOngkir] rates success=${ratesJson.success}`);
@@ -1331,13 +1332,13 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Ambil rekening dari users table ───────────────────────
-    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_key,default_sumber&limit=1`).catch(() => []);
-    const userRekening      = userRows[0]?.rekening      || null;
-    const userAnthropicKey  = userRows[0]?.anthropic_key || ANTHROPIC_KEY;
-    const userGroupJid      = userRows[0]?.group_jid     || WA_GROUP_JID;
-    const userMngKey        = userRows[0]?.mengantar_key || MENGANTAR_KEY || null;
-    const userDefaultSumber = userRows[0]?.default_sumber || null;
-    console.log(`[user] mngKey=${userMngKey ? 'set' : 'null'}`);
+    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_origin_id,default_sumber&limit=1`).catch(() => []);
+    const userRekening      = userRows[0]?.rekening           || null;
+    const userAnthropicKey  = userRows[0]?.anthropic_key      || ANTHROPIC_KEY;
+    const userGroupJid      = userRows[0]?.group_jid           || WA_GROUP_JID;
+    const userMngOriginId   = userRows[0]?.mengantar_origin_id || MENGANTAR_ORIGIN_ID;
+    const userDefaultSumber = userRows[0]?.default_sumber      || null;
+    console.log(`[user] originId=${userMngOriginId}`);
 
     // ── Routing: cari produk dari referral/isi chat ────────────
     const { product, sumber } = await resolveProduct(userId, referral, message);
@@ -1821,7 +1822,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
           const wilayahGeo = [geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
           const alamatGeo  = [geo.kelurahan, geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
           console.log(`Reverse geocode: ${wilayahGeo}`);
-          const hasilGeo = await hitungOngkir(wilayahGeo, product, 1).catch(() => null);
+          const hasilGeo = await hitungOngkir(wilayahGeo, product, 1, userMngOriginId).catch(() => null);
           if (hasilGeo) {
             await updateConvState(conversation.id, { wilayah: wilayahGeo, ongkir: hasilGeo, alamat: alamatGeo });
             convState.ongkir  = hasilGeo;
@@ -1854,7 +1855,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       const alamatParts = [customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean);
       const wilayahAuto = alamatParts.join(', ');
       try {
-        const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1);
+        const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1, userMngOriginId);
         if (hasilAuto) {
           await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
           convState.wilayah = wilayahAuto;
@@ -1869,7 +1870,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
     // Skip kalau baru di-load oleh auto-load (tidak perlu hitung 2x)
     if (convState.wilayah && product && !autoLoadedOngkir) {
       try {
-        const freshOngkir = await hitungOngkir(convState.wilayah, product, 1);
+        const freshOngkir = await hitungOngkir(convState.wilayah, product, 1, userMngOriginId);
         if (freshOngkir) {
           await updateConvState(conversation.id, { ongkir: freshOngkir });
           convState.ongkir = freshOngkir;
@@ -2012,7 +2013,7 @@ JANGAN langsung kirim ulang ringkasan pesanan kalau customer tidak minta.`;
         // Hitung ongkir otomatis dari wilayah KTP
         let hasilKTP = null;
         if (wilayahKTP && !convState.ongkir) {
-          hasilKTP = await hitungOngkir(wilayahKTP, product, 1).catch(() => null);
+          hasilKTP = await hitungOngkir(wilayahKTP, product, 1, userMngOriginId).catch(() => null);
           if (hasilKTP) {
             stateKTP.wilayah = wilayahKTP;
             stateKTP.ongkir  = hasilKTP;
@@ -2185,7 +2186,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             convState.wilayah = wilayahKonfirm;
             convState.pending_kecamatan = null;
 
-            const hasilOngkir = await hitungOngkir(wilayahKonfirm, product, parseInt(convState.qty) || 1).catch(() => null);
+            const hasilOngkir = await hitungOngkir(wilayahKonfirm, product, parseInt(convState.qty) || 1, userMngOriginId).catch(() => null);
             if (hasilOngkir) {
               await updateConvState(conversation.id, { ongkir: hasilOngkir });
               convState.ongkir = hasilOngkir;
@@ -2233,7 +2234,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
               await updateConvState(conversation.id, { wilayah: wKonfirm, pending_kecamatan: null, proposed_wilayah: null });
               convState.wilayah = wKonfirm;
               convState.pending_kecamatan = null;
-              const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1).catch(()=>null);
+              const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1, userMngOriginId).catch(()=>null);
               if (ho) {
                 await updateConvState(conversation.id, { ongkir: ho });
                 convState.ongkir = ho;
@@ -2273,7 +2274,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
                 history.push({ role: 'user', content:
                   `[SISTEM] Sistem mendeteksi otomatis: Kelurahan ${autoMatchKel}, Kec. ${first.kecamatan}, ${first.kabupaten}, ${first.provinsi}. Konfirmasi ke customer dengan natural dan tulis [WILAYAH_OK:${wKonfirm}] di akhir pesan. Jangan tanya kelurahan lagi.`
                 });
-                const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1).catch(()=>null);
+                const ho = await hitungOngkir(wKonfirm, product, parseInt(convState.qty) || 1, userMngOriginId).catch(()=>null);
                 if (ho) {
                   await updateConvState(conversation.id, { ongkir: ho });
                   convState.ongkir = ho;
@@ -2375,7 +2376,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
           if (kelUnik.length === 1) {
             // Kelurahan spesifik → langsung hitung ongkir
-            const hasilOngkir = await hitungOngkir(wilayahBaru, product, parseInt(convState.qty) || 1).catch(() => null);
+            const hasilOngkir = await hitungOngkir(wilayahBaru, product, parseInt(convState.qty) || 1, userMngOriginId).catch(() => null);
             if (hasilOngkir) {
               await updateConvState(conversation.id, { wilayah: wilayahBaru, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasilOngkir, waiting_for_location: false });
               convState.wilayah = wilayahBaru;
@@ -2413,7 +2414,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     if (proposedWilayah && isConfirmation(message) && !convState.ongkir && !convState.pending_kecamatan) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
-      const hasil = await hitungOngkir(proposedWilayah, product, parseInt(convState.qty) || 1);
+      const hasil = await hitungOngkir(proposedWilayah, product, parseInt(convState.qty) || 1, userMngOriginId);
       if (hasil) {
         await updateConvState(conversation.id, {
           wilayah: proposedWilayah,
@@ -2640,7 +2641,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             convState.qty = qtyFromReply;
             console.log(`[WILAYAH_OK] qty deteksi dari reply: ${qtyFromReply}`);
           }
-          const hasil = await hitungOngkir(wilayah, product, qtyState);
+          const hasil = await hitungOngkir(wilayah, product, qtyState, userMngOriginId);
           if (hasil) {
             await updateConvState(conversation.id, { ongkir: hasil });
             convState.ongkir = hasil;
@@ -2768,7 +2769,7 @@ ${ongkirInfo}`;
         console.log(`[WILAYAH_OK] "${wilayah}" tidak ditemukan di local DB — fallback Mengantar`);
         await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
         convState.pending_kecamatan = null;
-        const hasil = await hitungOngkir(wilayah, product, 1);
+        const hasil = await hitungOngkir(wilayah, product, 1, userMngOriginId);
         if (hasil) {
           await updateConvState(conversation.id, { ongkir: hasil });
           convState.ongkir = hasil;
@@ -2812,7 +2813,7 @@ ${ongkirInfo}`;
     if (cekOngkirMatch && !autoOngkirResult && !wilayahOkMatch) {
       const wilayah = cekOngkirMatch[1].trim();
       await updateConvState(conversation.id, { wilayah });
-      const hasil = await hitungOngkir(wilayah, product, 1);
+      const hasil = await hitungOngkir(wilayah, product, 1, userMngOriginId);
       if (hasil) {
         await updateConvState(conversation.id, { ongkir: hasil });
         convState.ongkir = hasil; // update local state
@@ -3043,7 +3044,7 @@ ${ongkirInfo}`;
         if (wilayahFallback && product) {
           console.log(`[ORDER_CONFIRMED] ongkir kosong, re-hitung dari wilayah: ${wilayahFallback}`);
           const qtyFallback = parseInt(latestState.qty || orderDataParsed?.qty || convState.qty || 1) || 1;
-          const rekalkulasi = await hitungOngkir(wilayahFallback, product, qtyFallback).catch(() => null);
+          const rekalkulasi = await hitungOngkir(wilayahFallback, product, qtyFallback, userMngOriginId).catch(() => null);
           if (rekalkulasi) {
             ongkirData = rekalkulasi;
             await updateConvState(conversation.id, { ongkir: rekalkulasi }).catch(() => {});

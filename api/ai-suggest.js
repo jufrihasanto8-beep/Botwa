@@ -32,37 +32,47 @@ async function getUserAnthropicKey(userId) {
   } catch { return null; }
 }
 
-// Hitung ongkir dari wilayah string via Mengantar v1 API
+const MNG_PUBLIC_HEADERS = {
+  'User-Agent': 'Mozilla/5.0',
+  'Accept': 'application/json',
+  'Referer': 'https://www.mengantar.com/',
+};
+
+// Hitung ongkir dari wilayah string via Mengantar public API
 async function hitungOngkirByWilayah(wilayah, product, userId, qty = 1) {
   try {
     const fmt = n => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
 
     const [userRows, whitelist] = await Promise.all([
-      sbGet(`users?id=eq.${userId}&select=mengantar_key&limit=1`),
+      sbGet(`users?id=eq.${userId}&select=mengantar_origin_id&limit=1`),
       sbGet(`courier_whitelist?user_id=eq.${userId}&aktif=eq.true`),
     ]);
-    const apiKey = userRows[0]?.mengantar_key || process.env.MENGANTAR_KEY;
-    console.log(`[ai-suggest] hitungOngkir: wilayah="${wilayah}" apiKey=${apiKey ? 'set' : 'null'}`);
-    if (!apiKey) return null;
+    const originId = userRows[0]?.mengantar_origin_id || process.env.MENGANTAR_ORIGIN_ID;
+    console.log(`[ai-suggest] hitungOngkir: wilayah="${wilayah}" originId=${originId || 'null'}`);
+    if (!originId) return null;
 
-    const MNG_AUTH = { 'Authorization': `Bearer ${apiKey}` };
-
-    // Cari area via v1 API
-    const areasRes = await fetchWithTimeout(
-      `https://api.mengantar.com/v1/areas?search=${encodeURIComponent(wilayah)}&limit=3`,
-      { headers: MNG_AUTH }, 8000
+    // Cari destination via public autofill
+    const autofillRes = await fetchWithTimeout(
+      `https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(wilayah)}`,
+      { headers: MNG_PUBLIC_HEADERS }, 8000
     ).then(r => r.json()).catch(() => null);
-    const areaId = areasRes?.data?.[0]?.id;
-    console.log(`[ai-suggest] v1/areas "${wilayah}" → areaId=${areaId}`);
+    const areas = Array.isArray(autofillRes) ? autofillRes : (autofillRes?.data || []);
+    const area = areas[0];
+    const areaId = area?._id || area?.id;
+    console.log(`[ai-suggest] autofill "${wilayah}" → areaId=${areaId}`);
     if (!areaId) return null;
 
-    // Ambil rates
+    // Ambil rates via public allEstimatePublic
     const beratKg = ((product?.berat_gram || 1000) / 1000) * qty;
     const ratesRes = await fetchWithTimeout(
-      `https://api.mengantar.com/v1/rates?destination_id=${areaId}&weight=${beratKg}`,
-      { headers: MNG_AUTH }, 8000
+      `https://app.mengantar.com/api/order/allEstimatePublic?origin_id=${originId}&destination_id=${areaId}&weight=${beratKg}`,
+      { headers: MNG_PUBLIC_HEADERS }, 8000
     ).then(r => r.json()).catch(() => null);
-    let rates = (ratesRes?.data || []).filter(r => (r.price || 0) > 0);
+    if (!ratesRes?.success || !ratesRes.data) return null;
+
+    let rates = Object.entries(ratesRes.data)
+      .filter(([name, info]) => !name.toLowerCase().includes('cargo') && !info.unsupported && (info.price || 0) > 0)
+      .map(([name, info]) => ({ courier_name: name, price: info.price }));
     if (!rates.length) return null;
 
     // Filter whitelist
