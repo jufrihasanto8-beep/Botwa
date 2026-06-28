@@ -58,8 +58,8 @@ module.exports = async function handler(req, res) {
 
         // Ambil kodepos dari Mengantar pakai query kombinasi (sebagai fallback jika wilayah_id tidak punya)
         const mngQ = [kel, kec].filter(Boolean).join(', ');
-        const mngRes = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(mngQ)}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' }
+        const mngRes = await fetch(`https://api-public.mengantar.com/api/public/abc/address/search?keyword=${encodeURIComponent(mngQ)}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
         }).then(r => r.json()).catch(() => null);
 
         const mngList = mngRes?.data || (Array.isArray(mngRes) ? mngRes : []);
@@ -79,7 +79,7 @@ module.exports = async function handler(req, res) {
     if (action === 'mengantar-origins') {
       if (!key) return res.status(400).json({ error: 'key wajib' });
       try {
-        const BASE = `https://app.mengantar.com/api/public/${key}`;
+        const BASE = `https://api-public.mengantar.com/api/public/${key}`;
         const CANDIDATES = ['address', 'warehouse', 'pickup', 'origin', 'sender'];
         let found = null;
         for (const slug of CANDIDATES) {
@@ -187,7 +187,7 @@ module.exports = async function handler(req, res) {
       const MNG_HEADERS = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/' };
 
       const ratesRes = await fetch(
-        `https://app.mengantar.com/api/order/allEstimatePublic?origin_id=${originId}&destination_id=${dest_id}&weight=${beratKg}`,
+        `https://api-public.mengantar.com/api/order/allEstimatePublic?origin_id=${originId}&destination_id=${dest_id}&weight=${beratKg}`,
         { headers: MNG_HEADERS }
       ).then(r => r.json()).catch(() => null);
 

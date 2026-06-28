@@ -818,14 +818,12 @@ function bulatkan(nilai, kelipatan = 500) {
 /* ── MENGANTAR PUBLIC API ─────────────────────────────────── */
 const MENGANTAR_ORIGIN_ID = process.env.MENGANTAR_ORIGIN_ID || '5fc63315f8f44b34aa4c44c7';
 const MENGANTAR_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+  'User-Agent': 'Mozilla/5.0',
   'Accept': 'application/json',
-  'Referer': 'https://www.mengantar.com/',
-  'Origin': 'https://www.mengantar.com',
 };
 
 async function mengantarFetch(path) {
-  const res = await fetchWithTimeout(`https://app.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS }, 10000);
+  const res = await fetchWithTimeout(`https://api-public.mengantar.com/api/${path}`, { headers: MENGANTAR_HEADERS }, 10000);
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     console.error(`[mengantarFetch] HTTP ${res.status} — ${body.slice(0, 200)}`);
@@ -880,43 +878,48 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
 
     let areas = [];
     for (const q of queryFallbacks) {
-      const searchJson = await mengantarFetch(`address/autofill?keyword=${encodeURIComponent(q)}`);
-      if (!searchJson) { console.warn(`[hitungOngkir] autofill null untuk "${q}"`); continue; }
+      const searchJson = await mengantarFetch(`public/abc/address/search?keyword=${encodeURIComponent(q)}`);
+      if (!searchJson) { console.warn(`[hitungOngkir] search null untuk "${q}"`); continue; }
       const res = Array.isArray(searchJson) ? searchJson : (searchJson.data || []);
-      console.log(`[hitungOngkir] autofill "${q}" → ${res.length} results`);
+      console.log(`[hitungOngkir] search "${q}" → ${res.length} results`);
       if (res.length) { areas = res; console.log(`[hitungOngkir] area[0]: ${JSON.stringify(res[0]).slice(0,120)}`); break; }
     }
 
     if (!areas.length) {
-      console.error(`[hitungOngkir] Semua autofill fallback gagal untuk "${queryMengantar}"`);
+      console.error(`[hitungOngkir] Semua search fallback gagal untuk "${queryMengantar}"`);
       return null;
     }
 
     // Step 3b: Pilih area terbaik (scoring)
+    // Field baru: SUBDISTRICT_NAME, DISTRICT_NAME, CITY_NAME, PROVINCE_NAME, ZIP_CODE
     const normStr = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const aSubdistrict = a => a.SUBDISTRICT_NAME || a.subdistrict || '';
+    const aDistrict    = a => a.DISTRICT_NAME    || a.district    || '';
+    const aCity        = a => a.CITY_NAME        || a.city        || a.regency || '';
+    const aProvince    = a => a.PROVINCE_NAME    || a.province    || '';
     let bestArea = areas[0], bestScore = -1;
     for (const a of areas) {
       let score = 0;
       if (lokal) {
-        if (normStr(a.subdistrict) === normStr(lokal.kelurahan)) score += 50;
-        else if ((a.subdistrict || '').toLowerCase().includes(lokal.kelurahan.toLowerCase())) score += 30;
-        if (normStr(a.district) === normStr(lokal.kecamatan)) score += 30;
-        else if ((a.district || '').toLowerCase().includes(lokal.kecamatan.toLowerCase())) score += 15;
-        if (normStr(a.city || a.regency || '') === normStr(lokal.kabupaten)) score += 20;
+        if (normStr(aSubdistrict(a)) === normStr(lokal.kelurahan)) score += 50;
+        else if (aSubdistrict(a).toLowerCase().includes(lokal.kelurahan.toLowerCase())) score += 30;
+        if (normStr(aDistrict(a)) === normStr(lokal.kecamatan)) score += 30;
+        else if (aDistrict(a).toLowerCase().includes(lokal.kecamatan.toLowerCase())) score += 15;
+        if (normStr(aCity(a)) === normStr(lokal.kabupaten)) score += 20;
       } else {
         const kwParts = wilayah.toLowerCase().split(',').map(s => s.trim());
-        const aFull = [a.subdistrict, a.district, a.city || a.regency, a.province].filter(Boolean).join(' ').toLowerCase();
+        const aFull = [aSubdistrict(a), aDistrict(a), aCity(a), aProvince(a)].filter(Boolean).join(' ').toLowerCase();
         for (const part of kwParts) {
           if (aFull.includes(part)) score += 10;
-          if (normStr(a.city || a.regency || '') === normStr(part)) score += 20;
-          if (normStr(a.subdistrict || '') === normStr(part)) score += 30;
+          if (normStr(aCity(a)) === normStr(part)) score += 20;
+          if (normStr(aSubdistrict(a)) === normStr(part)) score += 30;
         }
       }
       if (score > bestScore) { bestScore = score; bestArea = a; }
     }
 
     const areaId  = bestArea._id || bestArea.id;
-    const areaNama = bestArea.subdistrict || bestArea.name || wilayah;
+    const areaNama = aSubdistrict(bestArea) || bestArea.name || wilayah;
     console.log(`[hitungOngkir] best area: "${areaNama}" id=${areaId} score=${bestScore}`);
     if (!areaId) { console.error('[hitungOngkir] areaId null'); return null; }
 

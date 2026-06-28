@@ -35,7 +35,6 @@ async function getUserAnthropicKey(userId) {
 const MNG_PUBLIC_HEADERS = {
   'User-Agent': 'Mozilla/5.0',
   'Accept': 'application/json',
-  'Referer': 'https://www.mengantar.com/',
 };
 
 // Hitung ongkir dari wilayah string via Mengantar public API
@@ -51,21 +50,21 @@ async function hitungOngkirByWilayah(wilayah, product, userId, qty = 1) {
     console.log(`[ai-suggest] hitungOngkir: wilayah="${wilayah}" originId=${originId || 'null'}`);
     if (!originId) return null;
 
-    // Cari destination via public autofill
-    const autofillRes = await fetchWithTimeout(
-      `https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(wilayah)}`,
+    // Cari destination via public address/search
+    const searchRes = await fetchWithTimeout(
+      `https://api-public.mengantar.com/api/public/abc/address/search?keyword=${encodeURIComponent(wilayah)}`,
       { headers: MNG_PUBLIC_HEADERS }, 8000
     ).then(r => r.json()).catch(() => null);
-    const areas = Array.isArray(autofillRes) ? autofillRes : (autofillRes?.data || []);
+    const areas = Array.isArray(searchRes) ? searchRes : (searchRes?.data || []);
     const area = areas[0];
     const areaId = area?._id || area?.id;
-    console.log(`[ai-suggest] autofill "${wilayah}" → areaId=${areaId}`);
+    console.log(`[ai-suggest] address/search "${wilayah}" → areaId=${areaId}`);
     if (!areaId) return null;
 
-    // Ambil rates via public allEstimatePublic
+    // Ambil rates via public allEstimatePublic (pakai price bukan estimatedSpecialPrice)
     const beratKg = ((product?.berat_gram || 1000) / 1000) * qty;
     const ratesRes = await fetchWithTimeout(
-      `https://app.mengantar.com/api/order/allEstimatePublic?origin_id=${originId}&destination_id=${areaId}&weight=${beratKg}`,
+      `https://api-public.mengantar.com/api/order/allEstimatePublic?origin_id=${originId}&destination_id=${areaId}&weight=${beratKg}`,
       { headers: MNG_PUBLIC_HEADERS }, 8000
     ).then(r => r.json()).catch(() => null);
     if (!ratesRes?.success || !ratesRes.data) return null;
