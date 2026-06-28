@@ -93,23 +93,16 @@ async function testOngkir() {
     const ms = Date.now() - t;
     log(`✓ Response ${ms}ms\n`, 'ok');
 
-    // Steps
-    (json.steps || []).forEach(s => {
-      if (s.step === 'keywords') {
-        log(`[keywords] ${JSON.stringify(s.parts)}`, 'info');
-      } else if (s.step === 'autofill') {
-        s.results.forEach(r => {
-          const status = r.count > 0 ? 'ok' : 'warn';
-          log(`[autofill] "${r.q}" → ${r.count} results (${r.ms}ms)${r.error ? ' ERR:'+r.error : ''}`, status);
-          if (r.first) log(`  area[0]: ${JSON.stringify({ _id: r.first._id, sub: r.first.SUBDISTRICT_NAME, dist: r.first.DISTRICT_NAME, city: r.first.CITY_NAME, prov: r.first.PROVINCE_NAME })}`, 'info');
-        });
-      } else if (s.step === 'best_area') {
-        log(`[best_area] id=${s.areaId}`, 'ok');
-      } else if (s.step === 'allEstimatePublic') {
-        const cls = s.success ? 'ok' : 'err';
-        log(`[allEstimate] success=${s.success} (${s.ms}ms)${s.error ? ' ERR:'+s.error : ''}`, cls);
-      }
-    });
+    // Searches (autofill per keyword)
+    if (json.searches?.length) {
+      log('[autofill searches]', 'info');
+      json.searches.forEach(s => {
+        const cls = s.count > 0 ? 'ok' : 'warn';
+        log(`  "${s.q}" → ${s.count} results (${s.ms}ms)${s.error ? ' ERR:'+s.error : ''}`, cls);
+        if (s.first) log(`    area[0]: id=${s.first._id} | ${[s.first.SUBDISTRICT_NAME, s.first.DISTRICT_NAME, s.first.CITY_NAME, s.first.PROVINCE_NAME].filter(Boolean).join(', ')}`, 'info');
+      });
+      if (json.areaId) log(`[best_area] id=${json.areaId} (${json.allEstimateMs}ms)`, 'ok');
+    }
 
     if (!json.ok) {
       log(`\n✗ GAGAL: ${json.error}`, 'err');
@@ -117,7 +110,7 @@ async function testOngkir() {
       return;
     }
 
-    log(`\n=== HASIL ONGKIR (${json.total} kurir) ===`, 'ok');
+    log(`\n=== HASIL ONGKIR (${json.kurir?.length ?? 0} kurir) ===`, 'ok');
     (json.kurir || []).forEach(r => {
       log(`  ${r.name.padEnd(14)} Rp ${r.price.toLocaleString('id-ID').padStart(8)}   ${r.est}`, 'ok');
     });
