@@ -97,14 +97,15 @@ body.light .prod-sw-all.active{background:rgba(59,130,246,.08);color:#2563eb}
   // ── Load produk dari Supabase ─────────────────────────────
   async function loadProds() {
     const userId = window.Auth?.getUser?.()?.id;
-    if (!userId) return;
+    if (!userId) { console.log('[ProdSW] no userId'); return; }
     try {
       const r = await fetch(
-        `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id`,
+        `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama`,
         { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
       );
-      if (r.ok) allUserProducts = await r.json();
-    } catch(e) {}
+      if (r.ok) { allUserProducts = await r.json(); console.log('[ProdSW] loaded', allUserProducts.length, 'products'); }
+      else { console.log('[ProdSW] fetch error', r.status, await r.text()); }
+    } catch(e) { console.log('[ProdSW] fetch exception', e); }
 
     // Reset filter kalau produk yang dipilih sudah tidak ada
     if (activeProductFilter && !allUserProducts.find(p => p.id === activeProductFilter)) {
