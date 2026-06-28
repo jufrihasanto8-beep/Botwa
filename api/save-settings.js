@@ -167,7 +167,7 @@ module.exports = async function handler(req, res) {
   const body = req.body || {};
 
   // ── Legacy: update kolom users (rekening / anthropic_key / default_sumber) ──
-  if (body.user_id && ('rekening' in body || 'anthropic_key' in body || 'group_jid' in body || 'mengantar_key' in body || 'mengantar_origin_id' in body || 'default_sumber' in body)) {
+  if (body.user_id && ('rekening' in body || 'anthropic_key' in body || 'group_jid' in body || 'mengantar_key' in body || 'mengantar_origin_id' in body || 'mengantar_area_id' in body || 'default_sumber' in body)) {
     try {
       const patch = {};
       if ('rekening' in body)            patch.rekening            = body.rekening;
@@ -175,6 +175,7 @@ module.exports = async function handler(req, res) {
       if ('group_jid' in body)           patch.group_jid           = body.group_jid;
       if ('mengantar_key' in body)       patch.mengantar_key       = body.mengantar_key;
       if ('mengantar_origin_id' in body) patch.mengantar_origin_id = body.mengantar_origin_id;
+      if ('mengantar_area_id' in body)   patch.mengantar_area_id   = body.mengantar_area_id;
       if ('default_sumber' in body) {
         const ALLOWED_SUMBER = ['ctwa', 'form', 'inbound'];
         if (!ALLOWED_SUMBER.includes(body.default_sumber)) return res.status(400).json({ error: 'default_sumber tidak valid' });
