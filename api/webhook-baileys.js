@@ -942,7 +942,8 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     const weight = ((product?.berat_gram || 1000) / 1000) * qty;
     const originId = userMngOriginId || MENGANTAR_ORIGIN_ID;
     const ratesJson = await mengantarFetch(
-      `order/allEstimatePublic?origin_id=${originId}&destination_id=${areaId}&weight=${weight}`
+      `order/allEstimatePublic?origin_id=${originId}&destination_id=${areaId}&weight=${weight}`,
+      30000
     );
     if (!ratesJson) { console.error(`[hitungOngkir] allEstimatePublic null`); return null; }
     console.log(`[hitungOngkir] rates success=${ratesJson.success}`);
