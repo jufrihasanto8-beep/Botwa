@@ -138,13 +138,15 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
         produk_locked: !!prevState.produk_locked,
         reopened_at: reopenedAt,
         has_new_message: true, // tampil badge "Pelanggan Baru" di tab Closing
-        // Preserve konteks penting agar bot ingat data customer
-        wilayah:      prevState.wilayah      || null,
-        ongkir:       prevState.ongkir       || null,
-        keluhan:      prevState.keluhan       || null,
-        alamat:       prevState.alamat        || null,
-        metode_bayar: prevState.metode_bayar  || null,
-        qty:          prevState.qty           || null,
+        // Simpan wilayah lama sebagai referensi → Claude konfirmasi ke customer dulu sebelum pakai
+        // Tidak langsung auto-hitung (customer mungkin ganti alamat), tapi tidak tanya dari nol
+        prev_wilayah: prevState.wilayah || null,
+        wilayah:      null,  // clear — diisi ulang setelah customer konfirmasi
+        ongkir:       null,
+        keluhan:      null,
+        alamat:       null,
+        metode_bayar: null,
+        qty:          null,
         // Clear state transient
         proposed_wilayah:       null,
         pending_kecamatan:      null,
@@ -1916,21 +1918,38 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       }
     }
 
-    // ── Auto-load wilayah dari customer.alamat jika convState.wilayah belum ada (repeat customer / form lead) ──
+    // ── Auto-load wilayah: prioritas form_alamat (Gmail) → customer.alamat (hanya inbound baru) ──
+    // Re-open conversation: TIDAK auto-load — customer mungkin ganti alamat, biarkan bot tanya natural
+    const isReopenedConv = !!(convState.reopened_at && !convState.wilayah);
     let autoLoadedOngkir = null;
-    if (!convState.wilayah && product && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten) {
-      const alamatParts = [customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean);
-      const wilayahAuto = alamatParts.join(', ');
-      try {
-        const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1, userMngAreaId);
-        if (hasilAuto) {
-          await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
-          convState.wilayah = wilayahAuto;
-          convState.ongkir  = hasilAuto;
-          autoLoadedOngkir  = hasilAuto;
-          console.log(`[auto-load] Wilayah dari customer.alamat: ${wilayahAuto}`);
-        }
-      } catch(e) { console.error('[auto-load] Gagal:', e.message); }
+    if (!convState.wilayah && !isReopenedConv && product) {
+
+      // Prioritas 1: form_alamat dari Gmail (orderonline.id) — alamat segar dari form, paling reliable
+      // Syarat: is_form_lead + alamat_lengkap (sudah ada kecamatan/kabupaten) + customer.alamat terisi dari form
+      const isFormLeadWithAddress = convState.is_form_lead && convState.alamat_lengkap
+        && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten;
+
+      // Prioritas 2: customer.alamat — hanya untuk inbound baru (bukan form lead, bukan re-open)
+      // Sengaja tidak dipakai untuk form_lead: form_alamat sudah jadi sumber wilayah
+      // Sengaja tidak dipakai untuk re-open: alamat lama bisa salah (customer ganti alamat)
+      const isInboundWithSavedAddress = !convState.is_form_lead
+        && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten;
+
+      if (isFormLeadWithAddress || isInboundWithSavedAddress) {
+        const alamatParts = [customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean);
+        const wilayahAuto = alamatParts.join(', ');
+        const sumber = isFormLeadWithAddress ? 'form_alamat (Gmail)' : 'customer.alamat (inbound)';
+        try {
+          const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1, userMngAreaId);
+          if (hasilAuto) {
+            await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
+            convState.wilayah = wilayahAuto;
+            convState.ongkir  = hasilAuto;
+            autoLoadedOngkir  = hasilAuto;
+            console.log(`[auto-load] Wilayah dari ${sumber}: ${wilayahAuto}`);
+          }
+        } catch(e) { console.error('[auto-load] Gagal:', e.message); }
+      }
     }
 
     // ── Refresh ongkir jika wilayah sudah diketahui (ambil promo terbaru) ──
@@ -2015,6 +2034,21 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       formCtx += `\n3. Proses order seperti biasa`;
 
       systemPrompt += formCtx;
+    }
+
+    // Inject konteks repeat order (re-open dari closing) — tampilkan alamat lama untuk dikonfirmasi
+    if (convState.reopened_at && !convState.wilayah && convState.prev_wilayah) {
+      const prevAlamatDisplay = customer?.alamat
+        ? [customer.alamat.jalan, customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean).join(', ')
+        : convState.prev_wilayah;
+      systemPrompt += `\n\n[SISTEM - REPEAT ORDER] Customer ini pernah order sebelumnya dan chat lagi.`
+        + `\nAlamat order terakhir: "${prevAlamatDisplay}"`
+        + `\nLangkah yang BENAR:`
+        + `\n1. Sambut dengan hangat, tanyakan mau order lagi atau ada keperluan lain`
+        + `\n2. Kalau mau order → tanyakan konfirmasi alamat: "Alamat pengirimannya masih sama ya kak di ${convState.prev_wilayah}? 😊"`
+        + `\n3. Customer bilang iya/sama → langsung tulis [WILAYAH_OK:${convState.prev_wilayah}] → sistem hitung ongkir otomatis`
+        + `\n4. Customer bilang ganti/beda → tanya alamat baru dari awal`
+        + `\nJANGAN tanya alamat dari nol tanpa tunjukkan alamat lama dulu.`;
     }
 
     if (conversation.ringkasan) {
@@ -2645,6 +2679,13 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       const wilayah = wilayahOkMatch[1].trim();
       console.log(`[WILAYAH_OK] detected: ${wilayah}`);
 
+      // Guard: keyword terlalu pendek (< 5 karakter) → kemungkinan nama orang/kata umum, skip
+      // Contoh: "Yayu" (4 huruf) bisa match "Nyayum" di Kalimantan via substring
+      if (wilayah.length < 5 && !wilayah.includes(',')) {
+        console.log(`[WILAYAH_OK] "${wilayah}" terlalu pendek (${wilayah.length} char) — skip, bukan nama wilayah valid`);
+        // Jangan process — biarkan bot lanjut normal tanpa ongkir
+      } else {
+
       // Cek apakah wilayah sudah spesifik (minimal kecamatan level)
       const lokalCek = await cariWilayah(wilayah, 100);
       const kecamatanUnik = [...new Set(lokalCek.map(r => `${r.kecamatan}||${r.kabupaten}`))];
@@ -2874,6 +2915,7 @@ ${ongkirInfo}`;
           rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim();
         }
       }
+      } // end else (wilayah.length >= 5)
     }
 
     // ── Handle cek ongkir (dari marker Claude — fallback) ─────
@@ -3075,12 +3117,34 @@ ${ongkirInfo}`;
       let   ongkirData  = latestState.ongkir || convState.ongkir;
       const custAlamat  = customer?.alamat || {};
 
+      // ── Konflik check: alamat ORDER_DATA vs wilayah tersimpan (repeat customer ganti alamat) ──
+      // Contoh: customer pernah order dari Kalimantan Barat, sekarang order dari Jakarta
+      // → auto-load pakai alamat lama, tapi alamat baru (Jakarta) ada di ORDER_DATA
+      let conflictAlamat = false;
+      if ((ongkirData?.area?.kota || custAlamat?.kabupaten) && orderDataParsed?.alamat) {
+        const alamatLower = orderDataParsed.alamat.toLowerCase();
+        const storedProv  = (ongkirData?.area?.provinsi || custAlamat?.provinsi || '')
+          .toLowerCase().replace(/^(provinsi|daerah istimewa|dki)\s*/i, '').trim();
+        const storedKab   = (ongkirData?.area?.kota || custAlamat?.kabupaten || '')
+          .toLowerCase().replace(/^(kabupaten|kota)\s*/i, '').trim();
+        // Cek 5-6 karakter pertama (cukup unique untuk nama kota/provinsi Indonesia)
+        const provKey = storedProv.substring(0, 6);
+        const kabKey  = storedKab.substring(0, 6);
+        if (provKey && kabKey && !alamatLower.includes(provKey) && !alamatLower.includes(kabKey)) {
+          conflictAlamat = true;
+          console.log(`[ORDER_CONFIRMED] ⚠️ Konflik area: stored="${storedKab}, ${storedProv}" tidak ada di alamat ORDER_DATA "${orderDataParsed.alamat.substring(0, 60)}" → force re-detect`);
+          ongkirData = null; // clear agar re-compute triggered
+        }
+      }
+
       // Fallback: kalau ongkirData kosong tapi wilayah ada di state → hitung ulang on-the-fly
       // PENTING: area lokal (wilayah_id) di-resolve TERPISAH dari hitungOngkir (Mengantar)
       // Jadi walau Mengantar down, breakdown kelurahan/kecamatan/kab/prov tetap terisi
       let localAreaFallback = null;
-      if (!ongkirData?.area?.kecamatan && !custAlamat?.kecamatan) {
-        let wilayahFallback = latestState.wilayah || convState.wilayah;
+      // kalau conflictAlamat, paksa re-detect meski custAlamat masih punya kecamatan (alamat lama)
+      if (!ongkirData?.area?.kecamatan && (!custAlamat?.kecamatan || conflictAlamat)) {
+        // kalau conflict: set null dulu agar step-2 bisa detect dari orderDataParsed.alamat
+        let wilayahFallback = conflictAlamat ? null : (latestState.wilayah || convState.wilayah);
 
         // 1. Resolve area lokal dari wilayah yang ada di state
         if (wilayahFallback) {
@@ -3139,9 +3203,9 @@ ${ongkirInfo}`;
         }
       }
 
-      // Fallback area: ongkir state → customers.alamat → area lokal (wilayah_id)
+      // Fallback area: ongkir state → customers.alamat (skip kalau conflict) → area lokal (wilayah_id)
       const area = ongkirData?.area?.kecamatan ? ongkirData.area
-                 : custAlamat?.kecamatan ? {
+                 : (!conflictAlamat && custAlamat?.kecamatan) ? {
                      kelurahan: custAlamat.kelurahan || '',
                      kecamatan: custAlamat.kecamatan || '',
                      kota:      custAlamat.kabupaten || '',
