@@ -530,14 +530,15 @@ window.addEventListener('productSwitch', () => render());
 
 function render() {
   const prodFilter = window.__activeProductFilter || null;
-  let filtered = prodFilter ? allConvs.filter(c => c.product_id === prodFilter) : allConvs;
+  let filtered      = prodFilter ? allConvs.filter(c => c.product_id === prodFilter) : allConvs;
+  let filteredLeads = prodFilter ? allLeads.filter(c => c.product_id === prodFilter) : allLeads;
   const list = filterByRange(filtered);
-  calcStats(list);
+  calcStats(list, filteredLeads);
   renderCharts(list);
   renderTable(list);
 }
 
-function calcStats(list) {
+function calcStats(list, leadsFiltered) {
   let gross = 0, codCount = 0, codRp = 0, tfCount = 0, tfRp = 0, totalQty = 0;
 
   list.forEach(c => {
@@ -559,8 +560,8 @@ function calcStats(list) {
   const net    = gross;
   const avg    = total ? Math.round(gross / total) : 0;
 
-  // Hitung lead (semua conversations) di range yang sama
-  const leadList = filterByRange(allLeads);
+  // Hitung lead di range yang sama (sudah difilter per produk dari render())
+  const leadList = filterByRange(leadsFiltered || allLeads);
   const totalLead = leadList.length;
   const days = Math.max(1, Math.round((filterEnd - filterStart) / (1000*60*60*24)));
   const leadPerHari = (totalLead / days).toFixed(1);
@@ -702,7 +703,7 @@ function renderTable(list) {
         </div>
       </td>
       <td>
-        <div style="font-weight:500">${escH(prod.nama || '—')}</div>
+        <div style="font-weight:500">${escH(prod.nama || st.keluhan || '(produk lama)')}</div>
         <div style="font-size:11px;color:var(--text-3)">×${qty} · ongkir ${rp(ongkir)}</div>
       </td>
       <td><span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'Transfer':'COD'}</span></td>
@@ -713,7 +714,9 @@ function renderTable(list) {
 }
 
 function exportCSV() {
-  const list = filterByRange(allConvs);
+  const prodFilter = window.__activeProductFilter || null;
+  const filtered = prodFilter ? allConvs.filter(c => c.product_id === prodFilter) : allConvs;
+  const list = filterByRange(filtered);
   if (!list.length) return alert('Tidak ada data untuk diekspor.');
 
   const rows = [['Nama','WA','Produk','Qty','Harga Produk','Ongkir','Total','Metode','Waktu Closing']];
