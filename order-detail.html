@@ -576,16 +576,15 @@ function filterByRange(list) {
 
 async function init() {
   const [orders, custs, prods] = await Promise.all([
-    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,created_at&order=created_at.desc`),
+    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,mengantar_status,mengantar_error,mengantar_sent_at,created_at&order=created_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,catatan`),
-    sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga,persona_cs_nama`)
+    sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga,persona_cs_nama`),
   ]);
 
   custs.forEach(c => { custMap[c.id] = c; });
   prods.forEach(p => { prodMap[p.id] = p; });
 
   allOrders = orders || [];
-
   render();
 }
 
@@ -625,8 +624,10 @@ function getOrderRow(c, idx) {
   // Keterangan dari catatan customer
   const keterangan = cu.catatan ? cu.catatan.split('\n')[0] : '';
 
-  const sudahDikirim = c.status === 'dikirim' || c.status === 'selesai';
-  const noResi = c.no_resi || '';
+  const sudahDikirim = c.mengantar_status === 'sent' || c.status === 'dikirim' || c.status === 'selesai';
+  const queueFailed  = c.mengantar_status === 'failed';
+  const noResi       = c.no_resi || '';
+  const errorMsg     = c.mengantar_error || '';
 
   return {
     id: c.id,
@@ -640,7 +641,7 @@ function getOrderRow(c, idx) {
     produkNama: prod.nama || '—',
     jumlah: prod.nama ? `${prod.nama} ×${qty}` : `×${qty}`,
     qty, metode, total, instruksi, keterangan, rincian, keluhan,
-    isCOD, sudahDikirim, noResi,
+    isCOD, sudahDikirim, queueFailed, noResi, errorMsg,
     _raw: c, _cu: cu
   };
 }
@@ -682,7 +683,9 @@ function renderTable(rows) {
   tbody.innerHTML = rows.map((r, i) => {
     const resiTag = r.sudahDikirim
       ? `<div style="margin-top:3px"><span style="font-size:10px;background:rgba(34,197,94,.12);color:#16a34a;border:1px solid rgba(34,197,94,.25);border-radius:4px;padding:1px 5px;font-weight:600">✓ Terkirim${r.noResi ? ' · ' + r.noResi : ''}</span></div>`
-      : '';
+      : r.queueFailed
+        ? `<div style="margin-top:3px"><span style="font-size:10px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:4px;padding:1px 5px;font-weight:600" title="${escH(r.errorMsg)}">✗ Gagal · lihat detail</span></div>`
+        : '';
     return `<tr style="${r.sudahDikirim ? 'opacity:.65' : ''}">
     <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()" ${r.sudahDikirim ? 'disabled title="Sudah dikirim ke Mengantar"' : ''}></td>
     <td style="text-align:center"><button onclick="openEdit('${escH(r.id)}')" style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;color:#64748b;font-size:14px" title="Edit order">✏️</button></td>
