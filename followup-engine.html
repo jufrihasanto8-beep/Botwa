@@ -657,8 +657,10 @@ async function deleteSchedule(id) {
    TAB 2: LEADS PENDING
 ══════════════════════════════════ */
 async function loadLeads() {
+  const prodFilter = window.__activeProductFilter || null;
+  const prodQ = prodFilter ? `&product_id=eq.${prodFilter}` : '';
   allLeads = await sbGet('conversations',
-    `?user_id=eq.${userId}&status=in.(baru,diproses)&order=last_msg_at.desc` +
+    `?user_id=eq.${userId}&status=in.(baru,diproses)${prodQ}&order=last_msg_at.desc` +
     `&select=id,status,last_msg_at,state,product_id,customer_id,customers(wa_number,nama),products(nama)`
   );
   if (!Array.isArray(allLeads)) allLeads = [];
@@ -813,6 +815,7 @@ function showTab(name, btn) {
 }
 
 init();
+window.addEventListener('productSwitch', () => loadLeads());
 </script>
 </body>
 </html>
