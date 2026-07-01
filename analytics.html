@@ -400,6 +400,8 @@ function drpApply() {
   init();
 }
 
+window.addEventListener('productSwitch', () => init());
+
 function drpClickDay(y, m, d) {
   const clicked = new Date(y, m, d);
   if (!drpSelStart || (drpSelStart && drpSelEnd)) {
@@ -514,9 +516,11 @@ async function init() {
   const fmt = d => d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
   document.getElementById('header-sub').textContent = `${fmt(rangeStart)} — ${fmt(rangeEnd)}`;
 
+  const prodFilter = window.__activeProductFilter || null;
+  const prodQ = prodFilter ? `&product_id=eq.${prodFilter}` : '';
   const [convs, convsRange] = await Promise.all([
-    sbGet('conversations', `?user_id=eq.${userId}&select=id,status,customer_id,product_id,state,created_at,last_msg_at`),
-    sbGet('conversations', `?user_id=eq.${userId}&created_at=gte.${sinceISO}&created_at=lte.${rangeEnd.toISOString()}&select=id,status,state,created_at,last_msg_at,product_id`),
+    sbGet('conversations', `?user_id=eq.${userId}${prodQ}&select=id,status,customer_id,product_id,state,created_at,last_msg_at`),
+    sbGet('conversations', `?user_id=eq.${userId}${prodQ}&created_at=gte.${sinceISO}&created_at=lte.${rangeEnd.toISOString()}&select=id,status,state,created_at,last_msg_at,product_id`),
   ]);
 
   // Stat kalkulasi dalam range

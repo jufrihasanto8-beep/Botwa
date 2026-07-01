@@ -589,6 +589,8 @@ async function init() {
   render();
 }
 
+window.addEventListener('productSwitch', () => render());
+
 function getOrderRow(c, idx) {
   const cu      = custMap[c.customer_id] || {};
   const prod    = prodMap[c.product_id]  || {};
@@ -641,7 +643,9 @@ function getOrderRow(c, idx) {
 }
 
 function render() {
-  const list = filterByRange(allOrders);
+  const prodFilter = window.__activeProductFilter || null;
+  const filtered = prodFilter ? allOrders.filter(c => c.product_id === prodFilter) : allOrders;
+  const list = filterByRange(filtered);
   const rows = list.map((c, i) => getOrderRow(c, i));
 
   // Summary

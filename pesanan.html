@@ -228,9 +228,12 @@ async function init() {
   render();
 }
 
+window.addEventListener('productSwitch', () => render());
+
 function render() {
   const q = document.getElementById('ps-search').value.toLowerCase();
-  let list = allConvs;
+  const prodFilter = window.__activeProductFilter || null;
+  let list = prodFilter ? allConvs.filter(c => c.product_id === prodFilter) : allConvs;
 
   // Filter tab
   if (activeTab !== 'semua') {

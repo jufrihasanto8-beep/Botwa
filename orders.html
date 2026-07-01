@@ -526,8 +526,12 @@ async function init() {
   render();
 }
 
+window.addEventListener('productSwitch', () => render());
+
 function render() {
-  const list = filterByRange(allConvs);
+  const prodFilter = window.__activeProductFilter || null;
+  let filtered = prodFilter ? allConvs.filter(c => c.product_id === prodFilter) : allConvs;
+  const list = filterByRange(filtered);
   calcStats(list);
   renderCharts(list);
   renderTable(list);
