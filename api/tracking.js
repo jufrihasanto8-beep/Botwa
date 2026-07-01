@@ -432,16 +432,15 @@ async function handleCreateMengantar(req, res) {
         const al   = o.alamat || {};
         const isCOD      = (o.metode || '').toLowerCase() === 'cod';
         const qty        = o.qty || 1;
-        const hargaSatuan = o.harga || prod.harga || 0;   // utamakan harga dari orders_new (sudah resolve bundling)
-        const harga      = hargaSatuan;
-        const totalNilai = hargaSatuan * qty;             // total = harga × qty
-        const berat      = ((prod.berat_gram || 1000) / 1000); // berat per unit (kg)
+        const hargaSatuan = o.harga || prod.harga || 0;
+        const totalCOD   = o.total || (hargaSatuan * qty);
+        const totalNilai = hargaSatuan * qty;
+        const berat      = ((prod.berat_gram || 1000) / 1000);
 
-        // Lookup dest ID (cache di alamat.mengantar_dest_id)
+        // Lookup dest ID
         let destId = al.mengantar_dest_id || null;
         if (!destId) {
           destId = await lookupDestId(al);
-          // Simpan ke orders_new untuk cache
           if (destId) {
             await sbPatch('orders_new', `?id=eq.${o.id}`, {
               alamat: { ...al, mengantar_dest_id: destId }
@@ -449,32 +448,38 @@ async function handleCreateMengantar(req, res) {
           }
         }
 
-        // customerAddress = alamat jalan saja (street address untuk label kurir)
-        // Routing ke area yang benar sudah via customerAddressDataId (Mengantar dest ID)
-        // Jangan concat area (kelurahan/kab/prov) — bisa konflik kalau data area tidak sinkron dengan jalan
         const alamatStr = destId
-          ? [al.jalan, al.kodepos].filter(Boolean).join(', ')                                      // ada destId → jalan + kodepos cukup
-          : [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos].filter(Boolean).join(', '); // fallback full
+          ? [al.jalan, al.kodepos].filter(Boolean).join(', ')
+          : [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos].filter(Boolean).join(', ');
 
         const item = {
           customerName:           cu.nama || '-',
           customerPhone:          (cu.wa_number || '').replace(/^62/, '0'),
           customerAddress:        alamatStr || '-',
           parcelContent:          prod.nama || 'Produk',
-          weight:                 berat * qty,   // total weight (kg)
+          weight:                 berat * qty,
           quantity:               qty,
           dontIncludeSubdistrict: false,
           customProducts: [{
             name:   prod.nama || 'Produk',
             qty:    qty,
             price:  hargaSatuan,
-            weight: berat,        // weight per unit
+            weight: berat,
           }],
         };
 
         if (destId)   item.customerAddressDataId = destId;
-        if (isCOD)    item.COD         = totalNilai;
-        else          item.goodsValue  = totalNilai;
+        if (isCOD)    item.COD        = totalCOD;
+        else          item.goodsValue = totalNilai;
+
+        // Lengkapi orders_new dengan data flat sebelum kirim
+        await sbPatch('orders_new', `?id=eq.${o.id}`, {
+          customer_nama:    cu.nama || '-',
+          customer_phone:   (cu.wa_number || '').replace(/^62/, '0'),
+          product_nama:     prod.nama || '-',
+          berat_gram:       prod.berat_gram || 0,
+          mengantar_status: 'pending',
+        }).catch(() => {});
 
         orderItems.push({ orderId: o.id, item });
       }
@@ -501,42 +506,46 @@ async function handleCreateMengantar(req, res) {
         try { mJson = JSON.parse(mText); } catch { mJson = { success: false, message: `Non-JSON (${mResp.status}): ${mText.slice(0, 200)}` }; }
 
         if (mJson.success && Array.isArray(mJson.data)) {
-          // Update orders_new dengan cnote_no dan status dikirim
           for (let i = 0; i < mJson.data.length; i++) {
-            const mOrder = mJson.data[i];
+            const mOrder  = mJson.data[i];
             const orderId = orderItems[i]?.orderId;
-            const cnote = mOrder.cnote_no || '';
+            const cnote   = mOrder.cnote_no || '';
             if (orderId) {
               await sbPatch('orders_new', `?id=eq.${orderId}`, {
-                no_resi:    cnote,
-                ekspedisi:  kurir,
-                status:     'dikirim',
-                status_tracking: 'dikirim',
+                no_resi:          cnote,
+                ekspedisi:        kurir,
+                status:           'dikirim',
+                status_tracking:  'dikirim',
+                mengantar_status: 'sent',
+                mengantar_sent_at: new Date().toISOString(),
+                mengantar_error:  null,
               }).catch(() => {});
             }
-            results.push({
-              orderId,
-              kurir,
-              success: true,
-              cnote_no: cnote,
-              unpaid:   mOrder.unpaid || false,
-            });
+            results.push({ orderId, kurir, success: true, cnote_no: cnote, unpaid: mOrder.unpaid || false });
           }
-          // Catat errors dari Mengantar
           if (mJson.errors?.length) {
             mJson.errors.forEach(err => results.push({ kurir, success: false, error: String(err?.message || err) }));
           }
         } else {
           const errDetail = mJson.errors?.length ? ` | ${JSON.stringify(mJson.errors).slice(0, 300)}` : '';
           const errMsg = (mJson.message || mJson.error || mJson.msg || JSON.stringify(mJson).slice(0, 200)) + errDetail;
-          orderItems.forEach(x => results.push({
-            orderId: x.orderId, kurir, success: false,
-            error: String(errMsg),
-          }));
+          for (const x of orderItems) {
+            await sbPatch('orders_new', `?id=eq.${x.orderId}`, {
+              mengantar_status: 'failed',
+              mengantar_error:  String(errMsg).slice(0, 500),
+            }).catch(() => {});
+            results.push({ orderId: x.orderId, kurir, success: false, error: String(errMsg) });
+          }
         }
       } catch(e) {
         const errMsg = e?.message || e?.toString() || 'Unknown error';
-        orderItems.forEach(x => results.push({ orderId: x.orderId, kurir, success: false, error: errMsg }));
+        for (const x of orderItems) {
+          await sbPatch('orders_new', `?id=eq.${x.orderId}`, {
+            mengantar_status: 'failed',
+            mengantar_error:  String(errMsg).slice(0, 500),
+          }).catch(() => {});
+          results.push({ orderId: x.orderId, kurir, success: false, error: errMsg });
+        }
       }
     }
 
