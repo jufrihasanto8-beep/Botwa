@@ -334,12 +334,44 @@ async function getTimeId16(mngKey) {
     const json = await r.json();
     const times = json.data || json;
     if (!Array.isArray(times) || !times.length) return null;
-    // Pilih slot jam 16 (atau fallback ke slot terakhir)
-    const find = times.find(t => {
-      const label = (t.label || t.name || t.time || '').toString();
-      return label.includes('16') || label.includes('4 PM') || label.includes('16:00');
+
+    // Log semua slot untuk debug
+    console.log('[getTimeSlot] available slots:', JSON.stringify(times.map(t => ({
+      id: t._id || t.id,
+      label: t.label || t.name || t.time || t.start_time || '',
+    }))));
+
+    // Ambil waktu WIB sekarang + 2 jam (buffer aman)
+    const nowWIB = new Date(Date.now() + 7 * 3600 * 1000); // UTC+7
+    const minPickupMs = nowWIB.getTime() + 2 * 3600 * 1000; // +2 jam dari sekarang
+
+    // Coba parse slot berdasarkan jam (HH:MM atau H PM)
+    function parseSlotHour(t) {
+      const label = (t.label || t.name || t.time || t.start_time || '').toString();
+      const m24 = label.match(/(\d{1,2}):(\d{2})/);
+      if (m24) return parseInt(m24[1]);
+      const mPM = label.match(/(\d{1,2})\s*PM/i);
+      if (mPM) return parseInt(mPM[1]) + 12;
+      const mAM = label.match(/(\d{1,2})\s*AM/i);
+      if (mAM) return parseInt(mAM[1]);
+      return null;
+    }
+
+    const nowHourWIB = nowWIB.getUTCHours(); // jam WIB sekarang
+    const minHour = nowHourWIB + 2; // minimal jam sekarang + 2
+
+    // Cari slot yang jamnya >= minHour (cukup jauh dari sekarang)
+    const valid = times.filter(t => {
+      const h = parseSlotHour(t);
+      return h !== null && h >= minHour;
     });
-    return (find || times[times.length - 1])._id || (find || times[times.length - 1]).id;
+
+    // Kalau ada slot valid, ambil yang paling awal (terdekat tapi aman)
+    // Kalau tidak ada, ambil slot terakhir (paling malam)
+    const picked = valid.length ? valid[0] : times[times.length - 1];
+    const pickedId = picked._id || picked.id;
+    console.log('[getTimeSlot] picked:', JSON.stringify(picked), 'id:', pickedId);
+    return pickedId;
   } catch(e) {
     console.error('[createOrder] Gagal fetch time slots:', e.message);
     return null;
