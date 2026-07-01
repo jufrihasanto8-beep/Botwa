@@ -1788,6 +1788,11 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
               alamat:            alamatSnap,
               keluhan:           snap.keluhan      || convState.keluhan        || '',
               status:            'pending',
+              // Data flat untuk kemudahan tracking & Mengantar
+              customer_nama:     customer.nama     || '',
+              customer_phone:    (customer.wa_number || '').replace(/^62/, '0'),
+              product_nama:      product?.nama     || '',
+              berat_gram:        product?.berat_gram || 0,
             });
             console.log(`[closing] Insert orders_new OK — conv ${conversation.id}`);
           } catch(e) {
