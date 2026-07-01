@@ -625,6 +625,9 @@ function getOrderRow(c, idx) {
   // Keterangan dari catatan customer
   const keterangan = cu.catatan ? cu.catatan.split('\n')[0] : '';
 
+  const sudahDikirim = c.status === 'dikirim' || c.status === 'selesai';
+  const noResi = c.no_resi || '';
+
   return {
     id: c.id,
     customer_id: c.customer_id,
@@ -637,7 +640,7 @@ function getOrderRow(c, idx) {
     produkNama: prod.nama || '—',
     jumlah: prod.nama ? `${prod.nama} ×${qty}` : `×${qty}`,
     qty, metode, total, instruksi, keterangan, rincian, keluhan,
-    isCOD,
+    isCOD, sudahDikirim, noResi,
     _raw: c, _cu: cu
   };
 }
@@ -676,8 +679,12 @@ function renderTable(rows) {
     return;
   }
 
-  tbody.innerHTML = rows.map((r, i) => `<tr>
-    <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()"></td>
+  tbody.innerHTML = rows.map((r, i) => {
+    const resiTag = r.sudahDikirim
+      ? `<div style="margin-top:3px"><span style="font-size:10px;background:rgba(34,197,94,.12);color:#16a34a;border:1px solid rgba(34,197,94,.25);border-radius:4px;padding:1px 5px;font-weight:600">✓ Terkirim${r.noResi ? ' · ' + r.noResi : ''}</span></div>`
+      : '';
+    return `<tr style="${r.sudahDikirim ? 'opacity:.65' : ''}">
+    <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()" ${r.sudahDikirim ? 'disabled title="Sudah dikirim ke Mengantar"' : ''}></td>
     <td style="text-align:center"><button onclick="openEdit('${escH(r.id)}')" style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;color:#64748b;font-size:14px" title="Edit order">✏️</button></td>
     <td class="td-no">${fmtDt(r.tanggal)}</td>
     <td><div class="td-wrap-sm td-bold" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
@@ -692,11 +699,12 @@ function renderTable(rows) {
     <td style="text-align:center;font-weight:700">${r.qty}</td>
     <td><span class="bdg ${r.isCOD?'bdg-cod':'bdg-tf'}">${r.isCOD?'COD':'TF'}</span></td>
     <td class="td-num">${rp(r.total)}</td>
-    <td class="td-wrap-sm" style="font-size:11px">${escH(r.instruksi)}</td>
+    <td class="td-wrap-sm" style="font-size:11px">${escH(r.instruksi)}${resiTag}</td>
     <td class="td-wrap" style="font-size:11px">${escH(r.rincian)}</td>
     <td><div class="td-wrap" title="${escH(r.keluhan)}">${escH(r.keluhan)||'—'}</div></td>
     <td><div class="td-wrap" title="${escH(r.keterangan)}">${escH(r.keterangan)||'—'}</div></td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 }
 
 function toggleAll(cb) {
@@ -896,7 +904,7 @@ function openMengantar() {
 
   document.getElementById('mng-modal-body').innerHTML = `
     <div class="mng-summary">
-      <b>${mngSelectedIds.length} order</b> akan dikirim ke Mengantar dengan pickup <b>scheduledPickup jam 15:00</b>.
+      <b>${mngSelectedIds.length} order</b> akan dikirim ke Mengantar dengan pickup <b>hari ini jam 16:00</b>.
     </div>
     ${groupHtml}
   `;
