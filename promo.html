@@ -165,7 +165,7 @@ body.light .empty{color:#64748b}
 <div id="sidebar">
   <div class="sb-brand">
     <img src="img/logo-adsy.png" class="sb-logo" style="background:none;object-fit:contain;">
-    <div><div class="sb-title">Adsy CS</div><div class="sb-subtitle" id="sb-store">—</div></div>
+    <div><div class="sb-title">Adsy CS AI</div><div class="sb-subtitle">Automation CS</div></div>
   </div>
   <div class="bot-online" id="sb-bot-status"><div class="bot-dot"></div> Bot online</div>
   <div class="sb-nav">
@@ -431,7 +431,7 @@ Auth.guard();
   if (u) {
     document.getElementById('sb-av').textContent = (u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     document.getElementById('sb-name').textContent = u.name || 'Admin';
-    document.getElementById('sb-store').textContent = u.store || 'Adsy CS';
+    
   }
 })();
 

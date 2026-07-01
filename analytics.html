@@ -165,8 +165,8 @@ body.light .btn-sm:hover{border-color:#22c55e;color:#16a34a}
   <div class="sb-brand">
     <img src="img/logo-adsy.png" class="sb-logo" style="background:none;object-fit:contain;">
     <div>
-      <div class="sb-title">Adsy CS</div>
-      <div class="sb-subtitle" id="sb-store">Loading...</div>
+      <div class="sb-title">Adsy CS AI</div>
+      <div class="sb-subtitle">Automation CS</div>
     </div>
   </div>
   <div class="bot-online" id="sb-bot-status">
@@ -303,7 +303,7 @@ function toggleTheme() {
 const user = Auth.getUser();
 document.getElementById('sb-av').textContent    = initials(user?.name||'?');
 document.getElementById('sb-name').textContent  = user?.name||'Admin';
-document.getElementById('sb-store').textContent = user?.store||'Adsy CS';
+
 
 function initials(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 

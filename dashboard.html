@@ -470,8 +470,8 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
   <div class="sb-brand">
     <img src="img/logo-adsy.png" class="sb-logo" style="background:none;object-fit:contain;">
     <div>
-      <div class="sb-title">Adsy CS</div>
-      <div class="sb-subtitle" id="sb-store">Loading...</div>
+      <div class="sb-title">Adsy CS AI</div>
+      <div class="sb-subtitle">Automation CS</div>
     </div>
   </div>
   <div class="bot-online" id="sb-bot-status">
@@ -798,7 +798,7 @@ function toggleTheme() {
 const user = Auth.getUser();
 document.getElementById('sb-av').textContent   = initials(user?.name||'?');
 document.getElementById('sb-name').textContent = user?.name||'Admin';
-document.getElementById('sb-store').textContent = user?.store||'Adsy CS';
+
 updateDatetime();
 setInterval(updateDatetime, 60000);
 
