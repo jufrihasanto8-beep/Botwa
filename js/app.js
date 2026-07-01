@@ -721,8 +721,8 @@ function renderSidebar(activePage) {
     <div class="sb-brand">
       <img src="img/logo-adsy.png" class="sb-logo" style="background:none;object-fit:contain;">
       <div>
-        <div class="sb-title">Adsy CS</div>
-        <div class="sb-subtitle">${user?.store||'Adsy CS'}</div>
+        <div class="sb-title">Adsy CS AI</div>
+        <div class="sb-subtitle">Automation CS</div>
       </div>
     </div>
     <div class="bot-online" id="sb-bot-status"><div class="bot-dot"></div> Bot online</div>
