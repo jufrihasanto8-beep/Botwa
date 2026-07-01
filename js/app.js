@@ -719,7 +719,7 @@ function renderSidebar(activePage) {
 
   return `<div id="sidebar">
     <div class="sb-brand">
-      <div class="sb-logo">CS</div>
+      <img src="img/logo-adsy.png" class="sb-logo" style="background:none;object-fit:contain;">
       <div>
         <div class="sb-title">Adsy CS</div>
         <div class="sb-subtitle">${user?.store||'Adsy CS'}</div>
