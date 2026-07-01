@@ -326,7 +326,7 @@ async function lookupDestId(alamat) {
 }
 
 /* ── Fetch time slots, pilih yang jam 15:00 ─────────────────── */
-async function getTimeId15(mngKey) {
+async function getTimeId16(mngKey) {
   try {
     const r = await fetch(`https://app.mengantar.com/api/public/${mngKey}/time`, {
       headers: { 'Accept': 'application/json' },
@@ -334,10 +334,10 @@ async function getTimeId15(mngKey) {
     const json = await r.json();
     const times = json.data || json;
     if (!Array.isArray(times) || !times.length) return null;
-    // Pilih slot jam 15 (atau terdekat setelah 14:00)
+    // Pilih slot jam 16 (atau fallback ke slot terakhir)
     const find = times.find(t => {
       const label = (t.label || t.name || t.time || '').toString();
-      return label.includes('15') || label.includes('3 PM') || label.includes('15:00');
+      return label.includes('16') || label.includes('4 PM') || label.includes('16:00');
     });
     return (find || times[times.length - 1])._id || (find || times[times.length - 1]).id;
   } catch(e) {
@@ -377,8 +377,8 @@ async function handleCreateMengantar(req, res) {
 
     if (!mngKey) return res.status(400).json({ error: 'Mengantar API key belum dikonfigurasi. Isi di Settings → Mengantar.' });
 
-    // 2. Fetch time_id jam 15:00
-    const timeId = await getTimeId15(mngKey);
+    // 2. Fetch time_id jam 16:00
+    const timeId = await getTimeId16(mngKey);
 
     // 3. Group orders by kurir
     const grouped = {};
@@ -417,8 +417,12 @@ async function handleCreateMengantar(req, res) {
           }
         }
 
-        const alamatStr = [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos]
-          .filter(Boolean).join(', ');
+        // customerAddress = alamat jalan saja (street address untuk label kurir)
+        // Routing ke area yang benar sudah via customerAddressDataId (Mengantar dest ID)
+        // Jangan concat area (kelurahan/kab/prov) — bisa konflik kalau data area tidak sinkron dengan jalan
+        const alamatStr = destId
+          ? [al.jalan, al.kodepos].filter(Boolean).join(', ')                                      // ada destId → jalan + kodepos cukup
+          : [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos].filter(Boolean).join(', '); // fallback full
 
         const item = {
           customerName:           cu.nama || '-',
