@@ -239,8 +239,10 @@ const PER_PAGE = 20;
 async function init() {
   document.getElementById('tbody').innerHTML = `<tr><td colspan="5" class="empty-cell"><div class="e-icon">⏳</div><p>Memuat data...</p></td></tr>`;
 
+  const prodFilter = window.__activeProductFilter || null;
+  const prodQ = prodFilter ? `&product_id=eq.${prodFilter}` : '';
   const [convs, custs] = await Promise.all([
-    sbFetch('conversations', `?user_id=eq.${uid}&status=in.(baru,diproses,eskalasi)&select=id,customer_id,status,last_msg_at,state,created_at&order=last_msg_at.desc`),
+    sbFetch('conversations', `?user_id=eq.${uid}&status=in.(baru,diproses,eskalasi)${prodQ}&select=id,customer_id,product_id,status,last_msg_at,state,created_at&order=last_msg_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama`)
   ]);
 
@@ -415,6 +417,7 @@ function fmtDate(iso) {
 function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 init();
+window.addEventListener('productSwitch', () => init());
 </script>
 </body>
 </html>

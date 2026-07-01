@@ -215,8 +215,10 @@ function cleanPhone(raw) {
 const uid = Auth.getUser()?.id;
 
 async function init() {
+  const prodFilter = window.__activeProductFilter || null;
+  const prodQ = prodFilter ? `&product_id=eq.${prodFilter}` : '';
   const [convs, custs] = await Promise.all([
-    sbFetch('conversations', `?user_id=eq.${uid}&status=eq.eskalasi&select=id,customer_id,status,last_msg_at&order=last_msg_at.desc`),
+    sbFetch('conversations', `?user_id=eq.${uid}&status=eq.eskalasi${prodQ}&select=id,customer_id,status,last_msg_at&order=last_msg_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama`)
   ]);
 
@@ -267,6 +269,7 @@ async function init() {
 }
 
 init();
+window.addEventListener('productSwitch', () => init());
 </script>
 </body>
 </html>

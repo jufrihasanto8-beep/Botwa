@@ -219,14 +219,14 @@ async function init() {
 
   const [customers, convs] = await Promise.all([
     sbFetch('customers', `?user_id=eq.${uid}&order=created_at.desc&select=id,wa_number,nama,created_at`),
-    sbFetch('conversations', `?user_id=eq.${uid}&select=id,customer_id,status,last_msg_at&order=last_msg_at.desc`)
+    sbFetch('conversations', `?user_id=eq.${uid}&select=id,customer_id,product_id,status,last_msg_at&order=last_msg_at.desc`)
   ]);
 
   /* Build convMap: customer_id → latest conv */
   convMap = {};
   for (const c of convs) {
     if (!convMap[c.customer_id]) {
-      convMap[c.customer_id] = { convId: c.id, status: c.status, last_msg_at: c.last_msg_at, count: 0 };
+      convMap[c.customer_id] = { convId: c.id, status: c.status, last_msg_at: c.last_msg_at, product_id: c.product_id, count: 0 };
     }
     convMap[c.customer_id].count++;
   }
@@ -288,8 +288,13 @@ function setTab(tab, btn) {
 function onSearch(v) { q = v.toLowerCase().trim(); page = 1; renderTable(); }
 
 function getFiltered() {
+  const prodFilter = window.__activeProductFilter || null;
   let list = allCustomers;
-  if (currentTab === 'aktif')     list = list.filter(c => { const m=convMap[c.id]; return m&&(m.status==='baru'||m.status==='diproses'); });
+  if (prodFilter) {
+    const prodCustIds = new Set(Object.entries(convMap).filter(([,m]) => m.product_id === prodFilter).map(([id]) => id));
+    list = list.filter(c => prodCustIds.has(c.id));
+  }
+  if (currentTab === 'aktif')    list = list.filter(c => { const m=convMap[c.id]; return m&&(m.status==='baru'||m.status==='diproses'); });
   if (currentTab === 'eskalasi') list = list.filter(c => convMap[c.id]?.status==='eskalasi');
   if (q) list = list.filter(c => (c.nama||'').toLowerCase().includes(q) || (c.wa_number||'').includes(q));
   return list;
@@ -393,6 +398,7 @@ function escH(s) {
 }
 
 init();
+window.addEventListener('productSwitch', () => { page = 1; renderTable(); });
 </script>
 </body>
 </html>
