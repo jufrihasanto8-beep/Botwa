@@ -1485,7 +1485,17 @@ async function clearChat() {
 async function checkWA() {
   const sbBot = document.getElementById('sb-bot-status');
   try {
-    const res    = await fetch(`${PROXY}?path=${encodeURIComponent('/session/status/'+userId)}`);
+    // Gunakan wa_session_id dari produk aktif (multi-WA), fallback ke userId
+    let sessionId = userId;
+    const prodFilter = window.__activeProductFilter;
+    if (prodFilter) {
+      const prods = await sbGet('products', `?id=eq.${prodFilter}&select=wa_session_id&limit=1`).catch(() => []);
+      sessionId = prods[0]?.wa_session_id || userId;
+    } else {
+      const prods = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&select=wa_session_id&order=created_at.asc&limit=1`).catch(() => []);
+      sessionId = prods[0]?.wa_session_id || userId;
+    }
+    const res    = await fetch(`${PROXY}?path=${encodeURIComponent('/session/status/'+sessionId)}`);
     const status = await res.json();
     if (status.status === 'connected') {
       sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
