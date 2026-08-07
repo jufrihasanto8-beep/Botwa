@@ -867,7 +867,12 @@ function timeStr(ts) {
 
 /* ── LOAD STATS ── */
 async function loadStats() {
-  const convs = await sbGet('conversations', `?user_id=eq.${userId}`);
+  let convs = await sbGet('conversations', `?user_id=eq.${userId}`);
+
+  // Filter per produk aktif (ikut product switcher)
+  const prodFilter = window.__activeProductFilter;
+  if (prodFilter) convs = convs.filter(c => c.product_id === prodFilter);
+
   const open      = convs.filter(c => c.status !== 'selesai').length;
   const esc       = convs.filter(c => c.status === 'eskalasi').length;
   const selesai   = convs.filter(c => c.status === 'selesai').length;
@@ -906,8 +911,11 @@ async function loadStats() {
 
 /* ── RENDER INBOX ── */
 // Product switcher dihandle oleh js/prod-switcher.js (shared)
-// Dengarkan event productSwitch untuk re-render inbox
-window.addEventListener('productSwitch', () => renderInbox());
+// Dengarkan event productSwitch untuk re-render inbox + stats
+window.addEventListener('productSwitch', () => {
+  renderInbox();
+  loadStats().catch(() => {});
+});
 
 async function renderInbox() {
   let convs = await sbGet('conversations',
