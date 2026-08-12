@@ -3345,9 +3345,11 @@ ${ongkirInfo}`;
     }
 
     // ── Auto-kirim foto testimoni kalau customer minta bukti/review ────
-    const tanyaTestimoni = /\b(testimoni|testi|bukti|review|hasil|nyata|beneran|real|ada yang sudah|yang udah pakai|yang sudah pakai|ada hasilnya|ada fotonya|foto hasilnya|foto buktinya|sebelum sesudah|before after|ada reviewnya|ada buktiny)\b/i.test(message);
+    const tanyaTestimoni = /testimoni|ada bukti|foto bukti|ada review|ada hasil|ada yang sudah pakai|yang udah pakai|sebelum sesudah|before after|hasil nyata|ada yang berhasil|ada yang cocok/i.test(message);
     const testiList = Array.isArray(product?.testimoni_urls) ? product.testimoni_urls.filter(Boolean) : [];
     const sudahKirimTesti = convState.testimoni_terkirim;
+
+    console.log(`[TESTI] tanya=${tanyaTestimoni} jumlahFoto=${testiList.length} sudahKirim=${sudahKirimTesti}`);
 
     if (tanyaTestimoni && testiList.length > 0 && !sudahKirimTesti) {
       await new Promise(r => setTimeout(r, 800));
