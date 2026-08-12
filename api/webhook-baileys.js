@@ -288,6 +288,7 @@ Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
 Foto produk     : ${product?.gambar_url ? 'TERSEDIA. Kalau customer minta foto → CUKUP balas "Ini fotonya kak 😊" atau "Siap kak, ini ya!" lalu lanjut tanya keluhan. Foto PASTI terkirim otomatis bersamaan. ⛔ DILARANG: bilang kendala/error/teknis, suruh cek Google, bilang tidak bisa kirim, minta maaf soal foto, atau alasan apapun. Cukup balas singkat dan natural.' : 'Tidak ada — kalau ditanya foto, bilang "Belum ada fotonya kak, tapi bisa aku deskripsikan ya" lalu jelaskan produknya.'}
+Foto testimoni  : ${Array.isArray(product?.testimoni_urls) && product.testimoni_urls.filter(Boolean).length ? `TERSEDIA (${product.testimoni_urls.filter(Boolean).length} foto). Kalau customer minta testimoni/bukti/review/hasil → CUKUP balas "Ada kak, ini ya 😊" atau "Nih testimoninyaa kak!" lalu lanjut. Foto PASTI terkirim otomatis. ⛔ DILARANG: bilang tidak ada bukti, minta maaf, bilang tidak bisa kirim.` : 'Tidak ada — kalau ditanya testimoni, pakai testimonial dari product knowledge kalau ada, atau bilang "Banyak kak yang udah merasakan manfaatnya, nanti aku ceritain ya 😊"'}
 Stok            : Selalu ada (jangan bilang "cek dulu", langsung proses)
 
 ALUR KONSULTASI (WAJIB ikuti urutan, JANGAN loncat)
@@ -3340,6 +3341,26 @@ ${ongkirInfo}`;
         console.log(`[FOTO] Gambar terkirim: ${product.gambar_url}`);
       } catch(e) {
         console.error(`[FOTO] Gagal kirim gambar:`, e.message);
+      }
+    }
+
+    // ── Auto-kirim foto testimoni kalau customer minta bukti/review ────
+    const tanyaTestimoni = /\b(testimoni|testi|bukti|review|hasil|nyata|beneran|real|ada yang sudah|yang udah pakai|yang sudah pakai|ada hasilnya|ada fotonya|foto hasilnya|foto buktinya|sebelum sesudah|before after|ada reviewnya|ada buktiny)\b/i.test(message);
+    const testiList = Array.isArray(product?.testimoni_urls) ? product.testimoni_urls.filter(Boolean) : [];
+    const sudahKirimTesti = convState.testimoni_terkirim;
+
+    if (tanyaTestimoni && testiList.length > 0 && !sudahKirimTesti) {
+      await new Promise(r => setTimeout(r, 800));
+      try {
+        for (let i = 0; i < testiList.length; i++) {
+          if (i > 0) await new Promise(r => setTimeout(r, 500));
+          const caption = i === 0 ? `Ini testimoni dari customer kami kak 😊` : null;
+          await sendWA(waSession, reply_jid, null, false, testiList[i], caption);
+        }
+        await updateConvState(conversation.id, { testimoni_terkirim: true });
+        console.log(`[TESTI] ${testiList.length} foto testimoni terkirim`);
+      } catch(e) {
+        console.error(`[TESTI] Gagal kirim testimoni:`, e.message);
       }
     }
 
