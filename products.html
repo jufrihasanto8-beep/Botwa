@@ -479,6 +479,13 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <input type="file" id="f-gambar-file" accept="image/*" style="display:none" onchange="handleProdPhoto(this)">
         </div>
         <div class="form-group">
+          <label>Foto Testimoni <span style="font-size:11px;color:#64748b;font-weight:400">(max 5 foto — dikirim otomatis saat customer minta bukti/review)</span></label>
+          <div id="testi-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+          <button type="button" id="testi-add-btn" onclick="document.getElementById('f-testi-file').click()"
+            style="padding:6px 14px;border:1px dashed rgba(255,255,255,.15);background:none;color:#a5b4fc;border-radius:6px;font-size:12px;cursor:pointer">+ Tambah Foto</button>
+          <input type="file" id="f-testi-file" accept="image/*" style="display:none" onchange="handleTestiUpload(this)">
+        </div>
+        <div class="form-group">
           <label>Product Knowledge (info lengkap untuk AI)</label>
           <textarea id="f-knowledge" rows="5" placeholder="Kandungan, manfaat, testimoni, dll..."></textarea>
         </div>
@@ -988,6 +995,7 @@ function openAdd() {
   document.getElementById('f-promo-jawa').value = '';
   document.getElementById('f-promo-luar').value = '';
   removeProdPhoto();
+  loadTestiGrid([]);
   renderTags('keluhan'); renderTags('diagnosa');
   renderMappingList();
   togglePromoNilai();
@@ -1019,6 +1027,8 @@ async function openEdit(id) {
     document.getElementById('prod-photo-name').textContent = 'Foto tersimpan';
     document.getElementById('prod-remove-photo').style.display = 'inline-block';
   } else { removeProdPhoto(); }
+  // Load foto testimoni
+  loadTestiGrid(Array.isArray(p.testimoni_urls) ? p.testimoni_urls : []);
   const promo = p.promo_ongkir || {};
   document.getElementById('f-promo-tipe').value = promo.tipe || 'none';
   document.getElementById('f-promo-nilai').value = promo.nilai || '';
@@ -1155,6 +1165,7 @@ async function saveProduk() {
     cara_pakai: document.getElementById('f-cara-pakai').value.trim(),
     asal_pengiriman: document.getElementById('f-asal-pengiriman').value.trim(),
     gambar_url: document.getElementById('f-gambar-url').value || null,
+    testimoni_urls: getTestiUrls(),
     product_knowledge: document.getElementById('f-knowledge').value.trim(),
     keluhan_cocok: tagsData.keluhan,
     pertanyaan_diagnosa: tagsData.diagnosa,
@@ -1326,6 +1337,60 @@ function removeProdPhoto() {
   document.getElementById('prod-photo-name').textContent = 'Belum ada foto • maks 5MB';
   document.getElementById('prod-photo-thumb').innerHTML = '📷';
   document.getElementById('prod-remove-photo').style.display = 'none';
+}
+
+/* ── Testimoni multi-foto ── */
+let testiUrls = [];
+
+function loadTestiGrid(urls) {
+  testiUrls = urls.filter(Boolean);
+  renderTestiGrid();
+}
+
+function getTestiUrls() { return testiUrls.filter(Boolean); }
+
+function renderTestiGrid() {
+  const grid = document.getElementById('testi-grid');
+  const btn  = document.getElementById('testi-add-btn');
+  if (!grid) return;
+  grid.innerHTML = testiUrls.map((url, i) => `
+    <div style="position:relative;width:64px;height:64px">
+      <img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,.1)">
+      <button type="button" onclick="removeTestiFoto(${i})"
+        style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#ef4444;border:none;color:#fff;font-size:10px;line-height:18px;text-align:center;cursor:pointer;padding:0">✕</button>
+    </div>`).join('');
+  if (btn) btn.style.display = testiUrls.length >= 5 ? 'none' : 'inline-block';
+}
+
+function removeTestiFoto(idx) {
+  testiUrls.splice(idx, 1);
+  renderTestiGrid();
+}
+
+async function handleTestiUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('❌ Foto maksimal 5MB'); input.value=''; return; }
+  if (testiUrls.length >= 5) { toast('❌ Maksimal 5 foto testimoni'); input.value=''; return; }
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const path = `${currentUserId}/testi_${Date.now()}.${ext}`;
+  toast('⏳ Mengupload testimoni...');
+  try {
+    const res = await fetch(`${SB_URL}/storage/v1/object/followup-media/${path}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': file.type },
+      body: file,
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(res.status + ' - ' + (JSON.parse(errText)?.error || errText));
+    }
+    const url = `${SB_URL}/storage/v1/object/public/followup-media/${path}`;
+    testiUrls.push(url);
+    renderTestiGrid();
+    toast('✅ Testimoni berhasil diupload');
+  } catch(e) { toast('❌ ' + e.message); }
+  input.value = '';
 }
 
 async function handleSOPPhoto(input) {
