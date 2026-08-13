@@ -268,6 +268,7 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   } else {
     const c = await sbPost('conversations', {
       user_id: userId, customer_id: customerId || null,
+      product_id: matchedProd?.id || prodRows[0]?.id || null,
       sumber: 'form', status: 'baru', prioritas: 'high',
       state: convState,
     });
