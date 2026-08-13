@@ -244,6 +244,18 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
     customerId = c[0]?.id;
   }
 
+  // ── Cari produk yang cocok & wa_session_id ──────────────
+  // Harus sebelum conversation upsert karena product_id dibutuhkan saat insert conv baru
+  const prodRows = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id`).catch(() => []);
+  let matchedProd = null;
+  if (produk && prodRows.length) {
+    const produkLower = produk.toLowerCase();
+    matchedProd = prodRows.find(p => p.nama && p.nama.toLowerCase().includes(produkLower))
+               || prodRows.find(p => produkLower.includes(p.nama?.toLowerCase()));
+  }
+  const waSession = matchedProd?.wa_session_id || prodRows[0]?.wa_session_id || userId;
+  console.log('[gmail] waSession:', waSession, '| produk email:', produk, '| matched:', matchedProd?.nama || 'none');
+
   // ── Upsert conversation ──────────────────────────────────
   const existingConv = customerId ? await sbGet('conversations',
     `?user_id=eq.${userId}&customer_id=eq.${customerId}&order=created_at.desc&limit=1`
@@ -288,17 +300,6 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   const produkTxt    = produk ? ` untuk *${produk}*` : '';
   const defaultPesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
   const pesan        = tmpl ? renderTemplate(tmpl, { nama, produk, alamat, hp }) : defaultPesan;
-
-  // Cari wa_session_id berdasarkan nama produk dari email → fallback ke produk pertama aktif
-  const prodRows = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id`).catch(() => []);
-  let matchedProd = null;
-  if (produk && prodRows.length) {
-    const produkLower = produk.toLowerCase();
-    matchedProd = prodRows.find(p => p.nama && p.nama.toLowerCase().includes(produkLower))
-               || prodRows.find(p => produkLower.includes(p.nama?.toLowerCase()));
-  }
-  const waSession = matchedProd?.wa_session_id || prodRows[0]?.wa_session_id || userId;
-  console.log('[gmail] waSession:', waSession, '| produk email:', produk, '| matched:', matchedProd?.nama || 'none');
 
   const br = await fetch(`${BAILEYS_URL}/send`, {
     method: 'POST',
