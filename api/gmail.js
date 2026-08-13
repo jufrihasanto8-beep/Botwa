@@ -81,7 +81,7 @@ async function getAccessToken(refreshToken) {
 
 // ── Gmail API helpers ─────────────────────────────────────
 async function searchEmails(accessToken) {
-  const q = encodeURIComponent('from:support@orderonline.id is:unread');
+  const q = encodeURIComponent('from:support@orderonline.id is:unread in:anywhere');
   const r = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=10`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -122,16 +122,24 @@ function extractBody(payload) {
 function parseOrderEmail(body) {
   const namaMatch   = body.match(/Nama[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([^<\n]+)/i)
                    || body.match(/Nama[^:]*:\s*([^\n<]+)/i);
-  const hpMatch     = body.match(/No\.?\s*Telepon[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([+\d\s]+)/i)
-                   || body.match(/No\.?\s*(?:Telepon|HP)[^:]*:\s*([+\d][\d\s\-]{7,})/i);
+
+  // HP: tangkap semua variasi label (No. Telepon, Telepon, HP, WA, WhatsApp, Phone, Handphone, Nomor)
+  const hpMatch     = body.match(/(?:No\.?\s*)?(?:Telepon|HP|WA|WhatsApp|Phone|Handphone|Nomor\s*(?:WA|HP|Telepon)?)[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([+\d][\d\s\-()]{7,})/i)
+                   || body.match(/(?:No\.?\s*)?(?:Telepon|HP|WA|WhatsApp|Phone|Handphone|Nomor\s*(?:WA|HP|Telepon)?)[^:]*:\s*([+\d][\d\s\-()]{7,})/i)
+                   // fallback: cari pola nomor Indonesia di mana saja (08xx/628xx/+628xx, min 10 digit)
+                   || body.match(/(?<!\d)((?:\+?62|0)[8]\d{8,11})(?!\d)/);
+
   const alamatMatch = body.match(/Alamat[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([^<\n]+)/i)
                    || body.match(/Alamat[^:]*:\s*([^\n<]+)/i);
   const produkMatch = body.match(/<td[^>]*>\s*([A-Za-z][^<]{3,80}?)\s*<\/td>\s*(?:<[^>]+>)*\s*Rp/i)
                    || body.match(/([A-Za-z][^\n<]{3,60}?)\s+Rp[\d.,]+/i);
   const orderIdMatch = body.match(/Order\s*ID[^:]*:\s*(\d+)/i);
+
+  const hp = (hpMatch?.[hpMatch.length - 1] || '').replace(/[\s\-()]/g, '').trim();
+
   return {
     nama:    (namaMatch?.[namaMatch.length - 1]   || '').trim(),
-    hp:      (hpMatch?.[hpMatch.length - 1]       || '').replace(/[\s\-]/g, '').trim(),
+    hp,
     alamat:  (alamatMatch?.[alamatMatch.length - 1]|| '').replace(/,\s*-\s*/g, ', ').trim(),
     produk:  (produkMatch?.[1]                    || '').trim(),
     orderId: (orderIdMatch?.[1]                   || '').trim(),
@@ -280,9 +288,16 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   const defaultPesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
   const pesan        = tmpl ? renderTemplate(tmpl, { nama, produk, alamat, hp }) : defaultPesan;
 
-  // Ambil wa_session_id dari produk pertama aktif user (gmail tidak tahu produk spesifik)
-  const prodRows = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []);
-  const waSession = prodRows[0]?.wa_session_id || userId;
+  // Cari wa_session_id berdasarkan nama produk dari email → fallback ke produk pertama aktif
+  const prodRows = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id`).catch(() => []);
+  let matchedProd = null;
+  if (produk && prodRows.length) {
+    const produkLower = produk.toLowerCase();
+    matchedProd = prodRows.find(p => p.nama && p.nama.toLowerCase().includes(produkLower))
+               || prodRows.find(p => produkLower.includes(p.nama?.toLowerCase()));
+  }
+  const waSession = matchedProd?.wa_session_id || prodRows[0]?.wa_session_id || userId;
+  console.log('[gmail] waSession:', waSession, '| produk email:', produk, '| matched:', matchedProd?.nama || 'none');
 
   const br = await fetch(`${BAILEYS_URL}/send`, {
     method: 'POST',
@@ -436,7 +451,11 @@ module.exports = async function handler(req, res) {
               if (!emailBody) { await markAsRead(token, msg.id); continue; }
 
               const orderData = parseOrderEmail(emailBody);
-              if (!orderData.hp) { await markAsRead(token, msg.id); continue; }
+              if (!orderData.hp) {
+                console.warn('[gmail] HP tidak ditemukan di email', msg.id, '— snippet:', emailBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300));
+                await markAsRead(token, msg.id);
+                continue;
+              }
 
               const leadResult = await processLead(user.id, orderData);
               await markAsRead(token, msg.id);
