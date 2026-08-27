@@ -137,10 +137,15 @@ function parseOrderEmail(body) {
 
   const hp = (hpMatch?.[hpMatch.length - 1] || '').replace(/[\s\-()]/g, '').trim();
 
+  // Validasi: buang alamat kalau isinya cuma tanggal/waktu (regex greedy ambil field salah)
+  const DATE_PATTERN = /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}(\s+\d{1,2}:\d{2})?$/;
+  const rawAlamat = (alamatMatch?.[alamatMatch.length - 1] || '').replace(/,\s*-\s*/g, ', ').trim();
+  const alamat    = DATE_PATTERN.test(rawAlamat) ? '' : rawAlamat;
+
   return {
     nama:    (namaMatch?.[namaMatch.length - 1]   || '').trim(),
     hp,
-    alamat:  (alamatMatch?.[alamatMatch.length - 1]|| '').replace(/,\s*-\s*/g, ', ').trim(),
+    alamat,
     produk:  (produkMatch?.[1]                    || '').trim(),
     orderId: (orderIdMatch?.[1]                   || '').trim(),
   };
