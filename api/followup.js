@@ -236,9 +236,11 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, 
     : `[Follow-up Hari ${hariIni} - ${tipe}] ${message}`;
   await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: isiLog });
 
-  // Update state: tandai hari ini sudah terkirim
-  const followedDays = state.followed_up_days || [];
+  // Update state: tandai hari ini sudah terkirim (per schedule ID untuk support multi-jadwal 1 hari)
+  const followedDays    = state.followed_up_days || [];
+  const followedSchedIds = state.followed_up_sched_ids || [];
   if (!followedDays.includes(hariIni)) followedDays.push(hariIni);
+  if (schedule?.id && !followedSchedIds.includes(schedule.id)) followedSchedIds.push(schedule.id);
 
   await sbPatch('conversations', `?id=eq.${conv.id}`, {
     last_msg_at: now.toISOString(),
@@ -246,6 +248,7 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, 
       ...state,
       followed_up: true,
       followed_up_days: followedDays,
+      followed_up_sched_ids: followedSchedIds,
       followed_up_at: now.toISOString(),
     },
   });
@@ -520,11 +523,16 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
 
         for (const conv of convs) {
           try {
-            const state       = conv.state || {};
-            const followedDays = state.followed_up_days || [];
+            const state            = conv.state || {};
+            const followedSchedIds = state.followed_up_sched_ids || [];
+            const followedDays     = state.followed_up_days || [];
 
-            // Skip jika hari ini sudah terkirim, eskalasi, atau sedang menunggu konfirmasi order
-            if (followedDays.includes(hariKe)) { totalSkipped++; continue; }
+            // Skip jika schedule ini sudah terkirim (cek per sched ID untuk support multi-jadwal 1 hari)
+            // Fallback: kalau sched belum punya ID (data lama), cek by hari
+            const sudahTerkirim = sched.id
+              ? followedSchedIds.includes(sched.id)
+              : followedDays.includes(hariKe);
+            if (sudahTerkirim)                 { totalSkipped++; continue; }
             if (conv.status === 'eskalasi')    { totalSkipped++; continue; }
             if (state.awaiting_order_confirm || state.awaiting_order_correction) { totalSkipped++; continue; }
 
