@@ -203,21 +203,26 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, 
 
   } else if (tipe === 'testimoni') {
     imageUrl = schedule.image_url || null;
-    caption  = schedule.pesan_custom || `Ini testimoni dari customer kami kak ${namaKak} 😊 Banyak yang sudah merasakan manfaatnya!`;
+    const defaultTesti = `Ini testimoni dari customer kami kak ${namaKak} 😊 Banyak yang sudah merasakan manfaatnya!`;
+    caption  = (schedule.pesan_custom || defaultTesti).replace('{nama}', namaKak || 'Kak');
     if (!imageUrl) message = caption; // fallback teks kalau tidak ada gambar
 
   } else if (tipe === 'promo') {
     imageUrl = schedule.image_url || null;
-    caption  = schedule.pesan_custom || `Ada promo spesial hari ini kak ${namaKak}! 🎉 Jangan sampai kelewatan ya`;
+    const defaultPromo = `Ada promo spesial hari ini kak ${namaKak}! 🎉 Jangan sampai kelewatan ya`;
+    caption  = (schedule.pesan_custom || defaultPromo).replace('{nama}', namaKak || 'Kak');
     if (!imageUrl) message = caption; // fallback teks kalau tidak ada gambar
 
   } else if (tipe === 'custom') {
-    message  = schedule.pesan_custom
-      ? schedule.pesan_custom.replace('{nama}', namaKak || 'Kak')
-      : `Halo kak ${namaKak}! Ada yang bisa aku bantu? 😊`;
+    const rawPesan = schedule.pesan_custom || `Halo kak ${namaKak}! Ada yang bisa aku bantu? 😊`;
+    const pesanFinal = rawPesan.replace('{nama}', namaKak || 'Kak');
     imageUrl = schedule.image_url || null;
-    caption  = imageUrl ? (schedule.pesan_custom || '') : null;
-    if (imageUrl) message = null; // kalau ada gambar, teks masuk ke caption
+    if (imageUrl) {
+      caption = pesanFinal;
+      message = null; // teks masuk ke caption
+    } else {
+      message = pesanFinal;
+    }
   }
 
   // Kirim (pakai wa_session_id produk, fallback ke user_id)
