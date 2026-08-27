@@ -758,39 +758,56 @@ function renderLeads() {
    TAB 3: LOG
 ══════════════════════════════════ */
 async function loadLog() {
-  // Query conv_messages yang isinya dimulai dengan [Follow-up
-  // %25 = URL-encoded % untuk LIKE wildcard
-  const logs = await sbGet('conv_messages',
-    `?isi=like.%5BFollow-up%25&order=created_at.desc&limit=50` +
-    `&select=isi,created_at,conversation_id,conversations(customer_id,customers(wa_number,nama))`
-  );
-
   const tbody = document.getElementById('log-tbody');
   const empty = document.getElementById('log-empty');
 
-  const data = Array.isArray(logs) ? logs : [];
-  if (!data.length) { tbody.innerHTML=''; empty.style.display=''; return; }
-  empty.style.display = 'none';
+  try {
+    // Step 1: ambil pesan follow-up terbaru
+    const logs = await sbGet('conv_messages',
+      `?isi=like.%5BFollow-up%25&order=created_at.desc&limit=50` +
+      `&select=isi,created_at,conversation_id`
+    );
+    const data = Array.isArray(logs) ? logs : [];
+    if (!data.length) { tbody.innerHTML=''; empty.style.display=''; return; }
 
-  tbody.innerHTML = data.map(log => {
-    const cust   = log.conversations?.customers || {};
-    const isi    = log.isi || '';
-    // Parse tipe dari format: [Follow-up Hari N - tipe] pesan
-    const m = isi.match(/\[Follow-up Hari (\d+) - (\w+)\](.*)/);
-    const hari  = m ? m[1] : '?';
-    const tipe  = m ? m[2] : '?';
-    const pesan = m ? m[3].trim() : isi;
+    // Step 2: ambil conversation + customer untuk conv IDs unik
+    const convIds = [...new Set(data.map(l => l.conversation_id).filter(Boolean))];
+    let convMap = {};
+    if (convIds.length) {
+      const convs = await sbGet('conversations',
+        `?id=in.(${convIds.join(',')})&select=id,customer_id,customers(wa_number,nama)`
+      );
+      if (Array.isArray(convs)) {
+        convs.forEach(c => { convMap[c.id] = c; });
+      }
+    }
 
-    return `<tr>
-      <td>
-        <div style="font-weight:600;color:#f1f5f9">${escHtml(cust.nama||'?')}</div>
-        <div style="font-size:12px;color:#64748b">${cust.wa_number||''}</div>
-      </td>
-      <td>${tipeBadge(tipe)} <span style="color:#64748b;font-size:12px">H${hari}</span></td>
-      <td style="color:#94a3b8;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(pesan||'-')}</td>
-      <td style="color:#64748b;white-space:nowrap">${dateStr(log.created_at)}</td>
-    </tr>`;
-  }).join('');
+    empty.style.display = 'none';
+    tbody.innerHTML = data.map(log => {
+      const conv  = convMap[log.conversation_id] || {};
+      const cust  = conv.customers || {};
+      const isi   = log.isi || '';
+      const m = isi.match(/\[Follow-up Hari (\d+) - (\w+)\](.*)/);
+      const hari  = m ? m[1] : '?';
+      const tipe  = m ? m[2] : '?';
+      const pesan = m ? m[3].trim() : isi;
+
+      return `<tr>
+        <td>
+          <div style="font-weight:600;color:#f1f5f9">${escHtml(cust.nama||'?')}</div>
+          <div style="font-size:12px;color:#64748b">${cust.wa_number||''}</div>
+        </td>
+        <td>${tipeBadge(tipe)} <span style="color:#64748b;font-size:12px">H${hari}</span></td>
+        <td style="color:#94a3b8;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(pesan||'-')}</td>
+        <td style="color:#64748b;white-space:nowrap">${dateStr(log.created_at)}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '';
+    empty.style.display = '';
+    console.error('loadLog error:', e);
+    toast('Gagal load log: ' + e.message, 'error');
+  }
 }
 
 /* ══════════════════════════════════
