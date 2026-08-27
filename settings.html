@@ -205,9 +205,7 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
 .gi-sub{color:#64748b}
 body.light .gi-title{color:#0f172a}
 body.light .gi-sub{color:#64748b}
-body.light #gmail-status-card{background:#fff!important;border-color:#e2e8f0!important}
-body.light #template-form-lead{background:#fff!important;border-color:#e2e8f0!important;color:#0f172a!important}
-body.light #template-form-lead::placeholder{color:#94a3b8!important}
+
 body.light .gmail-template-card{background:#fff!important;border-color:#e2e8f0!important}
 body.light .gmail-template-card .gi-title{color:#0f172a}
 body.light .gmail-template-card .gi-sub{color:#64748b}
@@ -439,48 +437,20 @@ Bisa isi lebih dari satu rekening."></textarea>
         <p class="hint" style="margin-top:4px">💡 Kalau semua dimatikan, sistem pilih kurir termurah secara otomatis dari Mengantar.</p>
       </div>
 
-      <!-- ── Gmail Integration ── -->
+      <!-- ── Gmail Integration (per produk) ── -->
       <div class="settings-section" id="sec-gmail">
         <div class="section-title">Integrasi Gmail</div>
-        <div class="section-desc">Hubungkan Gmail untuk menerima order dari orderonline.id secara otomatis. Bot akan langsung kirim WA ke customer tanpa perlu klik manual.</div>
+        <div class="section-desc">Setiap produk bisa punya Gmail sendiri untuk auto follow-up order dari orderonline.id. Hubungkan satu per satu sesuai produknya.</div>
 
-        <div id="gmail-status-card" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:16px">
-          <div style="color:#64748b;font-size:13px">Memuat status...</div>
+        <div id="gmail-products-list" style="margin-top:16px">
+          <div style="text-align:center;padding:24px;color:#64748b">Memuat produk...</div>
         </div>
 
         <div class="gmail-info-box" style="margin-top:16px;padding:14px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:10px">
           <div style="font-size:12px;color:#93c5fd;font-weight:600;margin-bottom:6px">ℹ️ Cara kerja</div>
           <div style="font-size:12px;color:#94a3b8;line-height:1.6">
-            Setelah hubungkan Gmail, sistem otomatis cek email baru dari orderonline.id setiap 5 menit.
-            Saat ada pesanan masuk, bot langsung kirim WA ke customer — tanpa perlu klik apapun.
-          </div>
-        </div>
-
-        <!-- Template Pesan -->
-        <div class="gmail-template-card" style="margin-top:24px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px">
-          <div class="gi-title" style="font-weight:600;font-size:14px;margin-bottom:4px">Template Pesan WA</div>
-          <div class="gi-sub" style="font-size:12px;margin-bottom:14px">Pesan pertama yang dikirim ke customer saat ada order masuk.</div>
-
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-            <span class="gi-sub" style="font-size:11px;align-self:center">Variabel:</span>
-            <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:3px 8px;border-radius:6px;color:#a5b4fc;font-size:12px;cursor:pointer" onclick="insertVar('{nama}')">{nama}</code>
-            <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:3px 8px;border-radius:6px;color:#a5b4fc;font-size:12px;cursor:pointer" onclick="insertVar('{produk}')">{produk}</code>
-            <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:3px 8px;border-radius:6px;color:#a5b4fc;font-size:12px;cursor:pointer" onclick="insertVar('{alamat}')">{alamat}</code>
-            <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:3px 8px;border-radius:6px;color:#a5b4fc;font-size:12px;cursor:pointer" onclick="insertVar('{wa}')">{wa}</code>
-          </div>
-
-          <textarea id="template-form-lead" rows="6"
-            placeholder="Halo {nama} 👋&#10;&#10;Terima kasih sudah order {produk}! 🙏&#10;Kami segera proses pesanan kakak ya."
-            style="width:100%;background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;line-height:1.7;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
-
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
-            <div>
-              <div class="gi-sub" style="font-size:11px">💡 Klik variabel di atas untuk menyisipkan. Kosongkan = pakai template default.</div>
-              <div id="template-save-status" style="font-size:11px;margin-top:4px;color:#64748b"></div>
-            </div>
-            <button id="btn-save-template" onclick="saveTemplateFormLead()" style="padding:8px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .3s">
-              Simpan Template
-            </button>
+            Setelah hubungkan Gmail di tiap produk, sistem otomatis cek email baru dari orderonline.id setiap 5 menit.
+            Saat ada pesanan masuk, bot langsung kirim WA ke customer sesuai nomor WA produk tersebut.
           </div>
         </div>
       </div>
@@ -830,147 +800,131 @@ window.showSection = function(name, el) {
   if (name === 'kurir') loadKurir();
   if (name === 'rekening') loadRekening();
   if (name === 'ai') loadAnthropicKey();
-  if (name === 'gmail') { loadGmailStatus(); loadTemplateFormLead(); }
+  if (name === 'gmail') { loadGmailStatus(); }
   if (name === 'group') loadGroupJid();
   if (name === 'mengantar') loadMengantarSettings();
 };
 
-/* ── GMAIL INTEGRATION ── */
-function insertVar(v) {
-  const ta  = document.getElementById('template-form-lead');
+/* ── GMAIL INTEGRATION (per produk) ── */
+
+const GMAIL_COLORS  = ['#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#10b981'];
+const gmailInitials = n => (n||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+
+async function loadGmailStatus() {
+  const userId = Auth.getUser()?.id;
+  const list   = document.getElementById('gmail-products-list');
+  if (!list) return;
+
+  let prods = [];
+  try {
+    const r = await fetch(
+      `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,gmail_email,gmail_last_checked,template_form_lead`,
+      { headers: { 'apikey': window.SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY } }
+    );
+    if (r.ok) prods = await r.json();
+  } catch(e) {}
+
+  if (!prods.length) {
+    list.innerHTML = '<div style="color:#64748b;font-size:13px;padding:16px 0">Tidak ada produk aktif.</div>';
+    return;
+  }
+
+  list.innerHTML = prods.map((p, i) => {
+    const color     = GMAIL_COLORS[i % GMAIL_COLORS.length];
+    const isConn    = !!p.gmail_email;
+    const lastCheck = p.gmail_last_checked
+      ? new Date(p.gmail_last_checked).toLocaleString('id-ID') : 'Belum pernah';
+    const tmplVal    = (p.template_form_lead || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const tmplStatus = p.template_form_lead ? '✓ Template aktif' : 'Menggunakan template default';
+
+    return `<div style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:44px;height:44px;border-radius:10px;background:${color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0">${gmailInitials(p.nama)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px;color:#f1f5f9">${p.nama}</div>
+          ${isConn
+            ? `<div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                 <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span>
+                 <span style="font-size:12px;color:#94a3b8">${p.gmail_email}</span>
+               </div>
+               <div style="font-size:11px;color:#64748b;margin-top:2px">Terakhir cek: ${lastCheck}</div>`
+            : `<div style="font-size:12px;color:#64748b;margin-top:3px">Gmail belum terhubung</div>`
+          }
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          ${isConn
+            ? `<button class="btn-danger btn-sm" onclick="disconnectGmail('${p.id}')">Putus</button>`
+            : `<button class="btn-primary" style="font-size:12px;padding:6px 12px" onclick="connectGmail('${p.id}')">+ Hubungkan Gmail</button>`
+          }
+        </div>
+      </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">
+        <div style="font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:8px">Template Pesan WA</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <span style="font-size:11px;color:#64748b;align-self:center">Variabel:</span>
+          <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer" onclick="insertVarGmail('${p.id}','{nama}')">{nama}</code>
+          <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer" onclick="insertVarGmail('${p.id}','{produk}')">{produk}</code>
+          <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer" onclick="insertVarGmail('${p.id}','{alamat}')">{alamat}</code>
+          <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer" onclick="insertVarGmail('${p.id}','{wa}')">{wa}</code>
+        </div>
+        <textarea id="tmpl-gmail-${p.id}" rows="4"
+          placeholder="Halo {nama} 👋&#10;&#10;Terima kasih sudah order {produk}! 🙏&#10;Kami segera proses pesanan kakak ya."
+          style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;color:#e2e8f0;font-size:12px;line-height:1.6;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box">${tmplVal}</textarea>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:8px">
+          <div id="tmpl-status-${p.id}" style="font-size:11px;color:${p.template_form_lead ? '#22c55e' : '#64748b'}">${tmplStatus}</div>
+          <button onclick="saveTemplateFormLead('${p.id}')" style="padding:6px 16px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Simpan Template</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function insertVarGmail(productId, v) {
+  const ta = document.getElementById(`tmpl-gmail-${productId}`);
+  if (!ta) return;
   const pos = ta.selectionStart;
   ta.value  = ta.value.slice(0, pos) + v + ta.value.slice(ta.selectionEnd);
   ta.selectionStart = ta.selectionEnd = pos + v.length;
   ta.focus();
 }
 
-async function loadTemplateFormLead() {
+async function connectGmail(productId) {
   const userId = Auth.getUser()?.id;
   try {
-    const res  = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=template_form_lead`, {
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-    });
-    const rows = await res.json();
-    const tmpl   = rows[0]?.template_form_lead || '';
-    const status = document.getElementById('template-save-status');
-    document.getElementById('template-form-lead').value = tmpl;
-    if (status) {
-      status.textContent = tmpl ? '✓ Template aktif' : 'Menggunakan template default';
-      status.style.color = tmpl ? '#22c55e' : '#64748b';
-    }
-  } catch(e) { console.error('loadTemplateFormLead:', e); }
-}
-
-async function saveTemplateFormLead() {
-  const userId = Auth.getUser()?.id;
-  const tmpl   = document.getElementById('template-form-lead').value.trim();
-  const btn    = document.getElementById('btn-save-template');
-  const status = document.getElementById('template-save-status');
-
-  btn.disabled    = true;
-  btn.textContent = 'Menyimpan...';
-
-  try {
-    const res = await fetch('/api/save-settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId,
-        table: 'users_template',
-        payload: { template_form_lead: tmpl || null },
-      }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      btn.textContent      = '✓ Tersimpan!';
-      btn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
-      status.textContent   = tmpl ? '✓ Template aktif' : '✓ Menggunakan template default';
-      status.style.color   = '#22c55e';
-      setTimeout(() => {
-        btn.textContent      = 'Simpan Template';
-        btn.style.background = '';
-        btn.disabled         = false;
-      }, 2500);
-    } else {
-      btn.textContent = 'Simpan Template';
-      btn.disabled    = false;
-      toast('❌ Gagal simpan: ' + (data.error || ''));
-    }
-  } catch(e) {
-    btn.textContent = 'Simpan Template';
-    btn.disabled    = false;
-    toast('❌ Error: ' + e.message);
-  }
-}
-
-async function loadGmailStatus() {
-  const userId = Auth.getUser()?.id;
-  const card   = document.getElementById('gmail-status-card');
-  if (!card) return;
-
-  try {
-    const res  = await fetch(`/api/gmail?action=status&user_id=${userId}`);
-    const data = await res.json();
-
-    if (data.connected) {
-      const lastCheck = data.gmail_last_checked
-        ? new Date(data.gmail_last_checked).toLocaleString('id-ID')
-        : 'Belum pernah';
-      card.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:44px;height:44px;background:rgba(34,197,94,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📧</div>
-            <div>
-              <div class="gi-title" style="font-weight:600;font-size:14px">${data.gmail_email}</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-                <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span>
-                <span style="font-size:12px;color:#22c55e;font-weight:500">Terhubung</span>
-              </div>
-              <div class="gi-sub" style="font-size:11px;margin-top:2px">Terakhir cek: ${lastCheck}</div>
-            </div>
-          </div>
-          <button onclick="disconnectGmail()" style="padding:8px 16px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
-            Putuskan Gmail
-          </button>
-        </div>`;
-    } else {
-      card.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:44px;height:44px;background:rgba(100,116,139,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📧</div>
-            <div>
-              <div class="gi-title" style="font-weight:600;font-size:14px">Gmail belum terhubung</div>
-              <div class="gi-sub" style="font-size:12px;margin-top:3px">Hubungkan Gmail untuk auto follow-up order masuk</div>
-            </div>
-          </div>
-          <button onclick="connectGmail()" style="padding:10px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
-            + Hubungkan Gmail
-          </button>
-        </div>`;
-    }
-  } catch(e) {
-    card.innerHTML = `<div style="color:#fca5a5;font-size:13px">❌ Gagal cek status: ${e.message}</div>`;
-  }
-}
-
-async function connectGmail() {
-  const userId = Auth.getUser()?.id;
-  try {
-    const res  = await fetch(`/api/gmail?action=url&user_id=${userId}`);
+    const res  = await fetch(`/api/gmail?action=url&user_id=${userId}&product_id=${productId}`);
     const data = await res.json();
     if (data.url) window.location.href = data.url;
     else toast('❌ Gagal mendapatkan URL login');
   } catch(e) { toast('❌ Error: ' + e.message); }
 }
 
-async function disconnectGmail() {
-  if (!confirm('Putuskan Gmail dari BotWA?\nBot tidak akan lagi auto follow-up order masuk.')) return;
-  const userId = Auth.getUser()?.id;
+async function disconnectGmail(productId) {
+  if (!confirm('Putuskan Gmail dari produk ini?\nBot tidak akan lagi auto follow-up order masuk untuk produk ini.')) return;
   try {
-    await fetch(`/api/gmail?action=disconnect&user_id=${userId}`);
+    await fetch(`/api/gmail?action=disconnect&product_id=${productId}`);
     toast('✅ Gmail berhasil diputus');
     loadGmailStatus();
   } catch(e) { toast('❌ Gagal: ' + e.message); }
+}
+
+async function saveTemplateFormLead(productId) {
+  const userId   = Auth.getUser()?.id;
+  const tmpl     = document.getElementById(`tmpl-gmail-${productId}`)?.value?.trim() || null;
+  const statusEl = document.getElementById(`tmpl-status-${productId}`);
+  try {
+    const res = await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, product_id: productId, table: 'users_template', payload: { template_form_lead: tmpl } }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('✅ Template tersimpan');
+      if (statusEl) { statusEl.textContent = tmpl ? '✓ Template aktif' : '✓ Template default'; statusEl.style.color = '#22c55e'; }
+    } else {
+      toast('❌ Gagal simpan: ' + (data.error || ''));
+    }
+  } catch(e) { toast('❌ Error: ' + e.message); }
 }
 
 // Cek hasil OAuth saat kembali dari Google
@@ -978,12 +932,10 @@ async function disconnectGmail() {
   const params = new URLSearchParams(window.location.search);
   const gmail  = params.get('gmail');
   if (!gmail) return;
-  // Bersihkan URL
   history.replaceState({}, '', window.location.pathname);
   if (gmail === 'success') {
     const email = params.get('email') || '';
     toast(`✅ Gmail ${email} berhasil terhubung!`);
-    // Otomatis buka tab Gmail
     setTimeout(() => {
       const gmailNav = document.querySelector('[onclick*="showSection(\'gmail\'"]');
       if (gmailNav) gmailNav.click();
