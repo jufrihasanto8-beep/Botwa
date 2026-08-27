@@ -64,9 +64,10 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
   }
 
   // Status label & warna berdasarkan koneksi WA + Gmail
+  // wa_session_id ada = WA pernah di-connect (lebih reliable dari wa_status yang tidak realtime)
   function getProdStatus(p) {
-    const waOk     = p.wa_status === 'connected';
-    const gmailOk  = !!p.gmail_email;
+    const waOk    = !!(p.wa_session_id);
+    const gmailOk = !!(p.gmail_email);
     if (waOk && gmailOk)   return { label: '● Agent aktif',           color: '#22c55e' };
     if (!waOk && !gmailOk) return { label: '● Non aktif',             color: '#64748b' };
     if (!waOk)             return { label: '● WA belum terhubung',    color: '#f59e0b' };
@@ -207,10 +208,17 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     const userId = (typeof Auth !== 'undefined' ? Auth : window.Auth)?.getUser?.()?.id;
     if (!userId) { console.log('[ProdSW] no userId'); return; }
     try {
-      const r = await fetch(
+      let r = await fetch(
         `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_status,wa_session_id,gmail_email`,
         { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
       );
+      // Fallback: kolom gmail_email belum ada di DB (SQL belum dijalankan)
+      if (!r.ok) {
+        r = await fetch(
+          `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_status,wa_session_id`,
+          { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
+        );
+      }
       if (r.ok) { allUserProducts = await r.json(); console.log('[ProdSW] loaded', allUserProducts.length, 'products'); }
       else { console.log('[ProdSW] fetch error', r.status, await r.text()); }
     } catch(e) { console.log('[ProdSW] fetch exception', e); }
