@@ -358,16 +358,28 @@ const sbH = {
   'apikey': SB_KEY,
   'Authorization': 'Bearer ' + SB_KEY
 };
-async function sbGet(t, q='') { const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{headers:sbH}); return r.json(); }
+async function sbGet(t, q='') {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`, {headers:sbH});
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.message || JSON.stringify(data));
+  return data;
+}
 async function sbPost(t,b) {
-  const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)});
-  return r.json();
+  const r = await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)});
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.message || JSON.stringify(data));
+  return data;
 }
 async function sbPatch(t,q,b) {
-  const r=await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'PATCH',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)});
-  return r.json();
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'PATCH',headers:{...sbH,'Prefer':'return=representation'},body:JSON.stringify(b)});
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.message || JSON.stringify(data));
+  return data;
 }
-async function sbDelete(t,q) { await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'DELETE',headers:sbH}); }
+async function sbDelete(t,q) {
+  const r = await fetch(`${SB_URL}/rest/v1/${t}${q}`,{method:'DELETE',headers:sbH});
+  if (!r.ok) { const data = await r.json(); throw new Error(data?.message || JSON.stringify(data)); }
+}
 
 function toast(msg, type='success') {
   const el = document.getElementById('toast');
@@ -412,10 +424,16 @@ async function init() {
    TAB 1: JADWAL
 ══════════════════════════════════ */
 async function loadSchedules() {
-  allSchedules = await sbGet('followup_schedule',
-    `?user_id=eq.${userId}&order=hari.asc`
-  );
-  if (!Array.isArray(allSchedules)) allSchedules = [];
+  try {
+    allSchedules = await sbGet('followup_schedule',
+      `?user_id=eq.${userId}&order=hari.asc`
+    );
+    if (!Array.isArray(allSchedules)) allSchedules = [];
+  } catch(e) {
+    allSchedules = [];
+    toast('Gagal load jadwal: ' + e.message, 'error');
+    console.error('loadSchedules error:', e);
+  }
   renderSchedules();
 }
 
