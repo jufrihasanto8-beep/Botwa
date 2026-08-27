@@ -2,12 +2,12 @@
  * /api/gmail — handles semua Gmail integration
  *
  * Routing:
- *   GET  ?action=url&user_id=xxx        → generate Google OAuth URL
- *   GET  ?action=status&user_id=xxx     → cek status koneksi Gmail
- *   GET  ?action=disconnect&user_id=xxx → putus koneksi Gmail
- *   GET  ?code=xxx&state=xxx            → OAuth callback dari Google
- *   POST header x-cron-secret          → gmail poller (cron tiap 5 menit)
- *   POST body { form_token, ... }       → form lead dari orderonline.id / n8n
+ *   GET  ?action=url&user_id=xxx&product_id=yyy  → generate Google OAuth URL (per produk)
+ *   GET  ?action=status&product_id=yyy           → cek status koneksi Gmail produk
+ *   GET  ?action=disconnect&product_id=yyy       → putus koneksi Gmail produk
+ *   GET  ?code=xxx&state=xxx                     → OAuth callback dari Google
+ *   POST header x-cron-secret                   → gmail poller (cron tiap 5 menit)
+ *   POST body { form_token, ... }               → form lead dari orderonline.id / n8n
  */
 
 const SUPABASE_URL         = process.env.SUPABASE_URL;
@@ -216,9 +216,10 @@ function renderTemplate(template, { nama, produk, alamat, hp }) {
 }
 
 // ── Proses satu order lead (shared oleh poller & form-lead) ──
-async function processLead(userId, { nama, hp, alamat, produk }) {
+// overrideProduct: objek produk dari DB (kalau sudah diketahui, misal dari cron per-produk)
+//                  null → akan cari sendiri berdasarkan nama produk di email
+async function processLead(userId, { nama, hp, alamat, produk }, overrideProduct = null) {
   const waNumber = normalizeWA(hp);
-  const now = new Date().toISOString();
 
   // Parse alamat
   const { jsonb: alamatJsonb, lengkap: alamatLengkap } = parseAlamat(alamat);
@@ -229,14 +230,12 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   let customerId;
 
   if (existing.length) {
-    // Customer lama — update data yang kurang saja
     customerId = existing[0].id;
     const patch = {};
     if (nama && !existing[0].nama) patch.nama = nama;
     if (alamatJsonb && !existing[0].alamat?.kabupaten) patch.alamat = alamatJsonb;
     if (Object.keys(patch).length) await sbPatch('customers', `?id=eq.${customerId}`, patch);
   } else {
-    // Customer baru — insert
     const c = await sbPost('customers', {
       user_id: userId, wa_number: waNumber,
       nama: nama || null, alamat: alamatJsonb || null,
@@ -244,16 +243,22 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
     customerId = c[0]?.id;
   }
 
-  // ── Cari produk yang cocok & wa_session_id ──────────────
-  // Harus sebelum conversation upsert karena product_id dibutuhkan saat insert conv baru
-  const prodRows = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id`).catch(() => []);
-  let matchedProd = null;
-  if (produk && prodRows.length) {
-    const produkLower = produk.toLowerCase();
-    matchedProd = prodRows.find(p => p.nama && p.nama.toLowerCase().includes(produkLower))
-               || prodRows.find(p => produkLower.includes(p.nama?.toLowerCase()));
+  // ── Tentukan produk yang dipakai ────────────────────────
+  let matchedProd = overrideProduct;
+  if (!matchedProd) {
+    // Fallback: cari berdasarkan nama produk di email (untuk form_lead)
+    const prodRows = await sbGet('products',
+      `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id,template_form_lead`
+    ).catch(() => []);
+    if (produk && prodRows.length) {
+      const produkLower = produk.toLowerCase();
+      matchedProd = prodRows.find(p => p.nama && p.nama.toLowerCase().includes(produkLower))
+                 || prodRows.find(p => produkLower.includes(p.nama?.toLowerCase()));
+    }
+    if (!matchedProd) matchedProd = prodRows[0] || null;
   }
-  const waSession = matchedProd?.wa_session_id || prodRows[0]?.wa_session_id || userId;
+
+  const waSession = matchedProd?.wa_session_id || userId;
   console.log('[gmail] waSession:', waSession, '| produk email:', produk, '| matched:', matchedProd?.nama || 'none');
 
   // ── Upsert conversation ──────────────────────────────────
@@ -280,7 +285,7 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   } else {
     const c = await sbPost('conversations', {
       user_id: userId, customer_id: customerId || null,
-      product_id: matchedProd?.id || prodRows[0]?.id || null,
+      product_id: matchedProd?.id || null,
       sumber: 'form', status: 'baru', prioritas: 'high',
       state: convState,
     });
@@ -293,8 +298,8 @@ async function processLead(userId, { nama, hp, alamat, produk }) {
   }
 
   // ── Customer baru → kirim WA template ───────────────────
-  const userRows = await sbGet('users', `?id=eq.${userId}&select=template_form_lead&limit=1`);
-  const tmpl     = userRows[0]?.template_form_lead;
+  // Template diambil dari produk (per-produk), bukan dari users
+  const tmpl = matchedProd?.template_form_lead || null;
 
   const namaSapa     = nama ? nama.split(' ')[0] : 'kak';
   const produkTxt    = produk ? ` untuk *${produk}*` : '';
@@ -352,46 +357,50 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-cron-secret');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { action, user_id, code, state, error } = req.query;
+  const { action, user_id, product_id, code, state, error } = req.query;
 
   // ──────────────────────────────────────────────────────
   // GET: OAuth & Status routes
   // ──────────────────────────────────────────────────────
   if (req.method === 'GET') {
 
-    // Generate OAuth URL
+    // Generate OAuth URL — state = "userId::productId"
     if (action === 'url') {
-      if (!user_id) return res.status(400).json({ error: 'user_id wajib' });
+      if (!user_id || !product_id) return res.status(400).json({ error: 'user_id dan product_id wajib' });
+      const oauthState = `${user_id}::${product_id}`;
       const params = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID, redirect_uri: REDIRECT_URI,
         response_type: 'code', scope: SCOPE,
-        access_type: 'offline', prompt: 'consent', state: user_id,
+        access_type: 'offline', prompt: 'consent', state: oauthState,
       });
       return res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
     }
 
-    // Cek status
+    // Cek status — per produk
     if (action === 'status') {
-      if (!user_id) return res.status(400).json({ error: 'user_id wajib' });
-      const rows = await sbGet('users', `?id=eq.${user_id}&select=gmail_email,gmail_last_checked&limit=1`);
+      if (!product_id) return res.status(400).json({ error: 'product_id wajib' });
+      const rows = await sbGet('products', `?id=eq.${product_id}&select=gmail_email,gmail_last_checked&limit=1`);
       const row  = rows[0] || {};
       return res.json({ connected: !!row.gmail_email, gmail_email: row.gmail_email || null,
                         gmail_last_checked: row.gmail_last_checked || null });
     }
 
-    // Disconnect
+    // Disconnect — per produk
     if (action === 'disconnect') {
-      if (!user_id) return res.status(400).json({ error: 'user_id wajib' });
-      await sbPatch('users', `?id=eq.${user_id}`,
+      if (!product_id) return res.status(400).json({ error: 'product_id wajib' });
+      await sbPatch('products', `?id=eq.${product_id}`,
         { gmail_email: null, gmail_refresh_token: null, gmail_last_checked: null });
       return res.json({ ok: true });
     }
 
-    // OAuth callback dari Google
+    // OAuth callback dari Google — state = "userId::productId"
     if (error) return res.redirect(`${APP_URL}/settings.html?gmail=cancelled`);
 
     if (code && state) {
       try {
+        const [stateUserId, stateProductId] = state.split('::');
+        if (!stateUserId || !stateProductId) throw new Error('state tidak valid');
+
         const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -407,7 +416,8 @@ module.exports = async function handler(req, res) {
           { headers: { Authorization: `Bearer ${tokens.access_token}` } });
         const uiData = await uiRes.json();
 
-        await sbPatch('users', `?id=eq.${state}`, {
+        // Simpan ke products table (per produk)
+        await sbPatch('products', `?id=eq.${stateProductId}&user_id=eq.${stateUserId}`, {
           gmail_email: uiData.email || null,
           gmail_refresh_token: tokens.refresh_token,
           gmail_last_checked: null,
@@ -430,19 +440,22 @@ module.exports = async function handler(req, res) {
     const cronSecret = req.headers['x-cron-secret'];
     const body       = req.body || {};
 
-    // ── Gmail Poller (cron) ────────────────────────────
+    // ── Gmail Poller (cron) — loop per produk ─────────────
     if (cronSecret === CRON_SECRET || cronSecret === WEBHOOK_SECRET) {
       const start   = Date.now();
       const results = [];
-      const users   = await sbGet('users',
-        `?gmail_refresh_token=not.is.null&select=id,gmail_email,gmail_refresh_token`);
 
-      if (!users.length) return res.json({ ok: true, message: 'Tidak ada Gmail terhubung' });
+      // Ambil semua produk yang sudah hubungkan Gmail
+      const products = await sbGet('products',
+        `?gmail_refresh_token=not.is.null&aktif=eq.true&select=id,nama,user_id,gmail_email,gmail_refresh_token,gmail_last_checked,wa_session_id,template_form_lead`
+      );
 
-      for (const user of users) {
-        const log = { user_id: user.id, gmail: user.gmail_email, processed: 0, errors: [] };
+      if (!products.length) return res.json({ ok: true, message: 'Tidak ada Gmail terhubung di produk manapun' });
+
+      for (const product of products) {
+        const log = { product_id: product.id, produk: product.nama, user_id: product.user_id, gmail: product.gmail_email, processed: 0, errors: [] };
         try {
-          const token    = await getAccessToken(user.gmail_refresh_token);
+          const token    = await getAccessToken(product.gmail_refresh_token);
           const messages = await searchEmails(token);
           log.emails_found = messages.length;
 
@@ -459,7 +472,8 @@ module.exports = async function handler(req, res) {
                 continue;
               }
 
-              const leadResult = await processLead(user.id, orderData);
+              // Kirim produk langsung — tidak perlu match nama lagi
+              const leadResult = await processLead(product.user_id, orderData, product);
               await markAsRead(token, msg.id);
               log.processed++;
               if (!log.details) log.details = [];
@@ -479,7 +493,8 @@ module.exports = async function handler(req, res) {
               try { await markAsRead(token, msg.id); } catch(_) {}
             }
           }
-          await sbPatch('users', `?id=eq.${user.id}`, { gmail_last_checked: new Date().toISOString() });
+          // Update gmail_last_checked di products table
+          await sbPatch('products', `?id=eq.${product.id}`, { gmail_last_checked: new Date().toISOString() });
         } catch(e) { log.errors.push({ error: e.message }); }
         results.push(log);
       }

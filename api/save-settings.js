@@ -234,13 +234,21 @@ module.exports = async function handler(req, res) {
   }
 
   if (body.userId && body.table === 'users_template' && body.payload) {
-    const allowed = ['template_resi_dikirim', 'template_tiba_kota', 'template_out_for_delivery', 'template_delivered', 'template_bermasalah', 'template_retur', 'template_form_lead'];
-    const patch = {};
-    for (const key of allowed) {
-      if (key in body.payload) patch[key] = body.payload[key];
-    }
+    const allowedUsers    = ['template_resi_dikirim', 'template_tiba_kota', 'template_out_for_delivery', 'template_delivered', 'template_bermasalah', 'template_retur'];
+    const allowedProducts = ['template_form_lead']; // disimpan di products, bukan users
+
+    const userPatch    = {};
+    const productPatch = {};
+    for (const key of allowedUsers)    { if (key in body.payload) userPatch[key]    = body.payload[key]; }
+    for (const key of allowedProducts) { if (key in body.payload) productPatch[key] = body.payload[key]; }
+
     try {
-      await sbReq('PATCH', `users?id=eq.${body.userId}`, patch);
+      const ops = [];
+      if (Object.keys(userPatch).length)
+        ops.push(sbReq('PATCH', `users?id=eq.${body.userId}`, userPatch));
+      if (Object.keys(productPatch).length && body.product_id)
+        ops.push(sbReq('PATCH', `products?id=eq.${body.product_id}&user_id=eq.${body.userId}`, productPatch));
+      await Promise.all(ops);
       return res.status(200).json({ ok: true });
     } catch(e) {
       return res.status(500).json({ error: e.message });
