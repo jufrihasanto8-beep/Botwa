@@ -206,9 +206,13 @@ body.light #wa-qr-area{background:#fff!important;border-color:#e2e8f0!important}
 body.light .gi-title{color:#0f172a}
 body.light .gi-sub{color:#64748b}
 
-body.light .gmail-template-card{background:#fff!important;border-color:#e2e8f0!important}
-body.light .gmail-template-card .gi-title{color:#0f172a}
-body.light .gmail-template-card .gi-sub{color:#64748b}
+.gmail-prod-card{background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px;margin-bottom:16px}
+.gmail-prod-card-inner{border-top:1px solid rgba(255,255,255,.06)}
+.gmail-prod-textarea{width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;color:#e2e8f0;font-size:12px;line-height:1.6;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box}
+body.light .gmail-prod-card{background:#fff;border-color:#e2e8f0}
+body.light .gmail-prod-card-inner{border-top-color:#e2e8f0}
+body.light .gmail-prod-textarea{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+body.light .gmail-prod-textarea::placeholder{color:#94a3b8}
 body.light .gmail-info-box{background:rgba(59,130,246,.04)!important;border-color:rgba(59,130,246,.15)!important}
 body.light .gmail-info-box *{color:#475569!important}
 body.light #sec-gmail .section-title{color:#0f172a}
@@ -872,18 +876,18 @@ async function loadGmailStatus() {
     const tmplVal    = (p.template_form_lead || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const tmplStatus = p.template_form_lead ? '✓ Template aktif' : 'Menggunakan template default';
 
-    return `<div style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px;margin-bottom:16px">
+    return `<div class="gmail-prod-card">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="width:44px;height:44px;border-radius:10px;background:${color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0">${gmailInitials(p.nama)}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:14px;color:#f1f5f9">${p.nama}</div>
+          <div style="font-weight:600;font-size:14px" class="gi-title">${p.nama}</div>
           ${isConn
             ? `<div style="display:flex;align-items:center;gap:6px;margin-top:3px">
                  <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span>
-                 <span style="font-size:12px;color:#94a3b8">${p.gmail_email}</span>
+                 <span style="font-size:12px" class="gi-sub">${p.gmail_email}</span>
                </div>
-               <div style="font-size:11px;color:#64748b;margin-top:2px">Terakhir cek: ${lastCheck}</div>`
-            : `<div style="font-size:12px;color:#64748b;margin-top:3px">Gmail belum terhubung</div>`
+               <div style="font-size:11px;margin-top:2px" class="gi-sub">Terakhir cek: ${lastCheck}</div>`
+            : `<div style="font-size:12px;margin-top:3px" class="gi-sub">Gmail belum terhubung</div>`
           }
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
@@ -893,18 +897,17 @@ async function loadGmailStatus() {
           }
         </div>
       </div>
-      <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">
-        <div style="font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:8px">Template Pesan WA</div>
+      <div class="gmail-prod-card-inner" style="margin-top:14px;padding-top:14px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px" class="gi-sub">Template Pesan WA</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-          <span style="font-size:11px;color:#64748b;align-self:center">Variabel:</span>
+          <span style="font-size:11px;align-self:center" class="gi-sub">Variabel:</span>
           <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer" onclick="insertVarGmail('${p.id}','{nama}')">{nama}</code>
           <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer" onclick="insertVarGmail('${p.id}','{produk}')">{produk}</code>
           <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer" onclick="insertVarGmail('${p.id}','{alamat}')">{alamat}</code>
           <code style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer" onclick="insertVarGmail('${p.id}','{wa}')">{wa}</code>
         </div>
-        <textarea id="tmpl-gmail-${p.id}" rows="4"
-          placeholder="Halo {nama} 👋&#10;&#10;Terima kasih sudah order {produk}! 🙏&#10;Kami segera proses pesanan kakak ya."
-          style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;color:#e2e8f0;font-size:12px;line-height:1.6;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box">${tmplVal}</textarea>
+        <textarea id="tmpl-gmail-${p.id}" rows="4" class="gmail-prod-textarea"
+          placeholder="Halo {nama} 👋&#10;&#10;Terima kasih sudah order {produk}! 🙏&#10;Kami segera proses pesanan kakak ya.">${tmplVal}</textarea>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:8px">
           <div id="tmpl-status-${p.id}" style="font-size:11px;color:${p.template_form_lead ? '#22c55e' : '#64748b'}">${tmplStatus}</div>
           <button onclick="saveTemplateFormLead('${p.id}')" style="padding:6px 16px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Simpan Template</button>
