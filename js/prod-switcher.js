@@ -63,6 +63,16 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     return allUserProducts.find(p => p.id === activeProductFilter) || null;
   }
 
+  // Status label & warna berdasarkan koneksi WA + Gmail
+  function getProdStatus(p) {
+    const waOk     = p.wa_status === 'connected';
+    const gmailOk  = !!p.gmail_email;
+    if (waOk && gmailOk)   return { label: '● Agent aktif',           color: '#22c55e' };
+    if (!waOk && !gmailOk) return { label: '● Non aktif',             color: '#64748b' };
+    if (!waOk)             return { label: '● WA belum terhubung',    color: '#f59e0b' };
+                           return { label: '● Gmail belum terhubung', color: '#f59e0b' };
+  }
+
   // ── Inject div setelah #sb-bot-status ────────────────────
   function injectEl() {
     if (document.getElementById('prod-sw-root')) return;
@@ -90,7 +100,10 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
       : `<div class="prod-sw-av all">📋</div>`;
 
     const nameHtml = active ? active.nama : (showAll ? 'Semua Produk' : (allUserProducts[0]?.nama || 'Produk'));
-    const subHtml  = active ? '<span style="color:#22c55e">● Agent aktif</span>' : (showAll ? `${allUserProducts.length} produk aktif` : 'Agent aktif');
+    const st       = active ? getProdStatus(active) : null;
+    const subHtml  = active
+      ? `<span style="color:${st.color}">${st.label}</span>`
+      : (showAll ? `${allUserProducts.length} produk` : (() => { const s = getProdStatus(allUserProducts[0]); return `<span style="color:${s.color}">${s.label}</span>`; })());
 
     el.innerHTML = `
       <div class="prod-sw-trigger ${dropOpen?'open':''}" id="ps-trigger" onclick="window.__toggleProdDrop(event)">
@@ -138,7 +151,7 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
           <div class="prod-sw-opt-av" style="background:${color}">${initials(p.nama)}</div>
           <div class="prod-sw-opt-info">
             <div class="prod-sw-opt-name">${p.nama}</div>
-            <div class="prod-sw-opt-sub" style="color:#22c55e">● Agent aktif</div>
+            <div class="prod-sw-opt-sub" style="color:${getProdStatus(p).color}">${getProdStatus(p).label}</div>
           </div>
           ${isActive ? '<div class="prod-sw-opt-check">✓</div>' : ''}
         </div>
@@ -195,7 +208,7 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     if (!userId) { console.log('[ProdSW] no userId'); return; }
     try {
       const r = await fetch(
-        `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama`,
+        `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_status,wa_session_id,gmail_email`,
         { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
       );
       if (r.ok) { allUserProducts = await r.json(); console.log('[ProdSW] loaded', allUserProducts.length, 'products'); }
