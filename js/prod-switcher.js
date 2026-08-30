@@ -219,7 +219,7 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
           { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
         );
       }
-      if (r.ok) { allUserProducts = await r.json(); console.log('[ProdSW] loaded', allUserProducts.length, 'products'); }
+      if (r.ok) { allUserProducts = await r.json(); window.__userProducts = allUserProducts; console.log('[ProdSW] loaded', allUserProducts.length, 'products'); }
       else { console.log('[ProdSW] fetch error', r.status, await r.text()); }
     } catch(e) { console.log('[ProdSW] fetch exception', e); }
 
