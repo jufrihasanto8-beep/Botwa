@@ -194,7 +194,7 @@ body.light #toast.toast-error{background:#fef2f2;color:#dc2626;border-color:rgba
         <div class="sec-head">
           <div>
             <div class="sec-title">Ritme Follow-up</div>
-            <div class="sec-desc">Atur kapan & apa yang dikirim ke leads yang belum balas</div>
+            <div class="sec-desc" id="sched-prod-desc">Atur kapan & apa yang dikirim ke leads yang belum balas</div>
           </div>
           <button class="btn-blue" onclick="openAddForm()">+ Tambah Hari</button>
         </div>
@@ -423,16 +423,34 @@ async function init() {
 /* ══════════════════════════════════
    TAB 1: JADWAL
 ══════════════════════════════════ */
+function getActiveProdName() {
+  const prodFilter = window.__activeProductFilter;
+  if (!prodFilter) return null;
+  const prods = window.__userProducts || [];
+  const p = prods.find(x => x.id === prodFilter);
+  return p?.nama || null;
+}
+
 async function loadSchedules() {
   try {
+    const prodFilter = window.__activeProductFilter || null;
+    const prodQ = prodFilter ? `&product_id=eq.${prodFilter}` : '';
     allSchedules = await sbGet('followup_schedule',
-      `?user_id=eq.${userId}&order=hari.asc`
+      `?user_id=eq.${userId}${prodQ}&order=hari.asc,jam_kirim.asc`
     );
     if (!Array.isArray(allSchedules)) allSchedules = [];
   } catch(e) {
     allSchedules = [];
     toast('Gagal load jadwal: ' + e.message, 'error');
     console.error('loadSchedules error:', e);
+  }
+  // Update desc sesuai produk aktif
+  const prodName = getActiveProdName();
+  const descEl = document.getElementById('sched-prod-desc');
+  if (descEl) {
+    descEl.textContent = prodName
+      ? `Jadwal follow-up untuk: ${prodName}`
+      : 'Tampil semua jadwal — pilih produk di switcher untuk filter';
   }
   renderSchedules();
 }
@@ -631,6 +649,7 @@ async function saveSchedule() {
 
   const payload = {
     user_id: userId,
+    product_id: window.__activeProductFilter || null,
     hari,
     jam_kirim: jam + ':00', // pastikan format TIME
     tipe,
@@ -850,7 +869,7 @@ function showTab(name, btn) {
 }
 
 init();
-window.addEventListener('productSwitch', () => loadLeads());
+window.addEventListener('productSwitch', () => { loadSchedules(); loadLeads(); });
 </script>
 </body>
 </html>
