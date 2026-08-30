@@ -453,10 +453,18 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
           csNama     = product?.persona_cs_nama || 'Sari';
         }
 
-        // Cek apakah ada schedule khusus untuk hari 1
-        const schedHari1 = await sbGet('followup_schedule',
-          `?user_id=eq.${conv.user_id}&hari=eq.1&aktif=eq.true&limit=1`
-        ).catch(() => []);
+        // Cek schedule hari 1 — cari yang product_id match dulu, fallback ke null (global)
+        let schedHari1 = [];
+        if (conv.product_id) {
+          schedHari1 = await sbGet('followup_schedule',
+            `?user_id=eq.${conv.user_id}&hari=eq.1&aktif=eq.true&product_id=eq.${conv.product_id}&order=jam_kirim.asc&limit=1`
+          ).catch(() => []);
+        }
+        if (!schedHari1.length) {
+          schedHari1 = await sbGet('followup_schedule',
+            `?user_id=eq.${conv.user_id}&hari=eq.1&aktif=eq.true&product_id=is.null&order=jam_kirim.asc&limit=1`
+          ).catch(() => []);
+        }
 
         const schedule = schedHari1[0] || { hari: 1, tipe: 'ai' };
         const pesan = await kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, product);
@@ -474,19 +482,20 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
     }
 
     // ── BAGIAN 2: Hari 2+ — berdasarkan followup_schedule ──
-    // Ambil semua schedule aktif per user (hari 2+)
+    // Ambil semua schedule aktif (hari 2+)
     const allSchedules = await sbGet('followup_schedule',
-      `?hari=gte.2&aktif=eq.true&order=hari.asc`
+      `?hari=gte.2&aktif=eq.true&order=hari.asc,jam_kirim.asc`
     ).catch(() => []);
 
-    // Kelompokkan per user
-    const schedByUser = {};
+    // Kelompokkan per user + product (key = "userId::productId" atau "userId::null")
+    const schedByKey = {};
     for (const s of allSchedules) {
-      if (!schedByUser[s.user_id]) schedByUser[s.user_id] = [];
-      schedByUser[s.user_id].push(s);
+      const key = `${s.user_id}::${s.product_id || 'null'}`;
+      if (!schedByKey[key]) schedByKey[key] = { userId: s.user_id, productId: s.product_id || null, schedules: [] };
+      schedByKey[key].schedules.push(s);
     }
 
-    for (const [userId, schedules] of Object.entries(schedByUser)) {
+    for (const { userId, productId, schedules } of Object.values(schedByKey)) {
       // Cari schedule yang jam_kirimnya cocok dengan sekarang (±30 menit)
       const scheduleSekarang = schedules.filter(s => {
         if (!s.jam_kirim) return false;
@@ -504,7 +513,6 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         const hariKe = sched.hari;
 
         // Hitung tanggal mulai dan akhir untuk "hari ke-N"
-        // Hari ke-2 = lead masuk kemarin, hari ke-3 = 2 hari lalu, dst
         const hariMulai = new Date(now);
         hariMulai.setUTCDate(hariMulai.getUTCDate() - (hariKe - 1));
         hariMulai.setUTCHours(0 - 7, 0, 0, 0); // 00:00 WIB
@@ -512,9 +520,13 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         const hariAkhir = new Date(hariMulai);
         hariAkhir.setUTCDate(hariAkhir.getUTCDate() + 1);
 
-        // Hanya follow-up kalau customer diam minimal 1 jam (last_msg_at <= 1 jam lalu)
+        // Filter product: kalau schedule punya product_id → filter conversation by product
+        // Kalau null (global/semua produk) → tidak filter
+        const productQ = productId ? `&product_id=eq.${productId}` : '';
+
         const convs = await sbGet('conversations',
           `?user_id=eq.${userId}` +
+          productQ +
           `&status=in.(baru,diproses)` +
           `&created_at=gte.${hariMulai.toISOString()}` +
           `&created_at=lt.${hariAkhir.toISOString()}` +
@@ -522,7 +534,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
           `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
         ).catch(() => []);
 
-        // Tandai schedule terakhir
+        // Tandai schedule terakhir (per grup product)
         const maxHari = Math.max(...schedules.map(s => s.hari));
         sched.is_last = sched.hari === maxHari;
 
