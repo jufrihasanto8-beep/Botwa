@@ -283,7 +283,7 @@ ${hasBundling ? `Penawaran paket : ${bundlingTxt}
 ⚡ TIDAK ADA harga satuan/per box yang perlu disebutkan ke customer.` : `Harga           : ${harga}`}
 Cocok untuk     : ${keluhan}
 Cara pakai      : ${product?.cara_pakai || '(lihat kemasan)'}
-Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
+Knowledge       : ${product?.product_knowledge || '(belum diisi — kamu tetap TAHU nama produknya: ' + namaProduk + '. Jangan klaim manfaat/testimoni yang tidak ada, tapi boleh sebut nama produknya)'}
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
@@ -405,6 +405,7 @@ REM ETIS
 - Keluhan serius/di luar produk → sarankan periksa, jangan paksa.
 
 HANDLE PERTANYAAN UMUM
+- "Jual apa?", "produk apa?", "ini jual apa?", "kamu jual produk apa?" → WAJIB sebut nama produk spesifik: "${namaProduk}", lalu pivot ke keluhan. Contoh: "Kami jual ${namaProduk} kak 😊 Biasanya cocok untuk yang punya keluhan [keluhan utama]. Kak sendiri ada keluhan apa nih?" — JANGAN jawab generik "produk kesehatan" atau kategori saja.
 - "Stok masih ada?" → "Masih ready kak, langsung proses aja 😊"
 - "Ada diskon/promo?" → Kalau ada promo ongkir, sebut itu. Kalau tidak ada, bilang "Untuk saat ini belum ada promo khusus kak, tapi harganya sudah yang terbaik 😊"
 - "Bisa kirim hari ini?" → "Kalau ordernya sebelum jam 12 siang biasanya bisa kirim hari ini kak 😊" (atau sesuaikan dengan knowledge produk)
@@ -3345,11 +3346,9 @@ ${ongkirInfo}`;
     }
 
     // ── Auto-kirim foto testimoni kalau customer minta bukti/review ────
-    const tanyaTestimoni = /testimoni|ada bukti|foto bukti|ada review|ada hasil|ada yang sudah pakai|yang udah pakai|sebelum sesudah|before after|hasil nyata|ada yang berhasil|ada yang cocok/i.test(message);
+    const tanyaTestimoni = /\b(testimoni|testi|bukti|review|hasil|nyata|beneran|real|ada yang sudah|yang udah pakai|yang sudah pakai|ada hasilnya|ada fotonya|foto hasilnya|foto buktinya|sebelum sesudah|before after|ada reviewnya|ada buktiny)\b/i.test(message);
     const testiList = Array.isArray(product?.testimoni_urls) ? product.testimoni_urls.filter(Boolean) : [];
     const sudahKirimTesti = convState.testimoni_terkirim;
-
-    console.log(`[TESTI] tanya=${tanyaTestimoni} jumlahFoto=${testiList.length} sudahKirim=${sudahKirimTesti}`);
 
     if (tanyaTestimoni && testiList.length > 0 && !sudahKirimTesti) {
       await new Promise(r => setTimeout(r, 800));
