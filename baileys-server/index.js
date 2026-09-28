@@ -52,12 +52,17 @@ function humanDelay() {
 // Map: sessionId → { sock, status, qr, waNumber, saveCreds }
 const sessions = new Map();
 
-// ── Dedup message IDs (cegah Baileys double-fire) ────────
-// Set berisi msgId yang sudah diforward, auto-hapus setelah 60 detik
-const processedMsgIds = new Set();
-function markMsgProcessed(msgId) {
-  processedMsgIds.add(msgId);
-  setTimeout(() => processedMsgIds.delete(msgId), 60000);
+// ── Dedup message IDs per-session (cegah Baileys double-fire) ───
+// Map: sessionId → Set of msgIds, auto-hapus setelah 60 detik
+const processedMsgIds = new Map();
+function markMsgProcessed(sessionId, msgId) {
+  if (!processedMsgIds.has(sessionId)) processedMsgIds.set(sessionId, new Set());
+  const s = processedMsgIds.get(sessionId);
+  s.add(msgId);
+  setTimeout(() => s.delete(msgId), 60000);
+}
+function isMsgProcessed(sessionId, msgId) {
+  return processedMsgIds.has(sessionId) && processedMsgIds.get(sessionId).has(msgId);
 }
 
 // ── Pastikan folder auth_info ada ────────────────────────
@@ -203,13 +208,13 @@ async function processIncoming(sessionId, msg) {
   console.log(`[${sessionId}] Raw JID: ${jid}`);
   if (!jid || jid.includes('@g.us') || jid.includes('@broadcast') || jid.includes('@newsletter')) return;
 
-  // Dedup: skip kalau message ID ini sudah pernah diforward
+  // Dedup per-session: skip kalau message ID ini sudah diforward oleh session ini
   const msgId = msg.key.id;
-  if (msgId && processedMsgIds.has(msgId)) {
+  if (msgId && isMsgProcessed(sessionId, msgId)) {
     console.log(`[${sessionId}] Skip duplicate message: ${msgId}`);
     return;
   }
-  if (msgId) markMsgProcessed(msgId);
+  if (msgId) markMsgProcessed(sessionId, msgId);
 
   // reply_jid = full JID untuk kirim balas (termasuk @lid)
   // wa_number = nomor HP asli untuk simpan ke DB
