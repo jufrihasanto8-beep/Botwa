@@ -504,7 +504,7 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <div class="tags-input" id="tags-diagnosa" onclick="this.querySelector('input').focus()">
             <input type="text" placeholder="contoh: Sudah berapa lama?" onkeydown="addTag(event,'diagnosa')">
           </div>
-          <label onclick="document.getElementById('f-skip-diagnosa').click()" style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer;user-select:none">
+          <label style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer;user-select:none">
             <input type="checkbox" id="f-skip-diagnosa" style="width:15px;height:15px;accent-color:#6ee7b7">
             <span style="font-size:12px;color:#94a3b8">Keluhan sudah jelas dari produk — <span style="color:#6ee7b7">skip tanya keluhan, langsung edukasi & closing</span></span>
           </label>
@@ -576,6 +576,19 @@ body.light .fu-msg-lbl{color:#94a3b8}
 
         <div style="background:#0d1117;padding:16px;border-radius:8px;font-size:13px;color:#64748b;margin-top:8px;">
           <strong style="color:#94a3b8">Preview:</strong> <span id="promo-preview">Tidak ada promo ongkir</span>
+        </div>
+
+        <!-- Diskon Ongkir per Qty -->
+        <div style="margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#e2e8f0">Diskon Ongkir per Jumlah Beli</div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px">Atur potongan ongkir berbeda per qty. Akan override promo ongkir di atas untuk qty yang cocok.</div>
+            </div>
+            <button type="button" onclick="tambahDiskonOngkir()" style="font-size:11px;padding:4px 10px;border:1px solid rgba(52,211,153,.4);background:rgba(52,211,153,.08);color:#6ee7b7;border-radius:6px;cursor:pointer">+ Tambah</button>
+          </div>
+          <div id="diskon-ongkir-rows" style="display:flex;flex-direction:column;gap:6px"></div>
+          <div style="font-size:11px;color:#475569;margin-top:8px">💡 Contoh: beli 2 box = -50% ongkir · beli 3 box = -100% (gratis ongkir)</div>
         </div>
       </div>
 
@@ -893,7 +906,7 @@ function renderGrid() {
         <div class="prod-meta">Berat: <span>${p.berat_gram || 500}g</span> · Persona CS: <span>${p.persona_cs_nama || 'Sari'}</span></div>
         ${Array.isArray(p.harga_bundling) && p.harga_bundling.length ? `
         <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
-          ${p.harga_bundling.map(b => `<span style="font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid ${b.prioritas ? 'rgba(251,191,36,.5)' : 'rgba(255,255,255,.1)'};background:${b.prioritas ? 'rgba(251,191,36,.08)' : 'rgba(255,255,255,.04)'};color:${b.prioritas ? '#fbbf24' : '#94a3b8'}">${b.prioritas ? '⭐ ' : ''}${b.qty} box = ${rp(b.harga)}${b.bonus ? ` + ${b.bonus}` : ''}${b.diskon_ongkir ? ` 🚚-${b.diskon_ongkir}%` : ''}</span>`).join('')}
+          ${p.harga_bundling.map(b => `<span style="font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid ${b.prioritas ? 'rgba(251,191,36,.5)' : 'rgba(255,255,255,.1)'};background:${b.prioritas ? 'rgba(251,191,36,.08)' : 'rgba(255,255,255,.04)'};color:${b.prioritas ? '#fbbf24' : '#94a3b8'}">${b.prioritas ? '⭐ ' : ''}${b.qty} box = ${rp(b.harga)}${b.bonus ? ` + ${b.bonus}` : ''}</span>`).join('')}
         </div>` : ''}
         ${p.cara_pakai ? `<div class="prod-meta" style="margin-top:8px;font-size:12px;">${p.cara_pakai.slice(0,80)}...</div>` : ''}
       </div>
@@ -942,10 +955,10 @@ function setPrioritas(btn) {
   }
 }
 
-function tambahPaket(qty = '', harga = '', prioritas = false, bonus = '', diskonOngkir = '') {
+function tambahPaket(qty = '', harga = '', prioritas = false, bonus = '') {
   const wrap = document.getElementById('bundling-rows');
   const row  = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:70px 120px 1fr 90px auto auto;gap:8px;align-items:center' + (prioritas ? ';outline:1px solid rgba(251,191,36,.25);border-radius:8px' : '');
+  row.style.cssText = 'display:grid;grid-template-columns:70px 120px 1fr auto auto;gap:8px;align-items:center' + (prioritas ? ';outline:1px solid rgba(251,191,36,.25);border-radius:8px' : '');
   row.innerHTML = `
     <input type="number" placeholder="Qty" value="${qty}"
       style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
@@ -953,11 +966,6 @@ function tambahPaket(qty = '', harga = '', prioritas = false, bonus = '', diskon
       style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
     <input type="text" placeholder="Bonus (cth: sisir lipat)" value="${bonus}"
       style="background:#0d1117;border:1px solid rgba(251,191,36,.15);border-radius:8px;padding:8px 10px;color:#fde68a;font-size:13px;width:100%">
-    <div style="position:relative;display:flex;align-items:center">
-      <input type="number" placeholder="0" min="0" max="100" value="${diskonOngkir}"
-        style="background:#0d1117;border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:8px 28px 8px 10px;color:#6ee7b7;font-size:13px;width:100%">
-      <span style="position:absolute;right:8px;color:#6ee7b7;font-size:12px;pointer-events:none">%</span>
-    </div>
     <button type="button" class="btn-prioritas" data-aktif="${prioritas ? '1' : '0'}" onclick="setPrioritas(this)" title="Jadikan paket prioritas (direkomendasikan bot duluan)"
       style="padding:6px 9px;border:1px solid ${prioritas ? 'rgba(251,191,36,.4)' : 'rgba(255,255,255,.1)'};background:none;color:${prioritas ? '#fbbf24' : '#94a3b8'};border-radius:6px;cursor:pointer;font-size:14px">${prioritas ? '⭐' : '☆'}</button>
     <button type="button" onclick="this.closest('div').remove()"
@@ -970,17 +978,15 @@ function getBundlingData() {
   const rows = document.querySelectorAll('#bundling-rows > div');
   const result = [];
   rows.forEach(row => {
-    const inputs      = row.querySelectorAll('input');
-    const btn         = row.querySelector('.btn-prioritas');
-    const qty         = parseInt(inputs[0].value);
-    const harga       = parseInt(inputs[1].value);
-    const bonus       = inputs[2].value.trim();
-    const diskonOngkir = parseInt(inputs[3].value) || 0;
-    const prioritas   = btn?.dataset.aktif === '1';
+    const inputs  = row.querySelectorAll('input');
+    const btn     = row.querySelector('.btn-prioritas');
+    const qty     = parseInt(inputs[0].value);
+    const harga   = parseInt(inputs[1].value);
+    const bonus   = inputs[2].value.trim();
+    const prioritas = btn?.dataset.aktif === '1';
     if (qty > 0 && harga > 0) result.push({
       qty, harga,
       ...(bonus ? { bonus } : {}),
-      ...(diskonOngkir > 0 ? { diskon_ongkir: diskonOngkir } : {}),
       ...(prioritas ? { prioritas: true } : {})
     });
   });
@@ -989,7 +995,47 @@ function getBundlingData() {
 
 function loadBundling(data) {
   document.getElementById('bundling-rows').innerHTML = '';
-  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga, !!p.prioritas, p.bonus || '', p.diskon_ongkir || ''));
+  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga, !!p.prioritas, p.bonus || ''));
+}
+
+// ── Diskon Ongkir per Qty ────────────────────────────────
+function tambahDiskonOngkir(qty = '', diskon = '') {
+  const wrap = document.getElementById('diskon-ongkir-rows');
+  const row  = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center';
+  row.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:13px;color:#64748b;white-space:nowrap">Beli</span>
+      <input type="number" placeholder="Qty" min="1" value="${qty}"
+        style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
+      <span style="font-size:13px;color:#64748b;white-space:nowrap">box</span>
+    </div>
+    <div style="position:relative;display:flex;align-items:center">
+      <input type="number" placeholder="0" min="0" max="100" value="${diskon}"
+        style="background:#0d1117;border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:8px 32px 8px 10px;color:#6ee7b7;font-size:13px;width:100%">
+      <span style="position:absolute;right:10px;color:#6ee7b7;font-size:12px;pointer-events:none">% off</span>
+    </div>
+    <button type="button" onclick="this.closest('div').remove()"
+      style="padding:7px 10px;border:1px solid rgba(248,113,113,.2);background:none;color:#f87171;border-radius:6px;cursor:pointer;font-size:13px">✕</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function getDiskonOngkirData() {
+  const rows = document.querySelectorAll('#diskon-ongkir-rows > div');
+  const result = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const qty    = parseInt(inputs[0].value);
+    const diskon = parseInt(inputs[1].value) || 0;
+    if (qty > 0 && diskon > 0) result.push({ qty, diskon });
+  });
+  return result.length ? result.sort((a, b) => a.qty - b.qty) : null;
+}
+
+function loadDiskonOngkir(data) {
+  document.getElementById('diskon-ongkir-rows').innerHTML = '';
+  if (Array.isArray(data)) data.forEach(d => tambahDiskonOngkir(d.qty, d.diskon));
 }
 
 /* ── Modal Produk ── */
@@ -1059,6 +1105,7 @@ async function openEdit(id) {
   mappingRows = maps.map(m => ({ id: m.id, sumber: m.sumber, identifier: m.identifier }));
   renderTags('keluhan'); renderTags('diagnosa');
   document.getElementById('f-skip-diagnosa').checked = !!p.skip_diagnosa;
+  loadDiskonOngkir(p.diskon_ongkir_per_qty || []);
   renderMappingList();
   togglePromoNilai();
   switchTab('info', document.querySelector('.tab-btn'));
@@ -1189,6 +1236,7 @@ async function saveProduk() {
     keluhan_cocok: tagsData.keluhan,
     pertanyaan_diagnosa: tagsData.diagnosa,
     skip_diagnosa: document.getElementById('f-skip-diagnosa').checked || false,
+    diskon_ongkir_per_qty: getDiskonOngkirData(),
     persona_cs_nama: document.getElementById('f-persona-nama').value.trim() || 'Sari',
     persona_cs_gaya: document.getElementById('f-persona-gaya').value.trim(),
     promo_ongkir: {
