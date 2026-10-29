@@ -504,6 +504,10 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <div class="tags-input" id="tags-diagnosa" onclick="this.querySelector('input').focus()">
             <input type="text" placeholder="contoh: Sudah berapa lama?" onkeydown="addTag(event,'diagnosa')">
           </div>
+          <label onclick="document.getElementById('f-skip-diagnosa').click()" style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="f-skip-diagnosa" style="width:15px;height:15px;accent-color:#6ee7b7">
+            <span style="font-size:12px;color:#94a3b8">Keluhan sudah jelas dari produk — <span style="color:#6ee7b7">skip tanya keluhan, langsung edukasi & closing</span></span>
+          </label>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
@@ -1054,6 +1058,7 @@ async function openEdit(id) {
   const maps = await sbGet('ad_mapping', `?product_id=eq.${id}`);
   mappingRows = maps.map(m => ({ id: m.id, sumber: m.sumber, identifier: m.identifier }));
   renderTags('keluhan'); renderTags('diagnosa');
+  document.getElementById('f-skip-diagnosa').checked = !!p.skip_diagnosa;
   renderMappingList();
   togglePromoNilai();
   switchTab('info', document.querySelector('.tab-btn'));
@@ -1183,6 +1188,7 @@ async function saveProduk() {
     product_knowledge: document.getElementById('f-knowledge').value.trim(),
     keluhan_cocok: tagsData.keluhan,
     pertanyaan_diagnosa: tagsData.diagnosa,
+    skip_diagnosa: document.getElementById('f-skip-diagnosa').checked || false,
     persona_cs_nama: document.getElementById('f-persona-nama').value.trim() || 'Sari',
     persona_cs_gaya: document.getElementById('f-persona-gaya').value.trim(),
     promo_ongkir: {
