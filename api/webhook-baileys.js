@@ -232,8 +232,12 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
   const harga      = product?.harga ? `Rp ${product.harga.toLocaleString('id-ID')}` : '(akan dikonfirmasi)';
   const hasBundling   = Array.isArray(product?.harga_bundling) && product.harga_bundling.length > 0;
   const paketPrioritas = hasBundling ? product.harga_bundling.find(p => p.prioritas) : null;
+  const diskonOngkirPerQty = Array.isArray(product?.diskon_ongkir_per_qty) ? product.diskon_ongkir_per_qty : [];
   const bundlingTxt   = hasBundling
-    ? product.harga_bundling.map(p => `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.diskon_ongkir ? ` + ongkir -${p.diskon_ongkir}%${p.diskon_ongkir >= 100 ? ' (GRATIS)' : ''}` : ''}${p.prioritas ? ' ⭐PRIORITAS' : ''}`).join(' | ')
+    ? product.harga_bundling.map(p => {
+        const dok = diskonOngkirPerQty.find(d => d.qty === p.qty);
+        return `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.bonus ? ` + bonus ${p.bonus}` : ''}${dok ? ` + ongkir -${dok.diskon}%${dok.diskon >= 100 ? ' (GRATIS)' : ''}` : ''}${p.prioritas ? ' ⭐PRIORITAS' : ''}`;
+      }).join(' | ')
     : null;
 
   const pertanyaan = Array.isArray(product?.pertanyaan_diagnosa)
@@ -1017,10 +1021,10 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     // Step 6: Promo ongkir — cek diskon per bundling dulu, fallback ke promo_ongkir global
     const promo    = product?.promo_ongkir;
     const provinsi = lokal?.provinsi || bestArea.province || '';
-    const bundlingItem = Array.isArray(product?.harga_bundling)
-      ? product.harga_bundling.find(p => p.qty === qty)
+    const diskonQtyItem = Array.isArray(product?.diskon_ongkir_per_qty)
+      ? product.diskon_ongkir_per_qty.find(d => d.qty === qty)
       : null;
-    const diskonOngkirPct = bundlingItem?.diskon_ongkir || 0;
+    const diskonOngkirPct = diskonQtyItem?.diskon || 0;
 
     function applyDiskon(ongkirRaw) {
       if (diskonOngkirPct >= 100) return 0;
