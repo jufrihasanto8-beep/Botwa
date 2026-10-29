@@ -121,10 +121,20 @@ async function findOrCreateCustomer(userId, waNumber, nama, replyJid = null) {
 
 /* ── FIND / CREATE CONVERSATION ──────────────────────────── */
 async function findOrCreateConversation(userId, customerId, sumber, productId) {
-  // Ambil conversation terakhir customer ini (apapun statusnya)
-  const existing = await sbGet('conversations',
-    `?user_id=eq.${userId}&customer_id=eq.${customerId}&order=created_at.desc&limit=1`
-  );
+  // Kalau ada productId, cari conversation spesifik untuk produk itu dulu
+  // Ini penting agar chat Notelli & Jawara tidak tercampur di inbox
+  let existing = [];
+  if (productId) {
+    existing = await sbGet('conversations',
+      `?user_id=eq.${userId}&customer_id=eq.${customerId}&product_id=eq.${productId}&order=created_at.desc&limit=1`
+    ).catch(() => []);
+  }
+  // Fallback: cari conversation terbaru apapun produknya (backward compat / tanpa produk)
+  if (!existing.length) {
+    existing = await sbGet('conversations',
+      `?user_id=eq.${userId}&customer_id=eq.${customerId}&product_id=is.null&order=created_at.desc&limit=1`
+    ).catch(() => []);
+  }
 
   if (existing.length) {
     const conv = existing[0];
@@ -223,7 +233,7 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
   const hasBundling   = Array.isArray(product?.harga_bundling) && product.harga_bundling.length > 0;
   const paketPrioritas = hasBundling ? product.harga_bundling.find(p => p.prioritas) : null;
   const bundlingTxt   = hasBundling
-    ? product.harga_bundling.map(p => `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.prioritas ? ' ⭐PRIORITAS' : ''}`).join(' | ')
+    ? product.harga_bundling.map(p => `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐PRIORITAS' : ''}`).join(' | ')
     : null;
 
   const pertanyaan = Array.isArray(product?.pertanyaan_diagnosa)
@@ -283,7 +293,7 @@ ${hasBundling ? `Penawaran paket : ${bundlingTxt}
 ⚡ TIDAK ADA harga satuan/per box yang perlu disebutkan ke customer.` : `Harga           : ${harga}`}
 Cocok untuk     : ${keluhan}
 Cara pakai      : ${product?.cara_pakai || '(lihat kemasan)'}
-Knowledge       : ${product?.product_knowledge || '(belum diisi — kamu tetap TAHU nama produknya: ' + namaProduk + '. Jangan klaim manfaat/testimoni yang tidak ada, tapi boleh sebut nama produknya)'}
+Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
 Promo ongkir    : ${promoOngkir}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
@@ -405,7 +415,6 @@ REM ETIS
 - Keluhan serius/di luar produk → sarankan periksa, jangan paksa.
 
 HANDLE PERTANYAAN UMUM
-- "Jual apa?", "produk apa?", "ini jual apa?", "kamu jual produk apa?" → WAJIB sebut nama produk spesifik: "${namaProduk}", lalu pivot ke keluhan. Contoh: "Kami jual ${namaProduk} kak 😊 Biasanya cocok untuk yang punya keluhan [keluhan utama]. Kak sendiri ada keluhan apa nih?" — JANGAN jawab generik "produk kesehatan" atau kategori saja.
 - "Stok masih ada?" → "Masih ready kak, langsung proses aja 😊"
 - "Ada diskon/promo?" → Kalau ada promo ongkir, sebut itu. Kalau tidak ada, bilang "Untuk saat ini belum ada promo khusus kak, tapi harganya sudah yang terbaik 😊"
 - "Bisa kirim hari ini?" → "Kalau ordernya sebelum jam 12 siang biasanya bisa kirim hari ini kak 😊" (atau sesuaikan dengan knowledge produk)
@@ -1183,7 +1192,7 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
       const fee    = Math.ceil((hp + ongkirPromo) * 0.05);
       const tTF    = hp + ongkirPromo;
       const tCOD   = hp + ongkirPromo + fee;
-      return `- Paket ${p.qty} box${p.prioritas ? ' ⭐' : ''}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`;
+      return `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`;
     }).join('\n');
 
     hargaSection = `Tampilkan HANYA paket PRIORITAS ini ke customer (jangan ubah angka):
