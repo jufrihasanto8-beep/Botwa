@@ -889,7 +889,7 @@ function renderGrid() {
         <div class="prod-meta">Berat: <span>${p.berat_gram || 500}g</span> · Persona CS: <span>${p.persona_cs_nama || 'Sari'}</span></div>
         ${Array.isArray(p.harga_bundling) && p.harga_bundling.length ? `
         <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
-          ${p.harga_bundling.map(b => `<span style="font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid ${b.prioritas ? 'rgba(251,191,36,.5)' : 'rgba(255,255,255,.1)'};background:${b.prioritas ? 'rgba(251,191,36,.08)' : 'rgba(255,255,255,.04)'};color:${b.prioritas ? '#fbbf24' : '#94a3b8'}">${b.prioritas ? '⭐ ' : ''}${b.qty} box = ${rp(b.harga)}</span>`).join('')}
+          ${p.harga_bundling.map(b => `<span style="font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid ${b.prioritas ? 'rgba(251,191,36,.5)' : 'rgba(255,255,255,.1)'};background:${b.prioritas ? 'rgba(251,191,36,.08)' : 'rgba(255,255,255,.04)'};color:${b.prioritas ? '#fbbf24' : '#94a3b8'}">${b.prioritas ? '⭐ ' : ''}${b.qty} box = ${rp(b.harga)}${b.bonus ? ` + ${b.bonus}` : ''}</span>`).join('')}
         </div>` : ''}
         ${p.cara_pakai ? `<div class="prod-meta" style="margin-top:8px;font-size:12px;">${p.cara_pakai.slice(0,80)}...</div>` : ''}
       </div>
@@ -938,15 +938,17 @@ function setPrioritas(btn) {
   }
 }
 
-function tambahPaket(qty = '', harga = '', prioritas = false) {
+function tambahPaket(qty = '', harga = '', prioritas = false, bonus = '') {
   const wrap = document.getElementById('bundling-rows');
   const row  = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:center' + (prioritas ? ';outline:1px solid rgba(251,191,36,.25);border-radius:8px' : '');
+  row.style.cssText = 'display:grid;grid-template-columns:80px 120px 1fr auto auto;gap:8px;align-items:center' + (prioritas ? ';outline:1px solid rgba(251,191,36,.25);border-radius:8px' : '');
   row.innerHTML = `
-    <input type="number" placeholder="Jumlah (qty)" value="${qty}"
+    <input type="number" placeholder="Qty" value="${qty}"
       style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
     <input type="number" placeholder="Harga (Rp)" value="${harga}"
       style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
+    <input type="text" placeholder="Bonus (opsional, cth: sisir lipat)" value="${bonus}"
+      style="background:#0d1117;border:1px solid rgba(251,191,36,.15);border-radius:8px;padding:8px 10px;color:#fde68a;font-size:13px;width:100%">
     <button type="button" class="btn-prioritas" data-aktif="${prioritas ? '1' : '0'}" onclick="setPrioritas(this)" title="Jadikan paket prioritas (direkomendasikan bot duluan)"
       style="padding:6px 9px;border:1px solid ${prioritas ? 'rgba(251,191,36,.4)' : 'rgba(255,255,255,.1)'};background:none;color:${prioritas ? '#fbbf24' : '#94a3b8'};border-radius:6px;cursor:pointer;font-size:14px">${prioritas ? '⭐' : '☆'}</button>
     <button type="button" onclick="this.closest('div').remove()"
@@ -959,19 +961,20 @@ function getBundlingData() {
   const rows = document.querySelectorAll('#bundling-rows > div');
   const result = [];
   rows.forEach(row => {
-    const inputs   = row.querySelectorAll('input');
-    const btn      = row.querySelector('.btn-prioritas');
-    const qty      = parseInt(inputs[0].value);
-    const harga    = parseInt(inputs[1].value);
+    const inputs    = row.querySelectorAll('input');
+    const btn       = row.querySelector('.btn-prioritas');
+    const qty       = parseInt(inputs[0].value);
+    const harga     = parseInt(inputs[1].value);
+    const bonus     = inputs[2].value.trim();
     const prioritas = btn?.dataset.aktif === '1';
-    if (qty > 0 && harga > 0) result.push({ qty, harga, ...(prioritas ? { prioritas: true } : {}) });
+    if (qty > 0 && harga > 0) result.push({ qty, harga, ...(bonus ? { bonus } : {}), ...(prioritas ? { prioritas: true } : {}) });
   });
   return result.length ? result.sort((a, b) => a.qty - b.qty) : null;
 }
 
 function loadBundling(data) {
   document.getElementById('bundling-rows').innerHTML = '';
-  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga, !!p.prioritas));
+  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga, !!p.prioritas, p.bonus || ''));
 }
 
 /* ── Modal Produk ── */
