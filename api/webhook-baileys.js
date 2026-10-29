@@ -233,7 +233,7 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
   const hasBundling   = Array.isArray(product?.harga_bundling) && product.harga_bundling.length > 0;
   const paketPrioritas = hasBundling ? product.harga_bundling.find(p => p.prioritas) : null;
   const bundlingTxt   = hasBundling
-    ? product.harga_bundling.map(p => `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐PRIORITAS' : ''}`).join(' | ')
+    ? product.harga_bundling.map(p => `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.diskon_ongkir ? ` + ongkir -${p.diskon_ongkir}%${p.diskon_ongkir >= 100 ? ' (GRATIS)' : ''}` : ''}${p.prioritas ? ' ⭐PRIORITAS' : ''}`).join(' | ')
     : null;
 
   const pertanyaan = Array.isArray(product?.pertanyaan_diagnosa)
@@ -1012,14 +1012,26 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     const ekspedisi  = best.courier_name;
     const ongkirAsli = best.price;
 
-    // Step 6: Promo ongkir
+    // Step 6: Promo ongkir — cek diskon per bundling dulu, fallback ke promo_ongkir global
     const promo    = product?.promo_ongkir;
     const provinsi = lokal?.provinsi || bestArea.province || '';
-    let ongkirPromo = ongkirAsli;
-    if (promo?.tipe === 'gratis_penuh')        ongkirPromo = 0;
-    else if (promo?.tipe === 'potong')         ongkirPromo = Math.max(0, ongkirAsli - getPromoPotongan(promo, null, ongkirAsli));
-    else if (promo?.tipe === 'potong_wilayah') ongkirPromo = Math.max(0, ongkirAsli - getPromoPotongan(promo, provinsi, ongkirAsli));
-    else if (promo?.tipe === 'gratis_sd')      ongkirPromo = Math.max(0, ongkirAsli - (promo.nilai || 0));
+    const bundlingItem = Array.isArray(product?.harga_bundling)
+      ? product.harga_bundling.find(p => p.qty === qty)
+      : null;
+    const diskonOngkirPct = bundlingItem?.diskon_ongkir || 0;
+
+    function applyDiskon(ongkirRaw) {
+      if (diskonOngkirPct >= 100) return 0;
+      if (diskonOngkirPct > 0) return Math.round(ongkirRaw * (1 - diskonOngkirPct / 100));
+      // fallback ke promo_ongkir global
+      if (promo?.tipe === 'gratis_penuh')        return 0;
+      if (promo?.tipe === 'potong')              return Math.max(0, ongkirRaw - getPromoPotongan(promo, null, ongkirRaw));
+      if (promo?.tipe === 'potong_wilayah')      return Math.max(0, ongkirRaw - getPromoPotongan(promo, provinsi, ongkirRaw));
+      if (promo?.tipe === 'gratis_sd')           return Math.max(0, ongkirRaw - (promo.nilai || 0));
+      return ongkirRaw;
+    }
+
+    let ongkirPromo = applyDiskon(ongkirAsli);
 
     const harga = resolveHargaBundling(product, qty);
 
@@ -1030,11 +1042,7 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     const feeCODBulat        = totalCODBulat - harga - ongkirPromo;
 
     const allRates = rates.map(r => {
-      let rPromo = r.price;
-      if (promo?.tipe === 'gratis_penuh')        rPromo = 0;
-      else if (promo?.tipe === 'potong')         rPromo = Math.max(0, r.price - getPromoPotongan(promo, null, r.price));
-      else if (promo?.tipe === 'potong_wilayah') rPromo = Math.max(0, r.price - getPromoPotongan(promo, provinsi, r.price));
-      else if (promo?.tipe === 'gratis_sd')      rPromo = Math.max(0, r.price - (promo.nilai || 0));
+      const rPromo  = applyDiskon(r.price);
       const rFeeCOD = Math.ceil((harga + rPromo) * 0.05);
       return { nama: r.courier_name, ongkir: r.price, ongkirPromo: rPromo, totalTF: bulatkan(harga + rPromo), totalCOD: bulatkan(harga + rPromo + rFeeCOD) };
     });
