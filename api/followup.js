@@ -53,6 +53,21 @@ async function sbPost(table, body) {
   if (!res.ok) throw new Error(`sbPost ${table}: ${await res.text()}`);
 }
 
+// Batch fetch customers & products by IDs → Map
+async function batchFetchCustomers(ids) {
+  if (!ids.length) return new Map();
+  const uniq = [...new Set(ids)];
+  const rows = await sbGet('customers', `?id=in.(${uniq.join(',')})`).catch(() => []);
+  return new Map(rows.map(r => [r.id, r]));
+}
+async function batchFetchProducts(ids) {
+  if (!ids.length) return new Map();
+  const uniq = [...new Set(ids)].filter(Boolean);
+  if (!uniq.length) return new Map();
+  const rows = await sbGet('products', `?id=in.(${uniq.join(',')})&select=id,nama,persona_cs_nama,harga,harga_bundling,berat_gram,promo_ongkir,wa_session_id`).catch(() => []);
+  return new Map(rows.map(r => [r.id, r]));
+}
+
 // Ambil wa_session_id dari produk (fallback ke userId untuk backward compat)
 async function getWaSession(userId, productId) {
   if (productId) {
@@ -295,32 +310,40 @@ module.exports = async function handler(req, res) {
       `&select=id,user_id,customer_id,product_id,state,last_msg_at`
     ).catch(() => []);
 
+    // Filter dulu yang eligible sebelum batch fetch
+    const eligibleAwaiting = [];
+    const todayISO = new Date(now).toISOString().slice(0, 10);
     for (const conv of awaitingConvs) {
       const state = conv.state || {};
       if (!state.awaiting_order_confirm) continue;
+      if (state.confirm_reminder_sent_at?.startsWith(todayISO)) continue;
+      eligibleAwaiting.push(conv);
+    }
 
+    // Batch fetch customers & products untuk semua eligible conversations
+    const awCustMap = await batchFetchCustomers(eligibleAwaiting.map(c => c.customer_id));
+    const awProdMap = await batchFetchProducts(eligibleAwaiting.map(c => c.product_id).filter(Boolean));
+
+    for (const conv of eligibleAwaiting) {
       // Cek pesan terakhir harus dari AI (konfirmasi order) — bukan customer
       const lastMsgs = await sbGet('conv_messages',
         `?conversation_id=eq.${conv.id}&order=created_at.desc&limit=1`
       ).catch(() => []);
       if (!lastMsgs.length || lastMsgs[0].role !== 'ai') continue;
 
-      // Cek sudah pernah kirim reminder hari ini (max 1x per hari)
-      const todayISO = new Date(now).toISOString().slice(0, 10);
-      if (state.confirm_reminder_sent_at?.startsWith(todayISO)) continue;
+      const state = conv.state || {};
 
       try {
-        const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`).catch(() => []);
-        if (!customers.length) continue;
-        const customer = customers[0];
+        const customer = awCustMap.get(conv.customer_id);
+        if (!customer) continue;
         const jid = customer.reply_jid || customer.wa_number;
         if (!jid) continue;
 
         let productNama = '', csNama = 'Sari';
         if (conv.product_id) {
-          const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama&limit=1`).catch(() => []);
-          productNama = prods[0]?.nama || '';
-          csNama      = prods[0]?.persona_cs_nama || 'Sari';
+          const prod = awProdMap.get(conv.product_id);
+          productNama = prod?.nama || '';
+          csNama      = prod?.persona_cs_nama || 'Sari';
         }
 
         const snap      = state.order_snapshot || {};
@@ -420,6 +443,10 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
 
     console.log(`[DEBUG] newConvs=${newConvs.length}, reopenedToday=${reopenedToday.length}, total hariH=${hariHConvs.length}`);
 
+    // Batch fetch customers & products untuk semua hariH conversations
+    const hhCustMap = await batchFetchCustomers(hariHConvs.map(c => c.customer_id));
+    const hhProdMap = await batchFetchProducts(hariHConvs.map(c => c.product_id).filter(Boolean));
+
     for (const conv of hariHConvs) {
       try {
         const state = conv.state || {};
@@ -440,15 +467,13 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
           continue;
         }
 
-        const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
-        if (!customers.length) { totalSkipped++; continue; }
-        const customer = customers[0];
+        const customer = hhCustMap.get(conv.customer_id);
+        if (!customer) { totalSkipped++; continue; }
         if (!customer.reply_jid && !customer.wa_number) { totalSkipped++; continue; }
 
         let namaProduk = '', csNama = 'Sari', product = null;
         if (conv.product_id) {
-          const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama,harga,harga_bundling,berat_gram,promo_ongkir&limit=1`);
-          product    = prods[0] || null;
+          product    = hhProdMap.get(conv.product_id) || null;
           namaProduk = product?.nama || '';
           csNama     = product?.persona_cs_nama || 'Sari';
         }
@@ -538,6 +563,10 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         const maxHari = Math.max(...schedules.map(s => s.hari));
         sched.is_last = sched.hari === maxHari;
 
+        // Batch fetch customers & products untuk convs di schedule ini
+        const d2CustMap = await batchFetchCustomers(convs.map(c => c.customer_id));
+        const d2ProdMap = await batchFetchProducts(convs.map(c => c.product_id).filter(Boolean));
+
         for (const conv of convs) {
           try {
             const state            = conv.state || {};
@@ -553,15 +582,13 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
             if (conv.status === 'eskalasi')    { totalSkipped++; continue; }
             if (state.awaiting_order_confirm || state.awaiting_order_correction) { totalSkipped++; continue; }
 
-            const customers = await sbGet('customers', `?id=eq.${conv.customer_id}&limit=1`);
-            if (!customers.length) { totalSkipped++; continue; }
-            const customer = customers[0];
+            const customer = d2CustMap.get(conv.customer_id);
+            if (!customer) { totalSkipped++; continue; }
             if (!customer.reply_jid && !customer.wa_number) { totalSkipped++; continue; }
 
             let namaProduk = '', csNama = 'Sari', product = null;
             if (conv.product_id) {
-              const prods = await sbGet('products', `?id=eq.${conv.product_id}&select=nama,persona_cs_nama,harga,harga_bundling,berat_gram,promo_ongkir&limit=1`);
-              product    = prods[0] || null;
+              product    = d2ProdMap.get(conv.product_id) || null;
               namaProduk = product?.nama || '';
               csNama     = product?.persona_cs_nama || 'Sari';
             }
