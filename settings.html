@@ -217,6 +217,9 @@ body.light .gmail-info-box{background:rgba(59,130,246,.04)!important;border-colo
 body.light .gmail-info-box *{color:#475569!important}
 body.light #sec-gmail .section-title{color:#0f172a}
 body.light #sec-gmail .section-desc{color:#64748b}
+body.light #form-token-box{background:rgba(16,185,129,.04)!important;border-color:rgba(16,185,129,.15)!important}
+body.light #form-token-box div{color:#475569!important}
+body.light #form-token-box input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
 body.light #sec-group .section-title{color:#0f172a}
 body.light #sec-group .section-desc{color:#475569}
 body.light #grup-search{background:#fff!important;color:#0f172a!important;border-color:#e2e8f0!important}
@@ -450,11 +453,22 @@ Bisa isi lebih dari satu rekening."></textarea>
           <div style="text-align:center;padding:24px;color:#64748b">Memuat produk...</div>
         </div>
 
+        <!-- Form Token untuk integrasi OrderAdsy -->
+        <div id="form-token-box" style="margin-top:16px;padding:14px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);border-radius:10px;display:none">
+          <div style="font-size:12px;color:#6ee7b7;font-weight:600;margin-bottom:8px">🔗 Form Token (untuk OrderAdsy)</div>
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Copy token ini ke kolom <code style="background:rgba(99,102,241,.15);padding:1px 5px;border-radius:4px;color:#a5b4fc;font-size:11px">botwa_form_token</code> di produk OrderAdsy supaya order langsung masuk ke bot.</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="form-token-val" type="text" readonly style="flex:1;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-family:monospace;font-size:12px;outline:none">
+            <button onclick="copyFormToken()" class="btn-primary" style="font-size:12px;padding:8px 14px;white-space:nowrap">📋 Copy</button>
+          </div>
+        </div>
+
         <div class="gmail-info-box" style="margin-top:16px;padding:14px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:10px">
           <div style="font-size:12px;color:#93c5fd;font-weight:600;margin-bottom:6px">ℹ️ Cara kerja</div>
           <div style="font-size:12px;color:#94a3b8;line-height:1.6">
             Setelah hubungkan Gmail di tiap produk, sistem otomatis cek email baru dari orderonline.id setiap 5 menit.
-            Saat ada pesanan masuk, bot langsung kirim WA ke customer sesuai nomor WA produk tersebut.
+            Saat ada pesanan masuk, bot langsung kirim WA ke customer sesuai nomor WA produk tersebut.<br><br>
+            Atau gunakan <strong>Form Token</strong> di atas untuk integrasi langsung dengan OrderAdsy (instant, tanpa delay email).
           </div>
         </div>
       </div>
@@ -804,10 +818,35 @@ window.showSection = function(name, el) {
   if (name === 'kurir') loadKurir();
   if (name === 'rekening') loadRekening();
   if (name === 'ai') loadAnthropicKey();
-  if (name === 'gmail') { loadGmailStatus(); }
+  if (name === 'gmail') { loadGmailStatus(); loadFormToken(); }
   if (name === 'group') loadGroupJid();
   if (name === 'mengantar') loadMengantarSettings();
 };
+
+/* ── FORM TOKEN (untuk OrderAdsy) ── */
+async function loadFormToken() {
+  const userId = Auth.getUser()?.id;
+  if (!userId) return;
+  try {
+    const r = await fetch(`${window.SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=form_token`, {
+      headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+    });
+    const rows = await r.json();
+    const token = rows[0]?.form_token;
+    if (token) {
+      document.getElementById('form-token-val').value = token;
+      document.getElementById('form-token-box').style.display = '';
+    }
+  } catch(e) { console.error('loadFormToken:', e.message); }
+}
+function copyFormToken() {
+  const val = document.getElementById('form-token-val');
+  val.select();
+  navigator.clipboard.writeText(val.value).then(() => toast('✅ Form token di-copy!')).catch(() => {
+    document.execCommand('copy');
+    toast('✅ Form token di-copy!');
+  });
+}
 
 /* ── GMAIL INTEGRATION (per produk) ── */
 
