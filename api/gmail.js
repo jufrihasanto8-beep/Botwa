@@ -81,7 +81,7 @@ async function getAccessToken(refreshToken) {
 
 // ── Gmail API helpers ─────────────────────────────────────
 async function searchEmails(accessToken) {
-  const q = encodeURIComponent('from:support@orderonline.id is:unread in:anywhere');
+  const q = encodeURIComponent('(from:support@orderonline.id OR from:sufiruhana14@gmail.com) is:unread in:anywhere');
   const r = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=10`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -120,22 +120,42 @@ function extractBody(payload) {
   return '';
 }
 function parseOrderEmail(body) {
-  const namaMatch   = body.match(/Nama[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([^<\n]+)/i)
+  // Helper: extract value dari <td>Label</td> ... <td>Value</td> (table format OrderAdsy)
+  function extractTdValue(label) {
+    const re = new RegExp(`<td[^>]*>\\s*${label}\\s*</td>\\s*<td[^>]*>\\s*(?:<strong>)?\\s*([^<\\n]+)`, 'i');
+    return re.exec(body);
+  }
+
+  const namaMatch   = extractTdValue('Nama')
+                   || body.match(/Nama[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([^<\n]+)/i)
                    || body.match(/Nama[^:]*:\s*([^\n<]+)/i);
 
   // HP: tangkap semua variasi label (No. Telepon, Telepon, HP, WA, WhatsApp, Phone, Handphone, Nomor)
-  const hpMatch     = body.match(/(?:No\.?\s*)?(?:Telepon|HP|WA|WhatsApp|Phone|Handphone|Nomor\s*(?:WA|HP|Telepon)?)[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([+\d][\d\s\-()]{7,})/i)
+  const hpMatch     = extractTdValue('No\\.?\\s*WhatsApp')
+                   || body.match(/(?:No\.?\s*)?(?:Telepon|HP|WA|WhatsApp|Phone|Handphone|Nomor\s*(?:WA|HP|Telepon)?)[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([+\d][\d\s\-()]{7,})/i)
                    || body.match(/(?:No\.?\s*)?(?:Telepon|HP|WA|WhatsApp|Phone|Handphone|Nomor\s*(?:WA|HP|Telepon)?)[^:]*:\s*([+\d][\d\s\-()]{7,})/i)
                    // fallback: cari pola nomor Indonesia di mana saja (08xx/628xx/+628xx, min 10 digit)
                    || body.match(/(?<!\d)((?:\+?62|0)[8]\d{8,11})(?!\d)/);
 
-  const alamatMatch = body.match(/Alamat[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([^<\n]+)/i)
+  const alamatMatch = extractTdValue('Alamat')
+                   || body.match(/Alamat[^:]*:\s*<\/?(b|strong|td)[^>]*>\s*([^<\n]+)/i)
                    || body.match(/Alamat[^:]*:\s*([^\n<]+)/i);
-  const produkMatch = body.match(/<td[^>]*>\s*([A-Za-z][^<]{3,80}?)\s*<\/td>\s*(?:<[^>]+>)*\s*Rp/i)
+
+  // Produk: handle format <td><strong>Nama Produk</strong> Rp0</td> (OrderAdsy)
+  const produkTdMatch = body.match(/<td[^>]*>Produk\s*<\/td>\s*<td[^>]*>\s*(?:<strong>)?\s*([^<]+)/i);
+  const produkMatch = produkTdMatch
+                   || body.match(/<td[^>]*>\s*([A-Za-z][^<]{3,80}?)\s*<\/td>\s*(?:<[^>]+>)*\s*Rp/i)
                    || body.match(/([A-Za-z][^\n<]{3,60}?)\s+Rp[\d.,]+/i);
-  const orderIdMatch = body.match(/Order\s*ID[^:]*:\s*(\d+)/i);
+
+  // Order ID: support UUID (OrderAdsy) dan numeric (OrderOnline)
+  const orderIdMatch = body.match(/Order\s*ID[^<]*<\/td>\s*<td[^>]*>\s*([a-f0-9-]{36}|[a-f0-9]{32,}|\d+)/i)
+                    || body.match(/Order\s*ID[^:]*:\s*([a-f0-9-]{36}|[a-f0-9]{32,}|\d+)/i);
 
   const hp = (hpMatch?.[hpMatch.length - 1] || '').replace(/[\s\-()]/g, '').trim();
+
+  // Bersihkan produk dari suffix "Rp0" / harga
+  let rawProduk = (produkMatch?.[1] || '').trim();
+  rawProduk = rawProduk.replace(/\s*Rp[\d.,]*\s*$/, '').trim();
 
   // Validasi: buang alamat kalau isinya cuma tanggal/waktu (regex greedy ambil field salah)
   const DATE_PATTERN = /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}(\s+\d{1,2}:\d{2})?$/;
@@ -146,7 +166,7 @@ function parseOrderEmail(body) {
     nama:    (namaMatch?.[namaMatch.length - 1]   || '').trim(),
     hp,
     alamat,
-    produk:  (produkMatch?.[1]                    || '').trim(),
+    produk:  rawProduk,
     orderId: (orderIdMatch?.[1]                   || '').trim(),
   };
 }
