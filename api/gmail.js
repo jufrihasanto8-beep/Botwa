@@ -243,7 +243,7 @@ function renderTemplate(template, { nama, produk, alamat, hp }) {
 // ── Proses satu order lead (shared oleh poller & form-lead) ──
 // overrideProduct: objek produk dari DB (kalau sudah diketahui, misal dari cron per-produk)
 //                  null → akan cari sendiri berdasarkan nama produk di email
-async function processLead(userId, { nama, hp, alamat, produk }, overrideProduct = null) {
+async function processLead(userId, { nama, hp, alamat, produk, keluhan }, overrideProduct = null) {
   const waNumber = normalizeWA(hp);
 
   // Parse alamat
@@ -297,6 +297,7 @@ async function processLead(userId, { nama, hp, alamat, produk }, overrideProduct
     is_form_lead: true,
     form_produk: produk || null,
     form_alamat: alamat || null,
+    form_keluhan: keluhan || null,
     alamat_lengkap: alamatLengkap,
     followed_up: false,
     order_placed: existingConv[0]?.state?.order_placed || false,
@@ -527,12 +528,12 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Form Lead (dari n8n atau manual) ──────────────
-    const { form_token, nama, hp, alamat, produk } = body;
+    const { form_token, nama, hp, alamat, produk, keluhan } = body;
     if (form_token) {
       if (!hp) return res.status(400).json({ error: 'hp wajib diisi' });
       const users = await sbGet('users', `?form_token=eq.${form_token}&select=id&limit=1`);
       if (!users.length) return res.status(401).json({ error: 'form_token tidak valid' });
-      const result = await processLead(users[0].id, { nama, hp, alamat, produk });
+      const result = await processLead(users[0].id, { nama, hp, alamat, produk, keluhan });
       return res.status(200).json({ ok: true, ...result });
     }
 
