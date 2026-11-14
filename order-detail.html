@@ -114,7 +114,7 @@ body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
 /* Mengantar Modal */
 .mng-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;align-items:center;justify-content:center}
 .mng-overlay.open{display:flex}
-.mng-modal{background:var(--white);border-radius:14px;width:500px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.mng-modal{background:var(--white);border-radius:14px;width:620px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .mng-modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
 .mng-modal-head h3{font-size:15px;font-weight:700;color:var(--text)}
 .mng-modal-body{padding:16px 20px;overflow-y:auto;flex:1}
@@ -131,6 +131,18 @@ body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
 .btn-mengantar:hover{background:#ea6c00}
 .btn-mengantar:disabled{opacity:.6;cursor:not-allowed}
 .mng-loading{text-align:center;padding:30px;color:var(--text-2);font-size:13px}
+.mng-preview-item{padding:12px 0;border-bottom:1px solid var(--border)}
+.mng-preview-item:last-child{border-bottom:none}
+.mng-pv-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.mng-pv-name{font-weight:600;font-size:13px;color:var(--text)}
+.mng-pv-meta{font-size:11px;color:var(--text-2)}
+.mng-pv-row{display:flex;gap:8px;font-size:12px;line-height:1.6}
+.mng-pv-label{color:var(--text-2);min-width:70px;flex-shrink:0}
+.mng-pv-val{color:var(--text);flex:1}
+.mng-pv-match{margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px}
+.mng-pv-ok{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2)}
+.mng-pv-warn{background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2)}
+.mng-pv-fail{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2)}
 
 /* Date range picker */
 .drp-trigger{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
@@ -907,56 +919,189 @@ init();
 // ── KIRIM KE MENGANTAR ────────────────────────────────────
 let mngProcessing = false;
 let mngSelectedIds = [];
+let mngDestOverrides = {}; // { orderId: destId } — dari preview jika user pilih area berbeda
 
-function openMengantar() {
+async function openMengantar() {
   const chk = document.querySelectorAll('.row-cb:checked');
   mngSelectedIds = Array.from(chk).map(el => el.value).filter(Boolean);
+  mngDestOverrides = {};
   if (!mngSelectedIds.length) return;
 
-  // Build preview order list
-  const list = filterByRange(allOrders);
-  const rows = list.map((c, i) => getOrderRow(c, i)).filter(r => mngSelectedIds.includes(r.id));
-
-  // Group by kurir
-  const grouped = {};
-  rows.forEach(r => {
-    const k = r.instruksi || 'KURIR';
-    if (!grouped[k]) grouped[k] = [];
-    grouped[k].push(r);
-  });
-
-  const groupHtml = Object.entries(grouped).map(([kurir, items]) => `
-    <div style="margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px">${kurir} — ${items.length} order</div>
-      ${items.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-        <span style="font-size:16px">${r.isCOD ? '📦' : '💳'}</span>
-        <div>
-          <div style="font-weight:600">${escH(r.nama)}</div>
-          <div style="color:var(--text-2)">${escH(r.kecamatan)}, ${escH(r.kabupaten)} · ${r.isCOD ? 'COD' : 'TF'} ${rp(r.total)}</div>
-        </div>
-      </div>`).join('')}
-    </div>
-  `).join('');
-
-  document.getElementById('mng-modal-body').innerHTML = `
-    <div class="mng-summary">
-      <b>${mngSelectedIds.length} order</b> akan dikirim ke Mengantar dengan pickup <b>otomatis (min. 2 jam dari sekarang)</b>.
-    </div>
-    ${groupHtml}
-  `;
+  // Show loading state
   const submitBtn = document.getElementById('mng-btn-submit');
-  submitBtn.disabled = false;
-  submitBtn.textContent = 'Kirim Sekarang';
-  submitBtn.style.background = '#f97316';
-  submitBtn.onclick = submitMengantar;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Memverifikasi...';
+  submitBtn.style.background = '#94a3b8';
   document.getElementById('mng-btn-cancel').style.display = '';
+  document.getElementById('mng-modal-body').innerHTML = `
+    <div class="mng-loading">
+      <div style="font-size:32px;margin-bottom:12px">🔍</div>
+      <div>Memverifikasi alamat ${mngSelectedIds.length} order...</div>
+      <div style="font-size:11px;color:var(--text-2);margin-top:6px">Mencocokkan area tujuan dengan database Mengantar</div>
+    </div>
+  `;
   document.getElementById('mng-overlay').classList.add('open');
+
+  // Call preview endpoint
+  try {
+    const resp = await fetch('/api/tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'preview-mengantar', order_ids: mngSelectedIds, user_id: uid }),
+    });
+    const json = await resp.json();
+    if (!resp.ok) throw new Error(json.error || 'Server error');
+
+    const previews = json.previews || [];
+    let warnCount = 0, failCount = 0;
+
+    const previewHtml = previews.map(p => {
+      const al = p.alamatOrder;
+      const m = p.match;
+      const orderArea = [al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos].filter(Boolean).join(', ');
+
+      let statusClass, statusIcon, statusText;
+      if (!m) {
+        failCount++;
+        statusClass = 'mng-pv-fail';
+        statusIcon = '❌';
+        statusText = 'Area tidak ditemukan di Mengantar';
+      } else if (m.score >= 80) {
+        statusClass = 'mng-pv-ok';
+        statusIcon = '✅';
+        statusText = m.label;
+      } else if (m.score >= 30) {
+        warnCount++;
+        statusClass = 'mng-pv-warn';
+        statusIcon = '⚠️';
+        statusText = m.label;
+      } else {
+        warnCount++;
+        statusClass = 'mng-pv-warn';
+        statusIcon = '⚠️';
+        statusText = m.label + ' (score rendah)';
+      }
+
+      return `<div class="mng-preview-item" data-order-id="${p.orderId}">
+        <div class="mng-pv-head">
+          <span style="font-size:15px">${p.metode?.toLowerCase() === 'cod' ? '📦' : '💳'}</span>
+          <span class="mng-pv-name">${escH(p.nama)}</span>
+          <span class="mng-pv-meta">${escH(p.kurir)} · ${escH(p.produk)}</span>
+        </div>
+        <div class="mng-pv-row">
+          <span class="mng-pv-label">Alamat:</span>
+          <span class="mng-pv-val">${escH(al.jalan || '-')}</span>
+        </div>
+        <div class="mng-pv-row">
+          <span class="mng-pv-label">Area order:</span>
+          <span class="mng-pv-val">${escH(orderArea || '-')}</span>
+        </div>
+        <div class="mng-pv-match ${statusClass}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div>${statusIcon} <strong>Mengantar:</strong> ${escH(statusText)}</div>
+            ${m ? `<button onclick="searchDestManual('${p.orderId}','${escH(al.kecamatan || '')}')" style="padding:3px 10px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:6px;color:#3b82f6;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">Ganti</button>` : `<button onclick="searchDestManual('${p.orderId}','${escH(al.kecamatan || '')}')" style="padding:3px 10px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:6px;color:#ef4444;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">Cari Manual</button>`}
+          </div>
+          <div id="dest-search-${p.orderId}" style="display:none;margin-top:8px">
+            <div style="display:flex;gap:6px">
+              <input type="text" id="dest-q-${p.orderId}" placeholder="Ketik kecamatan/kelurahan..." value="${escH(al.kecamatan || '')}" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--white);color:var(--text)">
+              <button onclick="doDestSearch('${p.orderId}')" style="padding:6px 12px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">Cari</button>
+            </div>
+            <div id="dest-results-${p.orderId}" style="margin-top:6px;max-height:150px;overflow-y:auto"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const summaryColor = failCount ? 'border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04)' :
+                         warnCount ? 'border-color:rgba(234,179,8,.3);background:rgba(234,179,8,.04)' : '';
+
+    document.getElementById('mng-modal-body').innerHTML = `
+      <div class="mng-summary" style="${summaryColor}">
+        <b>${mngSelectedIds.length} order</b> — verifikasi alamat tujuan sebelum kirim ke Mengantar.
+        ${failCount ? `<br>❌ <b>${failCount} order</b> area tidak ditemukan` : ''}
+        ${warnCount ? `<br>⚠️ <b>${warnCount} order</b> perlu dicek` : ''}
+        ${!failCount && !warnCount ? '<br>✅ Semua area terverifikasi' : ''}
+      </div>
+      ${previewHtml}
+    `;
+
+    submitBtn.disabled = failCount > 0;
+    submitBtn.textContent = failCount > 0 ? `${failCount} order belum ada area` : 'Kirim Sekarang';
+    submitBtn.style.background = failCount > 0 ? '#94a3b8' : '#f97316';
+    submitBtn.onclick = submitMengantar;
+
+  } catch(e) {
+    document.getElementById('mng-modal-body').innerHTML = `
+      <div class="mng-summary" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04)">
+        ❌ Gagal memverifikasi alamat: ${escH(e.message)}
+      </div>
+    `;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Gagal';
+  }
+}
+
+function searchDestManual(orderId, defaultQ) {
+  const el = document.getElementById(`dest-search-${orderId}`);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'block') {
+    document.getElementById(`dest-q-${orderId}`).focus();
+  }
+}
+
+async function doDestSearch(orderId) {
+  const q = document.getElementById(`dest-q-${orderId}`)?.value?.trim();
+  if (!q || q.length < 3) return;
+  const resultsEl = document.getElementById(`dest-results-${orderId}`);
+  resultsEl.innerHTML = '<div style="font-size:11px;color:var(--text-2);padding:6px 0">Mencari...</div>';
+
+  try {
+    const r = await fetch('/api/tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'search-area', keyword: q }),
+    });
+    const json = await r.json();
+    const areas = json.areas || [];
+    if (!areas.length) {
+      resultsEl.innerHTML = '<div style="font-size:11px;color:#ef4444;padding:6px 0">Tidak ditemukan</div>';
+      return;
+    }
+
+    resultsEl.innerHTML = areas.map(a => {
+      const safeLabel = a.label.replace(/'/g, "\\'");
+      return `<div onclick="pickDest('${orderId}','${a.id}','${safeLabel}')" style="padding:8px 10px;cursor:pointer;font-size:12px;color:var(--text);border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='rgba(59,130,246,.08)'" onmouseout="this.style.background='transparent'">${escH(a.label)}</div>`;
+    }).join('');
+  } catch(e) {
+    resultsEl.innerHTML = `<div style="font-size:11px;color:#ef4444;padding:6px 0">Error: ${escH(e.message)}</div>`;
+  }
+}
+
+function pickDest(orderId, destId, label) {
+  mngDestOverrides[orderId] = destId;
+  // Update UI
+  const matchEl = document.querySelector(`[data-order-id="${orderId}"] .mng-pv-match`);
+  if (matchEl) {
+    matchEl.className = 'mng-pv-match mng-pv-ok';
+    matchEl.innerHTML = `<div>✅ <strong>Mengantar:</strong> ${label} <span style="font-size:10px;color:#22c55e">(dipilih manual)</span></div>`;
+  }
+  // Recheck if all orders now have area
+  const allItems = document.querySelectorAll('.mng-preview-item');
+  let stillFail = 0;
+  allItems.forEach(item => {
+    if (item.querySelector('.mng-pv-fail')) stillFail++;
+  });
+  const submitBtn = document.getElementById('mng-btn-submit');
+  submitBtn.disabled = stillFail > 0;
+  submitBtn.textContent = stillFail > 0 ? `${stillFail} order belum ada area` : 'Kirim Sekarang';
+  submitBtn.style.background = stillFail > 0 ? '#94a3b8' : '#f97316';
 }
 
 function closeMengantar() {
   if (mngProcessing) return;
   document.getElementById('mng-overlay').classList.remove('open');
   mngSelectedIds = [];
+  mngDestOverrides = {};
   mngProcessing = false;
 }
 
@@ -982,7 +1127,12 @@ async function submitMengantar() {
     const resp = await fetch('/api/tracking', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'create-mengantar', order_ids: mngSelectedIds, user_id: uid }),
+      body: JSON.stringify({
+        action: 'create-mengantar',
+        order_ids: mngSelectedIds,
+        user_id: uid,
+        dest_overrides: Object.keys(mngDestOverrides).length ? mngDestOverrides : undefined,
+      }),
     });
     const json = await resp.json();
 
