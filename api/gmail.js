@@ -527,10 +527,20 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, duration_ms: Date.now() - start, results });
     }
 
-    // ── Form Lead (dari n8n atau manual) ──────────────
+    // ── Form Lead (dari OrderAdsy / n8n / manual) ──────────────
     const { form_token, nama, hp, alamat, produk, keluhan } = body;
     if (form_token) {
       if (!hp) return res.status(400).json({ error: 'hp wajib diisi' });
+
+      // Cek form_token di products dulu (per produk), fallback ke users (per user, legacy)
+      const prods = await sbGet('products', `?form_token=eq.${form_token}&aktif=eq.true&select=id,nama,user_id,wa_session_id,template_form_lead&limit=1`).catch(() => []);
+      if (prods.length) {
+        const prod = prods[0];
+        const result = await processLead(prod.user_id, { nama, hp, alamat, produk: produk || prod.nama, keluhan }, prod);
+        return res.status(200).json({ ok: true, ...result });
+      }
+
+      // Fallback: cek di users table (legacy)
       const users = await sbGet('users', `?form_token=eq.${form_token}&select=id&limit=1`);
       if (!users.length) return res.status(401).json({ error: 'form_token tidak valid' });
       const result = await processLead(users[0].id, { nama, hp, alamat, produk, keluhan });
