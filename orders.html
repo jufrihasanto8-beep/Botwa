@@ -508,20 +508,25 @@ function filterByRange(convs) {
 let allLeads = []; // semua conversations (untuk hitung lead)
 
 async function init() {
-  const [convs, custs, prods] = await Promise.all([
+  const [convs, custs, prods, orders] = await Promise.all([
     sbFetch('conversations', `?user_id=eq.${uid}&select=id,customer_id,product_id,status,state,last_msg_at,created_at&order=last_msg_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama`),
-    sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`)
+    sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
+    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,qty,harga,ongkir_after_promo,fee_cod,total,metode,ekspedisi,created_at&order=created_at.desc`)
   ]);
 
   custs.forEach(c => { custMap[c.id] = c; });
   prods.forEach(p => { prodMap[p.id] = p; });
 
+  // Map orders by conversation_id (ambil yang terbaru per conversation)
+  const orderMap = {};
+  (orders||[]).forEach(o => { if (!orderMap[o.conversation_id]) orderMap[o.conversation_id] = o; });
+
   allLeads = convs || [];
-  // Filter hanya yang ada order (order_placed=true di state)
-  allConvs = (convs||[]).filter(c => {
-    try { return c.state?.order_placed === true; } catch { return false; }
-  });
+  // Filter: semua conversation yang status selesai (sama dengan dashboard)
+  allConvs = (convs||[]).filter(c => c.status === 'selesai');
+  // Attach order data ke conversation
+  allConvs.forEach(c => { c._order = orderMap[c.id] || {}; });
 
   render();
 }
@@ -543,15 +548,18 @@ function calcStats(list, leadsFiltered) {
 
   list.forEach(c => {
     const st = c.state || {};
+    const snap = st.order_snapshot || {};
+    const ord = c._order || {}; // dari orders_new kalau ada
     const prod = prodMap[c.product_id] || {};
-    const qty = parseInt(st.qty || 1);
-    const harga = prod.harga || 0;
-    const ongkir = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const nilai = (harga * qty) + ongkir;
+    const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
+    const harga = ord.harga || snap.harga || prod.harga || 0;
+    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
+    const nilai = ord.total || snap.total || (harga + ongkir + feeCod);
     gross += nilai;
     totalQty += qty;
 
-    const metode = (st.metode_bayar || 'cod').toLowerCase();
+    const metode = (ord.metode || snap.metode || st.metode_bayar || 'cod').toLowerCase();
     if (metode === 'transfer') { tfCount++; tfRp += nilai; }
     else { codCount++; codRp += nilai; }
   });
@@ -685,10 +693,14 @@ function renderTable(list) {
     const nama = cu.nama || cu.wa_number || 'Pelanggan';
     const prod = prodMap[c.product_id] || {};
     const st   = c.state || {};
-    const qty  = parseInt(st.qty || 1);
-    const ongkir = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const nilai = ((prod.harga||0) * qty) + ongkir;
-    const metode = (st.metode_bayar || 'cod').toLowerCase();
+    const snap = st.order_snapshot || {};
+    const ord  = c._order || {};
+    const qty  = parseInt(ord.qty || snap.qty || st.qty || 1);
+    const harga = ord.harga || snap.harga || prod.harga || 0;
+    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
+    const nilai = ord.total || snap.total || ((harga * qty) + ongkir + feeCod);
+    const metode = (ord.metode || snap.metode || st.metode_bayar || 'cod').toLowerCase();
     const color = avColor(nama);
     const ini   = avInit(nama);
 
@@ -703,8 +715,8 @@ function renderTable(list) {
         </div>
       </td>
       <td>
-        <div style="font-weight:500">${escH(prod.nama || st.keluhan || '(produk lama)')}</div>
-        <div style="font-size:11px;color:var(--text-3)">×${qty} · ongkir ${rp(ongkir)}</div>
+        <div style="font-weight:500">${escH(prod.nama || snap.produk || st.keluhan || '(produk lama)')}</div>
+        <div style="font-size:11px;color:var(--text-3)">×${qty} · @${rp(harga)} · ongkir ${rp(ongkir)}</div>
       </td>
       <td><span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'Transfer':'COD'}</span></td>
       <td style="font-weight:700;color:var(--text)">${rp(nilai)}</td>
@@ -724,18 +736,23 @@ function exportCSV() {
     const cu = custMap[c.customer_id] || {};
     const prod = prodMap[c.product_id] || {};
     const st = c.state || {};
-    const qty = parseInt(st.qty || 1);
-    const ongkir = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const nilai = ((prod.harga||0)*qty)+ongkir;
+    const snap = st.order_snapshot || {};
+    const ord = c._order || {};
+    const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
+    const harga = ord.harga || snap.harga || prod.harga || 0;
+    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
+    const nilai = ord.total || snap.total || ((harga * qty) + ongkir + feeCod);
+    const metode = (ord.metode || snap.metode || st.metode_bayar || 'COD').toUpperCase();
     rows.push([
       cu.nama || '—',
       cu.wa_number?.split('@')[0] || '—',
-      prod.nama || '—',
+      prod.nama || snap.produk || '—',
       qty,
-      prod.harga || 0,
+      harga,
       ongkir,
       nilai,
-      (st.metode_bayar || 'COD').toUpperCase(),
+      metode,
       fmtDt(c.last_msg_at)
     ]);
   });

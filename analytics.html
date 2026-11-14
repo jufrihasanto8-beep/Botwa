@@ -525,7 +525,7 @@ async function init() {
 
   // Stat kalkulasi dalam range
   const leadsHariIni   = convsRange.length;
-  const closingAll     = convsRange.filter(c => c.status === 'selesai' && c.state?.order_placed);
+  const closingAll     = convsRange.filter(c => c.status === 'selesai');
   const closingHariIni = closingAll.filter(c => new Date(c.last_msg_at||c.created_at) >= today).length;
   const convRate       = leadsHariIni > 0 ? Math.round((closingHariIni/leadsHariIni)*100) : 0;
   const esc            = convs.filter(c => c.status === 'eskalasi').length;
@@ -563,7 +563,7 @@ async function init() {
     const d = new Date(Date.now()-i*864e5);
     const start = new Date(d); start.setHours(0,0,0,0);
     const end   = new Date(d); end.setHours(23,59,59,999);
-    sparkData.push(convsRange.filter(c=>c.status==='selesai'&&c.state?.order_placed&&new Date(c.last_msg_at||c.created_at)>=start&&new Date(c.last_msg_at||c.created_at)<=end).length);
+    sparkData.push(convsRange.filter(c=>c.status==='selesai'&&new Date(c.last_msg_at||c.created_at)>=start&&new Date(c.last_msg_at||c.created_at)<=end).length);
   }
 
   // Render stat cards
@@ -620,7 +620,7 @@ async function init() {
     const d=new Date(rangeEnd.getTime()-i*864e5);
     days.push(d.toLocaleDateString('id-ID',{day:'numeric',month:'short'}));
     const s=new Date(d);s.setHours(0,0,0,0);const e=new Date(d);e.setHours(23,59,59,999);
-    closingCounts.push(convsRange.filter(c=>c.status==='selesai'&&c.state?.order_placed&&new Date(c.last_msg_at||c.created_at)>=s&&new Date(c.last_msg_at||c.created_at)<=e).length);
+    closingCounts.push(convsRange.filter(c=>c.status==='selesai'&&new Date(c.last_msg_at||c.created_at)>=s&&new Date(c.last_msg_at||c.created_at)<=e).length);
   }
   const totalClosing14 = closingCounts.reduce((a,b)=>a+b,0);
   document.getElementById('chart-total-num').textContent = totalClosing14;
@@ -672,7 +672,7 @@ async function generateInsights() {
       return;
     }
 
-    const closing   = convs.filter(c=>c.status==='selesai'&&c.state?.order_placed).length;
+    const closing   = convs.filter(c=>c.status==='selesai').length;
     const ekskalasi = convs.filter(c=>c.status==='eskalasi').length;
     const keluhanList = [...new Set(convs.map(c=>c.state?.keluhan).filter(Boolean))].slice(0,10);
     const sample    = msgs.slice(0,40).map(m=>`[${m.role}]: ${(m.isi||'').replace(/\[.*?\]/g,'').trim()}`).filter(l=>l.split(': ')[1]).join('\n');
