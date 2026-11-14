@@ -82,32 +82,33 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 /* Chat Preview Modal */
 .chat-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;align-items:center;justify-content:center}
 .chat-overlay.open{display:flex}
-.chat-modal{background:var(--white);border-radius:14px;width:480px;max-width:95vw;height:80vh;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.chat-modal{background:var(--white);border-radius:14px;width:420px;max-width:95vw;height:80vh;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .chat-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
 .chat-modal-head h3{font-size:14px;font-weight:700;color:var(--text)}
 .chat-modal-head .chat-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);line-height:1;padding:4px}
-.chat-modal-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.chat-modal-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-height:0}
 .chat-modal-body::-webkit-scrollbar{width:4px}
 .chat-modal-body::-webkit-scrollbar-thumb{background:rgba(100,100,100,.2);border-radius:4px}
-.chat-bubble{max-width:82%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word;white-space:pre-wrap}
-.chat-row{display:flex;gap:6px;align-items:flex-end}
+.chat-bubble{max-width:78%;min-width:40px;padding:7px 11px;border-radius:10px;font-size:13px;line-height:1.5;word-break:break-word;white-space:pre-wrap;text-align:left}
+.chat-row{display:flex;margin-bottom:1px}
 .chat-row.from-customer{justify-content:flex-start}
 .chat-row.from-bot{justify-content:flex-end}
-.chat-row.from-customer .chat-bubble{background:rgba(59,130,246,.08);color:var(--text);border-bottom-left-radius:4px}
-.chat-row.from-bot .chat-bubble{background:#3b82f6;color:#fff;border-bottom-right-radius:4px}
+.chat-row.from-customer .chat-bubble{background:#f0f0f0;color:#1a1a1a;border-bottom-left-radius:3px}
+.chat-row.from-bot .chat-bubble{background:#3b82f6;color:#fff;border-bottom-right-radius:3px}
 .chat-row.from-system{justify-content:center}
 .chat-row.from-system .chat-bubble{background:rgba(100,116,139,.08);color:var(--text-2);font-size:11px;max-width:90%;text-align:center;border-radius:8px}
-.chat-time{font-size:10px;color:var(--text-3);flex-shrink:0;margin-bottom:2px}
-.chat-label{font-size:10px;font-weight:600;margin-bottom:2px}
-.chat-label.ai{color:#3b82f6}
-.chat-label.cs{color:#f59e0b}
+.chat-time-inline{font-size:10px;color:rgba(0,0,0,.35);float:right;margin:6px 0 -3px 10px;line-height:1}
+.chat-time-bot{color:rgba(255,255,255,.55)}
+.chat-label{font-size:10px;font-weight:600;display:block;margin-bottom:2px}
+.chat-label.ai{color:rgba(255,255,255,.7)}
+.chat-label.cs{color:#fbbf24}
 .chat-loading{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
 .chat-empty{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
 .td-phone-link{color:#3b82f6;cursor:pointer;text-decoration:none;font-weight:500}
 .td-phone-link:hover{text-decoration:underline}
 .td-name-link{color:#3b82f6;cursor:pointer;text-decoration:none}
 .td-name-link:hover{text-decoration:underline}
-body.light .chat-row.from-customer .chat-bubble{background:rgba(59,130,246,.06)}
+body.light .chat-row.from-customer .chat-bubble{background:#f0f0f0;color:#1a1a1a}
 body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
 
 /* Mengantar Modal */
@@ -1208,22 +1209,11 @@ async function openChatPreview(convId, nama) {
       if (m.role === 'system') {
         html += `<div class="chat-row from-system"><div class="chat-bubble">${safe}</div></div>`;
       } else if (m.role === 'customer') {
-        html += `<div class="chat-row from-customer">
-          <div>
-            <div class="chat-bubble">${safe}</div>
-            <div class="chat-time">${time}</div>
-          </div>
-        </div>`;
+        html += `<div class="chat-row from-customer"><div class="chat-bubble">${safe}<span class="chat-time-inline">${time}</span></div></div>`;
       } else {
         const label = m.role === 'cs' ? 'CS' : 'AI';
         const cls   = m.role === 'cs' ? 'cs' : 'ai';
-        html += `<div class="chat-row from-bot">
-          <div style="text-align:right">
-            <div class="chat-label ${cls}">${label}</div>
-            <div class="chat-bubble">${safe}</div>
-            <div class="chat-time" style="text-align:right">${time}</div>
-          </div>
-        </div>`;
+        html += `<div class="chat-row from-bot"><div class="chat-bubble"><span class="chat-label ${cls}">${label}</span>${safe}<span class="chat-time-inline chat-time-bot">${time}</span></div></div>`;
       }
     });
 
