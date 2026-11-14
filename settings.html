@@ -829,7 +829,7 @@ async function loadFormToken() {
   if (!userId) return;
   try {
     const r = await fetch(`${window.SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=form_token`, {
-      headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+      headers: { 'apikey': window.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` }
     });
     const rows = await r.json();
     const token = rows[0]?.form_token;
