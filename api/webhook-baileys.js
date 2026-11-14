@@ -2256,6 +2256,92 @@ Beritahu customer dengan sopan bahwa transfer sepertinya salah rekening, minta k
         notif = `[SISTEM] Bukti transfer VALID dan rekening COCOK ✅
 Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'} | Tanggal: ${imageAnalysis.tanggal || '?'}
 Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan estimasi pengiriman.`;
+
+        // ── Auto-closing Transfer: bukti TF valid → langsung closing ──
+        if (convState.order_placed || convState.order_snapshot) {
+          try {
+            const nomorUrutClosing = await getOrderNumber(userId);
+            await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
+            await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
+
+            // Cek apakah order sudah ada (anti-double)
+            const existingOrder = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&limit=1`).catch(() => []);
+            if (!existingOrder.length) {
+              const snap       = convState.order_snapshot || {};
+              const ongkirSnap = convState.ongkir || {};
+              const alamatSnap = {
+                jalan:      snap.alamat       || convState.alamat              || '',
+                kelurahan:  ongkirSnap.area?.kelurahan || customer?.alamat?.kelurahan || '',
+                kecamatan:  ongkirSnap.area?.kecamatan || customer?.alamat?.kecamatan || '',
+                kabupaten:  ongkirSnap.area?.kota      || customer?.alamat?.kabupaten || '',
+                provinsi:   ongkirSnap.area?.provinsi  || customer?.alamat?.provinsi  || '',
+                kodepos:    ongkirSnap.area?.kodePos   || customer?.alamat?.kodepos   || '',
+                ...(ongkirSnap.mengantar_dest_id ? { mengantar_dest_id: ongkirSnap.mengantar_dest_id } : {}),
+              };
+              const qtySnap = parseInt(snap.qty || convState.qty || 1) || 1;
+              const hargaSnap = snap.harga || resolveHargaBundling(product, qtySnap) || product?.harga || 0;
+              const ongkirPromoSnap = snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0;
+              const totalSnap = hargaSnap + ongkirPromoSnap; // Transfer = no feeCOD
+
+              const insertedRows = await sbPost('orders_new', {
+                user_id:           userId,
+                customer_id:       customer?.id,
+                conversation_id:   conversation.id,
+                product_id:        product?.id || null,
+                metode:            'transfer',
+                qty:               qtySnap,
+                harga:             hargaSnap,
+                ongkir:            snap.ongkirAsli   || ongkirSnap.ongkirAsli   || 0,
+                ongkir_after_promo: ongkirPromoSnap,
+                fee_cod:           0,
+                total:             totalSnap,
+                ekspedisi:         snap.ekspedisi    || ongkirSnap.ekspedisi    || '',
+                alamat:            alamatSnap,
+                keluhan:           snap.keluhan      || convState.keluhan       || '',
+                status:            'pending',
+                customer_nama:     customer?.nama    || '',
+                customer_phone:    (customer?.wa_number || '').replace(/^62/, '0'),
+                product_nama:      product?.nama     || '',
+                berat_gram:        product?.berat_gram || 0,
+              });
+              const insertedOrderId = insertedRows?.[0]?.id || null;
+              console.log(`[bukti-tf-closing] Insert orders_new OK — conv ${conversation.id}, order_id: ${insertedOrderId}`);
+
+              // Set closed_order_id
+              if (insertedOrderId) {
+                await updateConvState(conversation.id, { closed_order_id: insertedOrderId }).catch(() => {});
+              }
+
+              // Update total_order & last_order_at
+              if (customer?.id) {
+                await sbPatch('customers', `?id=eq.${customer.id}`, {
+                  total_order:   (customer.total_order || 0) + 1,
+                  last_order_at: new Date().toISOString(),
+                }).catch(() => {});
+              }
+
+              // Kirim recap ke grup WA
+              if (userGroupJid) {
+                const closingMsg = buildClosingMessage({
+                  nomorUrut: nomorUrutClosing, customer,
+                  alamat:  snap.alamat  || convState.alamat || '-',
+                  ongkir:  ongkirSnap,
+                  product,
+                  keluhan: snap.keluhan || convState.keluhan || '-',
+                  metode:  'Transfer',
+                  qty:     qtySnap,
+                  csNama:  product?.persona_cs_nama || 'CS',
+                });
+                await sendWA(waSession, userGroupJid, closingMsg, true).catch(() => {});
+                console.log(`[bukti-tf-closing] Recap #${nomorUrutClosing} terkirim ke grup`);
+              }
+            } else {
+              console.log(`[bukti-tf-closing] Order sudah ada — skip insert`);
+            }
+          } catch(e) {
+            console.error('[bukti-tf-closing] Error:', e.message);
+          }
+        }
       } else {
         // rekening_cocok === null artinya tidak bisa dibaca — jangan anggap valid
         notif = `[SISTEM] Customer kirim gambar yang terlihat seperti bukti transfer tapi rekening tujuan tidak bisa terbaca dengan jelas.
