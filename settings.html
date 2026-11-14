@@ -286,6 +286,7 @@ body.light .grup-item-nama{color:#0f172a}
       <a href="#" onclick="showSection('gmail',this)">📧 Integrasi Gmail</a>
       <a href="#" onclick="showSection('group',this)">💬 Grup WA Recap</a>
       <a href="#" onclick="showSection('mengantar',this)">🚚 Mengantar</a>
+      <a href="#" onclick="showSection('template',this)">📝 Template Pesan</a>
     </div>
 
     <div class="settings-body">
@@ -549,6 +550,51 @@ Bisa isi lebih dari satu rekening."></textarea>
         </div>
       </div>
 
+      <!-- ── Template Pesan ── -->
+      <div class="settings-section" id="sec-template">
+        <div class="section-title">📝 Template Pesan</div>
+        <div class="section-desc">Kustomisasi pesan WA otomatis yang dikirim ke customer. Kosongkan untuk pakai template default.</div>
+
+        <!-- Template Resi Dikirim -->
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:16px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px" class="section-subtitle" style="margin-top:0">🚚 Resi Dikirim</div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.5">Pesan yang dikirim otomatis ke customer setelah resi didapat dari Mengantar.</div>
+
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+            <span style="font-size:11px;align-self:center;color:#94a3b8">Variabel:</span>
+            <code onclick="insertTmplVar('tmpl-resi-dikirim','{nama}')" style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer">{nama}</code>
+            <code onclick="insertTmplVar('tmpl-resi-dikirim','{produk}')" style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer">{produk}</code>
+            <code onclick="insertTmplVar('tmpl-resi-dikirim','{resi}')" style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer">{resi}</code>
+            <code onclick="insertTmplVar('tmpl-resi-dikirim','{kurir}')" style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;color:#a5b4fc;font-size:11px;cursor:pointer">{kurir}</code>
+          </div>
+
+          <textarea id="tmpl-resi-dikirim" rows="6" style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;line-height:1.6;resize:vertical"
+            placeholder="Halo kak {nama} 👋&#10;&#10;Pesanan {produk} kakak sudah dikirim! 🚚&#10;&#10;No. Resi: {resi}&#10;Kurir: {kurir}&#10;&#10;Kakak bisa cek status pengiriman pakai nomor resi di atas ya. Terima kasih sudah order! 🙏"></textarea>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
+            <div id="tmpl-resi-status" style="font-size:11px;color:#64748b">Memuat...</div>
+            <button onclick="saveTemplate('template_resi_dikirim','tmpl-resi-dikirim','tmpl-resi-status')" style="padding:6px 16px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Simpan Template</button>
+          </div>
+        </div>
+
+        <!-- SQL notice -->
+        <div id="tmpl-sql-notice" style="display:none;margin-top:16px;padding:14px;background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.2);border-radius:10px">
+          <div style="font-size:12px;color:#facc15;font-weight:600;margin-bottom:6px">⚠️ Jalankan SQL ini di Supabase (sekali saja)</div>
+          <code style="display:block;font-size:11px;color:#fde68a;background:rgba(0,0,0,.3);padding:8px 10px;border-radius:6px;line-height:1.6;white-space:pre-wrap">ALTER TABLE users ADD COLUMN IF NOT EXISTS template_resi_dikirim TEXT;</code>
+        </div>
+
+        <!-- Info variabel -->
+        <div style="margin-top:16px;padding:14px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:10px">
+          <div style="font-size:12px;color:#93c5fd;font-weight:600;margin-bottom:6px">ℹ️ Keterangan Variabel</div>
+          <div style="font-size:12px;color:#94a3b8;line-height:1.8">
+            <code style="color:#a5b4fc">{nama}</code> — Nama depan customer<br>
+            <code style="color:#a5b4fc">{produk}</code> — Nama produk yang dipesan<br>
+            <code style="color:#a5b4fc">{resi}</code> — Nomor resi pengiriman<br>
+            <code style="color:#a5b4fc">{kurir}</code> — Nama kurir / ekspedisi
+          </div>
+        </div>
+      </div>
+
     </div><!-- settings-body -->
   </div><!-- settings-layout -->
 </div><!-- main-content -->
@@ -808,6 +854,7 @@ window.showSection = function(name, el) {
   if (name === 'gmail') { loadGmailStatus(); }
   if (name === 'group') loadGroupJid();
   if (name === 'mengantar') loadMengantarSettings();
+  if (name === 'template') loadTemplates();
 };
 
 /* ── GMAIL INTEGRATION (per produk) ── */
@@ -1552,6 +1599,66 @@ async function saveMengantarSettings() {
   } catch(e) {
     alert('Gagal simpan: ' + e.message);
   }
+}
+
+/* ── TEMPLATE PESAN ── */
+async function loadTemplates() {
+  const userId = Auth.getUser()?.id;
+  const statusEl = document.getElementById('tmpl-resi-status');
+  try {
+    const data = await SB.get('users', `?id=eq.${userId}&select=template_resi_dikirim&limit=1`);
+    const row = data?.[0];
+    const ta = document.getElementById('tmpl-resi-dikirim');
+    if (row?.template_resi_dikirim) {
+      ta.value = row.template_resi_dikirim;
+      statusEl.textContent = '✓ Template aktif';
+      statusEl.style.color = '#22c55e';
+    } else {
+      ta.value = '';
+      statusEl.textContent = 'Menggunakan template default';
+      statusEl.style.color = '#64748b';
+    }
+  } catch(e) {
+    console.error('loadTemplates error', e);
+    if (e.message?.includes('column') || e.message?.includes('42703')) {
+      document.getElementById('tmpl-sql-notice').style.display = 'block';
+      statusEl.textContent = 'Kolom belum ada — jalankan SQL di bawah';
+      statusEl.style.color = '#facc15';
+    } else {
+      statusEl.textContent = 'Gagal memuat';
+      statusEl.style.color = '#ef4444';
+    }
+  }
+}
+
+function insertTmplVar(textareaId, v) {
+  const ta = document.getElementById(textareaId);
+  if (!ta) return;
+  const pos = ta.selectionStart;
+  ta.value = ta.value.slice(0, pos) + v + ta.value.slice(ta.selectionEnd);
+  ta.selectionStart = ta.selectionEnd = pos + v.length;
+  ta.focus();
+}
+
+async function saveTemplate(field, textareaId, statusId) {
+  const userId = Auth.getUser()?.id;
+  const tmpl = document.getElementById(textareaId)?.value?.trim() || null;
+  const statusEl = document.getElementById(statusId);
+  try {
+    const res = await fetch('/api/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, table: 'users_template', payload: { [field]: tmpl } }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('✅ Template tersimpan');
+      statusEl.textContent = tmpl ? '✓ Template aktif' : '✓ Template default';
+      statusEl.style.color = '#22c55e';
+    } else {
+      toast('❌ Gagal simpan: ' + (data.error || ''));
+    }
+  } catch(e) { toast('❌ Error: ' + e.message); }
 }
 </script>
 </body>
