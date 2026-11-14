@@ -587,11 +587,24 @@ async function handleCreateMengantar(req, res) {
           custNameFormatted = (cu.nama || '-') + '|' + skuParts.join('+');
         }
 
+        // Data tim untuk label Mengantar
+        const csNama   = prod.persona_cs_nama || '';
+        const advNama  = prod.advertiser      || '';
+        const admNama  = prod.admin_nama      || '';
+
         const item = {
           customerName:           custNameFormatted,
           customerPhone:          (cu.wa_number || '').replace(/^62/, '0'),
           customerAddress:        alamatStr || '-',
-          parcelContent:          prod.nama || 'Produk',
+          parcelContent:          (() => {
+            const parts = ['New', (prod.nama || 'Produk'), qty];
+            // Bonus dari bundling
+            const bundling = Array.isArray(prod.harga_bundling) ? prod.harga_bundling : [];
+            const matchPaket = bundling.find(b => b.qty === qty);
+            if (matchPaket?.bonus) parts.push('Bonus', matchPaket.bonus, '1');
+            if (csNama) parts.push('CS', csNama);
+            return parts.join(' ');
+          })(),
           weight:                 berat * qty,
           quantity:               qty,
           dontIncludeSubdistrict: false,
@@ -608,9 +621,6 @@ async function handleCreateMengantar(req, res) {
         else          item.goodsValue = totalNilai;
 
         // Instruksi pengiriman: CS X/ADV Y/Admin|ongkir|potOngkir|admin|potAdmin|hargaProduk
-        const csNama   = prod.persona_cs_nama || '';
-        const advNama  = prod.advertiser      || '';
-        const admNama  = prod.admin_nama      || '';
         const pengirim = ['CS ' + csNama, advNama ? 'ADV ' + advNama : '', admNama].filter(Boolean).join('/');
         const ongkirAsli   = o.ongkir || 0;
         const ongkirPromo  = o.ongkir_after_promo ?? ongkirAsli;
