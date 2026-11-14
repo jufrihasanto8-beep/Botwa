@@ -388,9 +388,9 @@ async function handleCreateMengantar(req, res) {
     const prodIds = [...new Set(orders.map(o => o.product_id).filter(Boolean))];
 
     const [customers, products, userRows] = await Promise.all([
-      sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,nama,wa_number`),
-      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama,harga,berat_gram`) : Promise.resolve([]),
-      sbGet('users', `?id=eq.${user_id}&select=id,mengantar_key,mengantar_origin_id&limit=1`),
+      sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,nama,wa_number,reply_jid`),
+      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama,harga,berat_gram,wa_session_id`) : Promise.resolve([]),
+      sbGet('users', `?id=eq.${user_id}&select=id,mengantar_key,mengantar_origin_id,template_resi_dikirim&limit=1`),
     ]);
 
     const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
@@ -541,6 +541,64 @@ async function handleCreateMengantar(req, res) {
           }).catch(() => {});
           results.push({ orderId: x.orderId, kurir, success: false, error: errMsg });
         }
+      }
+    }
+
+    // ── Kirim notif resi ke customer via WA ──────────────────
+    const BAILEYS_URL    = process.env.BAILEYS_URL;
+    const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
+    const tmplResi       = userRow.template_resi_dikirim || null;
+
+    for (const r of results) {
+      if (!r.success || !r.cnote_no || !r.orderId) continue;
+      const order = orders.find(o => o.id === r.orderId);
+      if (!order) continue;
+
+      const cu   = custMap[order.customer_id];
+      const prod = prodMap[order.product_id];
+      if (!cu?.wa_number) continue;
+
+      const jid       = cu.reply_jid || cu.wa_number;
+      const namaKak   = cu.nama ? cu.nama.split(' ')[0] : 'Kak';
+      const prodNama  = prod?.nama || 'pesanan';
+      const waSession = prod?.wa_session_id || user_id;
+
+      // Bangun pesan resi
+      let pesan;
+      if (tmplResi) {
+        pesan = tmplResi
+          .replace(/\{nama\}/gi, namaKak)
+          .replace(/\{produk\}/gi, prodNama)
+          .replace(/\{resi\}/gi, r.cnote_no)
+          .replace(/\{kurir\}/gi, r.kurir || '');
+      } else {
+        pesan = `Halo kak *${namaKak}* 👋\n\nPesanan *${prodNama}* kakak sudah dikirim! 🚚\n\nNo. Resi: *${r.cnote_no}*\nKurir: *${r.kurir || '-'}*\n\nKakak bisa cek status pengiriman pakai nomor resi di atas ya. Terima kasih sudah order! 🙏`;
+      }
+
+      try {
+        await fetch(`${BAILEYS_URL}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            secret: WEBHOOK_SECRET,
+            session_id: waSession,
+            wa_number: jid,
+            message: pesan,
+            is_outbound: true,
+          }),
+        });
+        console.log(`[resi-notif] Resi ${r.cnote_no} dikirim ke ${cu.wa_number}`);
+
+        // Simpan ke conv_messages kalau ada conversation
+        if (order.conversation_id) {
+          await sbPost('conv_messages', {
+            conversation_id: order.conversation_id,
+            role: 'ai',
+            isi: pesan,
+          }).catch(() => {});
+        }
+      } catch(e) {
+        console.error(`[resi-notif] Gagal kirim ke ${cu.wa_number}:`, e.message);
       }
     }
 
