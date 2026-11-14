@@ -500,7 +500,7 @@ const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agu
 const DAYS_ID   = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 
 (function(){
-  filterStart = new Date(Date.now()-6*864e5); filterStart.setHours(0,0,0,0);
+  filterStart = new Date(); filterStart.setHours(0,0,0,0);
   filterEnd   = new Date(); filterEnd.setHours(23,59,59,999);
   drpSelStart = new Date(filterStart); drpSelEnd = new Date(filterEnd);
 })();
