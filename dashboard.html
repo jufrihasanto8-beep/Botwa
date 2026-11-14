@@ -1592,43 +1592,87 @@ async function openClosingManual() {
 
   // Pre-fill dari state conversation
   const st  = activeConv.state || {};
-  const al  = st.alamat || {};
 
-  // Ambil data customer kalau ada
+  // Ambil data customer (nama, hp, alamat) kalau ada
   let custNama = '', custHp = '';
+  let custAlamat = {};
   if (activeConv.customer_id) {
-    const custs = await sbGet('customers', `?id=eq.${activeConv.customer_id}&select=nama,wa_number&limit=1`);
+    const custs = await sbGet('customers', `?id=eq.${activeConv.customer_id}&select=nama,wa_number,alamat&limit=1`);
     const cu = custs[0] || {};
-    custNama = cu.nama || '';
-    custHp   = cu.wa_number ? cu.wa_number.replace(/^62/, '0').split('@')[0] : '';
+    custNama   = cu.nama || '';
+    custHp     = cu.wa_number ? cu.wa_number.replace(/^62/, '0').split('@')[0] : '';
+    custAlamat = cu.alamat || {};
   }
+
+  // Alamat: prioritas ongkir.area (dari hitungOngkir) → customer.alamat → fallback kosong
+  const area = st.ongkir?.area || {};
+  const alJalan     = st.alamat || custAlamat.jalan || '';  // st.alamat = string teks alamat
+  const alKelurahan = area.kelurahan || custAlamat.kelurahan || '';
+  const alKecamatan = area.kecamatan || custAlamat.kecamatan || '';
+  const alKabupaten = area.kota      || custAlamat.kabupaten || '';
+  const alProvinsi  = area.provinsi  || custAlamat.provinsi  || '';
+  const alKodepos   = area.kodePos   || custAlamat.kodepos   || '';
+
+  // Metode bayar dari state
+  const metodePrefill = (st.metode_bayar || st.order_snapshot?.metode || 'COD').toUpperCase();
+  const metodeVal = metodePrefill === 'TRANSFER' || metodePrefill === 'TF' ? 'Transfer' : 'COD';
+
+  // Ongkir dari state
+  const ongkirPrefill = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? '';
 
   document.getElementById('cm-overlay').style.display = 'flex';
   document.getElementById('cm-prod').innerHTML = `<option value="">-- Pilih Produk --</option>${prodOpts}`;
   document.getElementById('cm-qty').value       = st.qty || '1';
   document.getElementById('cm-harga').value     = '';
-  document.getElementById('cm-metode').value    = 'COD';
-  const kurirFromState = st.ongkir?.kurir || '';
+  document.getElementById('cm-metode').value    = metodeVal;
+  const kurirFromState = st.ongkir?.kurir || st.ongkir?.ekspedisi || '';
   const kurirSel = document.getElementById('cm-kurir');
   kurirSel.value = kurirFromState;
   if (!kurirSel.value) kurirSel.value = ''; // reset jika tidak ada di list
   document.getElementById('cm-nama').value      = custNama;
   document.getElementById('cm-hp').value        = custHp;
-  document.getElementById('cm-jalan').value     = al.jalan || '';
-  document.getElementById('cm-kelurahan').value = al.kelurahan || '';
-  document.getElementById('cm-kecamatan').value = al.kecamatan || '';
-  document.getElementById('cm-kabupaten').value = al.kabupaten || '';
-  document.getElementById('cm-provinsi').value  = al.provinsi  || '';
-  document.getElementById('cm-kodepos').value   = al.kodepos   || '';
+  document.getElementById('cm-jalan').value     = alJalan;
+  document.getElementById('cm-kelurahan').value = alKelurahan;
+  document.getElementById('cm-kecamatan').value = alKecamatan;
+  document.getElementById('cm-kabupaten').value = alKabupaten;
+  document.getElementById('cm-provinsi').value  = alProvinsi;
+  document.getElementById('cm-kodepos').value   = alKodepos;
+  document.getElementById('cm-ongkir').value    = ongkirPrefill;
   document.getElementById('cm-catatan').value        = '';
   document.getElementById('cm-total-cod').value      = '';
   document.getElementById('cm-cod-row').style.display = 'none';
   document.getElementById('cm-bundling-info').textContent = '';
+
+  // Auto-select produk dari conversation
+  if (activeConv.product_id) {
+    document.getElementById('cm-prod').value = activeConv.product_id;
+    updateHargaFromBundling();
+    updateCMTotal();
+  }
   document.getElementById('cm-modal-err').textContent = '';
   document.getElementById('cm-ongkir').value = '';
   const oi = document.getElementById('cm-ongkir-info'); if (oi) oi.textContent = '';
   _cmDestId = null;
   document.getElementById('cm-total-preview').textContent = '';
+
+  // ── Guard: kalau sudah ada order untuk conversation ini, disable tombol ──
+  const cmBtn = document.getElementById('cm-btn-submit');
+  const cmErr = document.getElementById('cm-modal-err');
+  if (activeConvId) {
+    sbGet('orders_new', `?conversation_id=eq.${activeConvId}&limit=1`).then(ex => {
+      if (ex.length) {
+        cmBtn.disabled = true;
+        cmBtn.textContent = 'Sudah Closing';
+        cmBtn.style.opacity = '0.5';
+        cmErr.textContent = 'Conversation ini sudah punya order — tidak bisa double closing.';
+        cmErr.style.color = '#ef4444';
+      } else {
+        cmBtn.disabled = false;
+        cmBtn.textContent = 'Simpan Closing';
+        cmBtn.style.opacity = '1';
+      }
+    }).catch(() => {});
+  }
 }
 
 function closeClosingManual() {
@@ -1799,6 +1843,17 @@ async function submitClosingManual() {
   statusEl.textContent = '';
 
   try {
+    // ── Guard anti-double: cek apakah conversation ini sudah punya order ──
+    if (activeConvId) {
+      const existing = await sbGet('orders_new', `?conversation_id=eq.${activeConvId}&limit=1`);
+      if (existing.length) {
+        statusEl.textContent = 'Order untuk percakapan ini sudah ada — tidak bisa double closing.';
+        btn.disabled = false;
+        btn.textContent = 'Simpan Closing';
+        return;
+      }
+    }
+
     const prod    = cmProducts.find(p => p.id === prodId) || {};
     const ongkir  = parseInt(document.getElementById('cm-ongkir').value) || 0;
     const feeCOD  = metode === 'COD' ? Math.ceil((harga + ongkir) * 0.05) : 0;
