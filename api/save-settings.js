@@ -312,7 +312,7 @@ module.exports = async function handler(req, res) {
         if (lower) harga = lower.harga + (prod.harga || 0) * (qty - lower.qty);
       }
 
-      const feeCOD = Math.ceil((harga + ongkirPromo) * 0.05);
+      const feeCOD = Math.ceil((harga + ongkirPromo) * 0.03);
       return res.status(200).json({
         ok: true,
         kurir: best.name,

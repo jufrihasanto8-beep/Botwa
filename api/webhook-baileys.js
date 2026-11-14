@@ -371,7 +371,7 @@ ATURAN HARGA, ONGKIR & COD
   JANGAN tulis [WILAYAH_OK:...] sebelum provinsi dipastikan oleh customer.
 - Wilayah tak konsisten → konfirmasi halus, jangan asal proses.
 - Kurir dipilih SISTEM berdasarkan grade + ongkir daerah itu.
-- Fee COD 5% ke customer, dibulatkan ke terdekat.
+- Fee COD 3% ke customer, dibulatkan ke terdekat.
 - Kalau ditanya "pengiriman dari mana" → jawab dari DATA PRODUK di atas (Asal pengiriman). Jangan bilang "tidak bisa info".
 - Promo ongkir diterapkan SISTEM (berlaku COD & transfer).
 
@@ -1050,14 +1050,14 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     const harga = resolveHargaBundling(product, qty);
 
     // Step 7: Hitung total
-    const feeCOD             = Math.ceil((harga + ongkirPromo) * 0.05);
+    const feeCOD             = Math.ceil((harga + ongkirPromo) * 0.03);
     const totalTransferBulat = bulatkan(harga + ongkirPromo);
     const totalCODBulat      = bulatkan(harga + ongkirPromo + feeCOD);
     const feeCODBulat        = totalCODBulat - harga - ongkirPromo;
 
     const allRates = rates.map(r => {
       const rPromo  = applyDiskon(r.price);
-      const rFeeCOD = Math.ceil((harga + rPromo) * 0.05);
+      const rFeeCOD = Math.ceil((harga + rPromo) * 0.03);
       return { nama: r.courier_name, ongkir: r.price, ongkirPromo: rPromo, totalTF: bulatkan(harga + rPromo), totalCOD: bulatkan(harga + rPromo + rFeeCOD) };
     });
 
@@ -1204,14 +1204,14 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
   if (hasBundling) {
     const defaultPaket  = paketPrioritas || product.harga_bundling[0];
     const defaultHarga  = defaultPaket.harga;
-    const defaultFeeCOD = Math.ceil((defaultHarga + ongkirPromo) * 0.05);
+    const defaultFeeCOD = Math.ceil((defaultHarga + ongkirPromo) * 0.03);
     const defaultTotalTF  = defaultHarga + ongkirPromo;
     const defaultTotalCOD = defaultHarga + ongkirPromo + defaultFeeCOD;
 
     // Tabel semua paket (hanya ditampilkan ke Claude, TIDAK ke customer kecuali ditanya)
     const tabelSemuaPaket = product.harga_bundling.map(p => {
       const hp     = p.harga;
-      const fee    = Math.ceil((hp + ongkirPromo) * 0.05);
+      const fee    = Math.ceil((hp + ongkirPromo) * 0.03);
       const tTF    = hp + ongkirPromo;
       const tCOD   = hp + ongkirPromo + fee;
       return `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`;
@@ -1331,9 +1331,14 @@ function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, sat
   const oa = ongkirAsli  || op;
   const fc = isCOD ? (feeCOD || 0) : 0;
   const total = h + op + fc;
+  const adaDiskonOngkir = oa > 0 && oa > op;
 
-  const parts    = isCOD && fc > 0 ? [h, op, fc] : [h, op];
-  const totalStr = `${parts.join('+')}=${total}`;
+  // Tampilkan ongkir dengan diskon kalau ada
+  const ongkirStr = adaDiskonOngkir
+    ? `~Rp ${oa.toLocaleString('id-ID')}~ Rp ${op.toLocaleString('id-ID')}`
+    : `Rp ${op.toLocaleString('id-ID')}`;
+
+  const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
 
   return `✅ *Konfirmasi Order ${productNama || 'Produk'}*
 
@@ -1348,8 +1353,10 @@ function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, sat
 *Kode Pos:* ${area?.kodePos || '-'}
 
 *Jumlah Pesanan:* ${qty} ${satuanLabel} ${productNama || '-'}
+*Harga Produk:* ${fmt(h)}
+*Ongkir:* ${ongkirStr}${adaDiskonOngkir ? ` 🎉` : ''}${isCOD && fc > 0 ? `\n*Admin COD:* ${fmt(fc)}` : ''}
 *Pembayaran:* ${isCOD ? 'COD' : 'Transfer'} ${ekspLabel}
-*Total Pembayaran:* ${totalStr}
+*Total Pembayaran:* ${fmt(total)}
 
 Sudah bener kak? 😊`;
 }
@@ -1631,6 +1638,16 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
 
     // ── State conversation ────────────────────────────────────
     const convState = conversation.state || {};
+
+    // ── Auto-backfill closed_order_id untuk conversation lama yang sudah closing tapi belum punya ID ──
+    if (!convState.closed_order_id) {
+      const existingOrders = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=1`).catch(() => []);
+      if (existingOrders.length) {
+        convState.closed_order_id = existingOrders[0].id;
+        await updateConvState(conversation.id, { closed_order_id: existingOrders[0].id }).catch(() => {});
+        console.log(`[backfill] closed_order_id set untuk conv ${conversation.id} → order ${existingOrders[0].id}`);
+      }
+    }
 
     // ── Handle konfirmasi / koreksi order ─────────────────────
     if (convState.awaiting_order_confirm || convState.awaiting_order_correction) {
@@ -3085,7 +3102,7 @@ ${ongkirInfo}`;
 
         const harga = product?.harga || 0;
         const totalTransferBulat = bulatkan(harga + ongkirPromo);
-        const feeCODRaw = Math.ceil((harga + ongkirPromo) * 0.05);
+        const feeCODRaw = Math.ceil((harga + ongkirPromo) * 0.03);
         const totalCODBulat = bulatkan(harga + ongkirPromo + feeCODRaw);
         const feeCODBulat = totalCODBulat - harga - ongkirPromo; // derive dari total agar konsisten
         const newOngkir = {
@@ -3300,7 +3317,7 @@ ${ongkirInfo}`;
       const ongkirAsli  = ongkirData?.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
       const ongkirPromo = ongkirData?.ongkirPromo || custAlamat?.ongkirPromo || 0;
       // Recalculate feeCOD pakai harga bundling yang benar — Transfer selalu 0
-      const feeCODCalc  = isCOD ? Math.ceil((harga + ongkirPromo) * 0.05) : 0;
+      const feeCODCalc  = isCOD ? Math.ceil((harga + ongkirPromo) * 0.03) : 0;
       const feeCOD      = isCOD ? (feeCODCalc || ongkirData?.feeCOD || custAlamat?.feeCOD || 0) : 0;
 
       // Simpan area & ekspedisi yang sudah confirmed ke ongkir state agar tersimpan permanen di Supabase
