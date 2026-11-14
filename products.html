@@ -418,9 +418,16 @@ body.light .fu-msg-lbl{color:#94a3b8}
 
       <!-- Tab: Info Dasar -->
       <div class="tab-pane active" id="tab-info">
-        <div class="form-group">
-          <label>Nama Produk *</label>
-          <input type="text" id="f-nama" placeholder="contoh: Herbal Sinus Pro">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:12px;">
+          <div class="form-group">
+            <label>Nama Produk *</label>
+            <input type="text" id="f-nama" placeholder="contoh: Herbal Sinus Pro">
+          </div>
+          <div class="form-group">
+            <label>Kode SKU</label>
+            <input type="text" id="f-sku" placeholder="NSR" style="width:90px;text-transform:uppercase;font-weight:700;text-align:center">
+            <small style="color:#64748b;font-size:10px;margin-top:2px">Untuk label Mengantar</small>
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
@@ -955,10 +962,10 @@ function setPrioritas(btn) {
   }
 }
 
-function tambahPaket(qty = '', harga = '', prioritas = false, bonus = '') {
+function tambahPaket(qty = '', harga = '', prioritas = false, bonus = '', bonus_sku = '') {
   const wrap = document.getElementById('bundling-rows');
   const row  = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:70px 120px 1fr auto auto;gap:8px;align-items:center' + (prioritas ? ';outline:1px solid rgba(251,191,36,.25);border-radius:8px' : '');
+  row.style.cssText = 'display:grid;grid-template-columns:70px 120px 1fr 70px auto auto;gap:8px;align-items:center' + (prioritas ? ';outline:1px solid rgba(251,191,36,.25);border-radius:8px' : '');
   row.innerHTML = `
     <input type="number" placeholder="Qty" value="${qty}"
       style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
@@ -966,6 +973,8 @@ function tambahPaket(qty = '', harga = '', prioritas = false, bonus = '') {
       style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
     <input type="text" placeholder="Bonus (cth: sisir lipat)" value="${bonus}"
       style="background:#0d1117;border:1px solid rgba(251,191,36,.15);border-radius:8px;padding:8px 10px;color:#fde68a;font-size:13px;width:100%">
+    <input type="text" placeholder="SKU" value="${bonus_sku}" title="Kode SKU bonus (cth: SIR)"
+      style="background:#0d1117;border:1px solid rgba(251,191,36,.15);border-radius:8px;padding:8px 10px;color:#fde68a;font-size:11px;width:100%;text-transform:uppercase;text-align:center;font-weight:700">
     <button type="button" class="btn-prioritas" data-aktif="${prioritas ? '1' : '0'}" onclick="setPrioritas(this)" title="Jadikan paket prioritas (direkomendasikan bot duluan)"
       style="padding:6px 9px;border:1px solid ${prioritas ? 'rgba(251,191,36,.4)' : 'rgba(255,255,255,.1)'};background:none;color:${prioritas ? '#fbbf24' : '#94a3b8'};border-radius:6px;cursor:pointer;font-size:14px">${prioritas ? '⭐' : '☆'}</button>
     <button type="button" onclick="this.closest('div').remove()"
@@ -983,10 +992,12 @@ function getBundlingData() {
     const qty     = parseInt(inputs[0].value);
     const harga   = parseInt(inputs[1].value);
     const bonus   = inputs[2].value.trim();
+    const bonus_sku = (inputs[3]?.value || '').trim().toUpperCase();
     const prioritas = btn?.dataset.aktif === '1';
     if (qty > 0 && harga > 0) result.push({
       qty, harga,
       ...(bonus ? { bonus } : {}),
+      ...(bonus_sku ? { bonus_sku } : {}),
       ...(prioritas ? { prioritas: true } : {})
     });
   });
@@ -995,7 +1006,7 @@ function getBundlingData() {
 
 function loadBundling(data) {
   document.getElementById('bundling-rows').innerHTML = '';
-  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga, !!p.prioritas, p.bonus || ''));
+  if (Array.isArray(data)) data.forEach(p => tambahPaket(p.qty, p.harga, !!p.prioritas, p.bonus || '', p.bonus_sku || ''));
 }
 
 // ── Diskon Ongkir per Qty ────────────────────────────────
@@ -1045,6 +1056,7 @@ function openAdd() {
   mappingRows = [];
   document.getElementById('modal-title').textContent = 'Tambah Produk';
   document.getElementById('f-nama').value = '';
+  document.getElementById('f-sku').value = '';
   document.getElementById('f-harga').value = '';
   loadBundling([]);
   document.getElementById('f-aktif').value = 'true';
@@ -1075,6 +1087,7 @@ async function openEdit(id) {
   tagsData.diagnosa = Array.isArray(p.pertanyaan_diagnosa)  ? [...p.pertanyaan_diagnosa] : [];
   document.getElementById('modal-title').textContent = 'Edit Produk';
   document.getElementById('f-nama').value = p.nama || '';
+  document.getElementById('f-sku').value = p.sku || '';
   document.getElementById('f-harga').value = p.harga || '';
   document.getElementById('f-aktif').value = String(p.aktif);
   loadBundling(p.harga_bundling || []);
@@ -1222,9 +1235,12 @@ async function saveProduk() {
   const harga = parseInt(document.getElementById('f-harga').value);
   if (!nama || !harga) { toast('Nama dan harga wajib diisi', 'error'); return; }
 
+  const sku = document.getElementById('f-sku').value.trim().toUpperCase() || null;
+
   const payload = {
     user_id: currentUserId,
     nama,
+    sku,
     harga,
     aktif: document.getElementById('f-aktif').value === 'true',
     berat_gram: parseInt(document.getElementById('f-berat').value) || 500,
