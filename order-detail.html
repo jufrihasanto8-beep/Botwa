@@ -300,19 +300,19 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
     <div class="drp-wrap">
       <button class="drp-trigger" onclick="drpToggle()" id="drp-trigger">
         <span class="drp-icon">📅</span>
-        <span id="drp-label">7 hari terakhir</span>
+        <span id="drp-label">Hari ini</span>
         <span style="color:var(--text-3)">▾</span>
       </button>
       <div class="drp-dropdown" id="drp-dropdown">
         <div class="drp-presets">
-          <button class="drp-preset active" onclick="drpPreset(7,'7 hari terakhir',this)">7 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPreset(7,'7 hari terakhir',this)">7 Hari Terakhir</button>
           <button class="drp-preset" onclick="drpPreset(14,'14 hari terakhir',this)">14 Hari Terakhir</button>
           <button class="drp-preset" onclick="drpPreset(30,'30 hari terakhir',this)">30 Hari Terakhir</button>
           <button class="drp-preset" onclick="drpPreset(90,'90 hari terakhir',this)">90 Hari Terakhir</button>
           <button class="drp-preset" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
           <button class="drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
           <hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
-          <button class="drp-preset" onclick="drpPreset(1,'Hari ini',this)">Hari Ini</button>
+          <button class="drp-preset active" onclick="drpPreset(1,'Hari ini',this)">Hari Ini</button>
           <button class="drp-preset" onclick="drpPresetYesterday(this)">Kemarin</button>
         </div>
         <div style="display:flex;flex-direction:column;flex:1">
