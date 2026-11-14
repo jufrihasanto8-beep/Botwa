@@ -1767,7 +1767,8 @@ Isi field yang berubah saja, sisanya null.` }],
         // ── Awaiting confirm — cek jawaban customer ────────────
         // Normalize repeated vowel di akhir: "yaa" → "ya", "iyaa" → "iya", "okee" → "oke"
         const msgNorm = msgLower.replace(/([aeiou])\1+$/g, '$1').replace(/([aeiou])\1+\b/g, '$1');
-        const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|udah|siap|fix|setuju|benar|yap|yep|mantap|jadi|boleh|lanjut|gas|benar|okey)\b/i.test(msgNorm);
+        const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|suda|udah|uda|siap|sip|fix|setuju|benar|yap|yep|yoi|mantap|mantab|jadi|boleh|lanjut|gas|okey|baik|deal|acc|gass)\b/i.test(msgNorm)
+                       || (msgLower.length <= 20 && /\b(oke|ok|iya|ya|suda|sudah|udah|siap|baik|bener|benar|betul|setuju|deal|fix|jadi|boleh|lanjut|mantap|sip|yoi|acc)\b/i.test(msgLower));
         // isDeny: hanya kalau jelas nolak/minta ubah order — jangan trigger dari "gak" / "ga" yang sering muncul di kalimat biasa
         const isDeny    = /\b(salah|ganti|ubah|bukan|koreksi|ralat|perbaiki|enggak|nggak|ngga|wrong|nope)\b/i.test(msgLower)
                        || /\b(tidak|belum)\s+(benar|bener|betul|sesuai|cocok|iya|ya|oke)\b/i.test(msgLower);
@@ -1779,7 +1780,22 @@ Isi field yang berubah saja, sisanya null.` }],
           // Tidak ubah state — tetap awaiting_order_confirm
           // Fall through ke Claude di bawah (sudah ada inject konteks awaiting_order_confirm di system prompt)
         } else if (isConfirm) {
-          // ✅ Closing! — ambil nomor urut SEBELUM set status selesai supaya tidak ikut terhitung
+          // ── Cek metode bayar: Transfer → jangan closing dulu, tunggu bukti TF ──
+          const snapMetode = (convState.order_snapshot?.metode || convState.metode_bayar || 'cod').toLowerCase();
+          if (snapMetode === 'transfer' || snapMetode === 'tf') {
+            // Transfer: simpan order_snapshot tapi JANGAN closing — tunggu bukti TF
+            await updateConvState(conversation.id, {
+              awaiting_order_confirm: false,
+              awaiting_bukti_tf: true,
+              order_snapshot: convState.order_snapshot,
+            });
+            const tfMsg = `Siap kak, pesanannya sudah kami catat! 📝\n\nSilakan transfer ke:\n${userRekening || '(hubungi CS untuk info rekening)'}\n\nKalau sudah transfer, kirim bukti TF-nya ya kak 🙏`;
+            const { wamid: wamid_tf } = await sendWA(waSession, reply_jid, tfMsg).catch(()=>({}));
+            await saveMessage(conversation.id, 'ai', tfMsg, wamid_tf);
+            return res.status(200).json({ ok: true, action: 'awaiting_bukti_tf' });
+          }
+
+          // ✅ COD → langsung Closing!
           const nomorUrutClosing = await getOrderNumber(userId);
           await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
           await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
@@ -2142,6 +2158,11 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       systemPrompt += `\n\nKONTEKS PERCAKAPAN SEBELUMNYA (ringkasan otomatis)\n${conversation.ringkasan}\n\nLanjutkan percakapan dari konteks ini. Jangan ulangi salam dari awal.`;
     }
 
+    // Inject konteks awaiting bukti TF — customer sudah confirm order transfer, tinggal kirim bukti
+    if (convState.awaiting_bukti_tf) {
+      systemPrompt += `\n\n[SISTEM - PENTING] Customer sudah KONFIRMASI pesanan dengan metode TRANSFER. Sedang menunggu bukti transfer (foto struk/screenshot). JANGAN generate [ORDER_CONFIRMED]. Kalau customer kirim pesan teks (bukan gambar), ingatkan dengan sopan untuk kirim bukti TF-nya. Kalau customer tanya rekening lagi, kasih info rekening: ${userRekening || '(belum diisi)'}. JANGAN closing sebelum bukti TF valid.`;
+    }
+
     // Inject konteks order sudah placed — cegah Claude kirim konfirmasi ulang
     if (convState.order_placed && !convState.awaiting_order_confirm) {
       systemPrompt += `\n\n[SISTEM - PENTING] Order customer ini SUDAH SELESAI DIPROSES sebelumnya. JANGAN generate marker [ORDER_CONFIRMED] atau kirim ringkasan order lagi. Baca konteks percakapan dan jawab pertanyaan customer secara natural sesuai apa yang mereka tanyakan.`;
@@ -2260,11 +2281,11 @@ Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'} | 
 Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan estimasi pengiriman.`;
 
         // ── Auto-closing Transfer: bukti TF valid → langsung closing ──
-        if (convState.order_placed || convState.order_snapshot) {
+        if (convState.awaiting_bukti_tf || convState.order_placed || convState.order_snapshot) {
           try {
             const nomorUrutClosing = await getOrderNumber(userId);
             await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
-            await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
+            await updateConvState(conversation.id, { awaiting_order_confirm: false, awaiting_bukti_tf: false, order_placed: true });
 
             // Cek apakah order sudah ada (anti-double)
             const existingOrder = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&limit=1`).catch(() => []);
