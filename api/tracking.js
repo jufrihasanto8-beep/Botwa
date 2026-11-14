@@ -515,7 +515,7 @@ async function handleCreateMengantar(req, res) {
 
     const [customers, products, userRows] = await Promise.all([
       sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,nama,wa_number,reply_jid`),
-      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama,sku,harga,berat_gram,wa_session_id,harga_bundling`) : Promise.resolve([]),
+      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama,sku,harga,berat_gram,wa_session_id,harga_bundling,persona_cs_nama,advertiser,admin_nama`) : Promise.resolve([]),
       sbGet('users', `?id=eq.${user_id}&select=id,mengantar_key,mengantar_origin_id,template_resi_dikirim&limit=1`),
     ]);
 
@@ -606,6 +606,19 @@ async function handleCreateMengantar(req, res) {
         if (destId)   item.customerAddressDataId = destId;
         if (isCOD)    item.COD        = totalCOD;
         else          item.goodsValue = totalNilai;
+
+        // Instruksi pengiriman: CS X/ADV Y/Admin|ongkir|potOngkir|admin|potAdmin|hargaProduk
+        const csNama   = prod.persona_cs_nama || '';
+        const advNama  = prod.advertiser      || '';
+        const admNama  = prod.admin_nama      || '';
+        const pengirim = ['CS ' + csNama, advNama ? 'ADV ' + advNama : '', admNama].filter(Boolean).join('/');
+        const ongkirAsli   = o.ongkir || 0;
+        const ongkirPromo  = o.ongkir_after_promo ?? ongkirAsli;
+        const potOngkir    = ongkirAsli - ongkirPromo;
+        const feeCod       = o.fee_cod || 0;
+        const potAdmin     = 0;
+        const hargaProdukTotal = hargaSatuan * qty;
+        item.shippingInstruction = `${pengirim}|${ongkirAsli}|${potOngkir}|${feeCod}|${potAdmin}|${hargaProdukTotal}`;
 
         // Lengkapi orders_new dengan data flat sebelum kirim
         await sbPatch('orders_new', `?id=eq.${o.id}`, {
