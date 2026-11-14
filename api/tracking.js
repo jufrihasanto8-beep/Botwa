@@ -410,7 +410,24 @@ async function handleCreateMengantar(req, res) {
     if (!mngKey) return res.status(400).json({ error: 'Mengantar API key belum dikonfigurasi. Isi di Settings → Mengantar.' });
 
     // 2. Fetch time_id jam 16:00
-    const timeId = await getTimeId16(mngKey);
+    let timeId = await getTimeId16(mngKey);
+
+    // Fallback: kalau gagal, coba ambil slot pertama langsung
+    if (!timeId) {
+      try {
+        const r = await fetch(`https://app.mengantar.com/api/public/${mngKey}/time`, {
+          headers: { 'Accept': 'application/json' },
+        });
+        const json = await r.json();
+        const times = json.data || json;
+        if (Array.isArray(times) && times.length) {
+          timeId = times[times.length - 1]._id || times[times.length - 1].id;
+          console.log('[getTimeSlot] fallback ke slot terakhir:', timeId);
+        }
+      } catch(e) { console.error('[getTimeSlot] fallback gagal:', e.message); }
+    }
+
+    if (!timeId) return res.status(400).json({ error: 'Gagal mendapatkan jadwal pickup dari Mengantar. Coba lagi nanti.' });
 
     // 3. Group orders by kurir
     const grouped = {};
@@ -490,7 +507,7 @@ async function handleCreateMengantar(req, res) {
           address_id: mngOriginId,
           type: 'scheduledPickup',
           volume: 'volumeMobil',
-          ...(timeId ? { time_id: timeId } : {}),
+          time_id: timeId,
         };
         const ordersPayload = orderItems.map(x => x.item);
         console.log('[createMengantar] payload kurir', kurir, JSON.stringify({ courier: kurir, pickup: pickupPayload, orders: ordersPayload }));
