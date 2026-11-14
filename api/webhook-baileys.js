@@ -1501,6 +1501,47 @@ module.exports = async function handler(req, res) {
     // session WA yang dipakai untuk kirim balas (wa_session_id produk, fallback ke userId)
     const waSession = product?.wa_session_id || userId;
 
+    // ── Pending Greeting: cek & kirim greeting form yang sudah lewat 3 menit ──
+    // Dijalankan setiap ada webhook masuk (piggyback), non-blocking
+    const GREETING_DELAY_MS = 3 * 60 * 1000;
+    (async () => {
+      try {
+        const pendingConvs = await sbGet('conversations',
+          `?user_id=eq.${userId}&status=in.(baru,diproses)&select=id,state`
+        );
+        for (const pc of pendingConvs) {
+          const pg = pc.state?.pending_greeting;
+          if (!pg?.created_at) continue;
+          const elapsed = Date.now() - new Date(pg.created_at).getTime();
+          if (elapsed < GREETING_DELAY_MS) continue;
+
+          // Cek ada pesan customer belum (kalau ada = sudah redirect, skip)
+          const custMsgs = await sbGet('conv_messages',
+            `?conversation_id=eq.${pc.id}&role=eq.customer&limit=1`
+          ).catch(() => []);
+          if (custMsgs.length) {
+            await updateConvState(pc.id, { pending_greeting: null }).catch(() => {});
+            console.log(`[greeting] conv ${pc.id}: customer sudah chat duluan, skip`);
+            continue;
+          }
+
+          // Kirim greeting
+          console.log(`[greeting] Kirim ke ${pg.wa_number} (delay ${Math.round(elapsed/1000)}s)`);
+          let greetOk = false;
+          try {
+            await sendWA(pg.wa_session, pg.wa_number, pg.message, true); // isOutbound = true
+            await saveMessage(pc.id, 'ai', pg.message).catch(() => {});
+            greetOk = true;
+          } catch(sendErr) {
+            await saveMessage(pc.id, 'cs', `⚠️ Gagal kirim greeting ke ${pg.wa_number}: ${sendErr.message}`).catch(() => {});
+          }
+          await updateConvState(pc.id, { pending_greeting: null }).catch(() => {});
+        }
+      } catch(e) {
+        console.error('[greeting] Error:', e.message);
+      }
+    })(); // fire-and-forget, tidak blocking response
+
     // ── Ambil rekening dari users table ───────────────────────
     const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_origin_id,mengantar_area_id,default_sumber&limit=1`).catch(() => []);
     const userRekening      = userRows[0]?.rekening            || null;
@@ -1556,6 +1597,14 @@ module.exports = async function handler(req, res) {
     // Update produk ke conversation jika baru ketemu
     if (product?.id && !conversation.product_id) {
       await sbPatch('conversations', `?id=eq.${conversation.id}`, { product_id: product.id });
+    }
+
+    // ── Customer chat duluan → hapus pending_greeting (redirect berhasil) ──
+    const convStatePre = conversation.state || {};
+    if (convStatePre.pending_greeting) {
+      console.log(`[greeting] Customer ${wa_number} chat duluan — pending_greeting dihapus (redirect berhasil)`);
+      await updateConvState(conversation.id, { pending_greeting: null });
+      convStatePre.pending_greeting = null;
     }
 
     // ── Transcribe voice note jika ada (Groq Whisper) ─────────

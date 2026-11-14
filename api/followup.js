@@ -301,6 +301,54 @@ module.exports = async function handler(req, res) {
   const results = [];
 
   try {
+    // ── BAGIAN -1: Pending Greeting — kirim greeting form lead yang dijeda 3 menit ──
+    const GREETING_DELAY_MS = 3 * 60 * 1000;
+    const pendingConvs = await sbGet('conversations',
+      `?status=in.(baru,diproses)&select=id,user_id,state`
+    ).catch(() => []);
+    const pendingGreetings = pendingConvs.filter(c => c.state?.pending_greeting?.created_at);
+
+    for (const conv of pendingGreetings) {
+      const pg = conv.state.pending_greeting;
+      const elapsed = now.getTime() - new Date(pg.created_at).getTime();
+      if (elapsed < GREETING_DELAY_MS) continue;
+
+      // Cek ada pesan customer (sudah redirect & chat duluan)
+      const custMsgs = await sbGet('conv_messages',
+        `?conversation_id=eq.${conv.id}&role=eq.customer&limit=1`
+      ).catch(() => []);
+      if (custMsgs.length) {
+        await sbPatch('conversations', `?id=eq.${conv.id}`, {
+          state: { ...conv.state, pending_greeting: null },
+        }).catch(() => {});
+        console.log(`[greeting] conv ${conv.id}: customer sudah chat duluan, skip`);
+        continue;
+      }
+
+      // Kirim greeting
+      try {
+        console.log(`[greeting] Kirim ke ${pg.wa_number} (delay ${Math.round(elapsed/1000)}s)`);
+        await sendWA(pg.wa_session, pg.wa_number, pg.message);
+        await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: pg.message });
+        results.push({ type: 'greeting', conv: conv.id, ok: true });
+        totalSent++;
+      } catch(e) {
+        console.error(`[greeting] Gagal kirim ke ${pg.wa_number}:`, e.message);
+        await sbPost('conv_messages', {
+          conversation_id: conv.id, role: 'cs',
+          isi: `⚠️ Gagal kirim greeting ke ${pg.wa_number}: ${e.message}`,
+        }).catch(() => {});
+      }
+      // Clear pending
+      await sbPatch('conversations', `?id=eq.${conv.id}`, {
+        state: { ...conv.state, pending_greeting: null },
+      }).catch(() => {});
+    }
+
+    if (pendingGreetings.length) {
+      console.log(`[greeting] Processed ${pendingGreetings.length} pending greetings`);
+    }
+
     // ── BAGIAN 0: Reminder konfirmasi order — customer belum balas konfirmasi pesanan ──
     // Cek conversation dengan awaiting_order_confirm = true + diam minimal 2 jam
     const cutoff2h = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
