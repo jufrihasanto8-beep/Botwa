@@ -582,7 +582,7 @@ async function handleCreateMengantar(req, res) {
           const bundling = Array.isArray(prod.harga_bundling) ? prod.harga_bundling : [];
           const matchPaket = bundling.find(b => b.qty === qty);
           if (matchPaket?.bonus_sku) {
-            skuParts.push(matchPaket.bonus_sku + ' ' + qty);
+            skuParts.push(matchPaket.bonus_sku + ' 1');
           }
           custNameFormatted = (cu.nama || '-') + '|' + skuParts.join('+');
         }
