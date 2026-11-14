@@ -323,8 +323,9 @@ async function processLead(userId, { nama, hp, alamat, produk, keluhan }, overri
     return { waNumber, convId, ok: true, skipped: true, reason: 'customer lama, data diperbarui' };
   }
 
-  // ── Customer baru → kirim WA template ───────────────────
-  // Template diambil dari produk (per-produk), bukan dari users
+  // ── Customer baru → simpan greeting sebagai pending (jeda 3 menit) ───
+  // Tidak langsung kirim WA — tunggu dulu, kalau customer redirect & chat duluan
+  // maka greeting tidak perlu dikirim. Cron followup akan kirim setelah delay.
   const tmpl = matchedProd?.template_form_lead || null;
 
   const namaSapa     = nama ? nama.split(' ')[0] : 'kak';
@@ -332,47 +333,23 @@ async function processLead(userId, { nama, hp, alamat, produk, keluhan }, overri
   const defaultPesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
   const pesan        = tmpl ? renderTemplate(tmpl, { nama, produk, alamat, hp }) : defaultPesan;
 
-  const br = await fetch(`${BAILEYS_URL}/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ secret: WEBHOOK_SECRET, session_id: waSession,
-                           wa_number: waNumber, message: pesan, is_outbound: true }),
-  });
-
-  const brText = await br.text().catch(() => '');
-  let brBody = {};
-  try { brBody = JSON.parse(brText); } catch(e) {}
-  const sendFailed = !br.ok;
-  const errMsg = brBody?.error || brText?.slice(0, 100) || '';
-  const notRegistered = sendFailed && (
-    errMsg.includes('not registered') ||
-    errMsg.includes('not on WhatsApp') ||
-    errMsg.includes('No account')
-  );
-
+  // Simpan pending_greeting ke conversation state — cron akan kirim setelah 3 menit
   if (convId) {
-    if (sendFailed) {
-      const infoMsg = notRegistered
-        ? `⚠️ Nomor ${waNumber} tidak terdaftar di WhatsApp. Pesan tidak terkirim.`
-        : `⚠️ Gagal kirim WA ke ${waNumber}: ${errMsg || 'Unknown error'}`;
-      await sbPost('conv_messages', {
-        conversation_id: convId, role: 'cs', isi: infoMsg,
-      }).catch(() => {});
-      if (notRegistered) {
-        await sbPatch('conversations', `?id=eq.${convId}`, {
-          state: { ...convState, wa_not_registered: true },
-        }).catch(() => {});
-      }
-    } else {
-      const saveResult = await sbPost('conv_messages', {
-        conversation_id: convId, role: 'ai', isi: pesan,
-      }).catch(e => ({ _err: e.message }));
-      const saveErr = saveResult?._err || null;
-      if (saveErr) console.error('[gmail] conv_messages save error:', saveErr);
-      return { waNumber, convId, ok: true, not_registered: false, send_error: null, conv_saved: !saveErr, conv_error: saveErr };
-    }
+    await sbPatch('conversations', `?id=eq.${convId}`, {
+      state: {
+        ...convState,
+        pending_greeting: {
+          message: pesan,
+          wa_session: waSession,
+          wa_number: waNumber,
+          created_at: new Date().toISOString(),
+        },
+      },
+    }).catch(e => console.error('[gmail] Gagal simpan pending_greeting:', e.message));
+    console.log(`[gmail] Pending greeting saved for ${waNumber} — akan dikirim setelah 3 menit jika customer tidak chat duluan`);
   }
-  return { waNumber, convId, ok: !sendFailed, not_registered: notRegistered, send_error: sendFailed ? errMsg : null, conv_saved: false };
+
+  return { waNumber, convId, ok: true, pending: true, reason: 'greeting dijeda 3 menit, kirim otomatis jika customer tidak redirect' };
 }
 
 // ═══════════════════════════════════════════════════════════
