@@ -971,7 +971,7 @@ async function renderInbox() {
     const isLive  = conv.status === 'baru' || conv.status === 'diproses';
     const isDone  = conv.status === 'selesai';
     const isNew   = isDone && conv.state?.has_new_message;
-    const tags    = `<span class="ctag wa">WA</span>${isLive?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone&&!isNew?'<span class="ctag ai">Closing</span>':''}${isNew?'<span class="ctag new-msg">Pelanggan Baru</span>':''}`;
+    const tags    = `<span class="ctag wa">WA</span>${isLive?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone?'<span class="ctag ai">Closing</span>':''}`;
     const unreadDot = (conv.status === 'baru' || isNew) ? '<div class="conv-unread"></div>' : '';
     return `<div class="conv-item${activeConvId===conv.id?' active':''}" onclick="selectConv('${conv.id}')">
       <div class="conv-av" style="background:${color}">${initials(nama)}</div>
