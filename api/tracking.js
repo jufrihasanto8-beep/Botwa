@@ -443,7 +443,7 @@ async function handlePreviewMengantar(req, res) {
     const prodIds = [...new Set(orders.map(o => o.product_id).filter(Boolean))];
     const [customers, products] = await Promise.all([
       sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,nama,wa_number`),
-      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama`) : Promise.resolve([]),
+      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama,sku`) : Promise.resolve([]),
     ]);
     const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
     const prodMap = Object.fromEntries(products.map(p => [p.id, p]));
@@ -515,7 +515,7 @@ async function handleCreateMengantar(req, res) {
 
     const [customers, products, userRows] = await Promise.all([
       sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,nama,wa_number,reply_jid`),
-      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama,harga,berat_gram,wa_session_id`) : Promise.resolve([]),
+      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama,sku,harga,berat_gram,wa_session_id,harga_bundling`) : Promise.resolve([]),
       sbGet('users', `?id=eq.${user_id}&select=id,mengantar_key,mengantar_origin_id,template_resi_dikirim&limit=1`),
     ]);
 
@@ -574,8 +574,21 @@ async function handleCreateMengantar(req, res) {
           ? [al.jalan, al.kodepos].filter(Boolean).join(', ')
           : [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos].filter(Boolean).join(', ');
 
+        // Format customerName: Nama|SKU qty+BONUS_SKU qty
+        let custNameFormatted = cu.nama || '-';
+        if (prod.sku) {
+          const skuParts = [prod.sku + ' ' + qty];
+          // Cek apakah ada bonus dari bundling yang sesuai qty
+          const bundling = Array.isArray(prod.harga_bundling) ? prod.harga_bundling : [];
+          const matchPaket = bundling.find(b => b.qty === qty);
+          if (matchPaket?.bonus_sku) {
+            skuParts.push(matchPaket.bonus_sku + ' ' + qty);
+          }
+          custNameFormatted = (cu.nama || '-') + '|' + skuParts.join('+');
+        }
+
         const item = {
-          customerName:           cu.nama || '-',
+          customerName:           custNameFormatted,
           customerPhone:          (cu.wa_number || '').replace(/^62/, '0'),
           customerAddress:        alamatStr || '-',
           parcelContent:          prod.nama || 'Produk',
