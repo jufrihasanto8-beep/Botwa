@@ -464,6 +464,18 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <label>Cara Pakai</label>
           <textarea id="f-cara-pakai" rows="3" placeholder="2x sehari 1 kapsul, diminum setelah makan..."></textarea>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label>Nama Advertiser</label>
+            <input type="text" id="f-advertiser" placeholder="cth: Deden">
+            <small style="color:#64748b;font-size:10px;margin-top:2px">Untuk label Mengantar</small>
+          </div>
+          <div class="form-group">
+            <label>Nama Admin</label>
+            <input type="text" id="f-admin-nama" placeholder="cth: Triyuni">
+            <small style="color:#64748b;font-size:10px;margin-top:2px">Untuk label Mengantar</small>
+          </div>
+        </div>
         <div class="form-group">
           <label>Asal Pengiriman</label>
           <input type="text" id="f-asal-pengiriman" placeholder="cth: Kulon Progo, Yogyakarta">
@@ -1063,6 +1075,8 @@ function openAdd() {
   document.getElementById('f-berat').value = '500';
   document.getElementById('f-cara-pakai').value = '';
   document.getElementById('f-asal-pengiriman').value = '';
+  document.getElementById('f-advertiser').value = '';
+  document.getElementById('f-admin-nama').value = '';
   document.getElementById('f-knowledge').value = '';
   document.getElementById('f-persona-nama').value = 'Sari';
   document.getElementById('f-persona-gaya').value = 'hangat, sabar, konsultatif';
@@ -1094,6 +1108,8 @@ async function openEdit(id) {
   document.getElementById('f-berat').value = p.berat_gram || 500;
   document.getElementById('f-cara-pakai').value = p.cara_pakai || '';
   document.getElementById('f-asal-pengiriman').value = p.asal_pengiriman || '';
+  document.getElementById('f-advertiser').value = p.advertiser || '';
+  document.getElementById('f-admin-nama').value = p.admin_nama || '';
   document.getElementById('f-knowledge').value = p.product_knowledge || '';
   document.getElementById('f-persona-nama').value = p.persona_cs_nama || 'Sari';
   document.getElementById('f-persona-gaya').value = p.persona_cs_gaya || 'hangat, sabar, konsultatif';
@@ -1246,6 +1262,8 @@ async function saveProduk() {
     berat_gram: parseInt(document.getElementById('f-berat').value) || 500,
     cara_pakai: document.getElementById('f-cara-pakai').value.trim(),
     asal_pengiriman: document.getElementById('f-asal-pengiriman').value.trim(),
+    advertiser: document.getElementById('f-advertiser').value.trim() || null,
+    admin_nama: document.getElementById('f-admin-nama').value.trim() || null,
     gambar_url: document.getElementById('f-gambar-url').value || null,
     testimoni_urls: getTestiUrls(),
     product_knowledge: document.getElementById('f-knowledge').value.trim(),
