@@ -79,6 +79,37 @@ body.light .bot-online{background:rgba(34,197,94,.06)}
 .btn-save:disabled{opacity:.6;cursor:not-allowed}
 .btn-cancel{padding:8px 16px;background:transparent;color:var(--text-2);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer}
 
+/* Chat Preview Modal */
+.chat-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;align-items:center;justify-content:center}
+.chat-overlay.open{display:flex}
+.chat-modal{background:var(--white);border-radius:14px;width:480px;max-width:95vw;height:80vh;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.chat-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-modal-head h3{font-size:14px;font-weight:700;color:var(--text)}
+.chat-modal-head .chat-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);line-height:1;padding:4px}
+.chat-modal-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.chat-modal-body::-webkit-scrollbar{width:4px}
+.chat-modal-body::-webkit-scrollbar-thumb{background:rgba(100,100,100,.2);border-radius:4px}
+.chat-bubble{max-width:82%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word;white-space:pre-wrap}
+.chat-row{display:flex;gap:6px;align-items:flex-end}
+.chat-row.from-customer{justify-content:flex-start}
+.chat-row.from-bot{justify-content:flex-end}
+.chat-row.from-customer .chat-bubble{background:rgba(59,130,246,.08);color:var(--text);border-bottom-left-radius:4px}
+.chat-row.from-bot .chat-bubble{background:#3b82f6;color:#fff;border-bottom-right-radius:4px}
+.chat-row.from-system{justify-content:center}
+.chat-row.from-system .chat-bubble{background:rgba(100,116,139,.08);color:var(--text-2);font-size:11px;max-width:90%;text-align:center;border-radius:8px}
+.chat-time{font-size:10px;color:var(--text-3);flex-shrink:0;margin-bottom:2px}
+.chat-label{font-size:10px;font-weight:600;margin-bottom:2px}
+.chat-label.ai{color:#3b82f6}
+.chat-label.cs{color:#f59e0b}
+.chat-loading{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
+.chat-empty{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
+.td-phone-link{color:#3b82f6;cursor:pointer;text-decoration:none;font-weight:500}
+.td-phone-link:hover{text-decoration:underline}
+.td-name-link{color:#3b82f6;cursor:pointer;text-decoration:none}
+.td-name-link:hover{text-decoration:underline}
+body.light .chat-row.from-customer .chat-bubble{background:rgba(59,130,246,.06)}
+body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
+
 /* Mengantar Modal */
 .mng-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;align-items:center;justify-content:center}
 .mng-overlay.open{display:flex}
@@ -576,7 +607,7 @@ function filterByRange(list) {
 
 async function init() {
   const [orders, custs, prods] = await Promise.all([
-    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,mengantar_status,mengantar_error,mengantar_sent_at,created_at&order=created_at.desc`),
+    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,mengantar_status,mengantar_error,mengantar_sent_at,created_at&order=created_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,catatan`),
     sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga,persona_cs_nama`),
   ]);
@@ -631,6 +662,7 @@ function getOrderRow(c, idx) {
 
   return {
     id: c.id,
+    conversation_id: c.conversation_id || null,
     customer_id: c.customer_id,
     tanggal: c.created_at,
     no: idx + 1,
@@ -691,8 +723,8 @@ function renderTable(rows) {
     <td style="text-align:center"><button onclick="openEdit('${escH(r.id)}')" style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;color:#64748b;font-size:14px" title="Edit order">✏️</button></td>
     <td class="td-no">${fmtDt(r.tanggal)}</td>
     <td><div class="td-wrap-sm td-bold" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
-    <td><div class="td-name" title="${escH(r.nama)}">${escH(r.nama)}</div></td>
-    <td class="td-phone">${fmtWA(r.notelp)}</td>
+    <td><div class="td-name ${r.conversation_id ? 'td-name-link' : ''}" title="${escH(r.nama)}${r.conversation_id ? ' · Klik untuk lihat percakapan' : ''}" ${r.conversation_id ? `onclick="openChatPreview('${escH(r.conversation_id)}','${escH(r.nama)}')"` : ''}>${escH(r.nama)}</div></td>
+    <td class="td-phone">${r.conversation_id ? `<span class="td-phone-link" title="Klik untuk lihat percakapan" onclick="openChatPreview('${escH(r.conversation_id)}','${escH(r.nama)}')">${fmtWA(r.notelp)}</span>` : fmtWA(r.notelp)}</td>
     <td><div class="td-wrap" title="${escH(r.alamat)}">${escH(r.alamat)||'—'}</div></td>
     <td><div class="td-wrap-sm">${escH(r.kelurahan)||'—'}</div></td>
     <td><div class="td-wrap-sm">${escH(r.kecamatan)||'—'}</div></td>
@@ -1139,6 +1171,84 @@ async function checkBotStatus() {
   }
 }
 checkBotStatus();
+
+// ── Chat Preview Modal ──────────────────────────────────────
+async function openChatPreview(convId, nama) {
+  const overlay = document.getElementById('chat-overlay');
+  const body    = document.getElementById('chat-body');
+  const title   = document.getElementById('chat-title');
+
+  title.textContent = nama || 'Percakapan';
+  body.innerHTML = '<div class="chat-loading">Memuat percakapan...</div>';
+  overlay.classList.add('open');
+
+  try {
+    const msgs = await sbFetch('conv_messages',
+      `?conversation_id=eq.${convId}&order=created_at.asc&limit=300&select=role,isi,created_at`);
+
+    if (!msgs.length) {
+      body.innerHTML = '<div class="chat-empty">Tidak ada pesan ditemukan.</div>';
+      return;
+    }
+
+    let html = '';
+    let lastDate = '';
+    msgs.forEach(m => {
+      // Date divider
+      const d = new Date(m.created_at);
+      const dateStr = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' });
+      if (dateStr !== lastDate) {
+        html += `<div style="text-align:center;font-size:10px;color:var(--text-3);margin:8px 0;font-weight:600">${dateStr}</div>`;
+        lastDate = dateStr;
+      }
+
+      const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+      const safe = (m.isi || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      if (m.role === 'system') {
+        html += `<div class="chat-row from-system"><div class="chat-bubble">${safe}</div></div>`;
+      } else if (m.role === 'customer') {
+        html += `<div class="chat-row from-customer">
+          <div>
+            <div class="chat-bubble">${safe}</div>
+            <div class="chat-time">${time}</div>
+          </div>
+        </div>`;
+      } else {
+        const label = m.role === 'cs' ? 'CS' : 'AI';
+        const cls   = m.role === 'cs' ? 'cs' : 'ai';
+        html += `<div class="chat-row from-bot">
+          <div style="text-align:right">
+            <div class="chat-label ${cls}">${label}</div>
+            <div class="chat-bubble">${safe}</div>
+            <div class="chat-time" style="text-align:right">${time}</div>
+          </div>
+        </div>`;
+      }
+    });
+
+    body.innerHTML = html;
+    // Scroll to bottom
+    body.scrollTop = body.scrollHeight;
+  } catch(e) {
+    body.innerHTML = `<div class="chat-empty">Gagal memuat: ${e.message}</div>`;
+  }
+}
+
+function closeChatPreview() {
+  document.getElementById('chat-overlay').classList.remove('open');
+}
 </script>
+
+<!-- Chat Preview Modal -->
+<div id="chat-overlay" class="chat-overlay" onclick="if(event.target===this)closeChatPreview()">
+  <div class="chat-modal">
+    <div class="chat-modal-head">
+      <h3 id="chat-title">Percakapan</h3>
+      <button class="chat-close" onclick="closeChatPreview()">&times;</button>
+    </div>
+    <div class="chat-modal-body" id="chat-body"></div>
+  </div>
+</div>
 </body>
 </html>
