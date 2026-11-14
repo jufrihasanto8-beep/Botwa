@@ -355,7 +355,8 @@ ATURAN HARGA, ONGKIR & COD
 - ⚠️ WAJIB: Setiap kali kamu konfirmasi wilayah ke customer, tulis [WILAYAH_OK:wilayah lengkap] di akhir pesan. Sistem pakai ini untuk hitung ongkir.
   Contoh: "Oke kak, Medan Timur ya! 😊 [WILAYAH_OK:Medan Timur, Medan, Sumatera Utara]"
   Contoh: "Siap kak, Mariso Makassar ya 😊 [WILAYAH_OK:Mariso, Makassar, Sulawesi Selatan]"
-- ⛔ JANGAN bilang "sebentar aku cek ongkir" — sistem hitung OTOMATIS saat kamu tulis [WILAYAH_OK:].
+- ⛔ JANGAN PERNAH bilang "sebentar aku cek ongkir", "aku cek ongkirnya dulu", "tunggu ya", "aku hitung dulu" — SEMUA variasi ini DILARANG. Sistem hitung OTOMATIS saat kamu tulis [WILAYAH_OK:]. Kamu TIDAK PERLU cek apapun — langsung tulis [WILAYAH_OK:] dan sistem yang handle.
+- ⛔ JANGAN tanya "COD atau transfer?" SEBELUM ongkir dihitung. Urutan WAJIB: wilayah → [WILAYAH_OK:] → sistem tampilkan total → BARU tanya metode bayar.
 - ⛔ HANYA KOTA/KABUPATEN = TANYA KECAMATAN DULU dengan natural, sebut 2-3 kecamatan sebagai contoh. Misal: "Bantulnya di Sewon, Kasihan, atau kecamatan mana kak? 😊". Sistem akan bantu deteksi otomatis.
 - ⛔ KECAMATAN SAJA = TANYA KELURAHAN/DESA DULU dengan natural, sebut 2-3 contoh kelurahan. Misal: "Di desa mana kak? Pendowoharjo, Bangunharjo, atau yang lain? 😊". Sistem akan inject pilihan kelurahan yang valid.
 - Sebelum [WILAYAH_OK] → wilayah HARUS sudah spesifik sampai KELURAHAN/DESA.
@@ -364,6 +365,7 @@ ATURAN HARGA, ONGKIR & COD
   ⚠️ Kalau kamu sudah terlanjur tampilkan ringkasan alamat dan tanya "sudah benar?", lalu customer jawab "benar/ya/iya/betul/oke/siap/betul sekali/benar sekali" → WAJIB langsung tulis [WILAYAH_OK:kecamatan, kabupaten, provinsi] di balasan itu. Jangan balas hanya "Siap kak!" tanpa [WILAYAH_OK:].
   ⚠️ Kalau kamu sudah tahu kelurahan/kecamatan/kabupaten dari percakapan sebelumnya (kamu sendiri sudah sebut di pesan lalu), tapi belum tulis [WILAYAH_OK:] → WAJIB tulis [WILAYAH_OK:] di pesan berikutnya sekarang juga. Jangan tunggu customer konfirmasi lagi. Jangan balas "noted" atau hal lain tanpa [WILAYAH_OK:].
   ⚠️ Customer marah/tidak mau ditanya ulang → JANGAN tanya lagi. Pakai wilayah yang sudah disebutkan customer, langsung tulis [WILAYAH_OK:] dan lanjut proses order.
+  ⚠️ Kalau kamu sudah TAHU wilayah customer (dari percakapan, profil, atau context) → LANGSUNG tulis [WILAYAH_OK:] di pesan itu juga. JANGAN simpan di otak dan bilang "aku cek dulu" — tulis marker-nya SEKARANG.
 - Wilayah parsial (nama desa/kecamatan kecil yang unik) → tebak & konfirmasi provinsinya: "Pringsewu, Lampung ya kak?"
 - Wilayah ambigu → nama yang sama ada di banyak provinsi di Indonesia. Kamu sebagai AI tahu mana yang ambigu — kalau ragu, WAJIB tanya, jangan tebak.
   Prinsip: kalau nama itu bisa jadi kota/kab di lebih dari satu provinsi, TANYA dulu.
@@ -3004,8 +3006,16 @@ ${ongkirInfo}`;
             ];
             rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, userAnthropicKey);
           } else {
+            console.warn(`[WILAYAH_OK] hitungOngkir gagal untuk "${wilayah}" (kelurahan spesifik)`);
             await updateConvState(conversation.id, { proposed_wilayah: wilayah });
-            rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim();
+            // Inject ke Claude supaya kasih tau customer, bukan diam
+            const injeksiFail = `[SISTEM] Ongkir ke "${wilayah}" tidak bisa dihitung saat ini (area mungkin belum tercover kurir). Sampaikan ke customer dengan sopan: "Mohon maaf kak, untuk area ${wilayah} saat ini belum bisa kami cek ongkirnya secara otomatis 🙏 Boleh info alamat lebih lengkap (kecamatan/kelurahan) supaya aku coba cek lagi?" — jangan bilang error/sistem/maintenance.`;
+            const histFail = [
+              ...history,
+              { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
+              { role: 'user', content: injeksiFail },
+            ];
+            rawReply = await callClaude(systemPrompt, histFail, chatModel, userAnthropicKey);
           }
 
         } else {
@@ -3086,9 +3096,15 @@ ${ongkirInfo}`;
           ];
           rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, userAnthropicKey);
         } else {
-          console.warn(`hitungOngkir gagal untuk wilayah: ${wilayah}`);
+          console.warn(`[WILAYAH_OK fallback] hitungOngkir gagal untuk wilayah: ${wilayah}`);
           await updateConvState(conversation.id, { proposed_wilayah: wilayah });
-          rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim();
+          const injeksiFail = `[SISTEM] Ongkir ke "${wilayah}" tidak bisa dihitung (area mungkin belum tercover kurir). Sampaikan ke customer dengan sopan: "Mohon maaf kak, untuk area ${wilayah} saat ini belum bisa kami cek ongkirnya secara otomatis 🙏 Boleh info alamat lebih lengkap (kecamatan/kelurahan) supaya aku coba cek lagi?" — jangan bilang error/sistem/maintenance.`;
+          const histFail = [
+            ...history,
+            { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
+            { role: 'user', content: injeksiFail },
+          ];
+          rawReply = await callClaude(systemPrompt, histFail, chatModel, userAnthropicKey);
         }
       }
       } // end else (wilayah.length >= 5)
