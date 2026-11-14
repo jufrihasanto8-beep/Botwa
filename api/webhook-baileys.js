@@ -148,6 +148,9 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
         produk_locked: !!prevState.produk_locked,
         reopened_at: reopenedAt,
         has_new_message: true, // tampil badge "Pelanggan Baru" di tab Closing
+        // PERTAHANKAN closed_order_id — penanda permanen bahwa conversation ini sudah pernah closing
+        // Bot tidak akan proses order baru di conversation yang sama
+        closed_order_id: prevState.closed_order_id || null,
         // Simpan wilayah lama sebagai referensi → Claude konfirmasi ke customer dulu sebelum pakai
         // Tidak langsung auto-hitung (customer mungkin ganti alamat), tapi tidak tanya dari nol
         prev_wilayah: prevState.wilayah || null,
@@ -162,7 +165,7 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
         pending_kecamatan:      null,
         followed_up:            false,
         followed_up_days:       [],
-        order_placed:           false, // reset — bisa order lagi
+        order_placed:           false,
         awaiting_order_confirm: false,
         awaiting_order_correction: false,
         foto_terkirim:          false,
@@ -343,6 +346,7 @@ KUNCI KONTEKS PRODUK
 - Produk sudah ditentukan dari iklan: ${namaProduk}. KUNCI.
 - JANGAN ganti produk kecuali customer minta sendiri.
 - Angka/contoh dari percakapan lain JANGAN kebawa.
+- SATUAN PRODUK: Customer bisa sebut "box", "botol", "sachet", "pcs", "bungkus", "kotak", "pak", "dus", atau istilah lain — SEMUANYA SAMA, mengacu ke satuan produk ini. JANGAN bilang tidak tahu atau tidak paham. Pahami dan proses seperti biasa.
 
 ATURAN HARGA, ONGKIR & COD
 - Harga/dosis/klaim HANYA dari DATA PRODUK. JANGAN ngarang.
@@ -584,11 +588,11 @@ async function getContextMessages(conversationId, afterTimestamp = null, limit =
 async function updateRingkasan(conversationId) {
   try {
     const msgs = await sbGet('conv_messages',
-      `?conversation_id=eq.${conversationId}&order=created_at.asc`
+      `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=50`
     );
     if (msgs.length < 6) return; // belum cukup untuk diringkas
 
-    const transcript = msgs.map(m =>
+    const transcript = msgs.reverse().map(m =>
       `${m.role === 'customer' ? 'Customer' : 'AI'}: ${m.isi}`
     ).join('\n');
 
@@ -727,7 +731,10 @@ Isi field yang ada saja, kosongkan yang tidak disebutkan. Jangan mengarang.`;
 }
 
 /* ── SEARCH WILAYAH LOKAL (tabel wilayah_id di Supabase) ─── */
+const _wilayahCache = new Map();
 async function cariWilayah(keyword, limit = 50) {
+  const cacheKey = `${keyword}::${limit}`;
+  if (_wilayahCache.has(cacheKey)) return _wilayahCache.get(cacheKey);
   try {
     const cleanPart = s => s.trim().toLowerCase()
       .replace(/\bkota\b/gi, '').replace(/\bkabupaten\b/gi, '').replace(/\bkab\b/gi, '')
@@ -742,20 +749,20 @@ async function cariWilayah(keyword, limit = 50) {
       const byKecKab = await sbGet('wilayah_id',
         `?kecamatan=ilike.*${encodeURIComponent(part1)}*&kabupaten=ilike.*${encodeURIComponent(part2)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
       ).catch(() => []);
-      if (byKecKab.length > 0) return byKecKab;
+      if (byKecKab.length > 0) { _wilayahCache.set(cacheKey, byKecKab); return byKecKab; }
 
       // Coba: part1=kelurahan, part2=kecamatan
       const byKelKec = await sbGet('wilayah_id',
         `?kelurahan=ilike.*${encodeURIComponent(part1)}*&kecamatan=ilike.*${encodeURIComponent(part2)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
       ).catch(() => []);
-      if (byKelKec.length > 0) return byKelKec;
+      if (byKelKec.length > 0) { _wilayahCache.set(cacheKey, byKelKec); return byKelKec; }
 
       // Coba dengan part3 kalau ada (kelurahan, kecamatan, kabupaten)
       if (part3) {
         const byAll = await sbGet('wilayah_id',
           `?kecamatan=ilike.*${encodeURIComponent(part2)}*&kabupaten=ilike.*${encodeURIComponent(part3)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=${limit}`
         ).catch(() => []);
-        if (byAll.length > 0) return byAll;
+        if (byAll.length > 0) { _wilayahCache.set(cacheKey, byAll); return byAll; }
       }
     }
 
@@ -781,6 +788,7 @@ async function cariWilayah(keyword, limit = 50) {
         merged.push(row);
       }
     }
+    _wilayahCache.set(cacheKey, merged);
     return merged;
   } catch(e) {
     console.error('cariWilayah error:', e.message);
@@ -1779,6 +1787,7 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
           }
 
           // ── Insert ke orders_new ──
+          let insertedOrderId = null;
           try {
             const snap       = convState.order_snapshot || {};
             const ongkirSnap = convState.ongkir || {};
@@ -1791,7 +1800,7 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
               kodepos:    ongkirSnap.area?.kodePos   || customer.alamat?.kodepos   || '',
               ...(ongkirSnap.mengantar_dest_id ? { mengantar_dest_id: ongkirSnap.mengantar_dest_id } : {}),
             };
-            await sbPost('orders_new', {
+            const insertedRows = await sbPost('orders_new', {
               user_id:           userId,
               customer_id:       customer.id,
               conversation_id:   conversation.id,
@@ -1800,7 +1809,7 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
               qty:               parseInt(snap.qty || convState.qty || 1),
               harga:             snap.harga        || product?.harga || 0,
               ongkir:            snap.ongkirAsli   || ongkirSnap.ongkirAsli   || 0,
-              ongkir_after_promo: snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? null,
+              ongkir_after_promo: snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0,
               fee_cod:           snap.feeCOD       || ongkirSnap.feeCOD       || 0,
               total:             snap.total        || (() => {
                 const h = snap.harga || product?.harga || 0;
@@ -1819,9 +1828,15 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
               product_nama:      product?.nama     || '',
               berat_gram:        product?.berat_gram || 0,
             });
-            console.log(`[closing] Insert orders_new OK — conv ${conversation.id}`);
+            insertedOrderId = insertedRows?.[0]?.id || null;
+            console.log(`[closing] Insert orders_new OK — conv ${conversation.id}, order_id: ${insertedOrderId}`);
           } catch(e) {
             console.error('[closing] Gagal insert orders_new:', e.message);
+          }
+
+          // ── Tandai conversation sudah closing — permanen, tidak di-reset saat re-open ──
+          if (insertedOrderId) {
+            await updateConvState(conversation.id, { closed_order_id: insertedOrderId }).catch(() => {});
           }
 
           // ── Update total_order & last_order_at di customers ──
@@ -2028,8 +2043,8 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
     }
 
     // Inject konteks form lead dari orderonline.id / Gmail
-    if (convState.is_form_lead && (convState.form_produk || convState.form_alamat)) {
-      let formCtx = '\n\n[SISTEM - FORM LEAD] Customer ini masuk lewat form order (orderonline.id). Data sudah diketahui dari form — jangan tanya ulang dari nol.';
+    if (convState.is_form_lead && (convState.form_produk || convState.form_alamat || convState.form_keluhan)) {
+      let formCtx = '\n\n[SISTEM - FORM LEAD] Customer ini masuk lewat form order (OrderAdsy/orderonline.id). Data sudah diketahui dari form — jangan tanya ulang dari nol.';
 
       if (convState.form_produk) {
         formCtx += `\n- Produk: ${convState.form_produk} → SUDAH DIKETAHUI, jangan tanya mau beli apa.`;
@@ -2052,6 +2067,10 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
 
       if (!convState.form_alamat) {
         formCtx += `\n- Alamat: belum diisi di form → tanyakan alamat lengkap ke customer secara normal.`;
+      }
+
+      if (convState.form_keluhan) {
+        formCtx += `\n- Keluhan dari form: "${convState.form_keluhan}" → SUDAH DIKETAHUI. Langsung edukasi/respon, jangan tanya ulang keluhannya apa.`;
       }
 
       formCtx += `\n\nALUR YANG BENAR untuk form lead:`;
@@ -2088,6 +2107,11 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
     // Inject konteks order sudah placed — cegah Claude kirim konfirmasi ulang
     if (convState.order_placed && !convState.awaiting_order_confirm) {
       systemPrompt += `\n\n[SISTEM - PENTING] Order customer ini SUDAH SELESAI DIPROSES sebelumnya. JANGAN generate marker [ORDER_CONFIRMED] atau kirim ringkasan order lagi. Baca konteks percakapan dan jawab pertanyaan customer secara natural sesuai apa yang mereka tanyakan.`;
+    }
+
+    // Conversation sudah pernah closing (closed_order_id ada) — bot cukup bales chat, jangan order lagi
+    if (convState.closed_order_id) {
+      systemPrompt += `\n\n[SISTEM - PENTING] Pesanan customer ini SUDAH SELESAI dan tercatat di sistem (Order ID: ${convState.closed_order_id}). DILARANG KERAS generate marker [ORDER_CONFIRMED] atau [ORDER_DATA] dalam conversation ini. Tugasmu sekarang hanya membalas chat customer secara natural — jawab pertanyaan, ucapkan terima kasih, bantu tanya status pengiriman, dll. JANGAN proses order baru di conversation ini.`;
     }
 
     // Inject wilayah risk agar Claude ingat sepanjang conversation
@@ -3138,6 +3162,18 @@ ${ongkirInfo}`;
       // Order sudah selesai diproses sebelumnya — skip ORDER_CONFIRMED agar tidak kirim konfirmasi ulang
       console.log(`[ORDER_CONFIRMED] Diabaikan — order sudah placed (conv ${conversation.id})`);
       return res.status(200).json({ ok: true, action: 'order_already_placed' });
+    }
+
+    // Hard block: conversation sudah pernah closing (closed_order_id ada) → jangan proses ORDER_CONFIRMED lagi
+    if (orderConfirmed && convState.closed_order_id) {
+      console.log(`[ORDER_CONFIRMED] Diabaikan — conversation sudah closing (order ${convState.closed_order_id}), conv ${conversation.id}`);
+      // Strip marker, kirim reply bersih ke customer
+      reply = (reply || rawReply || '').replace(/\[ORDER_CONFIRMED\]/g, '').replace(/\[ORDER_DATA:[^\]]+\]/g, '').trim();
+      if (reply) {
+        const { wamid: wamid_skip } = await sendWA(waSession, reply_jid, reply).catch(() => ({}));
+        await saveMessage(conversation.id, 'ai', reply, wamid_skip);
+      }
+      return res.status(200).json({ ok: true, action: 'order_closed_permanent' });
     }
 
     if (orderConfirmed && !convState.order_placed) {
