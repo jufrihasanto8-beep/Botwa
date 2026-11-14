@@ -299,9 +299,17 @@ function kurirCreate(eks) {
   return eks;
 }
 
-/* ── Lookup destination ID dari Mengantar ───────────────────── */
-async function lookupDestId(alamat) {
-  const { kelurahan, kecamatan, kabupaten } = alamat || {};
+/* ── Helper: extract field dari Mengantar area ──────────────── */
+const normStr = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const aSubdistrict = a => a.SUBDISTRICT_NAME || a.subdistrict || '';
+const aDistrict    = a => a.DISTRICT_NAME    || a.district    || '';
+const aCity        = a => a.CITY_NAME        || a.city        || a.regency || '';
+const aProvince    = a => a.PROVINCE_NAME    || a.province    || '';
+const aZip         = a => a.ZIP_CODE         || a.posCode     || '';
+
+/* ── Lookup destination dari Mengantar (smart scoring) ──────── */
+async function lookupDest(alamat) {
+  const { kelurahan, kecamatan, kabupaten, provinsi } = alamat || {};
   if (!kecamatan) return null;
   const queries = [
     [kelurahan, kecamatan, kabupaten].filter(Boolean).join(', '),
@@ -314,15 +322,63 @@ async function lookupDestId(alamat) {
     'Referer': 'https://www.mengantar.com/',
     'Origin': 'https://www.mengantar.com',
   };
+
+  // Kumpulkan semua hasil dari semua query (dedup by _id)
+  const seenIds = new Set();
+  const allAreas = [];
   for (const q of queries) {
     try {
       const r = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(q)}`, { headers });
       const json = await r.json();
       const results = json.data || json;
-      if (Array.isArray(results) && results.length) return results[0]._id || results[0].id;
+      if (Array.isArray(results)) {
+        for (const a of results) {
+          const id = a._id || a.id;
+          if (id && !seenIds.has(id)) { seenIds.add(id); allAreas.push(a); }
+        }
+      }
     } catch(e) { /* coba query berikutnya */ }
   }
-  return null;
+  if (!allAreas.length) return null;
+
+  // Scoring — match field by field
+  let best = allAreas[0], bestScore = -1;
+  for (const a of allAreas) {
+    let score = 0;
+    if (kelurahan) {
+      if (normStr(aSubdistrict(a)) === normStr(kelurahan)) score += 50;
+      else if (aSubdistrict(a).toLowerCase().includes(kelurahan.toLowerCase())) score += 25;
+    }
+    if (kecamatan) {
+      if (normStr(aDistrict(a)) === normStr(kecamatan)) score += 30;
+      else if (aDistrict(a).toLowerCase().includes(kecamatan.toLowerCase())) score += 15;
+    }
+    if (kabupaten) {
+      if (normStr(aCity(a)) === normStr(kabupaten)) score += 20;
+      else if (aCity(a).toLowerCase().includes(kabupaten.toLowerCase())) score += 10;
+    }
+    if (provinsi) {
+      if (normStr(aProvince(a)) === normStr(provinsi)) score += 10;
+    }
+    if (score > bestScore) { bestScore = score; best = a; }
+  }
+
+  return {
+    id:         best._id || best.id,
+    kelurahan:  aSubdistrict(best),
+    kecamatan:  aDistrict(best),
+    kabupaten:  aCity(best),
+    provinsi:   aProvince(best),
+    kodepos:    aZip(best),
+    score:      bestScore,
+    label:      [aProvince(best), aCity(best), aDistrict(best), aSubdistrict(best), aZip(best)].filter(Boolean).join(', '),
+  };
+}
+
+// Backward-compat wrapper — returns just ID
+async function lookupDestId(alamat) {
+  const dest = await lookupDest(alamat);
+  return dest?.id || null;
 }
 
 /* ── Fetch/create time slot untuk pickup hari ini ────────────── */
@@ -372,9 +428,79 @@ async function getTimeId16(mngKey, originId) {
   }
 }
 
+/* ── PREVIEW: lookup area Mengantar untuk verifikasi ────────── */
+async function handlePreviewMengantar(req, res) {
+  const { order_ids, user_id } = req.body || {};
+  if (!order_ids?.length || !user_id) return res.status(400).json({ error: 'order_ids dan user_id wajib' });
+
+  try {
+    const orders = await sbGet('orders_new',
+      `?id=in.(${order_ids.join(',')})&user_id=eq.${user_id}&select=id,customer_id,product_id,alamat,ekspedisi,metode,qty,harga,total`
+    );
+    if (!orders.length) return res.status(404).json({ error: 'Order tidak ditemukan' });
+
+    const custIds = [...new Set(orders.map(o => o.customer_id))];
+    const prodIds = [...new Set(orders.map(o => o.product_id).filter(Boolean))];
+    const [customers, products] = await Promise.all([
+      sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,nama,wa_number`),
+      prodIds.length ? sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,nama`) : Promise.resolve([]),
+    ]);
+    const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
+    const prodMap = Object.fromEntries(products.map(p => [p.id, p]));
+
+    // Lookup area untuk setiap order
+    const previews = [];
+    for (const o of orders) {
+      const al = o.alamat || {};
+      const cu = custMap[o.customer_id] || {};
+      const prod = prodMap[o.product_id] || {};
+
+      // Cek apakah sudah ada cached dest_id
+      let dest = null;
+      if (al.mengantar_dest_id) {
+        dest = { id: al.mengantar_dest_id, label: al.mengantar_dest_label || '(tersimpan)', score: 999 };
+      } else {
+        dest = await lookupDest(al);
+      }
+
+      previews.push({
+        orderId:    o.id,
+        nama:       cu.nama || '-',
+        produk:     prod.nama || '-',
+        kurir:      o.ekspedisi || '-',
+        metode:     o.metode || 'cod',
+        alamatOrder: {
+          jalan:     al.jalan || '',
+          kelurahan: al.kelurahan || '',
+          kecamatan: al.kecamatan || '',
+          kabupaten: al.kabupaten || '',
+          provinsi:  al.provinsi || '',
+          kodepos:   al.kodepos || '',
+        },
+        match: dest ? {
+          id:        dest.id,
+          label:     dest.label || '',
+          kelurahan: dest.kelurahan || '',
+          kecamatan: dest.kecamatan || '',
+          kabupaten: dest.kabupaten || '',
+          provinsi:  dest.provinsi || '',
+          kodepos:   dest.kodepos || '',
+          score:     dest.score ?? 0,
+        } : null,
+      });
+    }
+
+    return res.status(200).json({ ok: true, previews });
+  } catch(e) {
+    console.error('[previewMengantar] Error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 /* ── CREATE ORDER ke Mengantar ───────────────────────────────── */
 async function handleCreateMengantar(req, res) {
-  const { order_ids, user_id } = req.body || {};
+  const { order_ids, user_id, dest_overrides } = req.body || {};
+  // dest_overrides = { orderId: destId, ... } — dari preview jika user memilih area berbeda
   if (!order_ids?.length || !user_id) return res.status(400).json({ error: 'order_ids dan user_id wajib' });
 
   try {
@@ -432,15 +558,16 @@ async function handleCreateMengantar(req, res) {
         const totalNilai = hargaSatuan * qty;
         const berat      = ((prod.berat_gram || 1000) / 1000);
 
-        // Lookup dest ID
-        let destId = al.mengantar_dest_id || null;
+        // Lookup dest ID — prioritas: override dari preview → cached → auto lookup
+        let destId = dest_overrides?.[o.id] || al.mengantar_dest_id || null;
         if (!destId) {
           destId = await lookupDestId(al);
-          if (destId) {
-            await sbPatch('orders_new', `?id=eq.${o.id}`, {
-              alamat: { ...al, mengantar_dest_id: destId }
-            }).catch(() => {});
-          }
+        }
+        // Simpan dest_id ke order supaya tidak perlu lookup lagi
+        if (destId && destId !== al.mengantar_dest_id) {
+          await sbPatch('orders_new', `?id=eq.${o.id}`, {
+            alamat: { ...al, mengantar_dest_id: destId }
+          }).catch(() => {});
         }
 
         const alamatStr = destId
@@ -614,6 +741,36 @@ async function handleCreateMengantar(req, res) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Route: search area Mengantar (proxy CORS)
+  if (req.method === 'POST' && req.body?.action === 'search-area') {
+    const keyword = (req.body.keyword || '').trim();
+    if (!keyword || keyword.length < 3) return res.status(400).json({ error: 'Keyword minimal 3 karakter' });
+    try {
+      const r = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(keyword)}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.mengantar.com/', 'Origin': 'https://www.mengantar.com' },
+      });
+      const json = await r.json();
+      const raw = json.data || json || [];
+      const areas = (Array.isArray(raw) ? raw : []).slice(0, 10).map(a => ({
+        id:        a._id || a.id,
+        provinsi:  aProvince(a),
+        kabupaten: aCity(a),
+        kecamatan: aDistrict(a),
+        kelurahan: aSubdistrict(a),
+        kodepos:   aZip(a),
+        label:     [aProvince(a), aCity(a), aDistrict(a), aSubdistrict(a), aZip(a)].filter(Boolean).join(', '),
+      }));
+      return res.status(200).json({ ok: true, areas });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // Route: preview — lookup area Mengantar untuk verifikasi sebelum kirim
+  if (req.method === 'POST' && req.body?.action === 'preview-mengantar') {
+    return handlePreviewMengantar(req, res);
+  }
 
   // Route: create mengantar order
   if (req.method === 'POST' && req.body?.action === 'create-mengantar') {
