@@ -337,6 +337,13 @@ module.exports = async function handler(req, res) {
   try {
     let data;
     if (action === 'insert') {
+      // ── Guard anti-double: kalau orders_new + ada conversation_id, cek dulu ──
+      if (table === 'orders_new' && payload?.conversation_id) {
+        const existing = await sbReq('GET', `orders_new?conversation_id=eq.${payload.conversation_id}&select=id&limit=1`);
+        if (existing.length) {
+          return res.status(409).json({ ok: false, error: 'Order untuk conversation ini sudah ada (anti-double)' });
+        }
+      }
       data = await sbReq('POST', table, payload);
       // Kalau ada convPatch sekaligus (closing manual), patch conversations juga
       if (convId && convPatch) {
