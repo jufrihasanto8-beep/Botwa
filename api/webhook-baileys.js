@@ -1201,27 +1201,46 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
 
   let hargaSection;
 
+  // Helper: hitung ongkir per qty (apply diskon_ongkir_per_qty kalau ada)
+  const diskonOngkirPerQty = Array.isArray(product?.diskon_ongkir_per_qty) ? product.diskon_ongkir_per_qty : [];
+  const promo = product?.promo_ongkir;
+  function ongkirPerQty(qty) {
+    const dok = diskonOngkirPerQty.find(d => d.qty === qty);
+    if (dok) {
+      if (dok.diskon >= 100) return 0;
+      if (dok.diskon > 0) return Math.round(ongkirAsli * (1 - dok.diskon / 100));
+    }
+    // Fallback ke promo_ongkir global (sudah dihitung di ongkirPromo)
+    return ongkirPromo;
+  }
+
   if (hasBundling) {
     const defaultPaket  = paketPrioritas || product.harga_bundling[0];
     const defaultHarga  = defaultPaket.harga;
-    const defaultFeeCOD = Math.ceil((defaultHarga + ongkirPromo) * 0.03);
-    const defaultTotalTF  = defaultHarga + ongkirPromo;
-    const defaultTotalCOD = defaultHarga + ongkirPromo + defaultFeeCOD;
+    const defaultOngkir = ongkirPerQty(defaultPaket.qty);
+    const defaultOngkirDisplay = ongkirAsli !== defaultOngkir
+      ? `~${fmt(ongkirAsli)}~ ${fmt(defaultOngkir)} 🎉`
+      : fmt(defaultOngkir);
+    const defaultFeeCOD = Math.ceil((defaultHarga + defaultOngkir) * 0.03);
+    const defaultTotalTF  = defaultHarga + defaultOngkir;
+    const defaultTotalCOD = defaultHarga + defaultOngkir + defaultFeeCOD;
 
-    // Tabel semua paket (hanya ditampilkan ke Claude, TIDAK ke customer kecuali ditanya)
+    // Tabel semua paket — tiap paket punya ongkir sendiri sesuai diskon qty-nya
     const tabelSemuaPaket = product.harga_bundling.map(p => {
       const hp     = p.harga;
-      const fee    = Math.ceil((hp + ongkirPromo) * 0.03);
-      const tTF    = hp + ongkirPromo;
-      const tCOD   = hp + ongkirPromo + fee;
-      return `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`;
+      const pOngkir = ongkirPerQty(p.qty);
+      const pOngkirInfo = ongkirAsli !== pOngkir ? ` (ongkir ${fmt(pOngkir)}, hemat ${fmt(ongkirAsli - pOngkir)})` : '';
+      const fee    = Math.ceil((hp + pOngkir) * 0.03);
+      const tTF    = hp + pOngkir;
+      const tCOD   = hp + pOngkir + fee;
+      return `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}${pOngkirInfo}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`;
     }).join('\n');
 
     hargaSection = `Tampilkan HANYA paket PRIORITAS ini ke customer (jangan ubah angka):
 
 Paket ${defaultPaket.qty} box ${product?.nama || 'Produk'}:
-💳 Transfer: ${fmt(defaultHarga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(defaultTotalTF)}
-📦 COD: ${fmt(defaultHarga)} + ongkir ${ongkirDisplay} + admin ${fmt(defaultFeeCOD)} = TOTAL ${fmt(defaultTotalCOD)}
+💳 Transfer: ${fmt(defaultHarga)} + ongkir ${defaultOngkirDisplay} = TOTAL ${fmt(defaultTotalTF)}
+📦 COD: ${fmt(defaultHarga)} + ongkir ${defaultOngkirDisplay} + admin ${fmt(defaultFeeCOD)} = TOTAL ${fmt(defaultTotalCOD)}
 
 Via ${hasil.ekspedisi} ya kak 🚗
 
@@ -1953,7 +1972,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
           const wilayahGeo = [geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
           const alamatGeo  = [geo.kelurahan, geo.kecamatan, geo.kota, geo.provinsi].filter(Boolean).join(', ');
           console.log(`Reverse geocode: ${wilayahGeo}`);
-          const hasilGeo = await hitungOngkir(wilayahGeo, product, 1, userMngAreaId).catch(() => null);
+          const hasilGeo = await hitungOngkir(wilayahGeo, product, parseInt(convState.qty) || 1, userMngAreaId).catch(() => null);
           if (hasilGeo) {
             await updateConvState(conversation.id, { wilayah: wilayahGeo, ongkir: hasilGeo, alamat: alamatGeo });
             convState.ongkir  = hasilGeo;
@@ -2018,7 +2037,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
     // Skip kalau baru di-load oleh auto-load (tidak perlu hitung 2x)
     if (convState.wilayah && product && !autoLoadedOngkir) {
       try {
-        const freshOngkir = await hitungOngkir(convState.wilayah, product, 1, userMngAreaId);
+        const freshOngkir = await hitungOngkir(convState.wilayah, product, parseInt(convState.qty) || 1, userMngAreaId);
         if (freshOngkir) {
           await updateConvState(conversation.id, { ongkir: freshOngkir });
           convState.ongkir = freshOngkir;
@@ -2185,7 +2204,7 @@ JANGAN langsung kirim ulang ringkasan pesanan kalau customer tidak minta.`;
         // Hitung ongkir otomatis dari wilayah KTP
         let hasilKTP = null;
         if (wilayahKTP && !convState.ongkir) {
-          hasilKTP = await hitungOngkir(wilayahKTP, product, 1, userMngAreaId).catch(() => null);
+          hasilKTP = await hitungOngkir(wilayahKTP, product, parseInt(convState.qty) || 1, userMngAreaId).catch(() => null);
           if (hasilKTP) {
             stateKTP.wilayah = wilayahKTP;
             stateKTP.ongkir  = hasilKTP;
@@ -2948,7 +2967,7 @@ ${ongkirInfo}`;
         console.log(`[WILAYAH_OK] "${wilayah}" tidak ditemukan di local DB — fallback Mengantar`);
         await updateConvState(conversation.id, { wilayah, proposed_wilayah: null, pending_kecamatan: null });
         convState.pending_kecamatan = null;
-        const hasil = await hitungOngkir(wilayah, product, 1, userMngAreaId);
+        const hasil = await hitungOngkir(wilayah, product, parseInt(convState.qty) || 1, userMngAreaId);
         if (hasil) {
           await updateConvState(conversation.id, { ongkir: hasil });
           convState.ongkir = hasil;
@@ -2993,7 +3012,7 @@ ${ongkirInfo}`;
     if (cekOngkirMatch && !autoOngkirResult && !wilayahOkMatch) {
       const wilayah = cekOngkirMatch[1].trim();
       await updateConvState(conversation.id, { wilayah });
-      const hasil = await hitungOngkir(wilayah, product, 1, userMngAreaId);
+      const hasil = await hitungOngkir(wilayah, product, parseInt(convState.qty) || 1, userMngAreaId);
       if (hasil) {
         await updateConvState(conversation.id, { ongkir: hasil });
         convState.ongkir = hasil; // update local state
