@@ -356,6 +356,7 @@ ATURAN HARGA, ONGKIR & COD
   Contoh: "Oke kak, Medan Timur ya! 😊 [WILAYAH_OK:Medan Timur, Medan, Sumatera Utara]"
   Contoh: "Siap kak, Mariso Makassar ya 😊 [WILAYAH_OK:Mariso, Makassar, Sulawesi Selatan]"
 - ⛔ JANGAN PERNAH bilang "sebentar aku cek ongkir", "aku cek ongkirnya dulu", "tunggu ya", "aku hitung dulu" — SEMUA variasi ini DILARANG. Sistem hitung OTOMATIS saat kamu tulis [WILAYAH_OK:]. Kamu TIDAK PERLU cek apapun — langsung tulis [WILAYAH_OK:] dan sistem yang handle.
+- ⛔ DILARANG KERAS mengarang/estimasi ongkir sendiri (misal "ongkirnya sekitar Rp 35.000-45.000"). Kamu TIDAK TAHU ongkir — HANYA sistem yang bisa hitung. Kalau sistem belum kasih data ongkir, JANGAN sebut angka ongkir apapun. Tunggu sistem hitung via [WILAYAH_OK:].
 - ⛔ JANGAN tanya "COD atau transfer?" SEBELUM ongkir dihitung. Urutan WAJIB: wilayah → [WILAYAH_OK:] → sistem tampilkan total → BARU tanya metode bayar.
 - ⛔ HANYA KOTA/KABUPATEN = TANYA KECAMATAN DULU dengan natural, sebut 2-3 kecamatan sebagai contoh. Misal: "Bantulnya di Sewon, Kasihan, atau kecamatan mana kak? 😊". Sistem akan bantu deteksi otomatis.
 - ⛔ KECAMATAN SAJA = TANYA KELURAHAN/DESA DULU dengan natural, sebut 2-3 contoh kelurahan. Misal: "Di desa mana kak? Pendowoharjo, Bangunharjo, atau yang lain? 😊". Sistem akan inject pilihan kelurahan yang valid.
@@ -432,8 +433,8 @@ HANDLE PERTANYAAN UMUM
 - "Bisa kirim hari ini?" → "Kalau ordernya sebelum jam 12 siang biasanya bisa kirim hari ini kak 😊" (atau sesuaikan dengan knowledge produk)
 - "Estimasi sampai berapa hari?" → Ada 3 kondisi:
   1. Sudah ada data kurir (ongkir sudah dihitung) → jawab langsung pakai kurir yang sudah ada, contoh: "Via JNE biasanya 2-4 hari kerja kak 😊" — JANGAN tanya wilayah lagi.
-  2. Wilayah sudah disebut tapi ongkir belum dihitung → kasih estimasi kasar berdasarkan wilayah: Jawa 1-3 hari, Sumatera/Kalimantan/Sulawesi 3-5 hari, Papua/NTT/Maluku 5-7 hari. Sambil langsung konfirmasi wilayahnya dan tulis [WILAYAH_OK:] biar sistem hitung ongkir + total. Contoh: "Ke Medan biasanya 3-5 hari kerja kak 😊 [WILAYAH_OK:Medan, Medan, Sumatera Utara]" — tapi kalau belum tahu kecamatannya, tanya dulu kecamatan, kasih estimasi, lalu tulis [WILAYAH_OK:] setelah dapat kecamatan.
-  3. Belum ada info wilayah sama sekali → "Tergantung wilayahnya kak, dari mana kak?" lalu setelah dapat wilayah baru estimasi.
+  2. Wilayah sudah disebut tapi ongkir belum dihitung → JANGAN kasih estimasi ongkir atau estimasi hari. Langsung konfirmasi wilayahnya dan tulis [WILAYAH_OK:] biar sistem hitung. Contoh: "Siap kak, aku cekkan ongkirnya ke sana ya 😊 [WILAYAH_OK:Medan, Medan, Sumatera Utara]" — kalau belum tahu kecamatannya, tanya dulu kecamatan.
+  3. Belum ada info wilayah sama sekali → "Tergantung wilayahnya kak, dari mana kak?" lalu setelah dapat wilayah baru cek.
 - "Pengiriman dari mana?" → Jawab dari DATA PRODUK (Asal pengiriman)
 
 CUSTOMER LANGSUNG ORDER
@@ -1005,7 +1006,7 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     const rawData = ratesJson.data || {};
     let rates = Object.entries(rawData)
       .filter(([name, info]) => !name.toLowerCase().includes('cargo') && !info.unsupported && (info.price || 0) > 0)
-      .map(([name, info]) => ({ courier_name: name, price: info.price }));
+      .map(([name, info]) => ({ courier_name: name, price: info.price, cod_supported: !info.unsupported_cod }));
     if (!rates.length) return null;
 
     // Step 4: Filter whitelist
@@ -1060,8 +1061,11 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     const allRates = rates.map(r => {
       const rPromo  = applyDiskon(r.price);
       const rFeeCOD = Math.ceil((harga + rPromo) * 0.03);
-      return { nama: r.courier_name, ongkir: r.price, ongkirPromo: rPromo, totalTF: bulatkan(harga + rPromo), totalCOD: bulatkan(harga + rPromo + rFeeCOD) };
+      return { nama: r.courier_name, ongkir: r.price, ongkirPromo: rPromo, totalTF: bulatkan(harga + rPromo), totalCOD: bulatkan(harga + rPromo + rFeeCOD), cod_supported: r.cod_supported };
     });
+
+    // Cek apakah ada kurir yang support COD
+    const codAvailable = allRates.some(r => r.cod_supported);
 
     return {
       ekspedisi, ongkirAsli, ongkirPromo,
@@ -1069,6 +1073,7 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
       totalCOD: totalCODBulat,
       feeCOD: feeCODBulat,
       harga, allRates,
+      cod_available: codAvailable,
       area: {
         kelurahan: lokal?.kelurahan || bestArea.SUBDISTRICT_NAME || bestArea.subdistrict || '',
         kecamatan: lokal?.kecamatan || bestArea.DISTRICT_NAME    || bestArea.district    || '',
@@ -1195,7 +1200,8 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
   // Tabel semua kurir yang tersedia
   const tabelKurir = (hasil.allRates || []).map(r => {
     const potongan = r.ongkir !== r.ongkirPromo ? ` (hemat ${fmt(r.ongkir - r.ongkirPromo)})` : '';
-    return `- ${r.nama}: ongkir ${fmt(r.ongkir)}${potongan} → TF total ${fmt(r.totalTF)} | COD total ${fmt(r.totalCOD)}`;
+    const codLabel = r.cod_supported ? '' : ' [COD ❌]';
+    return `- ${r.nama}: ongkir ${fmt(r.ongkir)}${potongan} → TF total ${fmt(r.totalTF)}${r.cod_supported ? ` | COD total ${fmt(r.totalCOD)}` : ''}${codLabel}`;
   }).join('\n');
 
   const hasBundling = Array.isArray(product?.harga_bundling) && product.harga_bundling.length > 0;
@@ -1216,6 +1222,8 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
     return ongkirPromo;
   }
 
+  const codOk = hasil.cod_available !== false; // default true kalau tidak ada info
+
   if (hasBundling) {
     const defaultPaket  = paketPrioritas || product.harga_bundling[0];
     const defaultHarga  = defaultPaket.harga;
@@ -1235,10 +1243,13 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
       const fee    = Math.ceil((hp + pOngkir) * 0.03);
       const tTF    = hp + pOngkir;
       const tCOD   = hp + pOngkir + fee;
-      return `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}${pOngkirInfo}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`;
+      return codOk
+        ? `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}${pOngkirInfo}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`
+        : `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}${pOngkirInfo}: Transfer total ${fmt(tTF)}`;
     }).join('\n');
 
-    hargaSection = `Tampilkan HANYA paket PRIORITAS ini ke customer (jangan ubah angka):
+    if (codOk) {
+      hargaSection = `Tampilkan HANYA paket PRIORITAS ini ke customer (jangan ubah angka):
 
 Paket ${defaultPaket.qty} box ${product?.nama || 'Produk'}:
 💳 Transfer: ${fmt(defaultHarga)} + ongkir ${defaultOngkirDisplay} = TOTAL ${fmt(defaultTotalTF)}
@@ -1246,14 +1257,27 @@ Paket ${defaultPaket.qty} box ${product?.nama || 'Produk'}:
 
 Via ${hasil.ekspedisi} ya kak 🚗
 
-Setelah tampilkan harga, tanya metode bayar: "Kakak enaknya COD atau Transfer? 😊"
+Setelah tampilkan harga, tanya metode bayar: "Kakak enaknya COD atau Transfer? 😊"`;
+    } else {
+      hargaSection = `⚠️ COD TIDAK TERSEDIA untuk wilayah ini — semua kurir ke sana belum support COD.
+Tampilkan HANYA opsi Transfer (jangan ubah angka):
 
-PAKET LAIN (jangan sebut ke customer kecuali customer nanya ada paket/harga lain):
+Paket ${defaultPaket.qty} box ${product?.nama || 'Produk'}:
+💳 Transfer: ${fmt(defaultHarga)} + ongkir ${defaultOngkirDisplay} = TOTAL ${fmt(defaultTotalTF)}
+
+Via ${hasil.ekspedisi} ya kak 🚗
+
+Sampaikan ke customer: "Untuk wilayah kak, pengiriman via Transfer ya kak 🙏 COD belum tersedia di sana."
+Langsung lanjut minta data (nama, alamat) tanpa tanya COD/Transfer.`;
+    }
+
+    hargaSection += `\n\nPAKET LAIN (jangan sebut ke customer kecuali customer nanya ada paket/harga lain):
 ${tabelSemuaPaket}`;
 
   } else {
-    // Produk tanpa bundling — tampilkan harga satuan normal
-    hargaSection = `Tampilkan PERSIS ini ke customer (jangan ubah angka):
+    if (codOk) {
+      // Produk tanpa bundling — tampilkan harga satuan normal
+      hargaSection = `Tampilkan PERSIS ini ke customer (jangan ubah angka):
 
 ${product?.nama || 'Produk'} ${fmt(hasil.harga)}
 
@@ -1266,6 +1290,20 @@ ${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + adm
 Via ${hasil.ekspedisi} ya kak 🚗
 
 SETELAH tampilkan harga di atas, tanya dengan santai: "Biasanya kakak lebih suka pakai kurir apa kak? Bisa aku cekkan juga 😊"`;
+    } else {
+      hargaSection = `⚠️ COD TIDAK TERSEDIA untuk wilayah ini — semua kurir ke sana belum support COD.
+Tampilkan HANYA opsi Transfer (jangan ubah angka):
+
+${product?.nama || 'Produk'} ${fmt(hasil.harga)}
+
+💳 Transfer
+${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
+
+Via ${hasil.ekspedisi} ya kak 🚗
+
+Sampaikan ke customer: "Untuk wilayah kak, pengiriman via Transfer ya kak 🙏 COD belum tersedia di sana."
+Langsung lanjut minta data (nama, alamat) tanpa tanya COD/Transfer.`;
+    }
   }
 
   return `[SISTEM] ${konteks}Ongkir sudah dihitung. Rekomendasi termurah: ${hasil.ekspedisi}.
@@ -3030,7 +3068,7 @@ ${ongkirInfo}`;
             console.warn(`[WILAYAH_OK] hitungOngkir gagal untuk "${wilayah}" (kelurahan spesifik)`);
             await updateConvState(conversation.id, { proposed_wilayah: wilayah });
             // Inject ke Claude supaya kasih tau customer, bukan diam
-            const injeksiFail = `[SISTEM] Ongkir ke "${wilayah}" tidak bisa dihitung saat ini (area mungkin belum tercover kurir). Sampaikan ke customer dengan sopan: "Mohon maaf kak, untuk area ${wilayah} saat ini belum bisa kami cek ongkirnya secara otomatis 🙏 Boleh info alamat lebih lengkap (kecamatan/kelurahan) supaya aku coba cek lagi?" — jangan bilang error/sistem/maintenance.`;
+            const injeksiFail = `[SISTEM] Ongkir ke "${wilayah}" tidak bisa dihitung. Minta alamat lebih spesifik (kelurahan/desa + kecamatan). Contoh: "Kak, bisa info nama desa/kelurahan dan kecamatannya? Biar aku cek ongkirnya ke sana 😊" — JANGAN bilang error/sistem/maintenance, JANGAN bilang kurir belum cover, JANGAN estimasi ongkir sendiri.`;
             const histFail = [
               ...history,
               { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
@@ -3119,7 +3157,7 @@ ${ongkirInfo}`;
         } else {
           console.warn(`[WILAYAH_OK fallback] hitungOngkir gagal untuk wilayah: ${wilayah}`);
           await updateConvState(conversation.id, { proposed_wilayah: wilayah });
-          const injeksiFail = `[SISTEM] Ongkir ke "${wilayah}" tidak bisa dihitung (area mungkin belum tercover kurir). Sampaikan ke customer dengan sopan: "Mohon maaf kak, untuk area ${wilayah} saat ini belum bisa kami cek ongkirnya secara otomatis 🙏 Boleh info alamat lebih lengkap (kecamatan/kelurahan) supaya aku coba cek lagi?" — jangan bilang error/sistem/maintenance.`;
+          const injeksiFail = `[SISTEM] Ongkir ke "${wilayah}" tidak bisa dihitung. Minta alamat lebih spesifik (kelurahan/desa + kecamatan). Contoh: "Kak, bisa info nama desa/kelurahan dan kecamatannya? Biar aku cek ongkirnya ke sana 😊" — JANGAN bilang error/sistem/maintenance, JANGAN bilang kurir belum cover, JANGAN estimasi ongkir sendiri.`;
           const histFail = [
             ...history,
             { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
