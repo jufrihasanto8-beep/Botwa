@@ -750,11 +750,17 @@ async function checkBotStatus() {
   const uid   = Auth.getUser()?.id;
   if (!sbBot || !uid) return;
 
-  // Cek WA status produk aktif saja (cepat), re-cek saat ganti produk via productSwitch
+  // Pakai session_id dari produk aktif (bukan user.id)
   const prods = window.__userProducts || [];
   const prodId = window.__activeProductFilter;
   const prod   = prodId ? prods.find(p => p.id === prodId) : prods[0];
-  const sessionId = prod?.wa_session_id || uid;
+  const sessionId = prod?.wa_session_id;
+
+  if (!sessionId) {
+    sbBot.innerHTML = '⚠️ WA belum terhubung';
+    sbBot.style.color = '#f59e0b';
+    return;
+  }
 
   try {
     const res = await fetch('/api/baileys-proxy?path=' + encodeURIComponent('/session/status/' + sessionId));
@@ -769,6 +775,18 @@ async function checkBotStatus() {
     }
     if (typeof window.__updateProdWaStatus === 'function') {
       window.__updateProdWaStatus(sessionId, connected);
+    }
+    // Sync wa_status ke DB supaya load berikutnya langsung akurat (fire & forget)
+    if (prod?.id && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+      const newStatus = connected ? 'connected' : 'disconnected';
+      if (prod.wa_status !== newStatus) {
+        fetch(`${window.SUPABASE_URL}/rest/v1/products?id=eq.${prod.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY },
+          body: JSON.stringify({ wa_status: newStatus }),
+        }).catch(() => {});
+        prod.wa_status = newStatus;
+      }
     }
   } catch(e) {
     sbBot.innerHTML   = '⚠️ Bot offline';

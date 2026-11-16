@@ -63,28 +63,23 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     return allUserProducts.find(p => p.id === activeProductFilter) || null;
   }
 
-  // Status label & warna — cek real WA status + Gmail
+  // Status label & warna — pakai hasil cek real-time dari checkBotStatus kalau ada
   const waStatusCache = {}; // sessionId → 'connected' | 'offline'
 
   function getProdStatus(p) {
-    const hasWaSetup = !!(p.wa_session_id);
-    const gmailOk    = !!(p.gmail_email);
-    const waReal     = hasWaSetup ? waStatusCache[p.wa_session_id] : null;
-    const waOnline   = waReal === 'connected';
-
-    if (!hasWaSetup && !gmailOk) return { label: '● Non aktif',             color: '#64748b' };
-    if (!hasWaSetup)             return { label: '● WA belum terhubung',    color: '#f59e0b' };
-    if (waReal === 'offline')    return { label: '● Bot offline',           color: '#ef4444' };
-    // Belum dicek (bukan produk aktif) — tampilkan berdasarkan setup
-    if (!waReal && gmailOk)      return { label: '● WA belum dicek',       color: '#94a3b8' };
-    if (!waReal)                 return { label: '● WA belum dicek',       color: '#94a3b8' };
-    // WA online
-    if (waOnline && gmailOk)     return { label: '● Agent aktif',           color: '#22c55e' };
-    if (waOnline)                return { label: '● Gmail belum terhubung', color: '#f59e0b' };
+    const gmailOk = !!(p.gmail_email);
+    if (!p.wa_session_id) return { label: '● WA belum setup', color: '#64748b' };
+    // Cek real-time dulu, fallback ke wa_status DB
+    const realStatus = waStatusCache[p.wa_session_id];
+    const waConnected = realStatus === 'connected' || (!realStatus && p.wa_status === 'connected');
+    const waOffline   = realStatus === 'offline'   || (!realStatus && p.wa_status !== 'connected');
+    if (waConnected && gmailOk)  return { label: '● Agent aktif',           color: '#22c55e' };
+    if (waConnected && !gmailOk) return { label: '● Gmail belum terhubung', color: '#f59e0b' };
+    if (waOffline)               return { label: '● WA terputus',           color: '#f59e0b' };
     return { label: '● Non aktif', color: '#64748b' };
   }
 
-  // Dipanggil dari app.js checkBotStatus setelah cek real WA per produk
+  // Dipanggil dari app.js checkBotStatus setelah dapat status real dari Baileys
   window.__updateProdWaStatus = function(sessionId, connected) {
     waStatusCache[sessionId] = connected ? 'connected' : 'offline';
     render();
