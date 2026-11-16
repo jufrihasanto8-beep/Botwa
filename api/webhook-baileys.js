@@ -2260,6 +2260,25 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       systemPrompt += `\n\n[SISTEM - PENTING] Pesanan customer ini SUDAH SELESAI dan tercatat di sistem (Order ID: ${convState.closed_order_id}). DILARANG KERAS generate marker [ORDER_CONFIRMED] atau [ORDER_DATA] dalam conversation ini. Tugasmu sekarang hanya membalas chat customer secara natural — jawab pertanyaan, ucapkan terima kasih, bantu tanya status pengiriman, dll. JANGAN proses order baru di conversation ini.`;
     }
 
+    // Inject data order (resi, status, ekspedisi) supaya bot bisa jawab kalau customer tanya
+    if (convState.order_placed || convState.closed_order_id) {
+      const recentOrders = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=5&select=no_resi,ekspedisi,status,status_tracking,tracking_lokasi,created_at`).catch(() => []);
+      if (recentOrders.length) {
+        let orderCtx = '\n\nDATA ORDER CUSTOMER (gunakan untuk menjawab pertanyaan seputar pesanan/resi/pengiriman):';
+        recentOrders.forEach((o, i) => {
+          const tgl = o.created_at ? new Date(o.created_at).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' }) : '-';
+          orderCtx += `\nOrder ${recentOrders.length > 1 ? (i+1) + ' ' : ''}(${tgl}):`;
+          orderCtx += ` Resi: ${o.no_resi || 'belum ada'}`;
+          orderCtx += ` | Kurir: ${o.ekspedisi || '-'}`;
+          orderCtx += ` | Status: ${o.status || '-'}`;
+          if (o.status_tracking) orderCtx += ` | Tracking: ${o.status_tracking}`;
+          if (o.tracking_lokasi) orderCtx += ` (${o.tracking_lokasi})`;
+        });
+        orderCtx += '\n\nKalau customer tanya resi/nomor pengiriman, berikan langsung. Kalau resi "belum ada", sampaikan bahwa pesanan sedang diproses dan resi akan dikirimkan segera setelah barang dikirim.';
+        systemPrompt += orderCtx;
+      }
+    }
+
     // Inject wilayah risk agar Claude ingat sepanjang conversation
     const wr = customer?.wilayah_risk;
     if (wr && convState.ongkir && !convState.order_placed) {
