@@ -727,12 +727,18 @@ function renderTable(rows) {
 
   tbody.innerHTML = rows.map((r, i) => {
     const resiTag = r.sudahDikirim
-      ? `<div style="margin-top:3px"><span style="font-size:10px;background:rgba(34,197,94,.12);color:#16a34a;border:1px solid rgba(34,197,94,.25);border-radius:4px;padding:1px 5px;font-weight:600">✓ Terkirim${r.noResi ? ' · ' + r.noResi : ''}</span></div>`
+      ? `<div style="margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+          <span style="font-size:10px;background:rgba(34,197,94,.12);color:#16a34a;border:1px solid rgba(34,197,94,.25);border-radius:4px;padding:1px 5px;font-weight:600">✓${r.noResi ? ' ' + r.noResi : ' Terkirim'}</span>
+          <button onclick="kirimUlang('${escH(r.id)}')" style="font-size:9px;padding:1px 6px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);border-radius:4px;color:#f97316;font-weight:600;cursor:pointer;white-space:nowrap" title="Kirim ulang ke Mengantar (resi baru)">🔄 Kirim Ulang</button>
+        </div>`
       : r.queueFailed
-        ? `<div style="margin-top:3px"><span style="font-size:10px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:4px;padding:1px 5px;font-weight:600" title="${escH(r.errorMsg)}">✗ Gagal · lihat detail</span></div>`
+        ? `<div style="margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+          <span style="font-size:10px;background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:4px;padding:1px 5px;font-weight:600" title="${escH(r.errorMsg)}">✗ Gagal</span>
+          <button onclick="kirimUlang('${escH(r.id)}')" style="font-size:9px;padding:1px 6px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);border-radius:4px;color:#f97316;font-weight:600;cursor:pointer;white-space:nowrap" title="Coba kirim ulang">🔄 Coba Lagi</button>
+        </div>`
         : '';
     return `<tr style="${r.sudahDikirim ? 'opacity:.65' : ''}">
-    <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()" ${r.sudahDikirim ? 'disabled title="Sudah dikirim ke Mengantar"' : ''}></td>
+    <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()" ${r.sudahDikirim ? 'disabled title="Sudah dikirim — pakai tombol Kirim Ulang"' : ''}></td>
     <td style="text-align:center"><button onclick="openEdit('${escH(r.id)}')" style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;color:#64748b;font-size:14px" title="Edit order">✏️</button></td>
     <td class="td-no">${fmtDt(r.tanggal)}</td>
     <td><div class="td-wrap-sm td-bold" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
@@ -922,9 +928,12 @@ let mngSelectedIds = [];
 let mngDestOverrides = {}; // { orderId: destId } — dari preview jika user pilih area berbeda
 
 async function openMengantar() {
-  const chk = document.querySelectorAll('.row-cb:checked');
-  mngSelectedIds = Array.from(chk).map(el => el.value).filter(Boolean);
-  mngDestOverrides = {};
+  // Kalau belum di-set (dari tombol batch), ambil dari checkbox
+  if (!mngSelectedIds.length) {
+    const chk = document.querySelectorAll('.row-cb:checked');
+    mngSelectedIds = Array.from(chk).map(el => el.value).filter(Boolean);
+    mngDestOverrides = {};
+  }
   if (!mngSelectedIds.length) return;
 
   // Show loading state
@@ -1095,6 +1104,13 @@ function pickDest(orderId, destId, label) {
   submitBtn.disabled = stillFail > 0;
   submitBtn.textContent = stillFail > 0 ? `${stillFail} order belum ada area` : 'Kirim Sekarang';
   submitBtn.style.background = stillFail > 0 ? '#94a3b8' : '#f97316';
+}
+
+function kirimUlang(orderId) {
+  if (!confirm('Kirim ulang order ini ke Mengantar?\nResi baru akan dibuat.')) return;
+  mngSelectedIds = [orderId];
+  mngDestOverrides = {};
+  openMengantar();
 }
 
 function closeMengantar() {
