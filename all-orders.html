@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="img/logo-adsy.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>All Orders · Admin</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.documentElement.classList.add('light');</script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
+
+.page-wrap{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg)}
+
+/* Top bar */
+.top-bar{background:var(--white);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.page-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.4px;margin-right:4px}
+.live-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2)}
+.live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn-export{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-csv{background:#22c55e;}.btn-csv:hover{background:#16a34a}
+.btn-xlsx{background:#3b82f6;}.btn-xlsx:hover{background:#2563eb}
+.theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* Product filter */
+.filter-select{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;outline:none;min-width:160px}
+.filter-select:focus{border-color:#3b82f6}
+
+/* Date range picker */
+.drp-trigger{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.drp-trigger:hover{border-color:#3b82f6}
+.drp-icon{color:#3b82f6;font-size:13px}
+.drp-wrap{position:relative}
+.drp-dropdown{position:fixed;z-index:9999;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.25);display:none;overflow:hidden;min-width:540px}
+body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.drp-dropdown.open{display:flex}
+.drp-presets{width:160px;border-right:1px solid var(--border);padding:10px 0;flex-shrink:0}
+.drp-preset{display:block;width:100%;text-align:left;padding:8px 16px;font-size:12px;color:var(--text-2);border:none;background:none;cursor:pointer;transition:all .12s}
+.drp-preset:hover{background:rgba(59,130,246,.08);color:#3b82f6}
+.drp-preset.active{color:#3b82f6;font-weight:600;background:rgba(59,130,246,.08)}
+.drp-cal{padding:16px;flex:1}
+.drp-cal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.drp-cal-title{font-size:14px;font-weight:600;color:var(--text)}
+.drp-nav{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .12s}
+.drp-nav:hover{border-color:#3b82f6;color:#3b82f6}
+.drp-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px}
+.drp-days-hdr span{text-align:center;font-size:11px;font-weight:600;color:var(--text-3);padding:4px 0}
+.drp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.drp-day{height:34px;border-radius:7px;border:none;background:none;color:var(--text);font-size:12px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
+.drp-day:hover:not(.empty){background:rgba(59,130,246,.12);color:#3b82f6}
+.drp-day.other-month{color:var(--text-3)}
+.drp-day.today{font-weight:700;color:#3b82f6}
+.drp-day.selected{background:#3b82f6!important;color:#fff!important;font-weight:600}
+.drp-day.in-range{background:rgba(59,130,246,.1);border-radius:0;color:var(--text)}
+.drp-day.range-start{border-radius:7px 0 0 7px;background:#3b82f6;color:#fff;font-weight:600}
+.drp-day.range-end{border-radius:0 7px 7px 0;background:#3b82f6;color:#fff;font-weight:600}
+.drp-day.range-start.range-end{border-radius:7px}
+.drp-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border)}
+.drp-selected-txt{font-size:11px;color:var(--text-3)}
+.drp-apply{padding:6px 16px;border-radius:7px;border:none;background:#3b82f6;color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.drp-apply:hover{background:#2563eb}
+.drp-cancel{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;cursor:pointer}
+
+/* Summary bar */
+.summary-bar{display:flex;gap:16px;padding:12px 24px;flex-shrink:0;flex-wrap:wrap;align-items:center;background:var(--white);border-bottom:1px solid var(--border)}
+.sum-item{font-size:12px;color:var(--text-2)}
+.sum-item b{color:var(--text);font-weight:700}
+
+/* Table vars dark */
+:root {
+  --tbl-bg:       #0f172a;
+  --tbl-head-bg:  #0f172a;
+  --tbl-border:   rgba(255,255,255,.05);
+  --tbl-row-bdr:  rgba(255,255,255,.04);
+  --tbl-hover:    rgba(255,255,255,.03);
+  --tbl-text:     #cbd5e1;
+  --tbl-text-2:   #94a3b8;
+  --tbl-text-3:   #475569;
+  --tbl-bold:     #e2e8f0;
+  --tbl-head-txt: #64748b;
+  --sb-thumb:     rgba(255,255,255,.1);
+}
+body.light {
+  --tbl-bg:       #ffffff;
+  --tbl-head-bg:  #f8fafc;
+  --tbl-border:   rgba(0,0,0,.07);
+  --tbl-row-bdr:  rgba(0,0,0,.05);
+  --tbl-hover:    rgba(59,130,246,.03);
+  --tbl-text:     #334155;
+  --tbl-text-2:   #475569;
+  --tbl-text-3:   #94a3b8;
+  --tbl-bold:     #0f172a;
+  --tbl-head-txt: #94a3b8;
+  --sb-thumb:     rgba(0,0,0,.1);
+}
+
+/* Table */
+.tbl-wrap{flex:1;overflow:auto;margin:16px 24px 24px;background:var(--tbl-bg);border:1px solid var(--tbl-border);border-radius:14px}
+.tbl-wrap::-webkit-scrollbar{width:4px;height:6px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:4px}
+
+table{width:100%;border-collapse:collapse;min-width:1500px}
+thead th{
+  padding:12px 16px;text-align:left;
+  font-size:10px;font-weight:700;color:var(--tbl-head-txt);
+  text-transform:uppercase;letter-spacing:.8px;
+  background:var(--tbl-head-bg);border-bottom:1px solid var(--tbl-border);
+  position:sticky;top:0;white-space:nowrap;z-index:2;
+}
+tbody tr{border-bottom:1px solid var(--tbl-row-bdr);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover td{background:var(--tbl-hover)}
+tbody td{padding:14px 16px;font-size:12.5px;vertical-align:middle;color:var(--tbl-text)}
+
+.td-no{font-size:11px;font-weight:600;color:var(--tbl-text-3);white-space:nowrap}
+.td-name{font-weight:600;color:var(--tbl-bold);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.td-wrap{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tbl-text-2)}
+.td-wrap-sm{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tbl-text-2)}
+.td-bold{font-weight:500;color:var(--tbl-bold)}
+.td-phone{font-family:monospace;font-size:12px;color:var(--tbl-text-2);white-space:nowrap}
+.td-num{font-weight:700;color:var(--tbl-bold);text-align:right;white-space:nowrap}
+
+/* Badges */
+.bdg{display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;letter-spacing:.5px;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.bdg-cod{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+.bdg-tf{background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.3)}
+body.light .bdg-cod{background:rgba(34,197,94,.1);color:#16a34a;border-color:rgba(34,197,94,.25)}
+body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgba(99,102,241,.25)}
+
+.empty-cell{text-align:center;padding:80px 20px;color:var(--tbl-text-3)}
+.empty-cell h4{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--tbl-text-2)}
+.empty-cell p{font-size:13px;line-height:1.6}
+
+/* Responsive */
+@media(max-width:768px){
+  .top-bar{padding:10px 14px;gap:8px}
+  .summary-bar{padding:10px 14px;gap:10px}
+  .tbl-wrap{margin:10px 14px 14px}
+  .page-title{font-size:15px}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div>
+      <div class="page-title">All Orders</div>
+      <div class="live-dot" style="margin-top:2px">Semua order dari semua produk</div>
+    </div>
+
+    <!-- Date range picker -->
+    <div class="drp-wrap">
+      <button class="drp-trigger" onclick="drpToggle()" id="drp-trigger">
+        <span class="drp-icon">&#x1F4C5;</span>
+        <span id="drp-label">Hari ini</span>
+        <span style="color:var(--text-3)">&#x25BE;</span>
+      </button>
+      <div class="drp-dropdown" id="drp-dropdown">
+        <div class="drp-presets">
+          <button class="drp-preset" onclick="drpPreset(7,'7 hari terakhir',this)">7 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPreset(14,'14 hari terakhir',this)">14 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPreset(30,'30 hari terakhir',this)">30 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPreset(90,'90 hari terakhir',this)">90 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
+          <button class="drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
+          <hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
+          <button class="drp-preset active" onclick="drpPreset(1,'Hari ini',this)">Hari Ini</button>
+          <button class="drp-preset" onclick="drpPresetYesterday(this)">Kemarin</button>
+        </div>
+        <div style="display:flex;flex-direction:column;flex:1">
+          <div class="drp-cal" id="drp-cal"></div>
+          <div class="drp-footer">
+            <div class="drp-selected-txt">
+              <span id="drp-sel-start">&mdash;</span> &rarr; <span id="drp-sel-end">&mdash;</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="drp-cancel" onclick="drpClose()">Batal</button>
+              <button class="drp-apply" onclick="drpApply()">Terapkan</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product filter -->
+    <select class="filter-select" id="filter-product" onchange="render()">
+      <option value="">Semua Produk</option>
+    </select>
+
+    <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
+      <button class="btn-export btn-csv" onclick="exportCSV()">&#x2B07; CSV</button>
+      <button class="btn-export btn-xlsx" onclick="exportExcel()">&#x2B07; Excel (.xlsx)</button>
+    </div>
+    <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema" id="theme-btn">&#x1F319;</button>
+  </div>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar">
+    <div class="sum-item">Total Order: <b id="sum-total">&mdash;</b></div>
+    <div class="sum-item" style="color:var(--text-3)">|</div>
+    <div class="sum-item">COD: <b id="sum-cod">&mdash;</b></div>
+    <div class="sum-item">Transfer: <b id="sum-tf">&mdash;</b></div>
+    <div class="sum-item" style="color:var(--text-3)">|</div>
+    <div class="sum-item">Total Nilai: <b id="sum-nilai" style="color:#22c55e">&mdash;</b></div>
+    <div class="sum-item" style="color:var(--text-3)">|</div>
+    <div class="sum-item">Total Qty: <b id="sum-qty">&mdash;</b></div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Tanggal</th>
+          <th>Produk</th>
+          <th>Nama</th>
+          <th>No Telpon</th>
+          <th>Alamat</th>
+          <th>Kelurahan</th>
+          <th>Kecamatan</th>
+          <th>Kabupaten</th>
+          <th>Provinsi</th>
+          <th>Kode Pos</th>
+          <th>Qty</th>
+          <th>Metode</th>
+          <th>Total</th>
+          <th>Kurir</th>
+          <th>Resi</th>
+          <th>Rincian</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="17" class="empty-cell">Memuat data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="js/config.js"></script>
+<script>
+// ── HELPERS ────────────────────────────────────────────────
+const SB_URL = window.SUPABASE_URL || '';
+const SB_KEY = window.SUPABASE_ANON_KEY || '';
+
+function sbFetch(table, query) {
+  return fetch(`${SB_URL}/rest/v1/${table}${query}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' }
+  }).then(r => r.json()).catch(() => []);
+}
+
+function rp(n) { return 'Rp ' + (n||0).toLocaleString('id-ID'); }
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDt(iso) {
+  if (!iso) return '\u2014';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2,'0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fmtWA(wa) {
+  if (!wa) return '\u2014';
+  return wa.replace(/@.*$/,'').replace(/^62/,'0');
+}
+
+// ── THEME ──────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  document.documentElement.classList.toggle('light', isLight);
+  localStorage.setItem('cs_theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = isLight ? '\u2600\uFE0F' : '\uD83C\uDF19';
+}
+(function(){
+  const t = localStorage.getItem('cs_theme');
+  if (t === 'light') {
+    document.body.classList.add('light');
+    document.documentElement.classList.add('light');
+    document.getElementById('theme-btn').textContent = '\u2600\uFE0F';
+  }
+})();
+
+// ── DATE RANGE PICKER ──────────────────────────────────────
+let filterStart = null, filterEnd = null;
+let drpSelStart = null, drpSelEnd = null;
+let drpViewYear = new Date().getFullYear(), drpViewMonth = new Date().getMonth();
+const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DAYS_ID = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+(function(){
+  filterStart = new Date(); filterStart.setHours(0,0,0,0);
+  filterEnd   = new Date(); filterEnd.setHours(23,59,59,999);
+  drpSelStart = new Date(filterStart); drpSelEnd = new Date(filterEnd);
+})();
+
+function drpFmt(d){ if(!d) return '\u2014'; return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
+function drpToggle(){
+  const dd=document.getElementById('drp-dropdown'),tr=document.getElementById('drp-trigger'),rect=tr.getBoundingClientRect();
+  dd.style.top=(rect.bottom+8)+'px'; dd.style.right=(window.innerWidth-rect.right)+'px';
+  dd.classList.toggle('open');
+  if(dd.classList.contains('open')){drpRender();drpUpdateSel();document.addEventListener('click',drpOutside);}
+  else document.removeEventListener('click',drpOutside);
+}
+function drpClose(){document.getElementById('drp-dropdown').classList.remove('open');document.removeEventListener('click',drpOutside);}
+function drpOutside(e){const dd=document.getElementById('drp-dropdown'),tr=document.getElementById('drp-trigger');if(!dd.contains(e.target)&&!tr.contains(e.target))drpClose();}
+function drpPreset(days,label,btn){
+  drpSelStart=new Date(Date.now()-(days-1)*864e5);drpSelStart.setHours(0,0,0,0);
+  drpSelEnd=new Date();drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  drpUpdateSel();drpRender();
+}
+function drpPresetThisMonth(btn){
+  drpSelStart=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+  drpSelEnd=new Date();drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  drpUpdateSel();drpRender();
+}
+function drpPresetLastMonth(btn){
+  const n=new Date();
+  drpSelStart=new Date(n.getFullYear(),n.getMonth()-1,1);
+  drpSelEnd=new Date(n.getFullYear(),n.getMonth(),0);drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  drpUpdateSel();drpRender();
+}
+function drpPresetYesterday(btn){
+  drpSelStart=new Date(Date.now()-864e5);drpSelStart.setHours(0,0,0,0);
+  drpSelEnd=new Date(Date.now()-864e5);drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  drpUpdateSel();drpRender();
+}
+function drpUpdateSel(){
+  document.getElementById('drp-sel-start').textContent=drpFmt(drpSelStart);
+  document.getElementById('drp-sel-end').textContent=drpFmt(drpSelEnd);
+}
+function drpApply(){
+  if(!drpSelStart)return;
+  filterStart=new Date(drpSelStart);filterEnd=drpSelEnd?new Date(drpSelEnd):new Date(drpSelStart);
+  filterEnd.setHours(23,59,59,999);
+  document.getElementById('drp-label').textContent=`${drpFmt(filterStart)} \u2014 ${drpFmt(filterEnd)}`;
+  drpClose();render();
+}
+function drpClickDay(y,m,d){
+  const clicked=new Date(y,m,d);
+  if(!drpSelStart||(drpSelStart&&drpSelEnd)){drpSelStart=clicked;drpSelEnd=null;}
+  else{if(clicked<drpSelStart){drpSelEnd=drpSelStart;drpSelStart=clicked;}else drpSelEnd=clicked;}
+  drpUpdateSel();drpRender();
+}
+function drpRender(){
+  const y=drpViewYear,m=drpViewMonth;
+  const firstDay=new Date(y,m,1).getDay(),startPad=firstDay===0?6:firstDay-1;
+  const daysInMonth=new Date(y,m+1,0).getDate(),prevDays=new Date(y,m,0).getDate();
+  const today=new Date();today.setHours(0,0,0,0);
+  let html=`<div class="drp-cal-hdr"><button class="drp-nav" onclick="drpNav(-1)">\u2039</button><div class="drp-cal-title">${MONTHS_ID[m]} ${y}</div><button class="drp-nav" onclick="drpNav(1)">\u203A</button></div><div class="drp-days-hdr">${DAYS_ID.map(d=>`<span>${d}</span>`).join('')}</div><div class="drp-days">`;
+  for(let i=startPad;i>0;i--) html+=`<button class="drp-day other-month" onclick="drpNav(-1)">${prevDays-i+1}</button>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const cur=new Date(y,m,d);
+    const isToday=cur.getTime()===today.getTime();
+    const isStart=drpSelStart&&cur.getTime()===new Date(drpSelStart.getFullYear(),drpSelStart.getMonth(),drpSelStart.getDate()).getTime();
+    const isEnd=drpSelEnd&&cur.getTime()===new Date(drpSelEnd.getFullYear(),drpSelEnd.getMonth(),drpSelEnd.getDate()).getTime();
+    const inRange=drpSelStart&&drpSelEnd&&cur>drpSelStart&&cur<drpSelEnd;
+    let cls='drp-day';
+    if(isStart&&isEnd)cls+=' selected';else if(isStart)cls+=' range-start';else if(isEnd)cls+=' range-end';else if(inRange)cls+=' in-range';
+    if(isToday)cls+=' today';
+    html+=`<button class="${cls}" onclick="drpClickDay(${y},${m},${d})">${d}</button>`;
+  }
+  const total=startPad+daysInMonth,rem=total%7===0?0:7-(total%7);
+  for(let d=1;d<=rem;d++) html+=`<button class="drp-day other-month" onclick="drpNav(1)">${d}</button>`;
+  html+='</div>';
+  document.getElementById('drp-cal').innerHTML=html;
+}
+function drpNav(dir){
+  drpViewMonth+=dir;
+  if(drpViewMonth>11){drpViewMonth=0;drpViewYear++;}
+  if(drpViewMonth<0){drpViewMonth=11;drpViewYear--;}
+  drpRender();
+}
+
+// ── DATA ───────────────────────────────────────────────────
+let allOrders = [], prodMap = {}, custMap = {}, prodList = [];
+
+async function init() {
+  const [orders, custs, prods] = await Promise.all([
+    sbFetch('orders_new', '?select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,created_at&order=created_at.desc'),
+    sbFetch('customers', '?select=id,wa_number,nama,catatan'),
+    sbFetch('products', '?select=id,nama,harga,persona_cs_nama'),
+  ]);
+
+  (custs || []).forEach(c => { custMap[c.id] = c; });
+  (prods || []).forEach(p => { prodMap[p.id] = p; });
+  prodList = prods || [];
+
+  // Populate product filter
+  const sel = document.getElementById('filter-product');
+  prodList.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.nama;
+    sel.appendChild(opt);
+  });
+
+  allOrders = orders || [];
+  render();
+}
+
+function getFiltered() {
+  const prodFilter = document.getElementById('filter-product').value;
+  return allOrders.filter(o => {
+    const d = new Date(o.created_at);
+    if (d < filterStart || d > filterEnd) return false;
+    if (prodFilter && o.product_id !== prodFilter) return false;
+    return true;
+  });
+}
+
+function render() {
+  const filtered = getFiltered();
+  const tbody = document.getElementById('tbody');
+
+  // Summary
+  let cod=0, tf=0, totalNilai=0, totalQty=0;
+  filtered.forEach(o => {
+    const m = (o.metode||'').toLowerCase();
+    if (m === 'cod') cod++; else tf++;
+    totalNilai += (o.total||0);
+    totalQty += (o.qty||0);
+  });
+  document.getElementById('sum-total').textContent = filtered.length;
+  document.getElementById('sum-cod').textContent = cod;
+  document.getElementById('sum-tf').textContent = tf;
+  document.getElementById('sum-nilai').textContent = rp(totalNilai);
+  document.getElementById('sum-qty').textContent = totalQty;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="17" class="empty-cell"><h4>Tidak ada order</h4><p>Belum ada order di rentang tanggal ini.</p></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((o, idx) => {
+    const alamat = o.alamat || {};
+    const prodName = o.product_nama || (prodMap[o.product_id]||{}).nama || '\u2014';
+    const custName = o.customer_nama || (custMap[o.customer_id]||{}).nama || '\u2014';
+    const phone = o.customer_phone || fmtWA((custMap[o.customer_id]||{}).wa_number) || '\u2014';
+    const metode = (o.metode||'').toLowerCase();
+    const bdgClass = metode === 'cod' ? 'bdg bdg-cod' : 'bdg bdg-tf';
+    const bdgText = metode === 'cod' ? 'COD' : 'TF';
+
+    const rincian = [];
+    if (o.harga) rincian.push('Harga: ' + rp(o.harga));
+    if (o.ongkir) rincian.push('Ongkir: ' + rp(o.ongkir));
+    if (o.fee_cod) rincian.push('Fee COD: ' + rp(o.fee_cod));
+
+    return `<tr>
+      <td class="td-no">${idx+1}</td>
+      <td class="td-no">${fmtDt(o.created_at)}</td>
+      <td class="td-wrap-sm" title="${escH(prodName)}">${escH(prodName)}</td>
+      <td class="td-name" title="${escH(custName)}">${escH(custName)}</td>
+      <td class="td-phone">${escH(phone)}</td>
+      <td class="td-wrap" title="${escH(alamat.jalan||'')}">${escH(alamat.jalan||'\u2014')}</td>
+      <td class="td-wrap-sm">${escH(alamat.kelurahan||'\u2014')}</td>
+      <td class="td-wrap-sm">${escH(alamat.kecamatan||'\u2014')}</td>
+      <td class="td-wrap-sm">${escH(alamat.kabupaten||'\u2014')}</td>
+      <td class="td-wrap-sm">${escH(alamat.provinsi||'\u2014')}</td>
+      <td>${escH(alamat.kodepos||'\u2014')}</td>
+      <td class="td-bold" style="text-align:center">${o.qty||0}</td>
+      <td><span class="${bdgClass}">${bdgText}</span></td>
+      <td class="td-num">${rp(o.total)}</td>
+      <td class="td-wrap-sm">${escH(o.ekspedisi||'\u2014')}</td>
+      <td class="td-wrap-sm" style="font-family:monospace;font-size:11px">${escH(o.no_resi||'\u2014')}</td>
+      <td style="font-size:11px;color:var(--tbl-text-2);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escH(rincian.join(', '))}">${escH(rincian.join(', ')||'\u2014')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── EXPORT ─────────────────────────────────────────────────
+function getExportData() {
+  return getFiltered().map((o, idx) => {
+    const alamat = o.alamat || {};
+    const prodName = o.product_nama || (prodMap[o.product_id]||{}).nama || '';
+    const custName = o.customer_nama || (custMap[o.customer_id]||{}).nama || '';
+    const phone = o.customer_phone || fmtWA((custMap[o.customer_id]||{}).wa_number) || '';
+    return {
+      'No': idx+1,
+      'Tanggal': fmtDt(o.created_at),
+      'Produk': prodName,
+      'Nama': custName,
+      'No Telpon': phone,
+      'Alamat': alamat.jalan || '',
+      'Kelurahan': alamat.kelurahan || '',
+      'Kecamatan': alamat.kecamatan || '',
+      'Kabupaten': alamat.kabupaten || '',
+      'Provinsi': alamat.provinsi || '',
+      'Kode Pos': alamat.kodepos || '',
+      'Qty': o.qty || 0,
+      'Metode': (o.metode||'').toUpperCase(),
+      'Total': o.total || 0,
+      'Kurir': o.ekspedisi || '',
+      'Resi': o.no_resi || '',
+      'Harga': o.harga || 0,
+      'Ongkir': o.ongkir || 0,
+      'Fee COD': o.fee_cod || 0,
+    };
+  });
+}
+
+function exportCSV() {
+  const data = getExportData();
+  if (!data.length) return alert('Tidak ada data untuk di-export');
+  const keys = Object.keys(data[0]);
+  const csv = [keys.join(','), ...data.map(r => keys.map(k => {
+    let v = String(r[k]||'');
+    if (v.includes(',') || v.includes('"') || v.includes('\n')) v = '"' + v.replace(/"/g,'""') + '"';
+    return v;
+  }).join(','))].join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `all-orders-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+function exportExcel() {
+  const data = getExportData();
+  if (!data.length) return alert('Tidak ada data untuk di-export');
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'All Orders');
+  XLSX.writeFile(wb, `all-orders-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ── INIT ───────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
