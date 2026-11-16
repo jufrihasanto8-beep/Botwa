@@ -69,18 +69,18 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
   function getProdStatus(p) {
     const hasWaSetup = !!(p.wa_session_id);
     const gmailOk    = !!(p.gmail_email);
-    // Cek real WA status dari cache (di-update oleh checkBotStatus)
     const waReal     = hasWaSetup ? waStatusCache[p.wa_session_id] : null;
     const waOnline   = waReal === 'connected';
 
     if (!hasWaSetup && !gmailOk) return { label: '● Non aktif',             color: '#64748b' };
     if (!hasWaSetup)             return { label: '● WA belum terhubung',    color: '#f59e0b' };
-    // WA sudah setup tapi belum dicek / offline
     if (waReal === 'offline')    return { label: '● Bot offline',           color: '#ef4444' };
-    if (!waReal)                 return { label: '● Mengecek...',           color: '#94a3b8' };
+    // Belum dicek (bukan produk aktif) — tampilkan berdasarkan setup
+    if (!waReal && gmailOk)      return { label: '● WA belum dicek',       color: '#94a3b8' };
+    if (!waReal)                 return { label: '● WA belum dicek',       color: '#94a3b8' };
     // WA online
     if (waOnline && gmailOk)     return { label: '● Agent aktif',           color: '#22c55e' };
-    if (waOnline && !gmailOk)    return { label: '● Gmail belum terhubung', color: '#f59e0b' };
+    if (waOnline)                return { label: '● Gmail belum terhubung', color: '#f59e0b' };
     return { label: '● Non aktif', color: '#64748b' };
   }
 

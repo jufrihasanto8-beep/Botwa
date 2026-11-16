@@ -750,34 +750,34 @@ async function checkBotStatus() {
   const uid   = Auth.getUser()?.id;
   if (!sbBot || !uid) return;
 
-  // Cek WA status per produk (multi-WA)
+  // Cek WA status produk aktif saja (cepat), re-cek saat ganti produk via productSwitch
   const prods = window.__userProducts || [];
-  const sessions = [...new Set(prods.map(p => p.wa_session_id).filter(Boolean))];
-  if (!sessions.length) sessions.push(uid); // fallback legacy
+  const prodId = window.__activeProductFilter;
+  const prod   = prodId ? prods.find(p => p.id === prodId) : prods[0];
+  const sessionId = prod?.wa_session_id || uid;
 
-  let anyOnline = false;
-  for (const sid of sessions) {
-    try {
-      const res = await fetch('/api/baileys-proxy?path=' + encodeURIComponent('/session/status/' + sid));
-      const s   = await res.json();
-      const connected = s.status === 'connected';
-      if (connected) anyOnline = true;
-      if (typeof window.__updateProdWaStatus === 'function') {
-        window.__updateProdWaStatus(sid, connected);
-      }
-    } catch(e) {
-      if (typeof window.__updateProdWaStatus === 'function') {
-        window.__updateProdWaStatus(sid, false);
-      }
+  try {
+    const res = await fetch('/api/baileys-proxy?path=' + encodeURIComponent('/session/status/' + sessionId));
+    const s   = await res.json();
+    const connected = s.status === 'connected';
+    if (connected) {
+      sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
+      sbBot.style.color = '#22c55e';
+    } else {
+      sbBot.innerHTML   = '⚠️ Bot offline';
+      sbBot.style.color = '#f59e0b';
     }
-  }
-
-  // Update global sidebar status
-  if (anyOnline) {
-    sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
-    sbBot.style.color = '#22c55e';
-  } else {
+    if (typeof window.__updateProdWaStatus === 'function') {
+      window.__updateProdWaStatus(sessionId, connected);
+    }
+  } catch(e) {
     sbBot.innerHTML   = '⚠️ Bot offline';
     sbBot.style.color = '#f59e0b';
+    if (typeof window.__updateProdWaStatus === 'function') {
+      window.__updateProdWaStatus(sessionId, false);
+    }
   }
 }
+
+// Re-cek status bot saat user ganti produk
+window.addEventListener('productSwitch', () => checkBotStatus());
