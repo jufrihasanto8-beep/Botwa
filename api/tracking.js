@@ -382,8 +382,19 @@ async function lookupDestId(alamat) {
 }
 
 /* ── Fetch/create time slot untuk pickup hari ini ────────────── */
-async function getTimeId16(mngKey, originId) {
+async function getTimeSlot(mngKey, originId) {
   try {
+    // Hitung waktu WIB sekarang + 2 jam (aman dari batas 90 menit)
+    const nowWIB = new Date(Date.now() + 7 * 3600 * 1000);
+    const minPickupWIB = new Date(nowWIB.getTime() + 2 * 3600 * 1000);
+    const dateStr = nowWIB.toISOString().slice(0, 10);
+
+    // Tentukan jam pickup: minimal 2 jam dari sekarang, minimal 10:00, maksimal 20:00
+    let pickupHour = minPickupWIB.getUTCHours();
+    if (pickupHour < 10) pickupHour = 10;
+    if (pickupHour > 20) pickupHour = 20;
+    const pickupTime = String(pickupHour).padStart(2, '0') + ':00';
+
     // 1. Cek time slots yang sudah ada
     const r = await fetch(`https://app.mengantar.com/api/public/${mngKey}/time`, {
       headers: { 'Accept': 'application/json' },
@@ -392,23 +403,27 @@ async function getTimeId16(mngKey, originId) {
     const times = json.data || json;
 
     if (Array.isArray(times) && times.length) {
-      // Pakai slot yang sudah ada
-      const picked = times[times.length - 1]; // slot terakhir (paling malam)
-      const pickedId = picked._id || picked.id;
-      console.log('[getTimeSlot] pakai slot existing:', picked.time, pickedId);
-      return pickedId;
+      // Cari slot yang waktunya >= pickupTime (masih valid)
+      const valid = times.filter(t => {
+        const slotTime = (t.time || '').slice(0, 5);
+        return slotTime >= pickupTime;
+      });
+      if (valid.length) {
+        const picked = valid[0]; // slot paling awal yang masih valid
+        console.log('[getTimeSlot] pakai slot existing:', picked.time, picked._id || picked.id);
+        return picked._id || picked.id;
+      }
+      // Semua slot sudah lewat — buat baru
     }
 
-    // 2. Belum ada → bikin otomatis jam 16:00 hari ini
-    console.log('[getTimeSlot] slots kosong, bikin baru jam 16:00...');
-    const todayWIB = new Date(Date.now() + 7 * 3600 * 1000);
-    const dateStr = todayWIB.toISOString().slice(0, 10); // YYYY-MM-DD
+    // 2. Buat slot baru
+    console.log(`[getTimeSlot] bikin slot baru jam ${pickupTime}...`);
 
     const cr = await fetch(`https://app.mengantar.com/api/public/${mngKey}/time`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({
-        time: '16:00',
+        time: pickupTime,
         date: dateStr,
         address_id: originId,
       }),
@@ -416,7 +431,7 @@ async function getTimeId16(mngKey, originId) {
     const crJson = await cr.json();
 
     if (crJson.success && crJson.data?._id) {
-      console.log('[getTimeSlot] slot baru dibuat:', crJson.data._id);
+      console.log('[getTimeSlot] slot baru dibuat:', pickupTime, crJson.data._id);
       return crJson.data._id;
     }
 
@@ -530,7 +545,7 @@ async function handleCreateMengantar(req, res) {
     if (!mngKey) return res.status(400).json({ error: 'Mengantar API key belum dikonfigurasi. Isi di Settings → Mengantar.' });
 
     // 2. Fetch/create time slot pickup jam 16:00
-    const timeId = await getTimeId16(mngKey, mngOriginId);
+    const timeId = await getTimeSlot(mngKey, mngOriginId);
     if (!timeId) return res.status(400).json({ error: 'Gagal membuat jadwal pickup di Mengantar. Cek konfigurasi Mengantar.' });
 
     // 3. Group orders by kurir
@@ -628,7 +643,7 @@ async function handleCreateMengantar(req, res) {
         const feeCod       = o.fee_cod || 0;
         const potAdmin     = 0;
         const hargaProdukTotal = hargaSatuan * qty;
-        item.shippingInstruction = `${pengirim}|${ongkirAsli}|${potOngkir}|${feeCod}|${potAdmin}|${hargaProdukTotal}`;
+        item.deliveryInstruction = `${pengirim}|${ongkirAsli}|${potOngkir}|${feeCod}|${potAdmin}|${hargaProdukTotal}`;
 
         // Lengkapi orders_new dengan data flat sebelum kirim
         await sbPatch('orders_new', `?id=eq.${o.id}`, {
