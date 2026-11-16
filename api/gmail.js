@@ -80,8 +80,12 @@ async function getAccessToken(refreshToken) {
 }
 
 // ── Gmail API helpers ─────────────────────────────────────
-async function searchEmails(accessToken) {
-  const q = encodeURIComponent('(from:support@orderonline.id OR from:sufiruhana14@gmail.com) is:unread in:anywhere');
+async function searchEmails(accessToken, lastChecked) {
+  // Filter: hanya email setelah gmail_last_checked (atau hari ini kalau baru connect)
+  const afterDate = lastChecked
+    ? new Date(lastChecked).toISOString().slice(0, 10).replace(/-/g, '/')
+    : new Date().toISOString().slice(0, 10).replace(/-/g, '/');
+  const q = encodeURIComponent(`(from:support@orderonline.id OR from:sufiruhana14@gmail.com) is:unread in:anywhere after:${afterDate}`);
   const r = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=10`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -423,7 +427,7 @@ module.exports = async function handler(req, res) {
         await sbPatch('products', `?id=eq.${stateProductId}&user_id=eq.${stateUserId}`, {
           gmail_email: uiData.email || null,
           gmail_refresh_token: tokens.refresh_token,
-          gmail_last_checked: null,
+          gmail_last_checked: new Date().toISOString(),
         });
 
         return res.redirect(`${APP_URL}/settings.html?gmail=success&email=${encodeURIComponent(uiData.email || '')}`);
@@ -459,7 +463,7 @@ module.exports = async function handler(req, res) {
         const log = { product_id: product.id, produk: product.nama, user_id: product.user_id, gmail: product.gmail_email, processed: 0, errors: [] };
         try {
           const token    = await getAccessToken(product.gmail_refresh_token);
-          const messages = await searchEmails(token);
+          const messages = await searchEmails(token, product.gmail_last_checked);
           log.emails_found = messages.length;
 
           for (const msg of messages) {
