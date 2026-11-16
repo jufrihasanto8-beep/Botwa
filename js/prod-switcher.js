@@ -63,16 +63,32 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     return allUserProducts.find(p => p.id === activeProductFilter) || null;
   }
 
-  // Status label & warna berdasarkan koneksi WA + Gmail
-  // wa_session_id ada = WA pernah di-connect (lebih reliable dari wa_status yang tidak realtime)
+  // Status label & warna — cek real WA status + Gmail
+  const waStatusCache = {}; // sessionId → 'connected' | 'offline'
+
   function getProdStatus(p) {
-    const waOk    = !!(p.wa_session_id);
-    const gmailOk = !!(p.gmail_email);
-    if (waOk && gmailOk)   return { label: '● Agent aktif',           color: '#22c55e' };
-    if (!waOk && !gmailOk) return { label: '● Non aktif',             color: '#64748b' };
-    if (!waOk)             return { label: '● WA belum terhubung',    color: '#f59e0b' };
-                           return { label: '● Gmail belum terhubung', color: '#f59e0b' };
+    const hasWaSetup = !!(p.wa_session_id);
+    const gmailOk    = !!(p.gmail_email);
+    // Cek real WA status dari cache (di-update oleh checkBotStatus)
+    const waReal     = hasWaSetup ? waStatusCache[p.wa_session_id] : null;
+    const waOnline   = waReal === 'connected';
+
+    if (!hasWaSetup && !gmailOk) return { label: '● Non aktif',             color: '#64748b' };
+    if (!hasWaSetup)             return { label: '● WA belum terhubung',    color: '#f59e0b' };
+    // WA sudah setup tapi belum dicek / offline
+    if (waReal === 'offline')    return { label: '● Bot offline',           color: '#ef4444' };
+    if (!waReal)                 return { label: '● Mengecek...',           color: '#94a3b8' };
+    // WA online
+    if (waOnline && gmailOk)     return { label: '● Agent aktif',           color: '#22c55e' };
+    if (waOnline && !gmailOk)    return { label: '● Gmail belum terhubung', color: '#f59e0b' };
+    return { label: '● Non aktif', color: '#64748b' };
   }
+
+  // Dipanggil dari app.js checkBotStatus setelah cek real WA per produk
+  window.__updateProdWaStatus = function(sessionId, connected) {
+    waStatusCache[sessionId] = connected ? 'connected' : 'offline';
+    render();
+  };
 
   // ── Inject div setelah #sb-bot-status ────────────────────
   function injectEl() {
@@ -102,9 +118,10 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
 
     const nameHtml = active ? active.nama : (showAll ? 'Semua Produk' : (allUserProducts[0]?.nama || 'Produk'));
     const st       = active ? getProdStatus(active) : null;
+    const csName   = active?.persona_cs_nama;
     const subHtml  = active
-      ? `<span style="color:${st.color}">${st.label}</span>`
-      : (showAll ? `${allUserProducts.length} produk` : (() => { const s = getProdStatus(allUserProducts[0]); return `<span style="color:${s.color}">${s.label}</span>`; })());
+      ? `${csName ? `<span style="color:#94a3b8">${csName}</span><span style="color:#475569"> · </span>` : ''}<span style="color:${st.color}">${st.label}</span>`
+      : (showAll ? `${allUserProducts.length} produk` : (() => { const p0 = allUserProducts[0]; const s = getProdStatus(p0); return `${p0.persona_cs_nama ? `<span style="color:#94a3b8">${p0.persona_cs_nama}</span><span style="color:#475569"> · </span>` : ''}<span style="color:${s.color}">${s.label}</span>`; })());
 
     el.innerHTML = `
       <div class="prod-sw-trigger ${dropOpen?'open':''}" id="ps-trigger" onclick="window.__toggleProdDrop(event)">
@@ -152,7 +169,7 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
           <div class="prod-sw-opt-av" style="background:${color}">${initials(p.nama)}</div>
           <div class="prod-sw-opt-info">
             <div class="prod-sw-opt-name">${p.nama}</div>
-            <div class="prod-sw-opt-sub" style="color:${getProdStatus(p).color}">${getProdStatus(p).label}</div>
+            <div class="prod-sw-opt-sub">${p.persona_cs_nama ? `<span style="color:#94a3b8">${p.persona_cs_nama}</span><span style="color:#475569"> · </span>` : ''}<span style="color:${getProdStatus(p).color}">${getProdStatus(p).label}</span></div>
           </div>
           ${isActive ? '<div class="prod-sw-opt-check">✓</div>' : ''}
         </div>
@@ -209,13 +226,13 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     if (!userId) { console.log('[ProdSW] no userId'); return; }
     try {
       let r = await fetch(
-        `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_status,wa_session_id,gmail_email`,
+        `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,persona_cs_nama,wa_status,wa_session_id,gmail_email`,
         { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
       );
       // Fallback: kolom gmail_email belum ada di DB (SQL belum dijalankan)
       if (!r.ok) {
         r = await fetch(
-          `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_status,wa_session_id`,
+          `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,persona_cs_nama,wa_status,wa_session_id`,
           { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
         );
       }

@@ -691,6 +691,7 @@ function renderSidebar(activePage) {
     'order-detail':   ic(`<path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/><line x1='16' y1='13' x2='8' y2='13'/><line x1='16' y1='17' x2='8' y2='17'/><polyline points='10 9 9 9 8 9'/>`),
     pesanan:          ic(`<path d='M11 21H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5'/><path d='M22 13V6a2 2 0 0 0-2-2h-5'/><rect x='9' y='11' width='6' height='11' rx='1'/><path d='M9 7h6'/>`),
     'followup-engine':ic(`<path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'/><path d='M10.3 21a1.94 1.94 0 0 0 3.4 0'/>`),
+    leads:            ic(`<path d='M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.99 12 19.79 19.79 0 0 1 1.98 3.4 2 2 0 0 1 3.96 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z'/><path d='M14.05 2a9 9 0 0 1 8 7.94'/><path d='M14.05 6A5 5 0 0 1 18 10'/>`),
     products:         ic(`<path d='m7.5 4.27 9 5.15'/><path d='M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z'/><path d='m3.3 7 8.7 5 8.7-5'/><path d='M12 22V12'/>`),
     promo:            ic(`<path d='M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42Z'/><circle cx='7.5' cy='7.5' r='.5' fill='currentColor'/>`),
     settings:         ic(`<path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/><circle cx='12' cy='12' r='3'/>`),
@@ -707,6 +708,7 @@ function renderSidebar(activePage) {
     { id:'order-detail',   href:'order-detail.html',    icon:ICONS['order-detail'],     label:'Detail Order' },
     { id:'pesanan',         href:'pesanan.html',         icon:ICONS.pesanan,            label:'Pesanan' },
     { id:'followup-engine', href:'followup-engine.html', icon:ICONS['followup-engine'],label:'Follow-up' },
+    { id:'leads',           href:'leads.html',           icon:ICONS.leads,            label:'Leads' },
     { id:'products',        href:'products.html',        icon:ICONS.products,         label:'Katalog & SOP' },
     { id:'promo',           href:'promo.html',           icon:ICONS.promo,            label:'Skema Promo' },
   ];
@@ -747,17 +749,34 @@ async function checkBotStatus() {
   const sbBot = document.getElementById('sb-bot-status');
   const uid   = Auth.getUser()?.id;
   if (!sbBot || !uid) return;
-  try {
-    const res = await fetch('/api/baileys-proxy?path=' + encodeURIComponent('/session/status/' + uid));
-    const s   = await res.json();
-    if (s.status === 'connected') {
-      sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
-      sbBot.style.color = '#22c55e';
-    } else {
-      sbBot.innerHTML   = '⚠️ Bot offline';
-      sbBot.style.color = '#f59e0b';
+
+  // Cek WA status per produk (multi-WA)
+  const prods = window.__userProducts || [];
+  const sessions = [...new Set(prods.map(p => p.wa_session_id).filter(Boolean))];
+  if (!sessions.length) sessions.push(uid); // fallback legacy
+
+  let anyOnline = false;
+  for (const sid of sessions) {
+    try {
+      const res = await fetch('/api/baileys-proxy?path=' + encodeURIComponent('/session/status/' + sid));
+      const s   = await res.json();
+      const connected = s.status === 'connected';
+      if (connected) anyOnline = true;
+      if (typeof window.__updateProdWaStatus === 'function') {
+        window.__updateProdWaStatus(sid, connected);
+      }
+    } catch(e) {
+      if (typeof window.__updateProdWaStatus === 'function') {
+        window.__updateProdWaStatus(sid, false);
+      }
     }
-  } catch(e) {
+  }
+
+  // Update global sidebar status
+  if (anyOnline) {
+    sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
+    sbBot.style.color = '#22c55e';
+  } else {
     sbBot.innerHTML   = '⚠️ Bot offline';
     sbBot.style.color = '#f59e0b';
   }
