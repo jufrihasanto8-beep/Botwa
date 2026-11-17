@@ -242,7 +242,35 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, 
   const isLastDay = schedule?.is_last || false;
 
   if (tipe === 'ai') {
-    message = await generateAIFollowup(recentMsgs, namaKak, namaProduk, csNama, isLastDay, isFormLead, state, product);
+    // ── Stage-based template: skip Claude call kalau tahap sudah jelas ──
+    const panggilan = namaKak ? `Kak ${namaKak}` : 'Kak';
+    const ongkir = state.ongkir;
+
+    if (ongkir && !state.metode_bayar && !state.awaiting_order_confirm) {
+      // Sudah ada ongkir tapi belum pilih metode → langsung tanya
+      const fmt = n => `Rp ${Number(n||0).toLocaleString('id-ID')}`;
+      message = `${panggilan}, pesanannya jadi kami proses? 😊\n\n`
+        + `Total:\n`
+        + `💳 Transfer: ${fmt(ongkir.totalTransfer)}\n`
+        + `📦 COD: ${fmt(ongkir.totalCOD)}\n\n`
+        + `Enaknya COD atau Transfer kak?`;
+      console.log(`[stage-fu] conv ${conv.id}: ongkir ada, tanya metode`);
+
+    } else if (state.awaiting_bukti_tf) {
+      // Nunggu bukti TF
+      message = `${panggilan}, sudah sempat transfer kak? Kalau sudah, kirim bukti TF-nya ya biar bisa segera kami proses 🙏`;
+      console.log(`[stage-fu] conv ${conv.id}: awaiting bukti TF`);
+
+    } else if (state.wilayah && !ongkir) {
+      // Wilayah ada tapi ongkir gagal — coba info ulang
+      message = `${panggilan}, maaf tadi sempat ada kendala. Boleh konfirmasi lagi kak alamat pengirimannya ke mana? Biar kami cek ongkirnya 😊`;
+      console.log(`[stage-fu] conv ${conv.id}: wilayah ada, ongkir gagal`);
+
+    } else {
+      // Default: panggil Claude AI
+      message = await generateAIFollowup(recentMsgs, namaKak, namaProduk, csNama, isLastDay, isFormLead, state, product);
+    }
+
     if (!message) {
       message = namaKak
         ? `Kak ${namaKak}, masih ada yang bisa aku bantu? 😊`
@@ -337,12 +365,27 @@ module.exports = async function handler(req, res) {
   const isTimeUp = () => Date.now() - startTime > MAX_RUNTIME;
 
   try {
+    // ── Filter: hanya produk dengan WA session aktif ──
+    const activeProducts = await sbGet('products',
+      `?wa_status=eq.connected&wa_session_id=not.is.null&aktif=eq.true&select=id,wa_session_id`
+    ).catch(() => []);
+    const activeProductIds = activeProducts.map(p => p.id);
+    const activeSessionIds = new Set(activeProducts.map(p => p.wa_session_id));
+
+    if (!activeProductIds.length) {
+      console.log('[followup] Tidak ada produk dengan WA session aktif, skip semua');
+      return res.status(200).json({ ok: true, sent: 0, skipped: 0, reason: 'no_active_sessions' });
+    }
+    console.log(`[followup] ${activeProductIds.length} produk aktif: ${activeProductIds.join(', ')}`);
+
+    const activeProductFilter = `&product_id=in.(${activeProductIds.join(',')})`;
+
     // ── BAGIAN -1: Pending Greeting — kirim greeting form lead yang dijeda 3 menit ──
     const GREETING_DELAY_MS = 3 * 60 * 1000;
     // Hanya cek conversation 15 menit terakhir (bukan semua 800+)
     const greetingCutoff = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
     const pendingConvs = await sbGet('conversations',
-      `?status=in.(baru,diproses)&created_at=gte.${greetingCutoff}&select=id,user_id,state&limit=50`
+      `?status=in.(baru,diproses)&created_at=gte.${greetingCutoff}${activeProductFilter}&select=id,user_id,state&limit=50`
     ).catch(() => []);
     const pendingGreetings = pendingConvs.filter(c => c.state?.pending_greeting?.created_at);
 
@@ -361,6 +404,12 @@ module.exports = async function handler(req, res) {
           state: { ...conv.state, pending_greeting: null },
         }).catch(() => {});
         console.log(`[greeting] conv ${conv.id}: customer sudah chat duluan, skip`);
+        continue;
+      }
+
+      // Skip kalau session greeting bukan dari WA aktif
+      if (pg.wa_session && !activeSessionIds.has(pg.wa_session)) {
+        console.log(`[greeting] SKIP conv ${conv.id}: session ${pg.wa_session} tidak aktif`);
         continue;
       }
 
@@ -389,6 +438,7 @@ module.exports = async function handler(req, res) {
       `?status=in.(baru,diproses)` +
       `&created_at=gte.${cutoff3d}` +
       `&last_msg_at=lte.${cutoff2h}` +
+      activeProductFilter +
       `&select=id,user_id,customer_id,product_id,state,last_msg_at` +
       `&limit=50`
     ).catch(() => []);
@@ -493,6 +543,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
       `&sumber=eq.form` +
       `&created_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff30m}` +
+      activeProductFilter +
       `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at` +
       `&limit=100`
     ).catch(() => []);
@@ -503,6 +554,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
       `&sumber=neq.form` +
       `&created_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
+      activeProductFilter +
       `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at` +
       `&limit=100`
     );
@@ -513,6 +565,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
       `&created_at=lt.${todayStartISO}` +
       `&last_msg_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
+      activeProductFilter +
       `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at` +
       `&limit=100`
     ).catch(() => []);
@@ -544,11 +597,12 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         if (conv.status === 'eskalasi') { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: status eskalasi`); continue; }
         if (state.awaiting_order_confirm || state.awaiting_order_correction) { totalSkipped++; console.log(`[SKIP] conv ${conv.id}: menunggu konfirmasi order`); continue; }
 
-        // Cek pesan terakhir harus dari AI
+        // Cek pesan terakhir harus dari AI (kecuali stage-based: awaiting_bukti_tf, ongkir ada tapi belum metode)
+        const isStageFollow = state.awaiting_bukti_tf || (state.ongkir && !state.metode_bayar) || (state.wilayah && !state.ongkir);
         const lastMsgs = await sbGet('conv_messages',
           `?conversation_id=eq.${conv.id}&order=created_at.desc&limit=1`
         );
-        if (!lastMsgs.length || lastMsgs[0].role !== 'ai') {
+        if (!isStageFollow && (!lastMsgs.length || lastMsgs[0].role !== 'ai')) {
           totalSkipped++;
           console.log(`[SKIP] conv ${conv.id}: pesan terakhir bukan dari AI (role=${lastMsgs[0]?.role || 'none'})`);
           continue;
@@ -642,6 +696,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
           `&created_at=gte.${hariMulai.toISOString()}` +
           `&created_at=lt.${hariAkhir.toISOString()}` +
           `&last_msg_at=lte.${cutoff1h}` +
+          activeProductFilter +
           `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at` +
           `&limit=100`
         ).catch(() => []);
