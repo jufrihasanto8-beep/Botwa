@@ -1147,9 +1147,29 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
+/* ── Random delay biar pattern lebih manusiawi ─────────── */
+function humanDelay(minMs = 2000, maxMs = 5000) {
+  const ms = minMs + Math.floor(Math.random() * (maxMs - minMs));
+  return new Promise(r => setTimeout(r, ms));
+}
+
+/* ── Kirim typing indicator "sedang mengetik..." ────────── */
+async function sendTyping(sessionId, waNumber) {
+  try {
+    await fetchWithTimeout(`${BAILEYS_URL}/typing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: WEBHOOK_SECRET, session_id: sessionId, wa_number: waNumber }),
+    }, 5000);
+  } catch (_) {} // silent fail, typing bukan critical
+}
+
 /* ── KIRIM WA via Baileys server ──────────────────────────── */
 async function sendWA(sessionId, waNumber, message, isOutbound = false, imageUrl = null, caption = null) {
   if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
+  // Typing indicator + delay manusiawi sebelum kirim
+  await sendTyping(sessionId, waNumber);
+  await humanDelay(2000, 5000);
   const res = await fetchWithTimeout(`${BAILEYS_URL}/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
