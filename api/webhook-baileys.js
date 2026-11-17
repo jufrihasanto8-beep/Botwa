@@ -1522,9 +1522,14 @@ module.exports = async function handler(req, res) {
     const waSession = product?.wa_session_id || userId;
 
     // ── Pending Greeting: cek & kirim greeting form yang sudah lewat 3 menit ──
+    // Skip kalau produk dalam Mode Pasif (warm up — bot hanya reply)
+    const waMode = product?.wa_mode || 'active';
+    if (waMode === 'passive') {
+      console.log(`[greeting] Skip — produk "${product?.nama}" dalam Mode Pasif`);
+    }
     // Dijalankan setiap ada webhook masuk (piggyback), non-blocking
     const GREETING_DELAY_MS = 3 * 60 * 1000;
-    (async () => {
+    if (waMode !== 'passive') (async () => {
       try {
         const pendingConvs = await sbGet('conversations',
           `?user_id=eq.${userId}&status=in.(baru,diproses)&select=id,state`
