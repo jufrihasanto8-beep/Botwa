@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="img/logo-adsy.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QC Transfer · Finance</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.documentElement.classList.add('light');</script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
+
+.page-wrap{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg)}
+
+/* Top bar */
+.top-bar{background:var(--white);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.page-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.4px;margin-right:4px}
+.live-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2)}
+.live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;padding:12px 24px;flex-shrink:0;flex-wrap:wrap;align-items:center;background:var(--white);border-bottom:1px solid var(--border)}
+.filter-select{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;outline:none;min-width:120px}
+.filter-select:focus{border-color:#3b82f6}
+.filter-input{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;outline:none}
+.filter-input:focus{border-color:#3b82f6}
+
+/* Summary bar */
+.summary-bar{display:flex;gap:16px;padding:10px 24px;flex-shrink:0;flex-wrap:wrap;align-items:center;background:var(--white);border-bottom:1px solid var(--border)}
+.sum-item{font-size:12px;color:var(--text-2)}
+.sum-item b{color:var(--text);font-weight:700}
+.sum-pending{color:#f59e0b!important}
+.sum-approved{color:#22c55e!important}
+.sum-rejected{color:#ef4444!important}
+
+/* Cards grid */
+.cards-wrap{flex:1;overflow:auto;padding:16px 24px 24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;align-content:start}
+.cards-wrap::-webkit-scrollbar{width:4px}
+.cards-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+
+/* Card */
+.qc-card{background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:all .15s}
+.qc-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.qc-card.status-approved{border-color:rgba(34,197,94,.3)}
+.qc-card.status-rejected{border-color:rgba(239,68,68,.3)}
+
+/* Card image */
+.qc-img-wrap{position:relative;height:200px;background:#0f172a;cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.qc-img-wrap img{max-width:100%;max-height:100%;object-fit:contain}
+.qc-img-wrap .no-img{color:var(--text-3);font-size:12px}
+
+/* Card body */
+.qc-body{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:8px}
+.qc-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.qc-label{font-size:11px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.qc-val{font-size:12px;color:var(--text);font-weight:500;text-align:right}
+.qc-val-bold{font-size:13px;color:var(--text);font-weight:700}
+.qc-val-nominal{font-size:14px;color:#22c55e;font-weight:700}
+.qc-time{font-size:11px;color:var(--text-3)}
+.qc-name{font-size:14px;font-weight:700;color:var(--text)}
+.qc-produk{font-size:12px;color:var(--text-2)}
+
+/* Status badge */
+.qc-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;letter-spacing:.5px;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.qc-badge-pending{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+.qc-badge-approved{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+.qc-badge-rejected{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+body.light .qc-badge-pending{color:#d97706;border-color:rgba(217,119,6,.3);background:rgba(217,119,6,.1)}
+body.light .qc-badge-approved{color:#16a34a;border-color:rgba(22,163,74,.3);background:rgba(22,163,74,.1)}
+body.light .qc-badge-rejected{color:#dc2626;border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.1)}
+
+/* Card actions */
+.qc-actions{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px}
+.btn-acc,.btn-rej{flex:1;padding:9px 0;border-radius:8px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:all .12s;letter-spacing:.3px}
+.btn-acc{background:#22c55e;color:#fff}.btn-acc:hover{background:#16a34a}
+.btn-rej{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2)}.btn-rej:hover{background:rgba(239,68,68,.2)}
+.btn-acc:disabled,.btn-rej:disabled{opacity:.4;cursor:not-allowed}
+
+/* Done stamp */
+.qc-done{padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--text-2)}
+.qc-done b{color:var(--text)}
+
+/* Lightbox */
+.lightbox{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;cursor:zoom-out}
+.lightbox.open{display:flex}
+.lightbox img{max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px}
+
+/* Empty */
+.empty-state{grid-column:1/-1;text-align:center;padding:80px 20px;color:var(--text-3)}
+.empty-state h4{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text-2)}
+
+/* Modal reject note */
+.modal-overlay{position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--white);border-radius:14px;padding:24px;width:380px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.modal-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px}
+.modal-textarea{width:100%;min-height:80px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;padding:10px;resize:vertical;outline:none;font-family:inherit}
+.modal-textarea:focus{border-color:#3b82f6}
+.modal-actions{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+.modal-btn{padding:8px 18px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer}
+.modal-btn-cancel{background:var(--bg);color:var(--text-2);border:1px solid var(--border)}
+.modal-btn-reject{background:#ef4444;color:#fff}
+
+@media(max-width:768px){
+  .top-bar,.filter-bar,.summary-bar{padding:10px 14px;gap:8px}
+  .cards-wrap{padding:10px 14px 14px;grid-template-columns:1fr}
+  .page-title{font-size:15px}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div>
+      <div class="page-title">QC Transfer</div>
+      <div class="live-dot" style="margin-top:2px">Verifikasi bukti transfer — Finance</div>
+    </div>
+    <div style="margin-left:auto"></div>
+    <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema" id="theme-btn">&#x1F319;</button>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <select class="filter-select" id="filter-status" onchange="loadData()">
+      <option value="pending">Pending</option>
+      <option value="all">Semua</option>
+      <option value="approved">ACC</option>
+      <option value="rejected">Ditolak</option>
+    </select>
+    <label class="filter-select" style="display:flex;align-items:center;gap:6px">
+      Dari <input type="date" class="filter-input" id="filter-from" onchange="loadData()" style="border:none;padding:0;background:transparent;color:var(--text)">
+    </label>
+    <label class="filter-select" style="display:flex;align-items:center;gap:6px">
+      Sampai <input type="date" class="filter-input" id="filter-to" onchange="loadData()" style="border:none;padding:0;background:transparent;color:var(--text)">
+    </label>
+    <select class="filter-select" id="filter-product" onchange="renderCards()">
+      <option value="">Semua Produk</option>
+    </select>
+  </div>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar">
+    <div class="sum-item">Total: <b id="sum-total">&mdash;</b></div>
+    <div class="sum-item" style="color:var(--text-3)">|</div>
+    <div class="sum-item">Pending: <b id="sum-pending" class="sum-pending">&mdash;</b></div>
+    <div class="sum-item">ACC: <b id="sum-approved" class="sum-approved">&mdash;</b></div>
+    <div class="sum-item">Ditolak: <b id="sum-rejected" class="sum-rejected">&mdash;</b></div>
+    <div class="sum-item" style="color:var(--text-3)">|</div>
+    <div class="sum-item">Total Nominal: <b id="sum-nominal" style="color:#22c55e">&mdash;</b></div>
+  </div>
+
+  <!-- CARDS -->
+  <div class="cards-wrap" id="cards-container"></div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="Bukti Transfer">
+</div>
+
+<!-- REJECT MODAL -->
+<div class="modal-overlay" id="reject-modal">
+  <div class="modal-box">
+    <div class="modal-title">Tolak Bukti Transfer</div>
+    <textarea class="modal-textarea" id="reject-note" placeholder="Catatan penolakan (opsional)..."></textarea>
+    <div class="modal-actions">
+      <button class="modal-btn modal-btn-cancel" onclick="closeRejectModal()">Batal</button>
+      <button class="modal-btn modal-btn-reject" id="btn-confirm-reject" onclick="confirmReject()">Tolak</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/qc-transfer';
+let allData = [];
+let rejectTargetId = null;
+
+// ── Init ──
+(function init() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('filter-from').value = today;
+  document.getElementById('filter-to').value = today;
+  loadData();
+})();
+
+// ── Load Data ──
+async function loadData() {
+  const status = document.getElementById('filter-status').value;
+  const from   = document.getElementById('filter-from').value;
+  const to     = document.getElementById('filter-to').value;
+
+  let url = `${API}?action=list&status=${status}`;
+  if (from) url += `&date_from=${from}`;
+  if (to)   url += `&date_to=${to}`;
+
+  try {
+    const r = await fetch(url);
+    const j = await r.json();
+    allData = j.data || [];
+    buildProductFilter();
+    renderCards();
+  } catch(e) {
+    console.error('Load error:', e);
+    allData = [];
+    renderCards();
+  }
+}
+
+// ── Build product filter dropdown ──
+function buildProductFilter() {
+  const sel = document.getElementById('filter-product');
+  const val = sel.value;
+  const products = [...new Set(allData.map(d => d.product_nama).filter(Boolean))];
+  sel.innerHTML = '<option value="">Semua Produk</option>' +
+    products.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  sel.value = val;
+}
+
+// ── Render Cards ──
+function renderCards() {
+  const container = document.getElementById('cards-container');
+  const prodFilter = document.getElementById('filter-product').value;
+
+  let filtered = allData;
+  if (prodFilter) filtered = filtered.filter(d => d.product_nama === prodFilter);
+
+  // Summary
+  const pending  = filtered.filter(d => d.qc_status === 'pending').length;
+  const approved = filtered.filter(d => d.qc_status === 'approved').length;
+  const rejected = filtered.filter(d => d.qc_status === 'rejected').length;
+  const totalNominal = filtered.reduce((s, d) => s + parseNominal(d.nominal), 0);
+
+  document.getElementById('sum-total').textContent = filtered.length;
+  document.getElementById('sum-pending').textContent = pending;
+  document.getElementById('sum-approved').textContent = approved;
+  document.getElementById('sum-rejected').textContent = rejected;
+  document.getElementById('sum-nominal').textContent = 'Rp ' + totalNominal.toLocaleString('id-ID');
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state"><h4>Tidak ada data</h4><p>Belum ada bukti transfer untuk filter ini</p></div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(d => {
+    const isPending  = d.qc_status === 'pending';
+    const isApproved = d.qc_status === 'approved';
+    const isRejected = d.qc_status === 'rejected';
+    const badgeClass = isPending ? 'qc-badge-pending' : isApproved ? 'qc-badge-approved' : 'qc-badge-rejected';
+    const badgeText  = isPending ? 'PENDING' : isApproved ? 'ACC' : 'DITOLAK';
+    const time       = formatTime(d.created_at);
+    const qcTime     = d.qc_at ? formatTime(d.qc_at) : '';
+    const snap       = d.order_snapshot || {};
+
+    return `
+    <div class="qc-card status-${d.qc_status}">
+      <div class="qc-img-wrap" onclick="openLightbox('${esc(d.bukti_url || '')}')">
+        ${d.bukti_url
+          ? `<img src="${esc(d.bukti_url)}" alt="Bukti TF" loading="lazy">`
+          : `<span class="no-img">Foto tidak tersedia</span>`}
+      </div>
+      <div class="qc-body">
+        <div class="qc-row">
+          <div>
+            <div class="qc-name">${esc(d.customer_nama || '-')}</div>
+            <div class="qc-produk">${esc(d.product_nama || '-')} x${d.qty || 1}</div>
+          </div>
+          <span class="qc-badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="qc-row"><span class="qc-label">Nominal</span><span class="qc-val-nominal">${esc(d.nominal || '?')}</span></div>
+        <div class="qc-row"><span class="qc-label">Bank</span><span class="qc-val">${esc(d.bank || '?')}</span></div>
+        <div class="qc-row"><span class="qc-label">Tanggal TF</span><span class="qc-val">${esc(d.tanggal_tf || '?')}</span></div>
+        <div class="qc-row"><span class="qc-label">Rek. Tujuan</span><span class="qc-val">${esc(d.rekening_tujuan || '?')}</span></div>
+        <div class="qc-row"><span class="qc-label">Total Order</span><span class="qc-val-bold">Rp ${(d.total || 0).toLocaleString('id-ID')}</span></div>
+        <div class="qc-row"><span class="qc-label">HP Customer</span><span class="qc-val" style="font-family:monospace">${esc(d.customer_phone || '-')}</span></div>
+        <div class="qc-row"><span class="qc-label">Alamat</span><span class="qc-val" style="max-width:200px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(snap.alamat || '-')}">${esc(snap.alamat || '-')}</span></div>
+        <div class="qc-time">${time}</div>
+      </div>
+      ${isPending ? `
+      <div class="qc-actions">
+        <button class="btn-acc" onclick="doApprove('${d.id}',this)">ACC</button>
+        <button class="btn-rej" onclick="openRejectModal('${d.id}')">Tolak</button>
+      </div>` : `
+      <div class="qc-done">
+        <b>${isApproved ? 'Di-ACC' : 'Ditolak'}</b> ${qcTime}${d.qc_note ? ` — ${esc(d.qc_note)}` : ''}
+      </div>`}
+    </div>`;
+  }).join('');
+}
+
+// ── Approve ──
+async function doApprove(qcId, btn) {
+  if (!confirm('ACC bukti transfer ini?')) return;
+  btn.disabled = true;
+  btn.textContent = 'Memproses...';
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve', qc_id: qcId }),
+    });
+    const j = await r.json();
+    if (j.ok) {
+      loadData();
+    } else {
+      alert('Error: ' + (j.error || 'Gagal approve'));
+      btn.disabled = false;
+      btn.textContent = 'ACC';
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'ACC';
+  }
+}
+
+// ── Reject Modal ──
+function openRejectModal(qcId) {
+  rejectTargetId = qcId;
+  document.getElementById('reject-note').value = '';
+  document.getElementById('reject-modal').classList.add('open');
+}
+function closeRejectModal() {
+  rejectTargetId = null;
+  document.getElementById('reject-modal').classList.remove('open');
+}
+async function confirmReject() {
+  if (!rejectTargetId) return;
+  const note = document.getElementById('reject-note').value.trim();
+  const btn = document.getElementById('btn-confirm-reject');
+  btn.disabled = true;
+  btn.textContent = 'Memproses...';
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject', qc_id: rejectTargetId, note: note || null }),
+    });
+    const j = await r.json();
+    if (j.ok) {
+      closeRejectModal();
+      loadData();
+    } else {
+      alert('Error: ' + (j.error || 'Gagal reject'));
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Tolak';
+}
+
+// ── Lightbox ──
+function openLightbox(url) {
+  if (!url) return;
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+// ── Helpers ──
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function parseNominal(s) {
+  if (!s) return 0;
+  const n = String(s).replace(/[^\d]/g, '');
+  return parseInt(n) || 0;
+}
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ── Theme ──
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  localStorage.setItem('cs_theme', document.body.classList.contains('light') ? 'light' : 'dark');
+  document.getElementById('theme-btn').innerHTML = document.body.classList.contains('light') ? '&#x2600;' : '&#x1F319;';
+}
+(function initTheme() {
+  if (document.body.classList.contains('light')) document.getElementById('theme-btn').innerHTML = '&#x2600;';
+})();
+</script>
+</body>
+</html>
