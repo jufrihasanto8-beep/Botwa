@@ -729,18 +729,39 @@ async function handleCreateMengantar(req, res) {
     const tmplResi       = userRow.template_resi_dikirim || null;
 
     for (const r of results) {
-      if (!r.success || !r.cnote_no || !r.orderId) continue;
+      if (!r.success || !r.orderId) continue;
+      // Skip notif kalau resi belum ada (kurir belum assign AWB)
+      if (!r.cnote_no) {
+        console.log(`[resi-notif] Skip order ${r.orderId}: cnote_no kosong, kurir belum assign AWB`);
+        continue;
+      }
       const order = orders.find(o => o.id === r.orderId);
       if (!order) continue;
 
       const cu   = custMap[order.customer_id];
       const prod = prodMap[order.product_id];
-      if (!cu?.wa_number) continue;
+      if (!cu?.wa_number) {
+        console.log(`[resi-notif] Skip order ${r.orderId}: customer wa_number kosong`);
+        continue;
+      }
 
       const jid       = cu.reply_jid || cu.wa_number;
       const namaKak   = cu.nama ? cu.nama.split(' ')[0] : 'Kak';
       const prodNama  = prod?.nama || 'pesanan';
       const waSession = prod?.wa_session_id || user_id;
+
+      // Generate tracking link
+      const kurirLc = (r.kurir || '').toLowerCase();
+      const linkLacak =
+        kurirLc.includes('jne')      ? `https://www.jne.co.id/id/tracking/trace/${r.cnote_no}` :
+        kurirLc.includes('jt') || kurirLc.includes('j&t') ? `https://jet.id/tracking?awb=${r.cnote_no}` :
+        kurirLc.includes('sicepat')  ? `https://www.sicepat.com/checkAwb?awb=${r.cnote_no}` :
+        kurirLc.includes('sap')      ? `https://sap-express.id/track?awb=${r.cnote_no}` :
+        kurirLc.includes('lion')     ? `https://lion.parcel.id/tracking?awb=${r.cnote_no}` :
+        kurirLc.includes('ninja')    ? `https://www.ninjaxpress.co/id-id/tracking?id=${r.cnote_no}` :
+        kurirLc.includes('anteraja') ? `https://anteraja.id/tracking/${r.cnote_no}` :
+        kurirLc.includes('pos')      ? `https://www.posindonesia.co.id/id/tracking/${r.cnote_no}` :
+        `https://cekresi.com/?noresi=${r.cnote_no}`;
 
       // Bangun pesan resi
       let pesan;
@@ -749,13 +770,14 @@ async function handleCreateMengantar(req, res) {
           .replace(/\{nama\}/gi, namaKak)
           .replace(/\{produk\}/gi, prodNama)
           .replace(/\{resi\}/gi, r.cnote_no)
-          .replace(/\{kurir\}/gi, r.kurir || '');
+          .replace(/\{kurir\}/gi, r.kurir || '')
+          .replace(/\{link\}/gi, linkLacak);
       } else {
-        pesan = `Halo kak *${namaKak}* 👋\n\nPesanan *${prodNama}* kakak sudah dikirim! 🚚\n\nNo. Resi: *${r.cnote_no}*\nKurir: *${r.kurir || '-'}*\n\nKakak bisa cek status pengiriman pakai nomor resi di atas ya. Terima kasih sudah order! 🙏`;
+        pesan = `Halo kak *${namaKak}* 👋\n\nPesanan *${prodNama}* kakak sudah dikirim! 🚚\n\nNo. Resi: *${r.cnote_no}*\nKurir: *${r.kurir || '-'}*\nLacak: ${linkLacak}\n\nKakak bisa cek status pengiriman pakai nomor resi di atas ya. Terima kasih sudah order! 🙏`;
       }
 
       try {
-        await fetch(`${BAILEYS_URL}/send`, {
+        const waResp = await fetch(`${BAILEYS_URL}/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -766,7 +788,12 @@ async function handleCreateMengantar(req, res) {
             is_outbound: true,
           }),
         });
-        console.log(`[resi-notif] Resi ${r.cnote_no} dikirim ke ${cu.wa_number}`);
+        if (!waResp.ok) {
+          const errText = await waResp.text().catch(() => '');
+          console.error(`[resi-notif] Baileys error ${waResp.status} untuk ${cu.wa_number}: ${errText}`);
+          continue;
+        }
+        console.log(`[resi-notif] Resi ${r.cnote_no} dikirim ke ${cu.wa_number} via session ${waSession}`);
 
         // Simpan ke conv_messages kalau ada conversation
         if (order.conversation_id) {
