@@ -295,9 +295,10 @@ Sumber chat     : ${sumber === 'ctwa' ? 'CTWA (dari iklan)' : sumber === 'form' 
 - Alur: jawab pertanyaan → gali keluhan singkat → edukasi ringkas → wilayah → order` : ''}
 Produk          : ${namaProduk}
 ${hasBundling ? `Penawaran paket : ${bundlingTxt}
-⚡ PENAWARAN AWAL: Saat customer siap order, LANGSUNG rekomendasikan${paketPrioritas ? ` paket ${paketPrioritas.qty} box (Rp ${paketPrioritas.harga.toLocaleString('id-ID')}) — ini paket PRIORITAS, tawarkan ini duluan dengan alasan yang relevan ke keluhannya` : ' paket yang paling cocok dengan keluhannya'}. JANGAN sebut harga per box/satuan — yang ada hanya paket di atas.
-⚡ HARGA ORDER: WAJIB pakai harga dari paket bundling di [ORDER_DATA]. Kalau customer pilih qty yang tidak ada di paket → pakai harga satuan × qty.
-⚡ TIDAK ADA harga satuan/per box yang perlu disebutkan ke customer.` : `Harga           : ${harga}`}
+Harga satuan    : Rp ${(product?.harga || 0).toLocaleString('id-ID')} per box (1 box)
+⚡ PENAWARAN AWAL: Saat customer siap order, LANGSUNG rekomendasikan${paketPrioritas ? ` paket ${paketPrioritas.qty} box (Rp ${paketPrioritas.harga.toLocaleString('id-ID')}) — ini paket PRIORITAS, tawarkan ini duluan dengan alasan yang relevan ke keluhannya` : ' paket yang paling cocok dengan keluhannya'}.
+⚡ KALAU CUSTOMER MINTA QTY LEBIH KECIL (misal "klo 1", "1 aja"): Boleh layani! Hitung pakai harga satuan × qty. Jangan tolak atau bilang "tidak tersedia". Cukup informasikan harganya, lalu SEKALI saja sebut paket bundling lebih hemat sebagai rekomendasi — kalau customer tetap pilih 1, langsung proses tanpa paksa.
+⚡ HARGA ORDER: WAJIB pakai harga dari paket bundling di [ORDER_DATA] kalau qty cocok. Kalau customer pilih qty yang tidak ada di paket → pakai harga satuan × qty.` : `Harga           : ${harga}`}
 Cocok untuk     : ${keluhan}
 Cara pakai      : ${product?.cara_pakai || '(lihat kemasan)'}
 Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
@@ -1275,8 +1276,22 @@ Sampaikan ke customer: "Untuk wilayah kak, pengiriman via Transfer ya kak 🙏 C
 Langsung lanjut minta data (nama, alamat) tanpa tanya COD/Transfer.`;
     }
 
+    // Info harga satuan untuk kalau customer minta qty di luar bundling
+    const satuanHarga = product?.harga || 0;
+    const satuanOngkir = ongkirPerQty(1);
+    const satuanFeeCOD = Math.ceil((satuanHarga + satuanOngkir) * 0.03);
+    const satuanTotalTF = satuanHarga + satuanOngkir;
+    const satuanTotalCOD = satuanHarga + satuanOngkir + satuanFeeCOD;
+
     hargaSection += `\n\nPAKET LAIN (jangan sebut ke customer kecuali customer nanya ada paket/harga lain):
-${tabelSemuaPaket}`;
+${tabelSemuaPaket}
+
+HARGA 1 BOX (kalau customer minta 1 saja):
+${codOk
+  ? `💳 Transfer: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} = TOTAL ${fmt(satuanTotalTF)}
+📦 COD: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} + admin ${fmt(satuanFeeCOD)} = TOTAL ${fmt(satuanTotalCOD)}`
+  : `💳 Transfer: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} = TOTAL ${fmt(satuanTotalTF)}`}
+Kalau customer pilih 1 box: berikan harga di atas, lalu SEKALI rekomendasikan paket bundling lebih hemat. Kalau tetap pilih 1 → langsung proses, jangan paksa.`;
 
   } else {
     if (codOk) {
