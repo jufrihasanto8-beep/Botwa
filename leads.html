@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="img/logo-adsy.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leads · Adsy CS</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
+
+.main-content{background:var(--bg);min-height:100vh;padding:0}
+
+/* Page Header */
+.ph{padding:20px 24px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ph-left h1{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.4px}
+.ph-left p{font-size:12px;color:var(--text-2);margin-top:3px}
+.ph-right{display:flex;gap:8px}
+.icon-btn2{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.icon-btn2:hover{border-color:#3b82f6;color:#3b82f6}
+
+/* Stat Cards */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px 24px}
+@media(max-width:900px){.stat-row{grid-template-columns:repeat(2,1fr)}}
+.sc{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:16px;transition:box-shadow .15s}
+.sc:hover{box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.sc-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sc-icon.blue{background:rgba(59,130,246,.12)}
+.sc-icon.green{background:rgba(34,197,94,.12)}
+.sc-icon.slate{background:rgba(100,116,139,.1)}
+.sc-body{flex:1;min-width:0}
+.sc-label{font-size:11px;font-weight:500;color:var(--text-2);margin-bottom:4px}
+.sc-num{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.5px;line-height:1}
+.sc.blue .sc-num{color:#3b82f6}
+.sc.green .sc-num{color:#22c55e}
+
+/* Table Card */
+.tc{background:var(--white);border:1px solid var(--border);border-radius:16px;margin:0 24px 24px;overflow:hidden}
+.tc-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tc-hdr-left{display:flex;align-items:center;gap:10px}
+.tc-hdr-icon{width:32px;height:32px;border-radius:8px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);display:flex;align-items:center;justify-content:center;font-size:14px}
+.tc-hdr-title{font-size:14px;font-weight:700;color:var(--text)}
+.tc-hdr-sub{font-size:11px;color:var(--text-2);margin-top:1px}
+
+/* Table */
+.tc-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--bg)}
+th{padding:10px 18px;text-align:left;font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;border-bottom:1px solid var(--border)}
+td{padding:13px 18px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:rgba(59,130,246,.03)}
+
+/* Customer cell */
+.cust-cell{display:flex;align-items:center;gap:10px}
+.c-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.c-name{font-size:13px;font-weight:600;color:var(--text)}
+.c-num{font-size:11px;color:var(--text-2);margin-top:1px;font-family:monospace}
+
+/* Text cells */
+.txt-main{font-size:12px;color:var(--text);font-weight:500}
+.txt-sub{font-size:11px;color:var(--text-2);margin-top:2px}
+.alamat-txt{font-size:12px;color:var(--text-2);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.time-txt{font-size:12px;color:var(--text-2);white-space:nowrap}
+
+/* Tombol kirim */
+.btn-kirim{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;background:#3b82f6;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+.btn-kirim:hover{opacity:.85}
+.btn-kirim:disabled{opacity:.5;cursor:default}
+.btn-chat{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;cursor:pointer;transition:all .15s;text-decoration:none;margin-right:6px}
+.btn-chat:hover{border-color:#3b82f6;color:#3b82f6}
+
+/* Empty */
+.empty-cell{text-align:center;padding:56px 20px;color:var(--text-2)}
+.empty-cell .e-icon{font-size:36px;margin-bottom:10px;opacity:.4}
+.empty-cell p{font-size:13px}
+
+/* Pagination */
+.pager{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border)}
+.pager-info{font-size:12px;color:var(--text-2)}
+.pager-btns{display:flex;gap:6px}
+.pager-btn{padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;cursor:pointer;transition:all .12s}
+.pager-btn:hover:not(:disabled){border-color:#3b82f6;color:#3b82f6}
+.pager-btn:disabled{opacity:.3;cursor:default}
+
+/* Skeleton */
+.skel{background:linear-gradient(90deg,var(--border) 25%,rgba(255,255,255,.04) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px}
+body.light .skel{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+body.light .toast{background:#0f172a}
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+
+    <!-- Header -->
+    <div class="ph">
+      <div class="ph-left">
+        <h1>📨 Leads</h1>
+        <p>Lead masuk dari orderonline.id via Gmail</p>
+      </div>
+      <div class="ph-right">
+        <button class="icon-btn2" onclick="init()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="stat-row">
+      <div class="sc blue">
+        <div class="sc-icon blue">📨</div>
+        <div class="sc-body">
+          <div class="sc-label">Total Leads</div>
+          <div class="sc-num" id="stat-total">–</div>
+        </div>
+      </div>
+      <div class="sc green">
+        <div class="sc-icon green">✅</div>
+        <div class="sc-body">
+          <div class="sc-label">WA Terkirim</div>
+          <div class="sc-num" id="stat-sent">–</div>
+        </div>
+      </div>
+      <div class="sc">
+        <div class="sc-icon slate">⏳</div>
+        <div class="sc-body">
+          <div class="sc-label">Belum Terkirim</div>
+          <div class="sc-num" id="stat-pending">–</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="tc">
+      <div class="tc-hdr">
+        <div class="tc-hdr-left">
+          <div class="tc-hdr-icon">📋</div>
+          <div>
+            <div class="tc-hdr-title">Daftar Lead</div>
+            <div class="tc-hdr-sub">Klik "Kirim WA" untuk lead yang belum terkirim</div>
+          </div>
+        </div>
+      </div>
+      <div class="tc-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Produk</th>
+              <th>Alamat</th>
+              <th>Waktu Masuk</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="leads-tbody">
+            <tr><td colspan="5"><div style="padding:40px;text-align:center;color:var(--text-2)">Memuat data...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager" id="pager" style="display:none">
+        <span class="pager-info" id="pager-info"></span>
+        <div class="pager-btns">
+          <button class="pager-btn" id="btn-prev" onclick="changePage(-1)" disabled>← Prev</button>
+          <button class="pager-btn" id="btn-next" onclick="changePage(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/prod-switcher.js"></script>
+<script>
+Auth.guard();
+document.getElementById('sidebar-container').innerHTML = renderSidebar('leads');
+</script>
+<script>
+const PAGE_SIZE = 10;
+let allLeads = [];
+let currentPage = 1;
+let userTemplate = '';
+let userProducts = [];
+
+// ── Avatar color ─────────────────────────────
+const AV_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#84cc16'];
+function avColor(str) {
+  let h = 0;
+  for (let i = 0; i < (str||'').length; i++) h = (h * 31 + str.charCodeAt(i)) & 0xffffffff;
+  return AV_COLORS[Math.abs(h) % AV_COLORS.length];
+}
+function initials(name) {
+  const parts = (name || '?').trim().split(' ');
+  return parts.length >= 2 ? parts[0][0] + parts[1][0] : parts[0].slice(0,2);
+}
+
+// ── Format time ──────────────────────────────
+function fmtTime(iso) {
+  if (!iso) return '–';
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = now - d;
+  const mins = Math.floor(diff / 60000);
+  const hrs  = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 60) return `${mins} menit lalu`;
+  if (hrs < 24)  return `${hrs} jam lalu`;
+  if (days < 7)  return `${days} hari lalu`;
+  return d.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+// ── Format alamat dari JSONB ─────────────────
+function fmtAlamat(alamat) {
+  if (!alamat) return '–';
+  if (typeof alamat === 'string') return alamat;
+  const parts = [alamat.jalan, alamat.kecamatan, alamat.kabupaten, alamat.provinsi].filter(Boolean);
+  return parts.join(', ') || '–';
+}
+
+// ── Toast ────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── Render template pesan ────────────────────
+function renderTemplate(tmpl, { nama, produk, alamat, hp }) {
+  const namaSapa = nama ? nama.split(' ')[0] : 'kak';
+  if (!tmpl) {
+    const produkTxt = produk ? ` untuk *${produk}*` : '';
+    return `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
+  }
+  return tmpl
+    .replace(/\{nama\}/gi,   namaSapa)
+    .replace(/\{produk\}/gi, produk  || '')
+    .replace(/\{alamat\}/gi, alamat  || '')
+    .replace(/\{wa\}/gi,     hp      || '');
+}
+
+// ── Kirim WA manual ──────────────────────────
+async function kirimWA(btn, convId, waNumber, nama, produk, alamatStr, waSession, customerId) {
+  btn.disabled = true;
+  btn.textContent = 'Mengirim...';
+
+  const pesan = renderTemplate(userTemplate, { nama, produk, alamat: alamatStr, hp: waNumber });
+
+  try {
+    // Kirim via baileys-proxy
+    const r = await fetch(`/api/baileys-proxy?path=/send&session_id=${waSession}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wa_number: waNumber, message: pesan, is_outbound: true }),
+    });
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || 'Gagal kirim');
+
+    // Simpan ke conv_messages
+    await fetch(`${SUPABASE_URL}/rest/v1/conv_messages`, {
+      method: 'POST',
+      headers: { ...SB.headers, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ conversation_id: convId, role: 'ai', isi: pesan }),
+    });
+
+    // Hapus tombol dari UI
+    btn.closest('td').innerHTML = '<span style="font-size:11px;color:var(--text-2)">Terkirim ✓</span>';
+
+    // Update stats
+    const pendingEl = document.getElementById('stat-pending');
+    const sentEl    = document.getElementById('stat-sent');
+    pendingEl.textContent = Math.max(0, parseInt(pendingEl.textContent || 0) - 1);
+    sentEl.textContent    = (parseInt(sentEl.textContent || 0) + 1);
+
+    showToast('✅ WA berhasil dikirim ke ' + (nama || waNumber));
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Kirim WA';
+    showToast('❌ Gagal: ' + e.message);
+  }
+}
+
+// ── Render tabel ─────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('leads-tbody');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const slice = allLeads.slice(start, start + PAGE_SIZE);
+
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="5">
+      <div class="empty-cell">
+        <div class="e-icon">📭</div>
+        <p>Belum ada lead masuk</p>
+      </div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = slice.map(lead => {
+    const { conv, customer, prodNama, waSession, sudahKirim } = lead;
+    const nama     = customer?.nama || '–';
+    const waNum    = customer?.wa_number || '';
+    const alamatObj= customer?.alamat;
+    const alamatStr= fmtAlamat(alamatObj);
+    const avBg     = avColor(nama);
+    const inits    = initials(nama).toUpperCase();
+    const convId   = conv.id;
+    const customerId = customer?.id;
+
+    const aksiHtml = sudahKirim
+      ? `<span style="font-size:11px;color:var(--text-2)">Terkirim ✓</span>`
+      : `<button class="btn-kirim" onclick="kirimWA(this,'${convId}','${waNum}',
+          ${JSON.stringify(nama)},${JSON.stringify(prodNama)},${JSON.stringify(alamatStr)},
+          '${waSession}','${customerId}')">
+          📤 Kirim WA
+        </button>`;
+
+    return `<tr>
+      <td>
+        <div class="cust-cell">
+          <div class="c-av" style="background:${avBg}">${inits}</div>
+          <div>
+            <div class="c-name">${nama}</div>
+            <div class="c-num">${waNum || '–'}</div>
+          </div>
+        </div>
+      </td>
+      <td><div class="txt-main">${prodNama || '–'}</div></td>
+      <td><div class="alamat-txt" title="${alamatStr}">${alamatStr}</div></td>
+      <td><div class="time-txt">${fmtTime(conv.created_at)}</div></td>
+      <td>
+        <a class="btn-chat" href="dashboard.html?conv=${convId}" title="Buka Chat">💬</a>
+        ${aksiHtml}
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Update pager
+  const total = allLeads.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  document.getElementById('pager').style.display = total > PAGE_SIZE ? '' : 'none';
+  document.getElementById('pager-info').textContent = `${start + 1}–${Math.min(start + PAGE_SIZE, total)} dari ${total} leads`;
+  document.getElementById('btn-prev').disabled = currentPage <= 1;
+  document.getElementById('btn-next').disabled = currentPage >= pages;
+}
+
+function changePage(dir) {
+  currentPage += dir;
+  renderTable();
+  window.scrollTo(0, 0);
+}
+
+// ── Load data ────────────────────────────────
+async function init() {
+  const uid = Auth.getUser()?.id;
+  if (!uid) return;
+
+  document.getElementById('leads-tbody').innerHTML =
+    `<tr><td colspan="5"><div style="padding:40px;text-align:center;color:var(--text-2)">Memuat data...</div></td></tr>`;
+  document.getElementById('stat-total').textContent = '–';
+  document.getElementById('stat-sent').textContent  = '–';
+  document.getElementById('stat-pending').textContent = '–';
+
+  try {
+    // Fetch template & produk user
+    const [userRows, prodRows] = await Promise.all([
+      SB.get('users', `?id=eq.${uid}&select=template_form_lead&limit=1`),
+      SB.get('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,wa_session_id`),
+    ]);
+    userTemplate = userRows[0]?.template_form_lead || '';
+    userProducts = prodRows || [];
+
+    // Fetch semua conversations sumber='form'
+    const convs = await SB.get('conversations',
+      `?user_id=eq.${uid}&sumber=eq.form&order=created_at.desc&select=id,created_at,customer_id,product_id,state`
+    );
+
+    if (!convs.length) {
+      allLeads = [];
+      renderTable();
+      document.getElementById('stat-total').textContent   = '0';
+      document.getElementById('stat-sent').textContent    = '0';
+      document.getElementById('stat-pending').textContent = '0';
+      return;
+    }
+
+    // Batch fetch customers & conv_messages
+    const convIds     = convs.map(c => c.id).join(',');
+    const customerIds = [...new Set(convs.map(c => c.customer_id).filter(Boolean))].join(',');
+
+    const [customers, msgs] = await Promise.all([
+      customerIds ? SB.get('customers', `?id=in.(${customerIds})&select=id,nama,wa_number,alamat`) : [],
+      SB.get('conv_messages', `?conversation_id=in.(${convIds})&select=conversation_id,role,isi`),
+    ]);
+
+    const custMap = Object.fromEntries((customers || []).map(c => [c.id, c]));
+
+    // Tentukan status per conversation (sudah kirim WA atau belum)
+    const sentConvIds = new Set();
+    for (const m of (msgs || [])) {
+      if (m.role === 'ai') sentConvIds.add(m.conversation_id);
+    }
+
+    // Produk map
+    const prodMap = Object.fromEntries(userProducts.map(p => [p.id, p]));
+
+    // Build leads array — skip customer lama (state.skipped)
+    allLeads = convs
+      .filter(c => !c.state?.skipped)
+      .map(c => {
+        const customer   = custMap[c.customer_id] || null;
+        const prod       = prodMap[c.product_id] || userProducts[0] || null;
+        const prodNama   = prod?.nama || '–';
+        const waSession  = prod?.wa_session_id || uid;
+        const sudahKirim = sentConvIds.has(c.id);
+        return { conv: c, customer, prodNama, waSession, sudahKirim };
+      });
+
+    const totalSent    = allLeads.filter(l => l.sudahKirim).length;
+    const totalPending = allLeads.filter(l => !l.sudahKirim).length;
+
+    document.getElementById('stat-total').textContent   = allLeads.length;
+    document.getElementById('stat-sent').textContent    = totalSent;
+    document.getElementById('stat-pending').textContent = totalPending;
+
+    currentPage = 1;
+    renderTable();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('leads-tbody').innerHTML =
+      `<tr><td colspan="5"><div class="empty-cell"><div class="e-icon">⚠️</div><p>${e.message}</p></div></td></tr>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  document.addEventListener('productSwitch', init);
+});
+</script>
+</body>
+</html>
