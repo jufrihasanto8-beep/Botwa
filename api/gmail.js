@@ -290,14 +290,16 @@ async function processLead(userId, { nama, hp, alamat, produk, keluhan }, overri
   const waSession = matchedProd?.wa_session_id || userId;
   console.log('[gmail] waSession:', waSession, '| produk email:', produk, '| matched:', matchedProd?.nama || 'none');
 
-  // ── Upsert conversation ──────────────────────────────────
+  // ── Upsert conversation (filter per product_id) ─────────
+  const prodFilter = matchedProd?.id ? `&product_id=eq.${matchedProd.id}` : '';
   const existingConv = customerId ? await sbGet('conversations',
-    `?user_id=eq.${userId}&customer_id=eq.${customerId}&order=created_at.desc&limit=1`
+    `?user_id=eq.${userId}&customer_id=eq.${customerId}${prodFilter}&order=created_at.desc&limit=1`
   ) : [];
 
   let convId;
+  const isNewConversation = existingConv.length === 0;
   const convState = {
-    tahap: isNewCustomer ? 'awal' : existingConv[0]?.state?.tahap || 'awal',
+    tahap: (isNewCustomer || isNewConversation) ? 'awal' : existingConv[0]?.state?.tahap || 'awal',
     is_form_lead: true,
     form_produk: produk || null,
     form_alamat: alamat || null,
@@ -322,12 +324,12 @@ async function processLead(userId, { nama, hp, alamat, produk, keluhan }, overri
     convId = c[0]?.id;
   }
 
-  // ── Customer lama → simpan data saja, tidak kirim WA ────
-  if (!isNewCustomer) {
+  // ── Customer lama + conversation lama untuk produk ini → update data saja ─
+  if (!isNewCustomer && !isNewConversation) {
     return { waNumber, convId, ok: true, skipped: true, reason: 'customer lama, data diperbarui' };
   }
 
-  // ── Customer baru → simpan greeting sebagai pending (jeda 3 menit) ───
+  // ── Customer baru ATAU produk baru → simpan greeting pending (jeda 3 menit) ───
   // Tidak langsung kirim WA — tunggu dulu, kalau customer redirect & chat duluan
   // maka greeting tidak perlu dikirim. Cron followup akan kirim setelah delay.
   const tmpl = matchedProd?.template_form_lead || null;
@@ -350,7 +352,7 @@ async function processLead(userId, { nama, hp, alamat, produk, keluhan }, overri
         },
       },
     }).catch(e => console.error('[gmail] Gagal simpan pending_greeting:', e.message));
-    console.log(`[gmail] Pending greeting saved for ${waNumber} — akan dikirim setelah 3 menit jika customer tidak chat duluan`);
+    console.log(`[gmail] Pending greeting saved for ${waNumber} via session ${waSession} — akan dikirim setelah 3 menit jika customer tidak chat duluan`);
   }
 
   return { waNumber, convId, ok: true, pending: true, reason: 'greeting dijeda 3 menit, kirim otomatis jika customer tidak redirect' };
