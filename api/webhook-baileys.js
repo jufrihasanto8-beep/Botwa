@@ -2108,35 +2108,64 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       }
     }
 
-    // ── Auto-load wilayah: prioritas form_alamat (Gmail) → customer.alamat (hanya inbound baru) ──
+    // ── Auto-load wilayah: prioritas form_alamat (Haiku extract) → customer.alamat (inbound) ──
     // Re-open conversation: TIDAK auto-load — customer mungkin ganti alamat, biarkan bot tanya natural
     const isReopenedConv = !!(convState.reopened_at && !convState.wilayah);
     let autoLoadedOngkir = null;
     if (!convState.wilayah && !isReopenedConv && product) {
 
-      // Prioritas 1: form_alamat dari Gmail (orderonline.id) — alamat segar dari form, paling reliable
-      // Syarat: is_form_lead + alamat_lengkap (sudah ada kecamatan/kabupaten) + customer.alamat terisi dari form
-      const isFormLeadWithAddress = convState.is_form_lead && convState.alamat_lengkap
-        && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten;
+      // Prioritas 1: form_alamat dari form lead — pakai Haiku AI extract (lebih akurat dari parseAlamat)
+      const hasFormAlamat = convState.is_form_lead && convState.form_alamat;
 
       // Prioritas 2: customer.alamat — hanya untuk inbound baru (bukan form lead, bukan re-open)
-      // Sengaja tidak dipakai untuk form_lead: form_alamat sudah jadi sumber wilayah
-      // Sengaja tidak dipakai untuk re-open: alamat lama bisa salah (customer ganti alamat)
       const isInboundWithSavedAddress = !convState.is_form_lead
         && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten;
 
-      if (isFormLeadWithAddress || isInboundWithSavedAddress) {
+      let wilayahAuto = null;
+      let sumber = '';
+
+      if (hasFormAlamat) {
+        // Gunakan Haiku AI untuk extract lokasi dari form_alamat (lebih reliable dari comma-split)
+        const lokasi = await extractLokasiHaiku(convState.form_alamat, userAnthropicKey).catch(() => null);
+        console.log(`[auto-load] Haiku extract form_alamat: "${convState.form_alamat}" →`, lokasi);
+        if (lokasi?.kecamatan || lokasi?.kabupaten) {
+          wilayahAuto = [lokasi.kelurahan, lokasi.kecamatan, lokasi.kabupaten].filter(Boolean).join(', ');
+          sumber = 'form_alamat (Haiku extract)';
+        }
+      } else if (isInboundWithSavedAddress) {
         const alamatParts = [customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean);
-        const wilayahAuto = alamatParts.join(', ');
-        const sumber = isFormLeadWithAddress ? 'form_alamat (Gmail)' : 'customer.alamat (inbound)';
+        wilayahAuto = alamatParts.join(', ');
+        sumber = 'customer.alamat (inbound)';
+      }
+
+      if (wilayahAuto) {
         try {
           const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1, userMngAreaId);
           if (hasilAuto) {
-            await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
-            convState.wilayah = wilayahAuto;
-            convState.ongkir  = hasilAuto;
-            autoLoadedOngkir  = hasilAuto;
-            console.log(`[auto-load] Wilayah dari ${sumber}: ${wilayahAuto}`);
+            // Validasi silang: cek hasil ongkir cocok dengan alamat asli
+            // Cegah kasus "form isi Bekasi tapi ongkir dapet Sidrap"
+            const alamatRef = (convState.form_alamat || wilayahAuto).toLowerCase();
+            const hasilKota = (hasilAuto.area?.kota || '').toLowerCase().replace(/^(kabupaten|kota|kab\.?)\s*/i, '');
+            const hasilProv = (hasilAuto.area?.provinsi || '').toLowerCase();
+            const hasilKec  = (hasilAuto.area?.kecamatan || '').toLowerCase();
+
+            // Minimal salah satu (kota/provinsi/kecamatan) harus ada di teks alamat asli
+            const kotaMatch = hasilKota && alamatRef.includes(hasilKota);
+            const provMatch = hasilProv && alamatRef.includes(hasilProv);
+            const kecMatch  = hasilKec  && alamatRef.includes(hasilKec);
+
+            if (kotaMatch || provMatch || kecMatch) {
+              await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
+              convState.wilayah = wilayahAuto;
+              convState.ongkir  = hasilAuto;
+              autoLoadedOngkir  = hasilAuto;
+              console.log(`[auto-load] ✅ Wilayah dari ${sumber}: ${wilayahAuto}`);
+            } else {
+              // Hasil ongkir tidak cocok dengan alamat form — jangan pakai, biar bot tanya
+              console.warn(`[auto-load] ❌ Validasi gagal! form="${alamatRef.slice(0,60)}" vs hasil="${hasilKota}, ${hasilProv}" — skip auto-ongkir`);
+              await updateConvState(conversation.id, { waiting_for_location: true });
+              convState.waiting_for_location = true;
+            }
           }
         } catch(e) { console.error('[auto-load] Gagal:', e.message); }
       }
