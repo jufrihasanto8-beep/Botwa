@@ -1784,7 +1784,19 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
     }
 
     // ── Handle konfirmasi / koreksi order ─────────────────────
-    if (convState.awaiting_order_confirm || convState.awaiting_order_correction) {
+    // PENTING: Kalau customer kirim bukti TF (gambar) saat awaiting_order_confirm Transfer
+    // → skip block konfirmasi, langsung treat sebagai bukti TF
+    if ((convState.awaiting_order_confirm || convState.awaiting_order_correction)
+        && imageAnalysis?.is_bukti_tf
+        && (convState.order_snapshot?.metode || '').toLowerCase() === 'transfer') {
+      console.log(`[awaiting-confirm] Customer kirim bukti TF saat awaiting_order_confirm → skip ke bukti TF handler`);
+      // Set awaiting_bukti_tf agar handler di bawah bisa proses
+      await updateConvState(conversation.id, { awaiting_order_confirm: false, awaiting_bukti_tf: true });
+      convState.awaiting_order_confirm = false;
+      convState.awaiting_bukti_tf = true;
+      // Fall through ke bawah — imageAnalysis handler akan proses bukti TF
+    }
+    else if (convState.awaiting_order_confirm || convState.awaiting_order_correction) {
       const msgLower = message.toLowerCase().trim();
       const snap     = convState.order_snapshot || {};
       const area     = snap.area || {};
