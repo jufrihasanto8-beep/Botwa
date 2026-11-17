@@ -79,6 +79,39 @@ async function getWaSession(userId, productId) {
   return rows[0]?.wa_session_id || userId;
 }
 
+// Kumpulkan semua pesan di queue, kirim 1x ke VPS di akhir handler
+const _fuQueueItems = [];
+
+function queueWA(sessionId, jid, message, imageUrl = null, caption = null, convId = null) {
+  _fuQueueItems.push({
+    session_id: sessionId,
+    wa_number: jid,
+    message: imageUrl ? undefined : (message || ''),
+    image_url: imageUrl || undefined,
+    caption: caption || undefined,
+    conv_id: convId || undefined,
+  });
+}
+
+// Kirim semua queue ke VPS dalam 1 request (fire-and-forget)
+async function flushQueueToVPS() {
+  if (!_fuQueueItems.length || !BAILEYS_URL) return { queued: 0 };
+  try {
+    const res = await fetchWithTimeout(`${BAILEYS_URL}/followup-queue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: WEBHOOK_SECRET, items: _fuQueueItems }),
+    }, 10000);
+    const data = await res.json();
+    console.log(`[fu-queue] Flushed ${_fuQueueItems.length} items to VPS: ${JSON.stringify(data)}`);
+    return data;
+  } catch(e) {
+    console.error(`[fu-queue] Flush failed: ${e.message}`);
+    return { error: e.message };
+  }
+}
+
+// Legacy sendWA — masih dipakai untuk backward compat (tapi bisa di-phase out)
 async function sendWA(sessionId, jid, message, imageUrl = null, caption = null) {
   if (!BAILEYS_URL) throw new Error('BAILEYS_URL belum diset');
   const res = await fetchWithTimeout(`${BAILEYS_URL}/send`, {
@@ -240,12 +273,12 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, 
     }
   }
 
-  // Kirim (pakai wa_session_id produk, fallback ke user_id)
+  // Queue ke VPS (ga langsung kirim — dikumpulin, flush di akhir)
   const waSession = await getWaSession(conv.user_id, conv.product_id);
   if (imageUrl) {
-    await sendWA(waSession, jid, null, imageUrl, caption);
+    queueWA(waSession, jid, null, imageUrl, caption, conv.id);
   } else if (message) {
-    await sendWA(waSession, jid, message);
+    queueWA(waSession, jid, message, null, null, conv.id);
   } else {
     return null; // tidak ada yang dikirim
   }
@@ -299,16 +332,22 @@ module.exports = async function handler(req, res) {
 
   let totalSent = 0, totalSkipped = 0;
   const results = [];
+  const startTime = Date.now();
+  const MAX_RUNTIME = 50000; // 50 detik safety margin (Vercel limit 60s)
+  const isTimeUp = () => Date.now() - startTime > MAX_RUNTIME;
 
   try {
     // ── BAGIAN -1: Pending Greeting — kirim greeting form lead yang dijeda 3 menit ──
     const GREETING_DELAY_MS = 3 * 60 * 1000;
+    // Hanya cek conversation 15 menit terakhir (bukan semua 800+)
+    const greetingCutoff = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
     const pendingConvs = await sbGet('conversations',
-      `?status=in.(baru,diproses)&select=id,user_id,state`
+      `?status=in.(baru,diproses)&created_at=gte.${greetingCutoff}&select=id,user_id,state&limit=50`
     ).catch(() => []);
     const pendingGreetings = pendingConvs.filter(c => c.state?.pending_greeting?.created_at);
 
     for (const conv of pendingGreetings) {
+      if (isTimeUp()) { console.log('[timeout] greeting loop'); break; }
       const pg = conv.state.pending_greeting;
       const elapsed = now.getTime() - new Date(pg.created_at).getTime();
       if (elapsed < GREETING_DELAY_MS) continue;
@@ -325,20 +364,12 @@ module.exports = async function handler(req, res) {
         continue;
       }
 
-      // Kirim greeting
-      try {
-        console.log(`[greeting] Kirim ke ${pg.wa_number} (delay ${Math.round(elapsed/1000)}s)`);
-        await sendWA(pg.wa_session, pg.wa_number, pg.message);
-        await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: pg.message });
-        results.push({ type: 'greeting', conv: conv.id, ok: true });
-        totalSent++;
-      } catch(e) {
-        console.error(`[greeting] Gagal kirim ke ${pg.wa_number}:`, e.message);
-        await sbPost('conv_messages', {
-          conversation_id: conv.id, role: 'cs',
-          isi: `⚠️ Gagal kirim greeting ke ${pg.wa_number}: ${e.message}`,
-        }).catch(() => {});
-      }
+      // Queue greeting ke VPS
+      console.log(`[greeting] Queue ke ${pg.wa_number} (delay ${Math.round(elapsed/1000)}s)`);
+      queueWA(pg.wa_session, pg.wa_number, pg.message, null, null, conv.id);
+      await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: pg.message });
+      results.push({ type: 'greeting', conv: conv.id, ok: true });
+      totalSent++;
       // Clear pending
       await sbPatch('conversations', `?id=eq.${conv.id}`, {
         state: { ...conv.state, pending_greeting: null },
@@ -351,11 +382,15 @@ module.exports = async function handler(req, res) {
 
     // ── BAGIAN 0: Reminder konfirmasi order — customer belum balas konfirmasi pesanan ──
     // Cek conversation dengan awaiting_order_confirm = true + diam minimal 2 jam
+    // Hanya cek yg dibuat max 3 hari lalu (bukan semua 900+), limit 50
     const cutoff2h = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+    const cutoff3d = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
     const awaitingConvs = await sbGet('conversations',
-      `?status=in.(baru,diproses,selesai)` +
+      `?status=in.(baru,diproses)` +
+      `&created_at=gte.${cutoff3d}` +
       `&last_msg_at=lte.${cutoff2h}` +
-      `&select=id,user_id,customer_id,product_id,state,last_msg_at`
+      `&select=id,user_id,customer_id,product_id,state,last_msg_at` +
+      `&limit=50`
     ).catch(() => []);
 
     // Filter dulu yang eligible sebelum batch fetch
@@ -373,6 +408,7 @@ module.exports = async function handler(req, res) {
     const awProdMap = await batchFetchProducts(eligibleAwaiting.map(c => c.product_id).filter(Boolean));
 
     for (const conv of eligibleAwaiting) {
+      if (isTimeUp()) { console.log('[timeout] order reminder loop'); break; }
       // Cek pesan terakhir harus dari AI (konfirmasi order) — bukan customer
       const lastMsgs = await sbGet('conv_messages',
         `?conversation_id=eq.${conv.id}&order=created_at.desc&limit=1`
@@ -425,7 +461,7 @@ Kak, kami ingin memastikan pesanan berikut:
 Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
 
         const waSessionReminder = await getWaSession(conv.user_id, conv.product_id);
-        await sendWA(waSessionReminder, jid, reminderMsg);
+        queueWA(waSessionReminder, jid, reminderMsg, null, null, conv.id);
         await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: `[Reminder konfirmasi order] ${reminderMsg}` });
         await sbPatch('conversations', `?id=eq.${conv.id}`, {
           state: { ...state, confirm_reminder_sent_at: now.toISOString() },
@@ -434,7 +470,6 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         totalSent++;
         results.push({ type: 'order_reminder', conv_id: conv.id, customer: customer.nama, status: 'sent' });
         console.log(`[Order Reminder] → ${customer.nama || customer.wa_number}`);
-        await new Promise(r => setTimeout(r, 1500));
       } catch(e) {
         console.error(`Error order reminder conv ${conv.id}:`, e.message);
       }
@@ -458,7 +493,8 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
       `&sumber=eq.form` +
       `&created_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff30m}` +
-      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at`
+      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at` +
+      `&limit=100`
     ).catch(() => []);
 
     // Query 1b: lead biasa baru hari ini (cutoff 1 jam)
@@ -467,7 +503,8 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
       `&sumber=neq.form` +
       `&created_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
-      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at`
+      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at` +
+      `&limit=100`
     );
 
     // Query 2: customer lama yang chat lagi hari ini (last_msg_at >= hari ini)
@@ -476,7 +513,8 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
       `&created_at=lt.${todayStartISO}` +
       `&last_msg_at=gte.${todayStartISO}` +
       `&last_msg_at=lte.${cutoff1h}` +
-      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at`
+      `&select=id,user_id,customer_id,product_id,sumber,state,last_msg_at,created_at` +
+      `&limit=100`
     ).catch(() => []);
 
     const reopenedToday = Array.isArray(reopenedConvs) ? reopenedConvs : [];
@@ -496,6 +534,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
     const hhProdMap = await batchFetchProducts(hariHConvs.map(c => c.product_id).filter(Boolean));
 
     for (const conv of hariHConvs) {
+      if (isTimeUp()) { console.log('[timeout] hari H loop'); break; }
       try {
         const state = conv.state || {};
         const followedDays = state.followed_up_days || [];
@@ -547,8 +586,6 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
           results.push({ hari: 1, conv_id: conv.id, customer: customer.nama, status: 'sent' });
           console.log(`[Hari H] → ${customer.nama || customer.wa_number}`);
         }
-
-        await new Promise(r => setTimeout(r, 1500));
       } catch(e) {
         console.error(`Error hari H conv ${conv.id}:`, e.message);
       }
@@ -569,6 +606,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
     }
 
     for (const { userId, productId, schedules } of Object.values(schedByKey)) {
+      if (isTimeUp()) { console.log('[timeout] schedule loop'); break; }
       // Cari schedule yang jam_kirimnya cocok dengan sekarang (±30 menit)
       const scheduleSekarang = schedules.filter(s => {
         if (!s.jam_kirim) return false;
@@ -604,7 +642,8 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
           `&created_at=gte.${hariMulai.toISOString()}` +
           `&created_at=lt.${hariAkhir.toISOString()}` +
           `&last_msg_at=lte.${cutoff1h}` +
-          `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at`
+          `&select=id,user_id,customer_id,product_id,state,last_msg_at,created_at` +
+          `&limit=100`
         ).catch(() => []);
 
         // Tandai schedule terakhir (per grup product)
@@ -616,6 +655,7 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
         const d2ProdMap = await batchFetchProducts(convs.map(c => c.product_id).filter(Boolean));
 
         for (const conv of convs) {
+          if (isTimeUp()) { console.log('[timeout] hari 2+ loop'); break; }
           try {
             const state            = conv.state || {};
             const followedSchedIds = state.followed_up_sched_ids || [];
@@ -648,8 +688,6 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
               results.push({ hari: hariKe, conv_id: conv.id, customer: customer.nama, tipe: sched.tipe, status: 'sent' });
               console.log(`[Hari ${hariKe} - ${sched.tipe}] → ${customer.nama || customer.wa_number}`);
             }
-
-            await new Promise(r => setTimeout(r, 1500));
           } catch(e) {
             console.error(`Error hari ${hariKe} conv ${conv.id}:`, e.message);
           }
@@ -657,10 +695,15 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
       }
     }
 
-    console.log(`Done: ${totalSent} terkirim, ${totalSkipped} dilewati`);
-    return res.status(200).json({ ok: true, sent: totalSent, skipped: totalSkipped, results });
+    // Flush semua queue ke VPS dalam 1 request
+    const flushResult = await flushQueueToVPS();
+
+    console.log(`Done: ${totalSent} queued, ${totalSkipped} dilewati, flush: ${JSON.stringify(flushResult)}`);
+    return res.status(200).json({ ok: true, sent: totalSent, skipped: totalSkipped, flush: flushResult, results });
 
   } catch(err) {
+    // Tetap flush meski ada error — jangan buang pesan yang sudah dikumpulkan
+    await flushQueueToVPS().catch(() => {});
     console.error('Follow-up job error:', err.message);
     return res.status(200).json({ ok: false, error: err.message });
   }
