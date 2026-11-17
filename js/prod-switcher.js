@@ -85,10 +85,10 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     render();
   };
 
-  // ── Inject div setelah #sb-bot-status ────────────────────
+  // ── Inject div setelah .sb-brand ─────────────────────────
   function injectEl() {
     if (document.getElementById('prod-sw-root')) return;
-    const anchor = document.getElementById('sb-bot-status');
+    const anchor = document.querySelector('.sb-brand');
     if (!anchor) return;
     const el = document.createElement('div');
     el.id = 'prod-sw-root';
@@ -246,14 +246,14 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     render();
   }
 
-  // ── Init: tunggu #sb-bot-status (support sidebar dinamis) ─
+  // ── Init: tunggu .sb-brand (support sidebar dinamis) ─
   function tryInit() {
-    if (document.getElementById('sb-bot-status')) {
+    if (document.querySelector('.sb-brand')) {
       injectEl();
       loadProds();
     } else {
       const obs = new MutationObserver(() => {
-        if (document.getElementById('sb-bot-status')) {
+        if (document.querySelector('.sb-brand')) {
           obs.disconnect();
           injectEl();
           loadProds();
