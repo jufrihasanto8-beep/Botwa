@@ -241,63 +241,73 @@ async function kirimFollowup(conv, customer, namaProduk, csNama, schedule, now, 
   const hariIni = schedule?.hari || 1;
   const isLastDay = schedule?.is_last || false;
 
-  if (tipe === 'ai') {
-    // ── Stage-based template: skip Claude call kalau tahap sudah jelas ──
-    const panggilan = namaKak ? `Kak ${namaKak}` : 'Kak';
-    const ongkir = state.ongkir;
+  // ── Stage-based template: PRIORITAS UTAMA untuk semua tipe & hari ──
+  // Kalau customer stuck di stage tertentu, kirim pesan sesuai stage-nya
+  // bukan testimoni/promo yang ga nyambung
+  const panggilan = namaKak ? `Kak ${namaKak}` : 'Kak';
+  const ongkir = state.ongkir;
+  let isStageHandled = false;
 
-    if (ongkir && !state.metode_bayar && !state.awaiting_order_confirm) {
-      // Sudah ada ongkir tapi belum pilih metode → langsung tanya
-      const fmt = n => `Rp ${Number(n||0).toLocaleString('id-ID')}`;
-      message = `${panggilan}, pesanannya jadi kami proses? 😊\n\n`
-        + `Total:\n`
-        + `💳 Transfer: ${fmt(ongkir.totalTransfer)}\n`
-        + `📦 COD: ${fmt(ongkir.totalCOD)}\n\n`
-        + `Enaknya COD atau Transfer kak?`;
-      console.log(`[stage-fu] conv ${conv.id}: ongkir ada, tanya metode`);
+  if (ongkir && !state.metode_bayar && !state.awaiting_order_confirm) {
+    // Sudah ada ongkir tapi belum pilih metode → langsung tanya
+    const fmt = n => `Rp ${Number(n||0).toLocaleString('id-ID')}`;
+    message = hariIni <= 1
+      ? `${panggilan}, pesanannya jadi kami proses? 😊\n\nTotal:\n💳 Transfer: ${fmt(ongkir.totalTransfer)}\n📦 COD: ${fmt(ongkir.totalCOD)}\n\nEnaknya COD atau Transfer kak?`
+      : `${panggilan}, kemarin totalnya sudah kami hitung ya 😊\n\n💳 Transfer: ${fmt(ongkir.totalTransfer)}\n📦 COD: ${fmt(ongkir.totalCOD)}\n\nMasih jadi order kak? Enaknya COD atau Transfer? 🙏`;
+    isStageHandled = true;
+    console.log(`[stage-fu] conv ${conv.id} hari ${hariIni}: ongkir ada, tanya metode`);
 
-    } else if (state.awaiting_bukti_tf) {
-      // Nunggu bukti TF
-      message = `${panggilan}, sudah sempat transfer kak? Kalau sudah, kirim bukti TF-nya ya biar bisa segera kami proses 🙏`;
-      console.log(`[stage-fu] conv ${conv.id}: awaiting bukti TF`);
+  } else if (state.awaiting_bukti_tf) {
+    // Nunggu bukti TF
+    message = hariIni <= 1
+      ? `${panggilan}, sudah sempat transfer kak? Kalau sudah, kirim bukti TF-nya ya biar bisa segera kami proses 🙏`
+      : `${panggilan}, kami masih nunggu bukti transfer-nya ya kak 😊 Kalau sudah transfer, langsung kirim foto buktinya biar bisa segera diproses 🙏`;
+    isStageHandled = true;
+    console.log(`[stage-fu] conv ${conv.id} hari ${hariIni}: awaiting bukti TF`);
 
-    } else if (state.wilayah && !ongkir) {
-      // Wilayah ada tapi ongkir gagal — coba info ulang
-      message = `${panggilan}, maaf tadi sempat ada kendala. Boleh konfirmasi lagi kak alamat pengirimannya ke mana? Biar kami cek ongkirnya 😊`;
-      console.log(`[stage-fu] conv ${conv.id}: wilayah ada, ongkir gagal`);
+  } else if (state.wilayah && !ongkir) {
+    // Wilayah ada tapi ongkir gagal
+    message = hariIni <= 1
+      ? `${panggilan}, maaf tadi sempat ada kendala. Boleh konfirmasi lagi kak alamat pengirimannya ke mana? Biar kami cek ongkirnya 😊`
+      : `${panggilan}, boleh info alamat lengkapnya kak? Biar kami cek ongkir dan totalnya ya 😊`;
+    isStageHandled = true;
+    console.log(`[stage-fu] conv ${conv.id} hari ${hariIni}: wilayah ada, ongkir gagal`);
+  }
 
-    } else {
+  // Kalau stage sudah di-handle → skip schedule tipe (testimoni/promo/dll)
+  if (!isStageHandled) {
+    if (tipe === 'ai') {
       // Default: panggil Claude AI
       message = await generateAIFollowup(recentMsgs, namaKak, namaProduk, csNama, isLastDay, isFormLead, state, product);
-    }
 
-    if (!message) {
-      message = namaKak
-        ? `Kak ${namaKak}, masih ada yang bisa aku bantu? 😊`
-        : `Masih ada yang bisa aku bantu kak? 😊`;
-    }
+      if (!message) {
+        message = namaKak
+          ? `Kak ${namaKak}, masih ada yang bisa aku bantu? 😊`
+          : `Masih ada yang bisa aku bantu kak? 😊`;
+      }
 
-  } else if (tipe === 'testimoni') {
-    imageUrl = schedule.image_url || null;
-    const defaultTesti = `Ini testimoni dari customer kami kak ${namaKak} 😊 Banyak yang sudah merasakan manfaatnya!`;
-    caption  = (schedule.pesan_custom || defaultTesti).replace('{nama}', namaKak || 'Kak');
-    if (!imageUrl) message = caption; // fallback teks kalau tidak ada gambar
+    } else if (tipe === 'testimoni') {
+      imageUrl = schedule.image_url || null;
+      const defaultTesti = `Ini testimoni dari customer kami kak ${namaKak} 😊 Banyak yang sudah merasakan manfaatnya!`;
+      caption  = (schedule.pesan_custom || defaultTesti).replace('{nama}', namaKak || 'Kak');
+      if (!imageUrl) message = caption;
 
-  } else if (tipe === 'promo') {
-    imageUrl = schedule.image_url || null;
-    const defaultPromo = `Ada promo spesial hari ini kak ${namaKak}! 🎉 Jangan sampai kelewatan ya`;
-    caption  = (schedule.pesan_custom || defaultPromo).replace('{nama}', namaKak || 'Kak');
-    if (!imageUrl) message = caption; // fallback teks kalau tidak ada gambar
+    } else if (tipe === 'promo') {
+      imageUrl = schedule.image_url || null;
+      const defaultPromo = `Ada promo spesial hari ini kak ${namaKak}! 🎉 Jangan sampai kelewatan ya`;
+      caption  = (schedule.pesan_custom || defaultPromo).replace('{nama}', namaKak || 'Kak');
+      if (!imageUrl) message = caption;
 
-  } else if (tipe === 'custom') {
-    const rawPesan = schedule.pesan_custom || `Halo kak ${namaKak}! Ada yang bisa aku bantu? 😊`;
-    const pesanFinal = rawPesan.replace('{nama}', namaKak || 'Kak');
-    imageUrl = schedule.image_url || null;
-    if (imageUrl) {
-      caption = pesanFinal;
-      message = null; // teks masuk ke caption
-    } else {
-      message = pesanFinal;
+    } else if (tipe === 'custom') {
+      const rawPesan = schedule.pesan_custom || `Halo kak ${namaKak}! Ada yang bisa aku bantu? 😊`;
+      const pesanFinal = rawPesan.replace('{nama}', namaKak || 'Kak');
+      imageUrl = schedule.image_url || null;
+      if (imageUrl) {
+        caption = pesanFinal;
+        message = null;
+      } else {
+        message = pesanFinal;
+      }
     }
   }
 

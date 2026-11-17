@@ -17,6 +17,7 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const BAILEYS_URL          = process.env.BAILEYS_URL;
 const WEBHOOK_SECRET       = process.env.WEBHOOK_SECRET;
 const CRON_SECRET          = process.env.CRON_SECRET;
+const ANTHROPIC_KEY        = process.env.ANTHROPIC_KEY;
 const APP_URL              = 'https://csadsy.vercel.app';
 const REDIRECT_URI         = `${APP_URL}/api/gmail`;
 
@@ -244,6 +245,59 @@ function renderTemplate(template, { nama, produk, alamat, hp }) {
     .trim();
 }
 
+// ── Generate greeting AI fleksibel ───────────────────────
+async function generateAIGreeting({ nama, produk, alamat, hp, csNama, keluhan }) {
+  if (!ANTHROPIC_KEY) return null;
+
+  const namaKak = nama ? nama.split(' ')[0] : null;
+  const hasAlamat = !!(alamat && alamat.trim().length > 5);
+
+  let dataInfo = '';
+  if (namaKak) dataInfo += `\n- Nama customer: ${nama}`;
+  if (hp) dataInfo += `\n- No WA: ${hp}`;
+  if (hasAlamat) dataInfo += `\n- Alamat: ${alamat}`;
+  if (keluhan) dataInfo += `\n- Keluhan/catatan dari form: ${keluhan}`;
+
+  const tujuan = hasAlamat
+    ? `Customer sudah kasih data lengkap. Kamu perlu: konfirmasi datanya benar atau tidak, dan tanya mau order berapa qty.`
+    : `Customer belum kasih alamat. Kamu perlu: tanya alamat lengkap pengiriman dan mau order berapa qty.`;
+
+  const prompt = `Kamu ${csNama || 'Sari'}, CS WhatsApp. Customer baru order ${produk || 'produk'} lewat form online.
+
+Data yang masuk:${dataInfo || '\n- Cuma nomor WA, belum ada nama/alamat'}
+${keluhan ? `\nCustomer juga bilang: "${keluhan}"` : ''}
+
+${tujuan}
+
+Tulis 1 pesan WA. Bebas gayanya — yang penting natural kayak orang beneran chat, bukan robot. Jangan sebut harga/total. Max 1 emoji. Langsung tulis pesannya.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text?.trim();
+    if (text && text.length > 20) {
+      console.log(`[gmail] AI greeting generated (${text.length} chars)`);
+      return text;
+    }
+    return null;
+  } catch(e) {
+    console.error('[gmail] AI greeting error:', e.message);
+    return null;
+  }
+}
+
 // ── Proses satu order lead (shared oleh poller & form-lead) ──
 // overrideProduct: objek produk dari DB (kalau sudah diketahui, misal dari cron per-produk)
 //                  null → akan cari sendiri berdasarkan nama produk di email
@@ -277,7 +331,7 @@ async function processLead(userId, { nama, hp, alamat, produk, keluhan }, overri
   if (!matchedProd) {
     // Fallback: cari berdasarkan nama produk di email (untuk form_lead)
     const prodRows = await sbGet('products',
-      `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id,template_form_lead`
+      `?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id,template_form_lead,persona_cs_nama`
     ).catch(() => []);
     if (produk && prodRows.length) {
       const produkLower = produk.toLowerCase();
@@ -332,12 +386,23 @@ async function processLead(userId, { nama, hp, alamat, produk, keluhan }, overri
   // ── Customer baru ATAU produk baru → simpan greeting pending (jeda 3 menit) ───
   // Tidak langsung kirim WA — tunggu dulu, kalau customer redirect & chat duluan
   // maka greeting tidak perlu dikirim. Cron followup akan kirim setelah delay.
-  const tmpl = matchedProd?.template_form_lead || null;
+  const csNama = matchedProd?.persona_cs_nama || null;
 
-  const namaSapa     = nama ? nama.split(' ')[0] : 'kak';
-  const produkTxt    = produk ? ` untuk *${produk}*` : '';
-  const defaultPesan = `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
-  const pesan        = tmpl ? renderTemplate(tmpl, { nama, produk, alamat, hp }) : defaultPesan;
+  // AI greeting fleksibel — fallback ke template/default kalau AI gagal
+  let pesan = await generateAIGreeting({
+    nama, produk: produk || matchedProd?.nama, alamat, hp, csNama, keluhan,
+  });
+
+  if (!pesan) {
+    // Fallback: template dari settings atau default
+    const tmpl = matchedProd?.template_form_lead || null;
+    const namaSapa  = nama ? nama.split(' ')[0] : 'kak';
+    const produkTxt = produk ? ` untuk *${produk}*` : '';
+    pesan = tmpl
+      ? renderTemplate(tmpl, { nama, produk, alamat, hp })
+      : `Halo *${namaSapa}* 👋\n\nTerima kasih sudah melakukan pemesanan${produkTxt}! 🙏\n\nKami sedang memproses pesanan kakak. Boleh kami konfirmasi dulu beberapa detailnya?`;
+    console.log('[gmail] AI greeting gagal, pakai fallback template/default');
+  }
 
   // Simpan pending_greeting ke conversation state — cron akan kirim setelah 3 menit
   if (convId) {
@@ -456,7 +521,7 @@ module.exports = async function handler(req, res) {
 
       // Ambil semua produk yang sudah hubungkan Gmail
       const products = await sbGet('products',
-        `?gmail_refresh_token=not.is.null&aktif=eq.true&select=id,nama,user_id,gmail_email,gmail_refresh_token,gmail_last_checked,wa_session_id,template_form_lead`
+        `?gmail_refresh_token=not.is.null&aktif=eq.true&select=id,nama,user_id,gmail_email,gmail_refresh_token,gmail_last_checked,wa_session_id,template_form_lead,persona_cs_nama`
       );
 
       if (!products.length) return res.json({ ok: true, message: 'Tidak ada Gmail terhubung di produk manapun' });
@@ -516,7 +581,7 @@ module.exports = async function handler(req, res) {
       if (!hp) return res.status(400).json({ error: 'hp wajib diisi' });
 
       // Cek form_token di products dulu (per produk), fallback ke users (per user, legacy)
-      const prods = await sbGet('products', `?form_token=eq.${form_token}&aktif=eq.true&select=id,nama,user_id,wa_session_id,template_form_lead&limit=1`).catch(() => []);
+      const prods = await sbGet('products', `?form_token=eq.${form_token}&aktif=eq.true&select=id,nama,user_id,wa_session_id,template_form_lead,persona_cs_nama&limit=1`).catch(() => []);
       if (prods.length) {
         const prod = prods[0];
         const result = await processLead(prod.user_id, { nama, hp, alamat, produk: produk || prod.nama, keluhan }, prod);
