@@ -365,9 +365,13 @@ module.exports = async function handler(req, res) {
 /* ── REMINDER HANDLER (cron tiap 15 menit) ────────────────── */
 async function handleReminder(res) {
   try {
-    const pending = await sbGet('transfer_qc?qc_status=eq.pending&order=created_at.asc');
+    // Hanya ambil pending yang sudah > 10 menit (hindari spam untuk TF yang baru masuk)
+    const minAgo10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const pending = await sbGet(
+      `transfer_qc?qc_status=eq.pending&created_at=lte.${minAgo10}&order=created_at.asc&limit=100`
+    );
     if (!pending.length) {
-      console.log('[qc-reminder] Tidak ada pending QC');
+      console.log('[qc-reminder] Tidak ada pending QC > 10 menit');
       return res.status(200).json({ ok: true, pending: 0 });
     }
 
@@ -378,6 +382,16 @@ async function handleReminder(res) {
       byUser[qc.user_id].push(qc);
     }
 
+    // Ambil semua session aktif dari VPS sekali saja
+    let activeSessions = [];
+    try {
+      const vsRes = await fetch(`${BAILEYS_URL}/active-sessions`, {
+        headers: { 'Authorization': `Bearer ${WEBHOOK_SECRET}` }
+      });
+      if (vsRes.ok) activeSessions = (await vsRes.json())?.sessions || [];
+    } catch(e) { /* fallback */ }
+    console.log(`[qc-reminder] Active sessions: ${JSON.stringify(activeSessions)}`);
+
     let sent = 0;
     for (const [userId, items] of Object.entries(byUser)) {
       const [userRows, prodRows] = await Promise.all([
@@ -385,10 +399,22 @@ async function handleReminder(res) {
         sbGet(`products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []),
       ]);
 
-      const groupJid = process.env.QC_GROUP_JID || userRows[0]?.group_jid || process.env.WA_GROUP_JID;
-      const waSession = prodRows[0]?.wa_session_id || userId;
+      // Prioritas: user.group_jid dari DB → env QC_GROUP_JID → env WA_GROUP_JID
+      const groupJid = userRows[0]?.group_jid || process.env.QC_GROUP_JID || process.env.WA_GROUP_JID || null;
 
-      if (!groupJid) continue;
+      // Pakai wa_session_id produk; kalau tidak aktif, fallback ke session aktif pertama
+      let waSession = prodRows[0]?.wa_session_id || null;
+      if (waSession && activeSessions.length && !activeSessions.includes(waSession)) {
+        console.warn(`[qc-reminder] session ${waSession} tidak aktif, fallback ke ${activeSessions[0]}`);
+        waSession = activeSessions[0];
+      }
+      if (!waSession && activeSessions.length) waSession = activeSessions[0];
+      if (!waSession) waSession = userId;
+
+      if (!groupJid) {
+        console.warn(`[qc-reminder] group_jid tidak ditemukan untuk user ${userId} — skip`);
+        continue;
+      }
 
       const oldest = new Date(items[0].created_at);
       const diffMin = Math.round((Date.now() - oldest.getTime()) / 60000);
@@ -396,15 +422,16 @@ async function handleReminder(res) {
         ? `${Math.floor(diffMin / 60)} jam ${diffMin % 60} menit`
         : `${diffMin} menit`;
 
+      const fmtNominal = n => n ? `Rp ${Number(n).toLocaleString('id-ID')}` : '?';
       const daftar = items.slice(0, 5).map((q, i) =>
-        `${i + 1}. ${q.customer_nama || '-'} — ${q.product_nama || '-'} x${q.qty || 1} (${q.nominal || '?'})`
+        `${i + 1}. ${q.customer_nama || '-'} — ${q.product_nama || '-'} x${q.qty || 1} (${fmtNominal(q.nominal)})`
       ).join('\n');
       const more = items.length > 5 ? `\n... dan ${items.length - 5} lainnya` : '';
 
-      const reminderMsg = `⏰ *Reminder QC Transfer*\n\nAda *${items.length}* bukti TF menunggu verifikasi (terlama: ${durasi} lalu)\n\n${daftar}${more}\n\nSegera cek & ACC di:\nhttps://csadsy.vercel.app/qc-transfer`;
+      const reminderMsg = `⏰ *Reminder QC Transfer*\n\nAda *${items.length}* bukti TF menunggu verifikasi finance (terlama: ${durasi} lalu)\n\n${daftar}${more}\n\nSegera cek & ACC di:\nhttps://csadsy.vercel.app/qc-transfer`;
 
-      await sendWA(waSession, groupJid, reminderMsg).catch(() => {});
-      console.log(`[qc-reminder] Reminder terkirim ke grup user ${userId}: ${items.length} pending`);
+      await sendWA(waSession, groupJid, reminderMsg).catch(e => console.error('[qc-reminder] sendWA error:', e.message));
+      console.log(`[qc-reminder] Reminder terkirim ke grup ${groupJid} (user ${userId}): ${items.length} pending`);
       sent++;
     }
 
