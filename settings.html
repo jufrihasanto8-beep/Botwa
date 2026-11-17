@@ -689,7 +689,7 @@ async function loadWAStatus() {
   // Ambil semua produk aktif user via window.SUPABASE_URL / SUPABASE_ANON_KEY (dari config.js)
   let prods = [];
   try {
-    const r = await fetch(`${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${waUserId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id,wa_phone,wa_status`, {
+    const r = await fetch(`${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${waUserId}&aktif=eq.true&order=created_at.asc&select=id,nama,wa_session_id,wa_phone,wa_status,wa_mode`, {
       headers: { 'Content-Type':'application/json','apikey':window.SUPABASE_ANON_KEY,'Authorization':'Bearer '+window.SUPABASE_ANON_KEY }
     });
     if (r.ok) prods = await r.json();
@@ -717,6 +717,7 @@ async function loadWAStatus() {
     const color  = COLORS[i % COLORS.length];
     const dotCls = `dot-${status.status || 'not_found'}`;
     const statusLabel = { connected:'✅ Terhubung', connecting:'🔄 Menghubungkan...', qr_ready:'📷 Menunggu scan QR', reconnecting:'🔄 Reconnecting...', logged_out:'❌ Logged out', not_found:'Belum terhubung' }[status.status] || 'Belum terhubung';
+    const isPassive = p.wa_mode === 'passive';
 
     return `<div style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:12px">
@@ -736,8 +737,37 @@ async function loadWAStatus() {
           }
         </div>
       </div>
+      ${isConn ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:${isPassive ? '#f59e0b' : '#22c55e'}">${isPassive ? '🟡 Mode Pasif' : '🟢 Mode Aktif'}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px">${isPassive ? 'Bot hanya reply, tidak kirim duluan (warm up)' : 'Bot aktif kirim greeting & reply'}</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+          <input type="checkbox" ${!isPassive ? 'checked' : ''} onchange="toggleWaMode('${p.id}',this.checked)" style="opacity:0;width:0;height:0">
+          <span style="position:absolute;inset:0;background:${isPassive ? '#374151' : '#22c55e'};border-radius:12px;transition:.3s"></span>
+          <span style="position:absolute;top:2px;left:${isPassive ? '2px' : '22px'};width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s"></span>
+        </label>
+      </div>` : ''}
     </div>`;
   })).then(arr => arr.join(''));
+}
+
+async function toggleWaMode(productId, isActive) {
+  const mode = isActive ? 'active' : 'passive';
+  try {
+    const r = await fetch(`${window.SUPABASE_URL}/rest/v1/products?id=eq.${productId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type':'application/json','apikey':window.SUPABASE_ANON_KEY,'Authorization':'Bearer '+window.SUPABASE_ANON_KEY,'Prefer':'return=minimal' },
+      body: JSON.stringify({ wa_mode: mode }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    toast(mode === 'passive' ? '🟡 Mode Pasif aktif — bot hanya reply' : '🟢 Mode Aktif — bot kirim greeting & reply');
+    loadWAList();
+  } catch(e) {
+    toast('Gagal ubah mode: ' + e.message);
+    loadWAList();
+  }
 }
 
 async function startQR(sessionId, prodNama, prodId) {
