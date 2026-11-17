@@ -401,7 +401,7 @@ async function handleReminder(res) {
       ).join('\n');
       const more = items.length > 5 ? `\n... dan ${items.length - 5} lainnya` : '';
 
-      const reminderMsg = `⏰ *Reminder QC Transfer*\n\nAda *${items.length}* bukti TF menunggu verifikasi (terlama: ${durasi} lalu)\n\n${daftar}${more}\n\nSegera cek & ACC di halaman QC Transfer`;
+      const reminderMsg = `⏰ *Reminder QC Transfer*\n\nAda *${items.length}* bukti TF menunggu verifikasi (terlama: ${durasi} lalu)\n\n${daftar}${more}\n\nSegera cek & ACC di:\nhttps://csadsy.vercel.app/qc-transfer`;
 
       await sendWA(waSession, groupJid, reminderMsg).catch(() => {});
       console.log(`[qc-reminder] Reminder terkirim ke grup user ${userId}: ${items.length} pending`);
