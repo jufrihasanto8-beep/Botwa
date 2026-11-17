@@ -727,7 +727,6 @@ function renderSidebar(activePage) {
         <div class="sb-subtitle">Automation CS</div>
       </div>
     </div>
-    <div class="bot-online" id="sb-bot-status"><div class="bot-dot"></div> Bot online</div>
     <div class="sb-nav">
       ${pages.map(item).join('')}
       <div class="sb-divider"></div>
@@ -746,33 +745,19 @@ function renderSidebar(activePage) {
 }
 
 async function checkBotStatus() {
-  const sbBot = document.getElementById('sb-bot-status');
-  const uid   = Auth.getUser()?.id;
-  if (!sbBot || !uid) return;
+  const uid = Auth.getUser()?.id;
+  if (!uid) return;
 
-  // Pakai session_id dari produk aktif (bukan user.id)
   const prods = window.__userProducts || [];
   const prodId = window.__activeProductFilter;
   const prod   = prodId ? prods.find(p => p.id === prodId) : prods[0];
   const sessionId = prod?.wa_session_id;
-
-  if (!sessionId) {
-    sbBot.innerHTML = '⚠️ WA belum terhubung';
-    sbBot.style.color = '#f59e0b';
-    return;
-  }
+  if (!sessionId) return;
 
   try {
     const res = await fetch('/api/baileys-proxy?path=' + encodeURIComponent('/session/status/' + sessionId));
     const s   = await res.json();
     const connected = s.status === 'connected';
-    if (connected) {
-      sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
-      sbBot.style.color = '#22c55e';
-    } else {
-      sbBot.innerHTML   = '⚠️ Bot offline';
-      sbBot.style.color = '#f59e0b';
-    }
     if (typeof window.__updateProdWaStatus === 'function') {
       window.__updateProdWaStatus(sessionId, connected);
     }
@@ -789,8 +774,6 @@ async function checkBotStatus() {
       }
     }
   } catch(e) {
-    sbBot.innerHTML   = '⚠️ Bot offline';
-    sbBot.style.color = '#f59e0b';
     if (typeof window.__updateProdWaStatus === 'function') {
       window.__updateProdWaStatus(sessionId, false);
     }
