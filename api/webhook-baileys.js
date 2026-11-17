@@ -2294,8 +2294,13 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
     }
 
     // Inject konteks awaiting bukti TF — customer sudah confirm order transfer, tinggal kirim bukti
-    if (convState.awaiting_bukti_tf) {
+    if (convState.awaiting_bukti_tf && !convState.awaiting_qc_tf) {
       systemPrompt += `\n\n[SISTEM - PENTING] Customer sudah KONFIRMASI pesanan dengan metode TRANSFER. Sedang menunggu bukti transfer (foto struk/screenshot). JANGAN generate [ORDER_CONFIRMED]. Kalau customer kirim pesan teks (bukan gambar), ingatkan dengan sopan untuk kirim bukti TF-nya. Kalau customer tanya rekening lagi, kasih info rekening: ${userRekening || '(belum diisi)'}. JANGAN closing sebelum bukti TF valid.`;
+    }
+
+    // Inject konteks awaiting QC — bukti TF sudah dikirim, menunggu verifikasi finance
+    if (convState.awaiting_qc_tf) {
+      systemPrompt += `\n\n[SISTEM - PENTING] Bukti transfer customer sudah diterima dan sedang DICEK oleh tim finance kami. JANGAN generate [ORDER_CONFIRMED]. Kalau customer tanya status, bilang "Bukti transfernya sudah kami terima kak, sedang dalam proses pengecekan oleh tim finance kami ya 🙏". Kalau customer kirim bukti TF baru/ulang, terima saja dan bilang sudah diupdate.`;
     }
 
     // Inject konteks order sudah placed — cegah Claude kirim konfirmasi ulang
@@ -2432,91 +2437,98 @@ Beritahu customer dengan sopan bahwa transfer sepertinya salah rekening, minta k
       } else if (imageAnalysis.rekening_cocok === true) {
         notif = `[SISTEM] Bukti transfer VALID dan rekening COCOK ✅
 Bank: ${imageAnalysis.bank || '?'} | Nominal: ${imageAnalysis.nominal || '?'} | Tanggal: ${imageAnalysis.tanggal || '?'}
-Konfirmasi penerimaan bukti TF, informasikan pesanan akan segera diproses dan estimasi pengiriman.`;
+Konfirmasi ke customer bahwa bukti TF sudah diterima dan sedang dicek oleh tim finance. Pesanan akan segera diproses setelah transfer dikonfirmasi.`;
 
-        // ── Auto-closing Transfer: bukti TF valid → langsung closing ──
-        if (convState.awaiting_bukti_tf || convState.order_placed || convState.order_snapshot) {
+        // ── QC Transfer: bukti TF valid → masuk antrian QC, JANGAN langsung closing ──
+        if (convState.awaiting_bukti_tf || convState.order_snapshot) {
           try {
-            const nomorUrutClosing = await getOrderNumber(userId);
-            await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
-            await updateConvState(conversation.id, { awaiting_order_confirm: false, awaiting_bukti_tf: false, order_placed: true });
+            // Upload bukti TF ke Supabase Storage
+            let buktiUrl = null;
+            if (mediaUrl && mediaUrl.startsWith('data:image')) {
+              const imgMatch = mediaUrl.match(/^data:image\/([a-z0-9]+);base64,/i);
+              const ext = imgMatch?.[1] || 'jpeg';
+              const imgBuffer = Buffer.from(mediaUrl.replace(/^data:image\/[a-z0-9]+;base64,/i, ''), 'base64');
+              const filename = `${conversation.id}_${Date.now()}.${ext}`;
 
-            // Cek apakah order sudah ada (anti-double)
-            const existingOrder = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&limit=1`).catch(() => []);
-            if (!existingOrder.length) {
-              const snap       = convState.order_snapshot || {};
-              const ongkirSnap = convState.ongkir || {};
-              const alamatSnap = {
-                jalan:      snap.alamat       || convState.alamat              || '',
-                kelurahan:  ongkirSnap.area?.kelurahan || customer?.alamat?.kelurahan || '',
-                kecamatan:  ongkirSnap.area?.kecamatan || customer?.alamat?.kecamatan || '',
-                kabupaten:  ongkirSnap.area?.kota      || customer?.alamat?.kabupaten || '',
-                provinsi:   ongkirSnap.area?.provinsi  || customer?.alamat?.provinsi  || '',
-                kodepos:    ongkirSnap.area?.kodePos   || customer?.alamat?.kodepos   || '',
-                ...(ongkirSnap.mengantar_dest_id ? { mengantar_dest_id: ongkirSnap.mengantar_dest_id } : {}),
-              };
-              const qtySnap = parseInt(snap.qty || convState.qty || 1) || 1;
-              const hargaSnap = snap.harga || resolveHargaBundling(product, qtySnap) || product?.harga || 0;
-              const ongkirPromoSnap = snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0;
-              const totalSnap = hargaSnap + ongkirPromoSnap; // Transfer = no feeCOD
-
-              const insertedRows = await sbPost('orders_new', {
-                user_id:           userId,
-                customer_id:       customer?.id,
-                conversation_id:   conversation.id,
-                product_id:        product?.id || null,
-                metode:            'transfer',
-                qty:               qtySnap,
-                harga:             hargaSnap,
-                ongkir:            snap.ongkirAsli   || ongkirSnap.ongkirAsli   || 0,
-                ongkir_after_promo: ongkirPromoSnap,
-                fee_cod:           0,
-                total:             totalSnap,
-                ekspedisi:         snap.ekspedisi    || ongkirSnap.ekspedisi    || '',
-                alamat:            alamatSnap,
-                keluhan:           snap.keluhan      || convState.keluhan       || '',
-                status:            'pending',
-                customer_nama:     customer?.nama    || '',
-                customer_phone:    (customer?.wa_number || '').replace(/^62/, '0'),
-                product_nama:      product?.nama     || '',
-                berat_gram:        product?.berat_gram || 0,
+              const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/bukti-tf/${filename}`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                  'Content-Type': `image/${ext}`,
+                  'x-upsert': 'true',
+                },
+                body: imgBuffer,
               });
-              const insertedOrderId = insertedRows?.[0]?.id || null;
-              console.log(`[bukti-tf-closing] Insert orders_new OK — conv ${conversation.id}, order_id: ${insertedOrderId}`);
-
-              // Set closed_order_id
-              if (insertedOrderId) {
-                await updateConvState(conversation.id, { closed_order_id: insertedOrderId }).catch(() => {});
+              if (uploadRes.ok) {
+                buktiUrl = `${SUPABASE_URL}/storage/v1/object/public/bukti-tf/${filename}`;
+                console.log(`[qc-tf] Bukti TF uploaded: ${buktiUrl}`);
+              } else {
+                console.error(`[qc-tf] Upload gagal: ${await uploadRes.text()}`);
               }
+            }
 
-              // Update total_order & last_order_at
-              if (customer?.id) {
-                await sbPatch('customers', `?id=eq.${customer.id}`, {
-                  total_order:   (customer.total_order || 0) + 1,
-                  last_order_at: new Date().toISOString(),
-                }).catch(() => {});
-              }
+            // Build order snapshot data
+            const snap       = convState.order_snapshot || {};
+            const ongkirSnap = convState.ongkir || {};
+            const qtySnap    = parseInt(snap.qty || convState.qty || 1) || 1;
+            const hargaSnap  = snap.harga || resolveHargaBundling(product, qtySnap) || product?.harga || 0;
+            const ongkirPromoSnap = snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0;
+            const totalSnap  = hargaSnap + ongkirPromoSnap; // Transfer = no feeCOD
 
-              // Kirim recap ke grup WA
-              if (userGroupJid) {
-                const closingMsg = buildClosingMessage({
-                  nomorUrut: nomorUrutClosing, customer,
-                  alamat:  snap.alamat  || convState.alamat || '-',
-                  ongkir:  ongkirSnap,
-                  product,
-                  keluhan: snap.keluhan || convState.keluhan || '-',
-                  metode:  'Transfer',
-                  qty:     qtySnap,
-                  csNama:  product?.persona_cs_nama || 'CS',
-                });
-                await sendWA(waSession, userGroupJid, closingMsg, true).catch(() => {});
-                console.log(`[bukti-tf-closing] Recap #${nomorUrutClosing} terkirim ke grup`);
-              }
+            const qcData = {
+              user_id:          userId,
+              customer_id:      customer?.id || null,
+              conversation_id:  conversation.id,
+              product_id:       product?.id || null,
+              bukti_url:        buktiUrl,
+              nominal:          imageAnalysis.nominal || null,
+              bank:             imageAnalysis.bank || null,
+              tanggal_tf:       imageAnalysis.tanggal || null,
+              rekening_tujuan:  imageAnalysis.no_rekening_tujuan || null,
+              order_snapshot: {
+                ...snap,
+                ongkir:    ongkirSnap,
+                alamat:    snap.alamat    || convState.alamat    || '',
+                keluhan:   snap.keluhan   || convState.keluhan   || '',
+                ekspedisi: snap.ekspedisi || ongkirSnap.ekspedisi || '',
+                ongkirAsli:   snap.ongkirAsli   || ongkirSnap.ongkirAsli   || 0,
+                ongkirPromo:  ongkirPromoSnap,
+                harga:        hargaSnap,
+                area:         ongkirSnap.area || null,
+                mengantar_dest_id: ongkirSnap.mengantar_dest_id || null,
+              },
+              customer_nama:    customer?.nama || '',
+              customer_phone:   (customer?.wa_number || '').replace(/^62/, '0'),
+              product_nama:     product?.nama || '',
+              qty:              qtySnap,
+              total:            totalSnap,
+            };
+
+            // Cek apakah sudah ada pending QC untuk conversation ini → replace
+            const existingQC = await sbGet('transfer_qc', `?conversation_id=eq.${conversation.id}&qc_status=eq.pending&limit=1`).catch(() => []);
+
+            if (existingQC.length) {
+              await sbPatch('transfer_qc', `?id=eq.${existingQC[0].id}`, {
+                ...qcData,
+                created_at: new Date().toISOString(),
+              });
+              console.log(`[qc-tf] Updated existing QC ${existingQC[0].id}`);
             } else {
-              console.log(`[bukti-tf-closing] Order sudah ada — skip insert`);
+              await sbPost('transfer_qc', qcData);
+              console.log(`[qc-tf] Insert transfer_qc OK — conv ${conversation.id}`);
+            }
+
+            // Update state: menunggu QC finance
+            await updateConvState(conversation.id, { awaiting_qc_tf: true });
+
+            // Kirim notif ke grup WA
+            if (userGroupJid) {
+              const qcNotif = `📋 *Bukti TF Baru*\nNama: ${customer?.nama || '-'}\nProduk: ${product?.nama || '-'} x${qtySnap}\nNominal: ${imageAnalysis.nominal || '?'}\nBank: ${imageAnalysis.bank || '?'}\n\nCek & ACC di halaman QC Transfer`;
+              await sendWA(waSession, userGroupJid, qcNotif, true).catch(() => {});
+              console.log(`[qc-tf] Notif QC terkirim ke grup`);
             }
           } catch(e) {
-            console.error('[bukti-tf-closing] Error:', e.message);
+            console.error('[qc-tf] Error:', e.message);
           }
         }
       } else {

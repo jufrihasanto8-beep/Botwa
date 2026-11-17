@@ -1,5 +1,8 @@
 /**
- * AI Suggest Reply — dipanggil dari dashboard untuk generate saran balasan
+ * AI Suggest Reply + Customer Risk Detection
+ * Routes:
+ *   GET ?action=risk&wa_number=&wilayah= → customer risk check
+ *   POST (default) → AI suggest reply
  */
 const ANTHROPIC_KEY     = process.env.ANTHROPIC_KEY;
 const SUPABASE_URL      = process.env.SUPABASE_URL;
@@ -124,6 +127,12 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // ── GET: Customer Risk Detection (gabungan dari customer-risk.js) ──
+  if (req.method === 'GET' && req.query?.action === 'risk') {
+    return handleCustomerRisk(req, res);
+  }
+
   if (req.method !== 'POST') return res.status(405).end();
 
   // Fallback parse kalau body belum di-parse Vercel
@@ -381,3 +390,66 @@ Rules:
     return res.status(500).json({ error: e.message });
   }
 };
+
+/* ── CUSTOMER RISK DETECTION (dari customer-risk.js) ─────── */
+async function handleCustomerRisk(req, res) {
+  const VALIDASI_URL = process.env.VALIDASI_SUPABASE_URL;
+  const VALIDASI_KEY = process.env.VALIDASI_SUPABASE_KEY;
+  const valH = { 'Content-Type': 'application/json', 'apikey': VALIDASI_KEY, 'Authorization': `Bearer ${VALIDASI_KEY}` };
+  const valGet = async (path) => {
+    const r = await fetch(`${VALIDASI_URL}/rest/v1/${path}`, { headers: valH });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  };
+  function normalizeHP(hp) {
+    let n = String(hp || '').replace(/\D/g, '');
+    if (n.startsWith('0')) n = '62' + n.slice(1);
+    if (!n.startsWith('62')) n = '62' + n;
+    return n;
+  }
+
+  const { wa_number, wilayah } = req.query;
+  if (!wa_number) return res.status(400).json({ error: 'wa_number wajib' });
+
+  const hp = normalizeHP(wa_number);
+  const result = { hp, rts: null, wilayah: null };
+
+  try {
+    const orders = await valGet(`all_orderan?hp=eq.${hp}&select=status_akhir&limit=500`);
+    const total = orders.length;
+    const retur = orders.filter(r => (r.status_akhir || '').toLowerCase().includes('retur')).length;
+    result.rts = {
+      total, retur, pernah: retur > 0,
+      label: retur === 0 ? 'Tidak pernah RTS' : retur === 1 ? '1x RTS' : `${retur}x RTS`,
+      level: retur === 0 ? 'aman' : retur <= 2 ? 'hati' : 'tinggi',
+    };
+  } catch(e) { console.error('RTS check error:', e.message); }
+
+  if (wilayah) {
+    try {
+      const parts = wilayah.split(',').map(s => s.trim());
+      const kecamatan = parts[0];
+      const kota = parts[1] || parts[0];
+      let orders = await valGet(`all_orderan?kecamatan=ilike.*${encodeURIComponent(kecamatan)}*&select=status_akhir&limit=1000`);
+      let namaLabel = kecamatan;
+      if (orders.length < 3 && kota !== kecamatan) {
+        orders = await valGet(`all_orderan?kabupaten=ilike.*${encodeURIComponent(kota)}*&select=status_akhir&limit=1000`);
+        namaLabel = kota;
+      }
+      const wTotal = orders.length;
+      const wRetur = orders.filter(r => (r.status_akhir || '').toLowerCase().includes('retur')).length;
+      if (wTotal >= 3) {
+        const pct = Math.round((wRetur / wTotal) * 100);
+        result.wilayah = {
+          nama: namaLabel, total: wTotal, retur: wRetur, pct,
+          label: pct === 0 ? 'Aman' : pct < 15 ? `Sedang (${pct}%)` : `Tinggi (${pct}%)`,
+          level: pct === 0 ? 'aman' : pct < 15 ? 'sedang' : 'tinggi',
+        };
+      } else {
+        result.wilayah = { nama: namaLabel, label: 'Data kurang', level: 'unknown', total: wTotal };
+      }
+    } catch(e) { console.error('Wilayah check error:', e.message); }
+  }
+
+  return res.status(200).json(result);
+}
