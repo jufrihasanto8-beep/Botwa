@@ -474,10 +474,6 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
       <div class="sb-subtitle">Automation CS</div>
     </div>
   </div>
-  <div class="bot-online" id="sb-bot-status">
-    <div class="bot-dot"></div> Bot online
-  </div>
-  <!-- prod-switcher di-inject otomatis oleh js/prod-switcher.js -->
   <div class="sb-nav">
     <a class="sb-item" href="analytics.html"><span class="si"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg></span> Ringkasan</a>
     <div class="sb-item active" onclick="location.href='dashboard.html'">
@@ -1353,7 +1349,7 @@ async function updateCaseBoard() {
     if (cached && (now - cached.ts) < 120000) {
       data = cached.data;
     } else {
-      const resp = await fetch(`/api/customer-risk?${params}`);
+      const resp = await fetch(`/api/ai-suggest?action=risk&${params}`);
       data = await resp.json();
       riskCache[activeConvId] = { data, ts: now };
     }
@@ -1489,34 +1485,7 @@ async function clearChat() {
   showToast('Chat dihapus');
 }
 
-/* ── WA STATUS ── */
-async function checkWA() {
-  const sbBot = document.getElementById('sb-bot-status');
-  try {
-    // Gunakan wa_session_id dari produk aktif (multi-WA), fallback ke userId
-    let sessionId = userId;
-    const prodFilter = window.__activeProductFilter;
-    if (prodFilter) {
-      const prods = await sbGet('products', `?id=eq.${prodFilter}&select=wa_session_id&limit=1`).catch(() => []);
-      sessionId = prods[0]?.wa_session_id || userId;
-    } else {
-      const prods = await sbGet('products', `?user_id=eq.${userId}&aktif=eq.true&select=wa_session_id&order=created_at.asc&limit=1`).catch(() => []);
-      sessionId = prods[0]?.wa_session_id || userId;
-    }
-    const res    = await fetch(`${PROXY}?path=${encodeURIComponent('/session/status/'+sessionId)}`);
-    const status = await res.json();
-    if (status.status === 'connected') {
-      sbBot.innerHTML   = '<div class="bot-dot"></div> Bot online';
-      sbBot.style.color = '#22c55e';
-    } else {
-      sbBot.innerHTML   = '⚠️ Bot offline';
-      sbBot.style.color = '#f59e0b';
-    }
-  } catch(e) {
-    sbBot.innerHTML   = '⚠️ Bot offline';
-    sbBot.style.color = '#f59e0b';
-  }
-}
+/* ── WA STATUS — handled by app.js checkBotStatus() + prod-switcher ── */
 
 /* ── TOGGLE BUTTONS ── */
 function toggleAI()  { showToast('AI dikelola otomatis via webhook'); }
@@ -1561,7 +1530,7 @@ window.addEventListener('load', async () => {
 
   await renderInbox();
   await loadStats();
-  checkWA();
+  checkBotStatus();
 
   // Open from URL param ?conv=ID (from cases/aiinsights) or restore last session
   const urlConv = new URLSearchParams(window.location.search).get('conv');

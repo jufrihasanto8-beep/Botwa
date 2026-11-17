@@ -15,7 +15,8 @@
     { "source": "/followup-engine", "destination": "/followup-engine.html" },
     { "source": "/connect-wa", "destination": "/connect-wa.html" },
     { "source": "/leads", "destination": "/leads.html" },
-    { "source": "/all-orders", "destination": "/all-orders.html" }
+    { "source": "/all-orders", "destination": "/all-orders.html" },
+    { "source": "/qc-transfer", "destination": "/qc-transfer.html" }
   ],
   "functions": {
     "api/webhook-baileys.js": {
@@ -32,6 +33,9 @@
       "maxDuration": 60
     },
     "api/gmail.js": {
+      "maxDuration": 60
+    },
+    "api/qc-transfer.js": {
       "maxDuration": 60
     }
   },
