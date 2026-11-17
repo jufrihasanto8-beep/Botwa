@@ -358,6 +358,12 @@ module.exports = async function handler(req, res) {
   }
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
+  // ── Respond langsung ke cron-job.org (max 30s timeout) ──
+  // Proses lanjut di background via waitUntil
+  res.status(200).json({ ok: true, status: 'processing' });
+
+  const doWork = async () => {
+
   const now     = new Date();
   // Jam WIB (UTC+7)
   const jamWIB  = now.getUTCHours() + 7 >= 24
@@ -764,12 +770,16 @@ Sudah bener kak? Agar bisa segera kami proses pengiriman 🙏`;
     const flushResult = await flushQueueToVPS();
 
     console.log(`Done: ${totalSent} queued, ${totalSkipped} dilewati, flush: ${JSON.stringify(flushResult)}`);
-    return res.status(200).json({ ok: true, sent: totalSent, skipped: totalSkipped, flush: flushResult, results });
 
   } catch(err) {
     // Tetap flush meski ada error — jangan buang pesan yang sudah dikumpulkan
     await flushQueueToVPS().catch(() => {});
     console.error('Follow-up job error:', err.message);
-    return res.status(200).json({ ok: false, error: err.message });
   }
+
+  }; // end doWork
+
+  // Jalankan di background — response sudah dikirim ke cron-job.org
+  // Vercel tetap jalankan function sampai maxDuration (60s) meski response sudah terkirim
+  doWork().catch(e => console.error('doWork error:', e.message));
 };
