@@ -389,8 +389,9 @@ async function getTimeSlot(mngKey, originId) {
     const minPickupWIB = new Date(nowWIB.getTime() + 2 * 3600 * 1000);
     const dateStr = nowWIB.toISOString().slice(0, 10);
 
-    // Tentukan jam pickup: minimal 2 jam dari sekarang, minimal 10:00, maksimal 20:00
+    // Tentukan jam pickup: minimal 2 jam dari sekarang, bulatkan ke atas ke jam penuh
     let pickupHour = minPickupWIB.getUTCHours();
+    if (minPickupWIB.getUTCMinutes() > 0) pickupHour += 1; // 13:59 → 14:00 bukan 13:00
     if (pickupHour < 10) pickupHour = 10;
     if (pickupHour > 20) pickupHour = 20;
     const pickupTime = String(pickupHour).padStart(2, '0') + ':00';
