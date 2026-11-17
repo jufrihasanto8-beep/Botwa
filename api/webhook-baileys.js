@@ -834,8 +834,12 @@ function cleanKelInput(msg) {
 
 // Deteksi apakah pesan customer adalah konfirmasi singkat
 function isConfirmation(msg) {
-  const lower = msg.toLowerCase().trim().replace(/[.!]+$/, '');
-  return /^(iya|ya|yakin|bener|betul|ok|oke|okey|yep|yup|iyah|bnar|benar|yes|confirm|bisa|boleh|lanjut)(\s+kak)?$/.test(lower);
+  const lower = msg.toLowerCase().trim().replace(/[.!,]+$/, '');
+  // Support variasi sapaan: kak, bu, pak, mas, mbak, bang, dll
+  const sapaan = '(kak|bu|pak|mas|mbak|bang|mba|sis|bro|gan|ka)';
+  const kata   = '(iya|ya|yakin|bener|betul|ok|oke|okey|yep|yup|iyah|bnar|benar|yes|confirm|bisa|boleh|lanjut|siap|yoi|iyaa|yaa|udah|sudah)';
+  // "iya", "iya kak", "benar bu", "iya benar kak", "ya udah lanjut", dll
+  return new RegExp(`^${kata}(\\s+${kata})?(\\s+${sapaan})?$`).test(lower);
 }
 
 /* ── PEMBULATAN ke kelipatan terdekat ────────────────────── */
