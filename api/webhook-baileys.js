@@ -2947,23 +2947,65 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           ? `~${fmt(d.ongkirAsli)}~ ${fmt(d.ongkirPromo)}`
           : fmt(d.ongkirPromo);
         const ekspLabel = d.ekspedisi || 'KURIR';
+
+        // Cek apakah data sudah lengkap (nama + alamat sudah ada)
+        const hasNama   = customer?.nama && customer.nama !== wa_number;
+        const hasAlamat = !!(convState.alamat || convState.form_alamat);
+        const dataLengkap = hasNama && hasAlamat;
+
+        const alamatFinal = convState.alamat || convState.form_alamat || '';
+        const namaFinal   = customer?.nama || '';
+        const keluhanFinal = convState.keluhan || '-';
+        const qtyFinal    = parseInt(convState.qty) || 1;
+        const metode      = pilihCOD ? 'COD' : 'Transfer';
+
         let hint;
-        if (pilihCOD) {
-          hint = `[SISTEM] Customer memilih COD. WAJIB tampilkan ULANG total lengkap ke customer PERSIS seperti ini:\n\n`
-            + `📦 COD\n`
-            + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(d.feeCOD)} = TOTAL ${fmt(d.totalCOD)}\n`
-            + `Via ${ekspLabel} ya kak 🚗\n\n`
-            + `Setelah tampilkan total di atas, minta data yang BELUM ADA saja (nama, nomor HP, alamat lengkap). `
-            + `Cek dulu dari data customer yang sudah diketahui — jangan tanya ulang yang sudah ada. JANGAN hanya bilang "Siap kak" tanpa total.`;
+        if (dataLengkap) {
+          // Data sudah lengkap → langsung closing tanpa tanya ulang
+          if (pilihCOD) {
+            hint = `[SISTEM] Customer memilih COD. Data sudah LENGKAP:\n`
+              + `- Nama: ${namaFinal}\n- Alamat: ${alamatFinal}\n- HP: ${wa_number}\n\n`
+              + `WAJIB lakukan SEKARANG dalam 1 pesan:\n`
+              + `1. Tampilkan total:\n`
+              + `📦 COD\n`
+              + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(d.feeCOD)} = TOTAL ${fmt(d.totalCOD)}\n`
+              + `Via ${ekspLabel} ya kak 🚗\n\n`
+              + `2. Langsung tulis marker di AKHIR pesan (jangan tanya konfirmasi lagi):\n`
+              + `[ORDER_CONFIRMED]\n`
+              + `[ORDER_DATA:alamat="${alamatFinal}" keluhan="${keluhanFinal}" metode="COD" qty=${qtyFinal}]`;
+          } else {
+            hint = `[SISTEM] Customer memilih Transfer. Data sudah LENGKAP:\n`
+              + `- Nama: ${namaFinal}\n- Alamat: ${alamatFinal}\n- HP: ${wa_number}\n\n`
+              + `WAJIB lakukan SEKARANG dalam 1 pesan:\n`
+              + `1. Tampilkan total:\n`
+              + `💳 Transfer\n`
+              + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(d.totalTransfer)}\n`
+              + `Via ${ekspLabel} ya kak 🚗\n\n`
+              + `2. Kasih info rekening: ${userRekening || '(rekening belum diisi)'}\n\n`
+              + `3. Langsung tulis marker di AKHIR pesan (jangan tanya konfirmasi lagi):\n`
+              + `[ORDER_CONFIRMED]\n`
+              + `[ORDER_DATA:alamat="${alamatFinal}" keluhan="${keluhanFinal}" metode="Transfer" qty=${qtyFinal}]`;
+          }
+          console.log(`[metode-hint] ${metode} — data LENGKAP, inject direct closing`);
         } else {
-          hint = `[SISTEM] Customer memilih Transfer. WAJIB tampilkan ULANG total lengkap ke customer PERSIS seperti ini:\n\n`
-            + `💳 Transfer\n`
-            + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(d.totalTransfer)}\n`
-            + `Via ${ekspLabel} ya kak 🚗\n\n`
-            + `Setelah tampilkan total di atas, langsung kasih info rekening lalu minta data yang BELUM ADA saja (nama, nomor HP, alamat lengkap). JANGAN hanya bilang "Siap kak" tanpa total.`;
+          // Data belum lengkap → minta data yang kurang dulu
+          if (pilihCOD) {
+            hint = `[SISTEM] Customer memilih COD. WAJIB tampilkan ULANG total lengkap ke customer PERSIS seperti ini:\n\n`
+              + `📦 COD\n`
+              + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(d.feeCOD)} = TOTAL ${fmt(d.totalCOD)}\n`
+              + `Via ${ekspLabel} ya kak 🚗\n\n`
+              + `Setelah tampilkan total di atas, minta data yang BELUM ADA saja (nama, nomor HP, alamat lengkap). `
+              + `Cek dulu dari data customer yang sudah diketahui — jangan tanya ulang yang sudah ada. JANGAN hanya bilang "Siap kak" tanpa total.`;
+          } else {
+            hint = `[SISTEM] Customer memilih Transfer. WAJIB tampilkan ULANG total lengkap ke customer PERSIS seperti ini:\n\n`
+              + `💳 Transfer\n`
+              + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(d.totalTransfer)}\n`
+              + `Via ${ekspLabel} ya kak 🚗\n\n`
+              + `Setelah tampilkan total di atas, langsung kasih info rekening lalu minta data yang BELUM ADA saja (nama, nomor HP, alamat lengkap). JANGAN hanya bilang "Siap kak" tanpa total.`;
+          }
+          console.log(`[metode-hint] ${metode} — data BELUM lengkap (nama:${hasNama}, alamat:${hasAlamat}), inject reminder`);
         }
         history.push({ role: 'user', content: hint });
-        console.log(`[metode-hint] ${pilihCOD ? 'COD' : 'Transfer'} — inject total reminder`);
       }
     }
 
@@ -3553,14 +3595,32 @@ ${ongkirInfo}`;
         // 2. Kalau belum ketemu, parse dari alamat ORDER_DATA (selalu dicoba, tidak di-gate state)
         if (!localAreaFallback && orderDataParsed.alamat) {
           const alamatParts = orderDataParsed.alamat.split(',').map(s => s.trim()).filter(Boolean);
-          for (let i = Math.max(0, alamatParts.length - 4); i < alamatParts.length; i++) {
-            const combined = alamatParts.slice(i).join(', ');
-            const cek = await cariWilayah(combined, 5).catch(() => []);
-            if (cek.length > 0) {
-              localAreaFallback = cek[0];
-              if (!wilayahFallback) wilayahFallback = `${cek[0].kelurahan}, ${cek[0].kecamatan}, ${cek[0].kabupaten}`;
-              console.log(`[ORDER_CONFIRMED] Area lokal dari alamat: "${combined}" → ${cek[0].kelurahan}, ${cek[0].kecamatan}`);
-              break;
+          // 2a. Coba split koma dulu (alamat format: "Jl X, Kec Y, Kab Z")
+          if (alamatParts.length >= 2) {
+            for (let i = Math.max(0, alamatParts.length - 4); i < alamatParts.length; i++) {
+              const combined = alamatParts.slice(i).join(', ');
+              const cek = await cariWilayah(combined, 5).catch(() => []);
+              if (cek.length > 0) {
+                localAreaFallback = cek[0];
+                if (!wilayahFallback) wilayahFallback = `${cek[0].kelurahan}, ${cek[0].kecamatan}, ${cek[0].kabupaten}`;
+                console.log(`[ORDER_CONFIRMED] Area lokal dari alamat (split): "${combined}" → ${cek[0].kelurahan}, ${cek[0].kecamatan}`);
+                break;
+              }
+            }
+          }
+          // 2b. Fallback AI: alamat tanpa koma / split gagal → pakai Haiku extract wilayah
+          if (!localAreaFallback) {
+            console.log(`[ORDER_CONFIRMED] Split koma gagal (${alamatParts.length} part), coba AI extract...`);
+            const aiExtract = await extractLokasiHaiku(orderDataParsed.alamat, userAnthropicKey).catch(() => null);
+            if (aiExtract) {
+              const searchKey = [aiExtract.kelurahan, aiExtract.kecamatan, aiExtract.kabupaten].filter(Boolean).join(', ');
+              console.log(`[ORDER_CONFIRMED] AI extract: ${searchKey}`);
+              const cek = await cariWilayah(searchKey, 5).catch(() => []);
+              if (cek.length > 0) {
+                localAreaFallback = cek[0];
+                if (!wilayahFallback) wilayahFallback = searchKey;
+                console.log(`[ORDER_CONFIRMED] Area lokal dari AI: ${cek[0].kelurahan}, ${cek[0].kecamatan}, ${cek[0].kabupaten}`);
+              }
             }
           }
         }
@@ -3601,23 +3661,41 @@ ${ongkirInfo}`;
         }
       }
 
-      // Fallback area: ongkir state → customers.alamat (skip kalau conflict) → area lokal (wilayah_id)
-      const area = ongkirData?.area?.kecamatan ? ongkirData.area
-                 : (!conflictAlamat && custAlamat?.kecamatan) ? {
-                     kelurahan: custAlamat.kelurahan || '',
-                     kecamatan: custAlamat.kecamatan || '',
-                     kota:      custAlamat.kabupaten || '',
-                     provinsi:  custAlamat.provinsi  || '',
-                     kodePos:   custAlamat.kodepos   || '',
-                   }
-                 : localAreaFallback ? {
-                     kelurahan: localAreaFallback.kelurahan || '',
-                     kecamatan: localAreaFallback.kecamatan || '',
-                     kota:      localAreaFallback.kabupaten || '',
-                     provinsi:  localAreaFallback.provinsi  || '',
-                     kodePos:   '',
-                   }
-                 : {};
+      // Fallback area: ongkir state → customers.alamat (skip kalau conflict) → area lokal (wilayah_id) → parse wilayah string
+      let area = ongkirData?.area?.kecamatan ? ongkirData.area
+               : (!conflictAlamat && custAlamat?.kecamatan) ? {
+                   kelurahan: custAlamat.kelurahan || '',
+                   kecamatan: custAlamat.kecamatan || '',
+                   kota:      custAlamat.kabupaten || '',
+                   provinsi:  custAlamat.provinsi  || '',
+                   kodePos:   custAlamat.kodepos   || '',
+                 }
+               : localAreaFallback ? {
+                   kelurahan: localAreaFallback.kelurahan || '',
+                   kecamatan: localAreaFallback.kecamatan || '',
+                   kota:      localAreaFallback.kabupaten || '',
+                   provinsi:  localAreaFallback.provinsi  || '',
+                   kodePos:   '',
+                 }
+               : {};
+
+      // Fallback terakhir: parse dari state.wilayah string (format: "kelurahan, kecamatan, kabupaten, provinsi")
+      if (!area.kecamatan && (latestState.wilayah || convState.wilayah)) {
+        const wStr = latestState.wilayah || convState.wilayah;
+        const wParts = wStr.split(',').map(s => s.trim()).filter(Boolean);
+        if (wParts.length >= 3) {
+          // Cari match di DB lokal untuk data yang akurat
+          const wMatch = await cariWilayah(wStr, 1).catch(() => []);
+          if (wMatch.length) {
+            area = { kelurahan: wMatch[0].kelurahan || '', kecamatan: wMatch[0].kecamatan || '', kota: wMatch[0].kabupaten || '', provinsi: wMatch[0].provinsi || '', kodePos: '' };
+            console.log(`[ORDER_CONFIRMED] Area dari state.wilayah DB: ${wMatch[0].kecamatan}, ${wMatch[0].kabupaten}`);
+          } else {
+            // Fallback: parse langsung dari string
+            area = { kelurahan: wParts[0] || '', kecamatan: wParts[1] || '', kota: wParts[2] || '', provinsi: wParts[3] || '', kodePos: '' };
+            console.log(`[ORDER_CONFIRMED] Area dari state.wilayah string: ${wParts[1]}, ${wParts[2]}`);
+          }
+        }
+      }
 
       const metode      = orderDataParsed.metode  || latestState.metode_bayar || 'COD';
       const qty         = orderDataParsed.qty     || latestState.qty          || 1;
