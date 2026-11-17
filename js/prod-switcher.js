@@ -68,11 +68,13 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
 
   function getProdStatus(p) {
     const gmailOk = !!(p.gmail_email);
+    const isPassive = p.wa_mode === 'passive';
     if (!p.wa_session_id) return { label: '● WA belum setup', color: '#64748b' };
     // Cek real-time dulu, fallback ke wa_status DB
     const realStatus = waStatusCache[p.wa_session_id];
     const waConnected = realStatus === 'connected' || (!realStatus && p.wa_status === 'connected');
     const waOffline   = realStatus === 'offline'   || (!realStatus && p.wa_status !== 'connected');
+    if (waConnected && isPassive) return { label: '● Mode Pasif (warm up)', color: '#f59e0b' };
     if (waConnected && gmailOk)  return { label: '● Agent aktif',           color: '#22c55e' };
     if (waConnected && !gmailOk) return { label: '● Gmail belum terhubung', color: '#f59e0b' };
     if (waOffline)               return { label: '● WA terputus',           color: '#f59e0b' };
@@ -221,13 +223,13 @@ body.light .prod-sw-divider{background:rgba(0,0,0,.07)}
     if (!userId) { console.log('[ProdSW] no userId'); return; }
     try {
       let r = await fetch(
-        `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,persona_cs_nama,wa_status,wa_session_id,gmail_email`,
+        `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,persona_cs_nama,wa_status,wa_session_id,gmail_email,wa_mode`,
         { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
       );
       // Fallback: kolom gmail_email belum ada di DB (SQL belum dijalankan)
       if (!r.ok) {
         r = await fetch(
-          `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,persona_cs_nama,wa_status,wa_session_id`,
+          `${window.SUPABASE_URL}/rest/v1/products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=id,nama,persona_cs_nama,wa_status,wa_session_id,wa_mode`,
           { headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.SUPABASE_ANON_KEY } }
         );
       }
