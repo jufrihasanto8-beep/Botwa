@@ -385,7 +385,7 @@ async function handleReminder(res) {
         sbGet(`products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []),
       ]);
 
-      const groupJid = userRows[0]?.group_jid || process.env.WA_GROUP_JID;
+      const groupJid = process.env.QC_GROUP_JID || userRows[0]?.group_jid || process.env.WA_GROUP_JID;
       const waSession = prodRows[0]?.wa_session_id || userId;
 
       if (!groupJid) continue;
