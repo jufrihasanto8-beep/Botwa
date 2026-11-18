@@ -497,11 +497,19 @@ function drpNav(dir) {
 }
 
 // ── DATA ──────────────────────────────────────────────────
-let allConvs = [], prodMap = {}, custMap = {};
+let allConvs = [], prodMap = {}, custMap = {}, convMap = {};
 let donutChart = null, barChart = null;
 
-function filterByRange(convs) {
-  return convs.filter(c => {
+function filterByRange(list) {
+  return list.filter(c => {
+    // Closing dihitung berdasarkan tanggal order dibuat (waktu closing)
+    const d = new Date(c._orderDate || c.created_at);
+    return d >= filterStart && d <= filterEnd;
+  });
+}
+
+function filterLeadsByRange(leads) {
+  return leads.filter(c => {
     const d = new Date(c.last_msg_at || c.created_at);
     return d >= filterStart && d <= filterEnd;
   });
@@ -514,21 +522,28 @@ async function init() {
     sbFetch('conversations', `?user_id=eq.${uid}&select=id,customer_id,product_id,status,state,last_msg_at,created_at&order=last_msg_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama`),
     sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
-    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,qty,harga,ongkir_after_promo,fee_cod,total,metode,ekspedisi,created_at&order=created_at.desc`)
+    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,customer_id,product_id,qty,harga,ongkir_after_promo,fee_cod,total,metode,ekspedisi,created_at&order=created_at.desc`)
   ]);
 
   custs.forEach(c => { custMap[c.id] = c; });
   prods.forEach(p => { prodMap[p.id] = p; });
-
-  // Map orders by conversation_id (ambil yang terbaru per conversation)
-  const orderMap = {};
-  (orders||[]).forEach(o => { if (!orderMap[o.conversation_id]) orderMap[o.conversation_id] = o; });
+  convs.forEach(c => { convMap[c.id] = c; });
 
   allLeads = (convs || []).filter(c => c.state?.is_form_lead);
-  // Filter: semua conversation yang status selesai (sama dengan dashboard)
-  allConvs = (convs||[]).filter(c => c.status === 'selesai');
-  // Attach order data ke conversation
-  allConvs.forEach(c => { c._order = orderMap[c.id] || {}; });
+
+  // Closing dihitung dari orders_new (bukan conversations)
+  // Tanggal = orders_new.created_at (waktu closing sebenarnya)
+  allConvs = (orders || []).map(o => {
+    const conv = convMap[o.conversation_id] || {};
+    return {
+      ...conv,
+      id: conv.id || o.conversation_id,
+      customer_id: conv.customer_id || o.customer_id,
+      product_id: conv.product_id || o.product_id,
+      _order: o,
+      _orderDate: o.created_at, // tanggal closing dari order
+    };
+  });
 
   render();
 }
@@ -549,9 +564,9 @@ function calcStats(list, leadsFiltered) {
   let gross = 0, codCount = 0, codRp = 0, tfCount = 0, tfRp = 0, totalQty = 0;
 
   list.forEach(c => {
+    const ord = c._order || {};
     const st = c.state || {};
     const snap = st.order_snapshot || {};
-    const ord = c._order || {}; // dari orders_new kalau ada
     const prod = prodMap[c.product_id] || {};
     const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
     const harga = ord.harga || snap.harga || prod.harga || 0;
@@ -570,8 +585,8 @@ function calcStats(list, leadsFiltered) {
   const net    = gross;
   const avg    = total ? Math.round(gross / total) : 0;
 
-  // Hitung lead di range yang sama (sudah difilter per produk dari render())
-  const leadList = filterByRange(leadsFiltered || allLeads);
+  // Hitung lead di range yang sama — lead pakai last_msg_at conversation
+  const leadList = filterLeadsByRange(leadsFiltered || allLeads);
   const totalLead = leadList.length;
   const days = Math.max(1, Math.round((filterEnd - filterStart) / (1000*60*60*24)));
   const leadPerHari = (totalLead / days).toFixed(1);
@@ -581,14 +596,18 @@ function calcStats(list, leadsFiltered) {
   const dur = filterEnd - filterStart;
   const prevStart = new Date(filterStart - dur);
   const prevEnd   = new Date(filterStart);
-  const prevList  = allConvs.filter(c => { const d=new Date(c.last_msg_at||c.created_at); return d>=prevStart&&d<prevEnd; });
+  const prevList  = allConvs.filter(c => { const d=new Date(c._orderDate||c.created_at); return d>=prevStart&&d<prevEnd; });
   let prevGross = 0;
   prevList.forEach(c => {
+    const ord = c._order || {};
     const st = c.state || {};
+    const snap = st.order_snapshot || {};
     const prod = prodMap[c.product_id] || {};
-    const qty = parseInt(st.qty || 1);
-    const ongkir = st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    prevGross += ((prod.harga||0) * qty) + ongkir;
+    const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
+    const harga = ord.harga || snap.harga || prod.harga || 0;
+    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
+    prevGross += ord.total || snap.total || (harga + ongkir + feeCod);
   });
   const prevTotal = prevList.length;
 
@@ -630,7 +649,8 @@ function renderCharts(list) {
   // Donut COD vs TF
   let cod = 0, tf = 0;
   list.forEach(c => {
-    const m = (c.state?.metode_bayar || 'cod').toLowerCase();
+    const ord = c._order || {};
+    const m = (ord.metode || c.state?.metode_bayar || 'cod').toLowerCase();
     if (m === 'transfer') tf++; else cod++;
   });
   const total = cod + tf || 1;
@@ -722,7 +742,7 @@ function renderTable(list) {
       </td>
       <td><span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'Transfer':'COD'}</span></td>
       <td style="font-weight:700;color:var(--text)">${rp(nilai)}</td>
-      <td style="color:var(--text-3);font-size:12px">${fmtDt(c.last_msg_at)}</td>
+      <td style="color:var(--text-3);font-size:12px">${fmtDt(c._orderDate)}</td>
     </tr>`;
   }).join('');
 }
@@ -755,7 +775,7 @@ function exportCSV() {
       ongkir,
       nilai,
       metode,
-      fmtDt(c.last_msg_at)
+      fmtDt(c._orderDate)
     ]);
   });
 
