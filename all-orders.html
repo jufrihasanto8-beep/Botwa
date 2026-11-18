@@ -348,7 +348,7 @@ const DAYS_ID = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 function drpFmt(d){ if(!d) return '\u2014'; return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
 function drpToggle(){
   const dd=document.getElementById('drp-dropdown'),tr=document.getElementById('drp-trigger'),rect=tr.getBoundingClientRect();
-  dd.style.top=(rect.bottom+8)+'px'; dd.style.right=(window.innerWidth-rect.right)+'px';
+  dd.style.top=(rect.bottom+8)+'px'; dd.style.left=rect.left+'px'; dd.style.right='auto';
   dd.classList.toggle('open');
   if(dd.classList.contains('open')){drpRender();drpUpdateSel();document.addEventListener('click',drpOutside);}
   else document.removeEventListener('click',drpOutside);
