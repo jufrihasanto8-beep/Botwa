@@ -763,10 +763,10 @@ async function toggleWaMode(productId, isActive) {
     });
     if (!r.ok) throw new Error(await r.text());
     toast(mode === 'passive' ? '🟡 Mode Pasif aktif — bot hanya reply' : '🟢 Mode Aktif — bot kirim greeting & reply');
-    loadWAList();
+    loadWAStatus();
   } catch(e) {
     toast('Gagal ubah mode: ' + e.message);
-    loadWAList();
+    loadWAStatus();
   }
 }
 
