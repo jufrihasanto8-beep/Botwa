@@ -829,7 +829,7 @@ async function getKelurahanByKecamatan(kecamatan, kabupaten) {
 // Contoh: "sewon kak" → "sewon", "pendowoharjo ya" → "pendowoharjo"
 function cleanKelInput(msg) {
   return msg.trim().toLowerCase()
-    .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis)\b/g, '')
+    .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis|sudah|udah|betul|bener|benar|yep|yup|boleh|lanjut|yoi)\b/g, '')
     .replace(/\s+/g, ' ').trim();
 }
 
@@ -2577,7 +2577,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     const kelurahanBelumTerisi = !convState.ongkir?.area?.kelurahan || convState.pending_kecamatan;
     // Kalau pending_kecamatan aktif, selalu coba search (tidak perlu aiTanyaLokasi)
     const perluSearchWilayah = (!convState.wilayah || kelurahanBelumTerisi) && (aiTanyaLokasi || convState.pending_kecamatan);
-    if (perluSearchWilayah && message.length >= 3 && message.length <= 80) {
+    // GUARD: kalau pesan hanya konfirmasi ("sudah", "iya", "betul", dll) → jangan search wilayah
+    // Kasus nyata: customer jawab "Sudah" (= iya betul) → sistem salah detect kelurahan "Sudah" di Bojonegoro
+    if (perluSearchWilayah && message.length >= 3 && message.length <= 80 && !isConfirmation(message)) {
       try {
         // ── Kalau bot sedang menunggu jawaban kelurahan (pending_kecamatan ada di state),
         //    cari kelurahan di kecamatan itu saja — jangan search global (bisa salah kecamatan)
