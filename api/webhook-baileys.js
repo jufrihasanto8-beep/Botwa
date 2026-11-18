@@ -9,6 +9,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY      = process.env.ANTHROPIC_KEY;
 const BAILEYS_URL        = process.env.BAILEYS_URL;
 const WEBHOOK_SECRET     = process.env.WEBHOOK_SECRET;
+const CRON_SECRET        = process.env.CRON_SECRET;
 const MENGANTAR_KEY      = process.env.MENGANTAR_KEY;
 const GROQ_API_KEY       = process.env.GROQ_API_KEY;
 const WA_GROUP_JID       = process.env.WA_GROUP_JID; // JID grup WA tujuan recap order
