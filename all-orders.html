@@ -140,38 +140,34 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
 .td-phone-link:hover{color:#2563eb;border-bottom-color:#2563eb}
 
 /* Chat Modal */
-.chat-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;animation:fadeIn .15s}
+.chat-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center}
 .chat-overlay.open{display:flex}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.chat-modal{background:var(--white);border:1px solid var(--border);border-radius:16px;width:520px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,.35);overflow:hidden}
-body.light .chat-modal{box-shadow:0 12px 48px rgba(0,0,0,.15)}
-.chat-modal-hdr{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
-.chat-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
-.chat-hdr-info{flex:1;min-width:0}
-.chat-hdr-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chat-hdr-sub{font-size:11px;color:var(--text-3)}
-.chat-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0}
-.chat-close:hover{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08)}
-.chat-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:4px;min-height:200px}
-.chat-body::-webkit-scrollbar{width:4px}
-.chat-body::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:4px}
-.chat-empty{text-align:center;padding:40px 20px;color:var(--text-3);font-size:13px}
-.chat-loading{text-align:center;padding:40px 20px;color:var(--text-3);font-size:12px}
-
-/* Chat bubbles */
-.cb-row{display:flex;margin-bottom:2px}
-.cb-row.from-cust{justify-content:flex-start}
-.cb-row.from-bot{justify-content:flex-end}
-.cb-bubble{max-width:80%;padding:8px 12px;border-radius:12px;font-size:12.5px;line-height:1.5;word-break:break-word;position:relative}
-.cb-row.from-cust .cb-bubble{background:rgba(59,130,246,.1);color:var(--text);border-bottom-left-radius:4px}
-.cb-row.from-bot .cb-bubble{background:rgba(34,197,94,.1);color:var(--text);border-bottom-right-radius:4px}
-.cb-row.from-sys{justify-content:center}
-.cb-row.from-sys .cb-bubble{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#f59e0b;font-size:11px;padding:4px 12px;border-radius:20px;max-width:90%}
-.cb-time{font-size:10px;color:var(--text-3);margin-top:2px}
-.cb-row.from-cust .cb-time{text-align:left}
-.cb-row.from-bot .cb-time{text-align:right}
-.cb-label{font-size:10px;font-weight:600;margin-bottom:2px;color:var(--text-3)}
-.cb-day{text-align:center;font-size:10px;font-weight:600;color:var(--text-3);padding:8px 0 4px;letter-spacing:.5px}
+.chat-modal{background:var(--white);border-radius:14px;width:420px;max-width:95vw;height:80vh;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+body.light .chat-modal{box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.chat-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-modal-head h3{font-size:14px;font-weight:700;color:var(--text)}
+.chat-modal-head .chat-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);line-height:1;padding:4px}
+.chat-modal-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-height:0}
+.chat-modal-body::-webkit-scrollbar{width:4px}
+.chat-modal-body::-webkit-scrollbar-thumb{background:rgba(100,100,100,.2);border-radius:4px}
+.chat-bubble{max-width:78%;min-width:40px;padding:7px 11px;border-radius:10px;font-size:13px;line-height:1.5;word-break:break-word;white-space:pre-wrap;text-align:left}
+.chat-row{display:flex;margin-bottom:1px}
+.chat-row.from-customer{justify-content:flex-start}
+.chat-row.from-bot{justify-content:flex-end}
+.chat-row.from-customer .chat-bubble{background:#f0f0f0;color:#1a1a1a;border-bottom-left-radius:3px}
+.chat-row.from-bot .chat-bubble{background:#3b82f6;color:#fff;border-bottom-right-radius:3px}
+.chat-row.from-system{justify-content:center}
+.chat-row.from-system .chat-bubble{background:rgba(100,116,139,.08);color:var(--text-2);font-size:11px;max-width:90%;text-align:center;border-radius:8px}
+.chat-time-inline{font-size:10px;color:rgba(0,0,0,.35);float:right;margin:6px 0 -3px 10px;line-height:1}
+.chat-time-bot{color:rgba(255,255,255,.55)}
+.chat-label{font-size:10px;font-weight:600;display:block;margin-bottom:2px}
+.chat-label.ai{color:rgba(255,255,255,.7)}
+.chat-label.cs{color:#fbbf24}
+.chat-loading{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
+.chat-empty{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
+.chat-date-div{text-align:center;font-size:10px;color:var(--text-3);margin:8px 0;font-weight:600}
+body.light .chat-row.from-customer .chat-bubble{background:#f0f0f0;color:#1a1a1a}
+body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
 
 /* Responsive */
 @media(max-width:768px){
@@ -285,15 +281,11 @@ body.light .chat-modal{box-shadow:0 12px 48px rgba(0,0,0,.15)}
 <!-- Chat Modal -->
 <div class="chat-overlay" id="chat-overlay" onclick="if(event.target===this)closeChatModal()">
   <div class="chat-modal">
-    <div class="chat-modal-hdr">
-      <div class="chat-av" id="cm-av">?</div>
-      <div class="chat-hdr-info">
-        <div class="chat-hdr-name" id="cm-name">—</div>
-        <div class="chat-hdr-sub" id="cm-sub">—</div>
-      </div>
-      <button class="chat-close" onclick="closeChatModal()" title="Tutup">&times;</button>
+    <div class="chat-modal-head">
+      <h3 id="chat-title">Percakapan</h3>
+      <button class="chat-close" onclick="closeChatModal()">&times;</button>
     </div>
-    <div class="chat-body" id="cm-body">
+    <div class="chat-modal-body" id="chat-body">
       <div class="chat-empty">Klik nomor WA di tabel untuk lihat percakapan</div>
     </div>
   </div>
@@ -587,10 +579,6 @@ function exportExcel() {
 }
 
 // ── CHAT MODAL ────────────────────────────────────────────
-const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#6366f1'];
-function chatAvatarColor(name) { let h=0; for(let i=0;i<(name||'').length;i++) h=name.charCodeAt(i)+((h<<5)-h); return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length]; }
-function chatInitials(name) { return (name||'?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'; }
-
 function openChatFromEl(el) {
   openChat(el.dataset.cid, el.dataset.convid, el.dataset.nama, el.dataset.phone);
 }
@@ -601,14 +589,10 @@ function closeChatModal() {
 
 async function openChat(customerId, conversationId, nama, phone) {
   const overlay = document.getElementById('chat-overlay');
-  const body = document.getElementById('cm-body');
-  const avEl = document.getElementById('cm-av');
-  const color = chatAvatarColor(nama);
+  const body    = document.getElementById('chat-body');
+  const title   = document.getElementById('chat-title');
 
-  avEl.textContent = chatInitials(nama);
-  avEl.style.background = color;
-  document.getElementById('cm-name').textContent = nama || '\u2014';
-  document.getElementById('cm-sub').textContent = phone ? `WhatsApp \xb7 ${phone}` : '\u2014';
+  title.textContent = nama || 'Percakapan';
   body.innerHTML = '<div class="chat-loading">Memuat percakapan...</div>';
   overlay.classList.add('open');
 
@@ -626,40 +610,41 @@ async function openChat(customerId, conversationId, nama, phone) {
     }
 
     const msgs = await sbFetch('conv_messages',
-      `?conversation_id=eq.${convId}&order=created_at.asc&limit=500&select=role,isi,created_at`);
+      `?conversation_id=eq.${convId}&order=created_at.asc&limit=300&select=role,isi,created_at`);
 
     if (!msgs || !msgs.length) {
-      body.innerHTML = '<div class="chat-empty">Percakapan kosong</div>';
+      body.innerHTML = '<div class="chat-empty">Tidak ada pesan ditemukan.</div>';
       return;
     }
 
-    // Group messages by date
     let html = '';
     let lastDate = '';
     msgs.forEach(m => {
-      const dt = new Date(m.created_at);
-      const dateStr = dt.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric', timeZone:'Asia/Jakarta'});
+      const d = new Date(m.created_at);
+      const dateStr = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' });
       if (dateStr !== lastDate) {
-        html += `<div class="cb-day">${dateStr}</div>`;
+        html += `<div class="chat-date-div">${dateStr}</div>`;
         lastDate = dateStr;
       }
-      const time = dt.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta'});
-      const safe = (m.isi||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+
+      const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+      const safe = (m.isi || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
       if (m.role === 'system') {
-        html += `<div class="cb-row from-sys"><div class="cb-bubble">${safe}</div></div>`;
+        html += `<div class="chat-row from-system"><div class="chat-bubble">${safe}</div></div>`;
       } else if (m.role === 'customer') {
-        html += `<div class="cb-row from-cust"><div><div class="cb-bubble">${safe}</div><div class="cb-time">${time}</div></div></div>`;
+        html += `<div class="chat-row from-customer"><div class="chat-bubble">${safe}<span class="chat-time-inline">${time}</span></div></div>`;
       } else {
-        const label = m.role === 'cs' ? '\uD83D\uDC64 CS' : '\uD83E\uDD16 AI';
-        html += `<div class="cb-row from-bot"><div><div class="cb-label">${label}</div><div class="cb-bubble">${safe}</div><div class="cb-time">${time}</div></div></div>`;
+        const label = m.role === 'cs' ? 'CS' : 'AI';
+        const cls   = m.role === 'cs' ? 'cs' : 'ai';
+        html += `<div class="chat-row from-bot"><div class="chat-bubble"><span class="chat-label ${cls}">${label}</span>${safe}<span class="chat-time-inline chat-time-bot">${time}</span></div></div>`;
       }
     });
 
     body.innerHTML = html;
     body.scrollTop = body.scrollHeight;
   } catch(e) {
-    body.innerHTML = `<div class="chat-empty">Error: ${e.message}</div>`;
+    body.innerHTML = `<div class="chat-empty">Gagal memuat: ${e.message}</div>`;
   }
 }
 
