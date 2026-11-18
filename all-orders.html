@@ -135,6 +135,44 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
 .empty-cell h4{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--tbl-text-2)}
 .empty-cell p{font-size:13px;line-height:1.6}
 
+/* Phone link */
+.td-phone-link{font-family:monospace;font-size:12px;color:#3b82f6;white-space:nowrap;cursor:pointer;text-decoration:none;border-bottom:1px dashed rgba(59,130,246,.4);transition:all .15s}
+.td-phone-link:hover{color:#2563eb;border-bottom-color:#2563eb}
+
+/* Chat Modal */
+.chat-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;animation:fadeIn .15s}
+.chat-overlay.open{display:flex}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.chat-modal{background:var(--white);border:1px solid var(--border);border-radius:16px;width:520px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,.35);overflow:hidden}
+body.light .chat-modal{box-shadow:0 12px 48px rgba(0,0,0,.15)}
+.chat-modal-hdr{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.chat-hdr-info{flex:1;min-width:0}
+.chat-hdr-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-hdr-sub{font-size:11px;color:var(--text-3)}
+.chat-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0}
+.chat-close:hover{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08)}
+.chat-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:4px;min-height:200px}
+.chat-body::-webkit-scrollbar{width:4px}
+.chat-body::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:4px}
+.chat-empty{text-align:center;padding:40px 20px;color:var(--text-3);font-size:13px}
+.chat-loading{text-align:center;padding:40px 20px;color:var(--text-3);font-size:12px}
+
+/* Chat bubbles */
+.cb-row{display:flex;margin-bottom:2px}
+.cb-row.from-cust{justify-content:flex-start}
+.cb-row.from-bot{justify-content:flex-end}
+.cb-bubble{max-width:80%;padding:8px 12px;border-radius:12px;font-size:12.5px;line-height:1.5;word-break:break-word;position:relative}
+.cb-row.from-cust .cb-bubble{background:rgba(59,130,246,.1);color:var(--text);border-bottom-left-radius:4px}
+.cb-row.from-bot .cb-bubble{background:rgba(34,197,94,.1);color:var(--text);border-bottom-right-radius:4px}
+.cb-row.from-sys{justify-content:center}
+.cb-row.from-sys .cb-bubble{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#f59e0b;font-size:11px;padding:4px 12px;border-radius:20px;max-width:90%}
+.cb-time{font-size:10px;color:var(--text-3);margin-top:2px}
+.cb-row.from-cust .cb-time{text-align:left}
+.cb-row.from-bot .cb-time{text-align:right}
+.cb-label{font-size:10px;font-weight:600;margin-bottom:2px;color:var(--text-3)}
+.cb-day{text-align:center;font-size:10px;font-weight:600;color:var(--text-3);padding:8px 0 4px;letter-spacing:.5px}
+
 /* Responsive */
 @media(max-width:768px){
   .top-bar{padding:10px 14px;gap:8px}
@@ -242,6 +280,23 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
     </table>
   </div>
 
+</div>
+
+<!-- Chat Modal -->
+<div class="chat-overlay" id="chat-overlay" onclick="if(event.target===this)closeChatModal()">
+  <div class="chat-modal">
+    <div class="chat-modal-hdr">
+      <div class="chat-av" id="cm-av">?</div>
+      <div class="chat-hdr-info">
+        <div class="chat-hdr-name" id="cm-name">—</div>
+        <div class="chat-hdr-sub" id="cm-sub">—</div>
+      </div>
+      <button class="chat-close" onclick="closeChatModal()" title="Tutup">&times;</button>
+    </div>
+    <div class="chat-body" id="cm-body">
+      <div class="chat-empty">Klik nomor WA di tabel untuk lihat percakapan</div>
+    </div>
+  </div>
 </div>
 
 <script src="js/config.js"></script>
@@ -385,7 +440,7 @@ let allOrders = [], prodMap = {}, custMap = {}, prodList = [];
 
 async function init() {
   const [orders, custs, prods] = await Promise.all([
-    sbFetch('orders_new', '?select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,created_at&order=created_at.desc'),
+    sbFetch('orders_new', '?select=id,customer_id,conversation_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,created_at&order=created_at.desc'),
     sbFetch('customers', '?select=id,wa_number,nama,catatan'),
     sbFetch('products', '?select=id,nama,harga,persona_cs_nama'),
   ]);
@@ -459,7 +514,7 @@ function render() {
       <td class="td-no">${fmtDt(o.created_at)}</td>
       <td class="td-wrap-sm" title="${escH(prodName)}">${escH(prodName)}</td>
       <td class="td-name" title="${escH(custName)}">${escH(custName)}</td>
-      <td class="td-phone">${escH(phone)}</td>
+      <td>${o.customer_id ? `<a class="td-phone-link" data-cid="${o.customer_id}" data-convid="${o.conversation_id||''}" data-nama="${escH(custName)}" data-phone="${escH(phone)}" onclick="openChatFromEl(this)" title="Lihat percakapan">${escH(phone)}</a>` : `<span class="td-phone">${escH(phone)}</span>`}</td>
       <td class="td-wrap" title="${escH(alamat.jalan||'')}">${escH(alamat.jalan||'\u2014')}</td>
       <td class="td-wrap-sm">${escH(alamat.kelurahan||'\u2014')}</td>
       <td class="td-wrap-sm">${escH(alamat.kecamatan||'\u2014')}</td>
@@ -530,6 +585,86 @@ function exportExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'All Orders');
   XLSX.writeFile(wb, `all-orders-${new Date().toISOString().slice(0,10)}.xlsx`);
 }
+
+// ── CHAT MODAL ────────────────────────────────────────────
+const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#6366f1'];
+function chatAvatarColor(name) { let h=0; for(let i=0;i<(name||'').length;i++) h=name.charCodeAt(i)+((h<<5)-h); return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length]; }
+function chatInitials(name) { return (name||'?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'; }
+
+function openChatFromEl(el) {
+  openChat(el.dataset.cid, el.dataset.convid, el.dataset.nama, el.dataset.phone);
+}
+
+function closeChatModal() {
+  document.getElementById('chat-overlay').classList.remove('open');
+}
+
+async function openChat(customerId, conversationId, nama, phone) {
+  const overlay = document.getElementById('chat-overlay');
+  const body = document.getElementById('cm-body');
+  const avEl = document.getElementById('cm-av');
+  const color = chatAvatarColor(nama);
+
+  avEl.textContent = chatInitials(nama);
+  avEl.style.background = color;
+  document.getElementById('cm-name').textContent = nama || '\u2014';
+  document.getElementById('cm-sub').textContent = phone ? `WhatsApp \xb7 ${phone}` : '\u2014';
+  body.innerHTML = '<div class="chat-loading">Memuat percakapan...</div>';
+  overlay.classList.add('open');
+
+  try {
+    // Cari conversation: pakai conversation_id dari order, atau cari by customer_id
+    let convId = conversationId;
+    if (!convId) {
+      const convs = await sbFetch('conversations', `?customer_id=eq.${customerId}&order=created_at.desc&limit=1&select=id`);
+      convId = convs[0]?.id;
+    }
+
+    if (!convId) {
+      body.innerHTML = '<div class="chat-empty">Belum ada percakapan untuk customer ini</div>';
+      return;
+    }
+
+    const msgs = await sbFetch('conv_messages',
+      `?conversation_id=eq.${convId}&order=created_at.asc&limit=500&select=role,isi,created_at`);
+
+    if (!msgs || !msgs.length) {
+      body.innerHTML = '<div class="chat-empty">Percakapan kosong</div>';
+      return;
+    }
+
+    // Group messages by date
+    let html = '';
+    let lastDate = '';
+    msgs.forEach(m => {
+      const dt = new Date(m.created_at);
+      const dateStr = dt.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric', timeZone:'Asia/Jakarta'});
+      if (dateStr !== lastDate) {
+        html += `<div class="cb-day">${dateStr}</div>`;
+        lastDate = dateStr;
+      }
+      const time = dt.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta'});
+      const safe = (m.isi||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+
+      if (m.role === 'system') {
+        html += `<div class="cb-row from-sys"><div class="cb-bubble">${safe}</div></div>`;
+      } else if (m.role === 'customer') {
+        html += `<div class="cb-row from-cust"><div><div class="cb-bubble">${safe}</div><div class="cb-time">${time}</div></div></div>`;
+      } else {
+        const label = m.role === 'cs' ? '\uD83D\uDC64 CS' : '\uD83E\uDD16 AI';
+        html += `<div class="cb-row from-bot"><div><div class="cb-label">${label}</div><div class="cb-bubble">${safe}</div><div class="cb-time">${time}</div></div></div>`;
+      }
+    });
+
+    body.innerHTML = html;
+    body.scrollTop = body.scrollHeight;
+  } catch(e) {
+    body.innerHTML = `<div class="chat-empty">Error: ${e.message}</div>`;
+  }
+}
+
+// Close on Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChatModal(); });
 
 // ── INIT ───────────────────────────────────────────────────
 init();
