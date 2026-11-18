@@ -524,7 +524,7 @@ async function init() {
   const orderMap = {};
   (orders||[]).forEach(o => { if (!orderMap[o.conversation_id]) orderMap[o.conversation_id] = o; });
 
-  allLeads = convs || [];
+  allLeads = (convs || []).filter(c => c.state?.is_form_lead);
   // Filter: semua conversation yang status selesai (sama dengan dashboard)
   allConvs = (convs||[]).filter(c => c.status === 'selesai');
   // Attach order data ke conversation
