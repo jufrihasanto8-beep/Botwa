@@ -830,7 +830,7 @@ async function getKelurahanByKecamatan(kecamatan, kabupaten) {
 // Contoh: "sewon kak" → "sewon", "pendowoharjo ya" → "pendowoharjo"
 function cleanKelInput(msg) {
   return msg.trim().toLowerCase()
-    .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis|sudah|udah|betul|bener|benar|yep|yup|boleh|lanjut|yoi)\b/g, '')
+    .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis|sudah|sdh|udah|betul|bener|benar|yep|yup|boleh|lanjut|yoi|ini)\b/g, '')
     .replace(/\s+/g, ' ').trim();
 }
 
@@ -842,6 +842,14 @@ function isConfirmation(msg) {
   const kata   = '(iya|ya|yakin|bener|betul|ok|oke|okey|yep|yup|iyah|bnar|benar|yes|confirm|bisa|boleh|lanjut|siap|yoi|iyaa|yaa|udah|sudah)';
   // "iya", "iya kak", "benar bu", "iya benar kak", "ya udah lanjut", dll
   return new RegExp(`^${kata}(\\s+${kata})?(\\s+${sapaan})?$`).test(lower);
+}
+
+// Cek apakah pesan MENGANDUNG kata konfirmasi (tidak harus seluruh pesan)
+// Untuk kasus campuran seperti "Kel.Dr. Sutomo.Sby.ini sdh benar"
+function containsConfirmation(msg) {
+  const lower = msg.toLowerCase().replace(/[.,!?]+/g, ' ').trim();
+  const konfirmasiWords = /\b(iya|ya|yakin|bener|betul|ok|oke|okey|yep|yup|iyah|benar|yes|confirm|bisa|boleh|lanjut|siap|yoi|udah|sudah|sdh)\b/;
+  return konfirmasiWords.test(lower);
 }
 
 /* ── PEMBULATAN ke kelipatan terdekat ────────────────────── */
@@ -2832,7 +2840,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     // ── Deteksi lokasi dari pesan customer (hanya aktif kalau flag waiting_for_location nyala) ──
     // Flag di-set setelah AI nanya alamat/wilayah ke customer
-    if (convState.waiting_for_location && !convState.ongkir && !isConfirmation(message)) {
+    if (convState.waiting_for_location && !convState.ongkir && !isConfirmation(message) && !(proposedWilayah && containsConfirmation(message))) {
       console.log(`[location] waiting_for_location aktif, extract dari: "${message.slice(0,80)}"`);
       const lokasi = await extractLokasiHaiku(message, userAnthropicKey);
       console.log(`[location] Haiku extract:`, lokasi);
@@ -2911,7 +2919,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       }
     }
 
-    if (proposedWilayah && isConfirmation(message) && !convState.ongkir && !convState.pending_kecamatan) {
+    if (proposedWilayah && containsConfirmation(message) && !convState.ongkir && !convState.pending_kecamatan) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
       const hasil = await hitungOngkir(proposedWilayah, product, parseInt(convState.qty) || 1, userMngAreaId);
       if (hasil) {
