@@ -36,6 +36,9 @@
     },
     "api/qc-transfer.js": {
       "maxDuration": 60
+    },
+    "api/validate-order.js": {
+      "maxDuration": 60
     }
   },
   "crons": []
