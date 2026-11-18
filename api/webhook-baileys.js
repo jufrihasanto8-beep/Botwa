@@ -2919,7 +2919,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       }
     }
 
-    if (proposedWilayah && containsConfirmation(message) && !convState.ongkir && !convState.pending_kecamatan) {
+    // pending_kecamatan tidak lagi memblokir — kalau proposed_wilayah sudah spesifik (ada kelurahan),
+    // customer konfirmasi → langsung hitung ongkir. pending_kecamatan akan di-clear di bawah.
+    if (proposedWilayah && containsConfirmation(message) && !convState.ongkir) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
       const hasil = await hitungOngkir(proposedWilayah, product, parseInt(convState.qty) || 1, userMngAreaId);
       if (hasil) {
