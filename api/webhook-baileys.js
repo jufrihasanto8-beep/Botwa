@@ -2087,6 +2087,17 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
             }
           }
 
+          // ── Trigger validation agent (fire-and-forget) ──
+          if (insertedOrderId) {
+            const validateUrl = `https://${req.headers.host}/api/validate-order`;
+            fetch(validateUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET || '' },
+              body: JSON.stringify({ order_id: insertedOrderId }),
+            }).catch(e => console.error('[validate-trigger] Fire-and-forget error:', e.message));
+            console.log(`[validate-trigger] Triggered for order ${insertedOrderId}`);
+          }
+
           console.log(`Order confirmed oleh customer ${wa_number} — percakapan ditutup`);
           return res.status(200).json({ ok: true, action: 'order_closed' });
 

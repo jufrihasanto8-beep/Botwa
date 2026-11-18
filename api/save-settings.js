@@ -4,6 +4,7 @@
  */
 const SUPABASE_URL        = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const CRON_SECRET          = process.env.CRON_SECRET;
 
 const sbH = {
   'Content-Type': 'application/json',
@@ -348,6 +349,15 @@ module.exports = async function handler(req, res) {
       // Kalau ada convPatch sekaligus (closing manual), patch conversations juga
       if (convId && convPatch) {
         await sbReq('PATCH', `conversations?id=eq.${convId}`, convPatch);
+      }
+      // Trigger validation agent untuk closing manual
+      if (table === 'orders_new' && data?.[0]?.id) {
+        const host = req.headers.host || 'csadsy.vercel.app';
+        fetch(`https://${host}/api/validate-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET || '' },
+          body: JSON.stringify({ order_id: data[0].id }),
+        }).catch(e => console.error('[validate-trigger] Error:', e.message));
       }
     } else if (action === 'update') {
       if (!id) return res.status(400).json({ error: 'id wajib untuk update' });
