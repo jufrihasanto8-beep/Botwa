@@ -759,6 +759,45 @@ Isi field yang ada saja, kosongkan yang tidak disebutkan. Jangan mengarang.`;
   } catch { return null; }
 }
 
+/* ── AI MATCH KELURAHAN — pakai Sonnet untuk analisis jawaban customer ── */
+// Kalau pending_kecamatan aktif dan customer jawab, kirim 1 pesan ke AI
+// dengan list candidates → AI pilihkan kelurahan yang dimaksud
+async function aiMatchKelurahan(customerMsg, candidates, kecamatan, kabupaten, apiKey, baseUrl = null) {
+  if (!apiKey || !candidates?.length) return null;
+  const base = baseUrl || ANTHROPIC_BASE;
+  const prompt = `Customer sedang ditanya kelurahan di Kec. ${kecamatan}, ${kabupaten}.
+Daftar kelurahan yang valid: ${candidates.join(', ')}
+
+Customer menjawab: "${customerMsg}"
+
+Kelurahan mana yang dimaksud customer? Pertimbangkan typo, singkatan, atau ejaan tidak baku.
+Jawab HANYA dengan nama kelurahan persis dari daftar di atas, atau "null" jika benar-benar tidak bisa ditentukan.`;
+  try {
+    const res = await fetch(`${base}/v1/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 50, messages: [{ role: 'user', content: prompt }] }),
+    });
+    const data = await res.json();
+    const raw = (data.content?.[0]?.text || '').trim().replace(/^["']|["']$/g, '');
+    if (!raw || raw === 'null') return null;
+    // Pastikan jawaban AI memang ada di candidates
+    const matched = candidates.find(c => c.toLowerCase() === raw.toLowerCase());
+    if (matched) {
+      console.log(`[aiMatchKel] "${customerMsg}" → "${matched}" (Sonnet match)`);
+      return matched;
+    }
+    // Fallback: cek partial match (AI mungkin jawab sedikit beda format)
+    const partial = candidates.find(c => raw.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(raw.toLowerCase()));
+    if (partial) {
+      console.log(`[aiMatchKel] "${customerMsg}" → "${partial}" (partial match from "${raw}")`);
+      return partial;
+    }
+    console.log(`[aiMatchKel] "${customerMsg}" → AI jawab "${raw}" tapi tidak ada di candidates`);
+    return null;
+  } catch(e) { console.error('[aiMatchKel] Error:', e.message); return null; }
+}
+
 /* ── NORMALISASI ANGKA → HURUF untuk nama wilayah Indonesia ── */
 const ANGKA_MAP = { '1':'Satu','2':'Dua','3':'Tiga','4':'Empat','5':'Lima','6':'Enam','7':'Tujuh','8':'Delapan','9':'Sembilan','10':'Sepuluh',
   '11':'Sebelas','12':'Dua Belas','13':'Tiga Belas','14':'Empat Belas','15':'Lima Belas' };
@@ -1530,7 +1569,7 @@ ${(product?.nama || 'PRODUK').toUpperCase()} ${qty} CS ${cs}
 KELUHAN: ${keluhan || 'tidak disebutkan'}`.trim();
 }
 
-function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, satuan, isCOD, ekspLabel, harga, ongkirAsli, ongkirPromo, feeCOD }) {
+function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, satuan, isCOD, ekspLabel, harga, ongkirAsli, ongkirPromo, feeCOD, rekening }) {
   const satuanLabel = satuan || 'pcs';
   const h  = harga       || 0;
   const op = ongkirPromo || 0;
@@ -1545,6 +1584,11 @@ function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, sat
     : `Rp ${op.toLocaleString('id-ID')}`;
 
   const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+
+  // Kalau Transfer, langsung tampilin rekening di konfirmasi
+  const rekeningBlock = (!isCOD && rekening)
+    ? `\n\nSilakan transfer ke:\n${rekening}\n\nKalau sudah transfer, kirim bukti TF-nya ya kak 🙏`
+    : '';
 
   return `✅ *Konfirmasi Order ${productNama || 'Produk'}*
 
@@ -1562,7 +1606,7 @@ function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, sat
 *Harga Produk:* ${fmt(h)}
 *Ongkir:* ${ongkirStr}${adaDiskonOngkir ? ` 🎉` : ''}${isCOD && fc > 0 ? `\n*Admin COD:* ${fmt(fc)}` : ''}
 *Pembayaran:* ${isCOD ? 'COD' : 'Transfer'} ${ekspLabel}
-*Total Pembayaran:* ${fmt(total)}
+*Total Pembayaran:* ${fmt(total)}${rekeningBlock}
 
 Sudah bener kak? 😊`;
 }
@@ -2004,11 +2048,14 @@ Isi field yang berubah saja, sisanya null.` }],
           ongkirAsli:  snap.ongkirAsli  || snap.ongkirPromo || 0,
           ongkirPromo: snap.ongkirPromo || 0,
           feeCOD:      snap.feeCOD      || 0,
+          rekening:    !isCOD ? userRekening : null,
         });
 
         await updateConvState(conversation.id, {
           awaiting_order_confirm: true,
           awaiting_order_correction: false,
+          order_confirmed_at: new Date().toISOString(),
+          confirm_fu_stage: 0,
           order_snapshot: snap,
         });
         const { wamid: wamid_cu } = await sendWA(waSession, reply_jid, confirmUlang).catch(()=>({}));
@@ -2031,20 +2078,25 @@ Isi field yang berubah saja, sisanya null.` }],
         const isQuestion = message.includes('?') || /^(apa|gimana|berapa|kapan|kenapa|bagaimana|apakah|udah|sudah|ada|bisa|boleh|kalau)/i.test(msgLower);
 
         if (isQuestion && !isConfirm && !isDeny) {
-          // Customer nanya hal lain (bukan konfirmasi/nolak) → teruskan ke Claude, ingatkan soal order di akhir sistem prompt
-          // Tidak ubah state — tetap awaiting_order_confirm
+          // Customer nanya hal lain (bukan konfirmasi/nolak) → teruskan ke Claude
+          // Reset timer FU supaya 30 menit mulai dari interaksi terakhir, bukan dari konfirmasi awal
+          await updateConvState(conversation.id, {
+            order_confirmed_at: new Date().toISOString(),
+            confirm_fu_stage: 0,
+          });
           // Fall through ke Claude di bawah (sudah ada inject konteks awaiting_order_confirm di system prompt)
         } else if (isConfirm) {
           // ── Cek metode bayar: Transfer → jangan closing dulu, tunggu bukti TF ──
           const snapMetode = (convState.order_snapshot?.metode || convState.metode_bayar || 'cod').toLowerCase();
           if (snapMetode === 'transfer' || snapMetode === 'tf') {
-            // Transfer: simpan order_snapshot tapi JANGAN closing — tunggu bukti TF
+            // Transfer: simpan order_snapshot tapi JANGAN closing — tunggu bukti TF + ACC finance
             await updateConvState(conversation.id, {
               awaiting_order_confirm: false,
               awaiting_bukti_tf: true,
               order_snapshot: convState.order_snapshot,
             });
-            const tfMsg = `Siap kak, pesanannya sudah kami catat! 📝\n\nSilakan transfer ke:\n${userRekening || '(hubungi CS untuk info rekening)'}\n\nKalau sudah transfer, kirim bukti TF-nya ya kak 🙏`;
+            // Rekening sudah ada di pesan konfirmasi, cukup kasih pesan singkat
+            const tfMsg = `Siap kak, pesanannya sudah kami catat! 📝 Ditunggu bukti TF-nya ya kak 🙏`;
             const { wamid: wamid_tf } = await sendWA(waSession, reply_jid, tfMsg).catch(()=>({}));
             await saveMessage(conversation.id, 'ai', tfMsg, wamid_tf);
             return res.status(200).json({ ok: true, action: 'awaiting_bukti_tf' });
@@ -2242,7 +2294,11 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
           await saveMessage(conversation.id, 'ai', tanyaKoreksi, wamid_tk);
           return res.status(200).json({ ok: true, action: 'awaiting_correction' });
         }
-        // Kalau ambigu (tidak jelas iya/tidak) → lanjut ke Claude biasa
+        // Kalau ambigu (tidak jelas iya/tidak) → reset timer FU, lanjut ke Claude biasa
+          await updateConvState(conversation.id, {
+            order_confirmed_at: new Date().toISOString(),
+            confirm_fu_stage: 0,
+          });
       }
     }
 
@@ -2354,8 +2410,9 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
         const wd = convState.wilayah_data;
         const hasilAuto = await hitungOngkir(wd, product, parseInt(convState.qty) || 1, userMngAreaId);
         if (hasilAuto) {
-          await updateConvState(conversation.id, { ongkir: hasilAuto });
+          await updateConvState(conversation.id, { ongkir: hasilAuto, waiting_for_location: false });
           convState.ongkir = hasilAuto;
+          convState.waiting_for_location = false;
           autoLoadedOngkir = hasilAuto;
           console.log(`[auto-load] ✅ Ongkir dihitung dari wilayah_data: ${wd.kelurahan}, ${wd.kecamatan}`);
         }
@@ -2370,8 +2427,9 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
         const ongkirInput = convState.wilayah_data || convState.wilayah;
         const freshOngkir = await hitungOngkir(ongkirInput, product, parseInt(convState.qty) || 1, userMngAreaId);
         if (freshOngkir) {
-          await updateConvState(conversation.id, { ongkir: freshOngkir });
+          await updateConvState(conversation.id, { ongkir: freshOngkir, waiting_for_location: false });
           convState.ongkir = freshOngkir;
+          convState.waiting_for_location = false;
           console.log(`Ongkir di-refresh: ${convState.wilayah} → asli ${freshOngkir.ongkirAsli} promo ${freshOngkir.ongkirPromo}`);
           // Update customers.alamat juga (biar selalu sinkron)
           if (customer?.id && freshOngkir.area?.kecamatan) {
@@ -2814,6 +2872,19 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             }
           }
 
+          // 5. AI Match (Sonnet) — analisis pesan customer langsung, handle typo/bahasa natural
+          if (!byKel.length) {
+            const allKel = byKel.length ? [] : await getKelurahanByKecamatan(pendingKec.kecamatan, pendingKec.kabupaten);
+            if (allKel.length > 0) {
+              const aiMatch = await aiMatchKelurahan(message, allKel, pendingKec.kecamatan, pendingKec.kabupaten, aiKey, aiBase);
+              if (aiMatch) {
+                byKel = await sbGet('wilayah_id',
+                  `?kelurahan=ilike.${encodeURIComponent(aiMatch)}&kecamatan=ilike.${encodeURIComponent(pendingKec.kecamatan)}&kabupaten=ilike.${encodeURIComponent(pendingKec.kabupaten)}&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
+                ).catch(() => []);
+              }
+            }
+          }
+
           hasil = byKel;
           if (byKel.length > 0) {
             console.log(`[pendingKec] "${message}" (clean:"${kwClean}") → ${byKel.length} hasil di ${pendingKec.kecamatan}`);
@@ -2855,8 +2926,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
             const hasilOngkir = await hitungOngkir(wilayahKonfirm, product, parseInt(convState.qty) || 1, userMngAreaId).catch(() => null);
             if (hasilOngkir) {
-              await updateConvState(conversation.id, { ongkir: hasilOngkir });
+              await updateConvState(conversation.id, { ongkir: hasilOngkir, waiting_for_location: false });
               convState.ongkir = hasilOngkir;
+              convState.waiting_for_location = false;
 
               // 3. Update customers.alamat dengan data ongkir lengkap
               if (customer?.id) {
@@ -3069,9 +3141,10 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       const wd = convState.wilayah_data;
       const hasil = await hitungOngkir(wd, product, parseInt(convState.qty) || 1, userMngAreaId);
       if (hasil) {
-        await updateConvState(conversation.id, { ongkir: hasil, proposed_wilayah: null, pending_kecamatan: null });
+        await updateConvState(conversation.id, { ongkir: hasil, proposed_wilayah: null, pending_kecamatan: null, waiting_for_location: false });
         convState.ongkir = hasil;
         convState.pending_kecamatan = null;
+        convState.waiting_for_location = false;
         autoOngkirResult = { wilayah: `${wd.kelurahan}, ${wd.kecamatan}, ${wd.kabupaten}`, hasil };
         if (customer?.id) {
           const alamatBaru = { ...(customer.alamat || {}), kelurahan: wd.kelurahan, kecamatan: wd.kecamatan, kabupaten: wd.kabupaten, provinsi: wd.provinsi, ekspedisi: hasil.ekspedisi, ongkirAsli: hasil.ongkirAsli, ongkirPromo: hasil.ongkirPromo, feeCOD: hasil.feeCOD, harga: hasil.harga };
@@ -3092,7 +3165,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       const hasil = await hitungOngkir(ongkirInput, product, parseInt(convState.qty) || 1, userMngAreaId);
       if (hasil) {
         const wilayahStr = validasi.valid ? `${validasi.row.kelurahan}, ${validasi.row.kecamatan}, ${validasi.row.kabupaten}, ${validasi.row.provinsi}` : proposedWilayah;
-        const stateUpdate = { wilayah: wilayahStr, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasil };
+        const stateUpdate = { wilayah: wilayahStr, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasil, waiting_for_location: false };
         if (validasi.valid) stateUpdate.wilayah_data = validasi.row;
         await updateConvState(conversation.id, stateUpdate);
         Object.assign(convState, stateUpdate);
@@ -3925,8 +3998,9 @@ ${ongkirInfo}`;
       const totalOrder      = isCOD ? harga + ongkirPromo + feeCOD : harga + ongkirPromo;
       const orderSnapshot   = { alamat, area, qty, metode, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD, total: totalOrder, keluhan: orderDataParsed.keluhan || latestState.keluhan || '' };
       await updateConvState(conversation.id, {
-        order_placed: true,
         awaiting_order_confirm: true,
+        order_confirmed_at: new Date().toISOString(),
+        confirm_fu_stage: 0,
         ongkir: confirmedOngkir,
         order_snapshot: orderSnapshot,
       });
@@ -3939,6 +4013,7 @@ ${ongkirInfo}`;
           satuan: product?.satuan,
           isCOD, ekspLabel,
           harga, ongkirAsli, ongkirPromo, feeCOD,
+          rekening: !isCOD ? userRekening : null,
         });
         const { wamid: wamid_cm } = await sendWA(waSession, reply_jid, confirmMsg).catch(()=>({}));
         await saveMessage(conversation.id, 'ai', confirmMsg, wamid_cm);

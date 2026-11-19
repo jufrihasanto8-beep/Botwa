@@ -8,6 +8,18 @@ const ANTHROPIC_KEY     = process.env.ANTHROPIC_KEY;
 const SUPABASE_URL      = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
+const MWAPI_BASE     = 'https://api.mwapi.dev';
+const ANTHROPIC_BASE = 'https://api.anthropic.com';
+
+function resolveAI(product, userAnthropicKey) {
+  if (product?.ai_api_key) {
+    const base = product.ai_provider === 'mwapi' ? MWAPI_BASE : ANTHROPIC_BASE;
+    return { key: product.ai_api_key, base };
+  }
+  if (userAnthropicKey) return { key: userAnthropicKey, base: ANTHROPIC_BASE };
+  return { key: ANTHROPIC_KEY, base: ANTHROPIC_BASE };
+}
+
 /* ── FETCH WITH TIMEOUT ───────────────────────────────────── */
 async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   const controller = new AbortController();
@@ -141,11 +153,15 @@ module.exports = async function handler(req, res) {
   const { action, messages, product, userId, hari, tipe } = body || {};
   console.log('[ai-suggest] action:', action, 'hari:', hari, 'body_type:', typeof req.body);
 
+  // ── Resolve AI provider (mwapi / anthropic) ──
+  const userKey = await getUserAnthropicKey(userId);
+  const ai = resolveAI(product, userKey);
+  const apiKey  = ai.key || ANTHROPIC_KEY;
+  const aiBase  = ai.base;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
+
   // ── ACTION: generate teks follow-up ──
   if (action === 'followup-text') {
-    const userKey = await getUserAnthropicKey(userId);
-    const apiKey  = userKey || ANTHROPIC_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
 
     const hariKe   = hari || 2;
     const image_url = body.image_url || null;
@@ -188,7 +204,7 @@ Tulis pesannya langsung, tanpa penjelasan.`;
       : prompt;
 
     try {
-      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      const response = await fetchWithTimeout(`${aiBase}/v1/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({
@@ -207,13 +223,10 @@ Tulis pesannya langsung, tanpa penjelasan.`;
 
   // ── ACTION: analytics insights ──
   if (action === 'analytics-insights') {
-    const userKey = await getUserAnthropicKey(userId);
-    const apiKey  = userKey || ANTHROPIC_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
     const { prompt: insightPrompt } = body;
     if (!insightPrompt) return res.status(400).json({ error: 'prompt wajib' });
     try {
-      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      const response = await fetchWithTimeout(`${aiBase}/v1/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content: insightPrompt }] }),
@@ -229,10 +242,6 @@ Tulis pesannya langsung, tanpa penjelasan.`;
   if (!messages?.length) return res.status(400).json({ error: 'messages wajib' });
 
   const { convState = {}, customerAlamat = {} } = body || {};
-
-  const userKey = await getUserAnthropicKey(userId);
-  const apiKey  = userKey || ANTHROPIC_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_KEY belum diset' });
 
   // ── Detect skenario stuck ongkir ──────────────────────────────
   const fmt = n => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
@@ -396,7 +405,7 @@ Rules:
 - Baca seluruh konteks percakapan dan buat balasan yang RELEVAN dengan pesan terakhir${stateContext}${extraContext}${ongkirContext}`;
 
   try {
-    const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+    const response = await fetchWithTimeout(`${aiBase}/v1/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
