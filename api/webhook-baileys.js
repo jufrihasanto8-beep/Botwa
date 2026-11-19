@@ -3899,6 +3899,21 @@ ${ongkirInfo}`;
       const ekspLabel   = ekspedisi.toUpperCase();
       // Resolve harga bundling sesuai qty yang confirmed (lebih akurat dari ongkirData.harga yg dihitung saat WILAYAH_OK)
       const harga       = resolveHargaBundling(product, qty) || ongkirData?.harga || custAlamat?.harga || product?.harga || 0;
+
+      // ── Recalculate ongkir jika qty berubah (diskon ongkir per qty bisa beda) ──
+      // Ongkir di state dihitung saat wilayah dikonfirmasi — qty saat itu mungkin berbeda
+      const ongkirQtyLama = ongkirData?.harga || 0;
+      if (ongkirData && product && harga !== ongkirQtyLama && (convState.wilayah_data || convState.wilayah || latestState.wilayah)) {
+        try {
+          const wilayahInput = latestState.wilayah_data || convState.wilayah_data || latestState.wilayah || convState.wilayah;
+          const freshOngkir = await hitungOngkir(wilayahInput, product, qty, userMngAreaId);
+          if (freshOngkir) {
+            ongkirData = freshOngkir;
+            console.log(`[ORDER_CONFIRMED] Ongkir re-calc qty=${qty}: asli ${freshOngkir.ongkirAsli} promo ${freshOngkir.ongkirPromo}`);
+          }
+        } catch(e) { console.error('[ORDER_CONFIRMED] Ongkir re-calc error:', e.message); }
+      }
+
       const ongkirAsli  = ongkirData?.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
       const ongkirPromo = ongkirData?.ongkirPromo || custAlamat?.ongkirPromo || 0;
       // Recalculate feeCOD pakai harga bundling yang benar — Transfer selalu 0
