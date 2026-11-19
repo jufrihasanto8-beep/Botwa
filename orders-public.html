@@ -22,8 +22,8 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
 .btn-export{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;background:#22c55e;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-decoration:none}
 .btn-export:hover{background:#16a34a}
 .theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.filter-select{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;min-width:140px}
-.filter-select:focus{outline:none;border-color:#3b82f6}
+.filter-select{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;min-width:140px;outline:none}
+.filter-select:focus{border-color:#3b82f6}
 .top-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
 /* Date range picker */
@@ -443,13 +443,13 @@ function drpNav(dir) {
 }
 
 // ── DATA ──────────────────────────────────────────────────
-let allConvs = [], allLeads = [];
-let prodMap = {}, custMap = {}, convMap = {}, userMap = {};
+let allOrders = [], allLeads = [];
+let prodMap = {}, userMap = {};
 let donutChart = null, barChart = null;
 
 function filterByRange(list) {
-  return list.filter(c => {
-    const d = new Date(c._orderDate || c.created_at);
+  return list.filter(o => {
+    const d = new Date(o.created_at);
     return d >= filterStart && d <= filterEnd;
   });
 }
@@ -461,20 +461,16 @@ function filterLeadsByRange(leads) {
 }
 
 async function init() {
-  // Fetch ALL data (no user_id filter)
-  const [users, convs, custs, prods, orders] = await Promise.all([
-    sbFetch('cs_team', '?select=id,name&order=name'),
-    sbFetch('conversations', '?select=id,user_id,customer_id,product_id,status,state,last_msg_at,created_at&order=last_msg_at.desc'),
-    sbFetch('customers', '?select=id,wa_number,nama'),
-    sbFetch('products', '?aktif=eq.true&select=id,user_id,nama,harga'),
-    sbFetch('orders_new', '?select=id,user_id,conversation_id,customer_id,product_id,qty,harga,ongkir_after_promo,fee_cod,total,metode,ekspedisi,created_at&order=created_at.desc')
+  // Fetch ALL data tanpa user_id filter — sama kayak all-orders.html
+  const [orders, prods, users, convs] = await Promise.all([
+    sbFetch('orders_new', '?select=id,user_id,customer_id,conversation_id,product_id,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,metode,ekspedisi,customer_nama,customer_phone,product_nama,created_at&order=created_at.desc'),
+    sbFetch('products', '?select=id,nama,harga'),
+    sbFetch('users', '?select=id,name&order=name'),
+    sbFetch('conversations', '?select=id,user_id,product_id,state,created_at')
   ]);
 
-  // Build maps
-  (users || []).forEach(u => { userMap[u.id] = u; });
-  (custs || []).forEach(c => { custMap[c.id] = c; });
   (prods || []).forEach(p => { prodMap[p.id] = p; });
-  (convs || []).forEach(c => { convMap[c.id] = c; });
+  (users || []).forEach(u => { userMap[u.id] = u; });
 
   // Populate user filter dropdown
   const userSelect = document.getElementById('filter-user');
@@ -485,7 +481,7 @@ async function init() {
     userSelect.appendChild(opt);
   });
 
-  // Populate product filter dropdown (unique product names)
+  // Populate product filter dropdown
   const prodSelect = document.getElementById('filter-product');
   const seenProds = new Set();
   (prods || []).forEach(p => {
@@ -498,22 +494,10 @@ async function init() {
     }
   });
 
-  // Lead = form lead, !skipped
-  allLeads = (convs || []).filter(c => c.state?.is_form_lead && !c.state?.skipped);
+  allOrders = orders || [];
 
-  // Closing from orders_new
-  allConvs = (orders || []).map(o => {
-    const conv = convMap[o.conversation_id] || {};
-    return {
-      ...conv,
-      id: conv.id || o.conversation_id,
-      user_id: o.user_id || conv.user_id,
-      customer_id: conv.customer_id || o.customer_id,
-      product_id: conv.product_id || o.product_id,
-      _order: o,
-      _orderDate: o.created_at,
-    };
-  });
+  // Lead = conversations with is_form_lead && !skipped
+  allLeads = (convs || []).filter(c => c.state?.is_form_lead && !c.state?.skipped);
 
   render();
 }
@@ -522,15 +506,15 @@ function render() {
   const userFilter = document.getElementById('filter-user').value;
   const prodFilter = document.getElementById('filter-product').value;
 
-  let filtered = allConvs;
+  let filtered = allOrders;
   let filteredLeads = allLeads;
 
   if (userFilter) {
-    filtered = filtered.filter(c => c.user_id === userFilter);
+    filtered = filtered.filter(o => o.user_id === userFilter);
     filteredLeads = filteredLeads.filter(c => c.user_id === userFilter);
   }
   if (prodFilter) {
-    filtered = filtered.filter(c => c.product_id === prodFilter);
+    filtered = filtered.filter(o => o.product_id === prodFilter);
     filteredLeads = filteredLeads.filter(c => c.product_id === prodFilter);
   }
 
@@ -543,20 +527,16 @@ function render() {
 function calcStats(list, leadsFiltered) {
   let gross = 0, codCount = 0, codRp = 0, tfCount = 0, tfRp = 0, totalQty = 0;
 
-  list.forEach(c => {
-    const ord = c._order || {};
-    const st = c.state || {};
-    const snap = st.order_snapshot || {};
-    const prod = prodMap[c.product_id] || {};
-    const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
-    const harga = ord.harga || snap.harga || prod.harga || 0;
-    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
-    const nilai = ord.total || snap.total || (harga + ongkir + feeCod);
+  list.forEach(o => {
+    const qty = parseInt(o.qty || 1);
+    const harga = o.harga || prodMap[o.product_id]?.harga || 0;
+    const ongkir = o.ongkir_after_promo ?? o.ongkir ?? 0;
+    const feeCod = o.fee_cod ?? 0;
+    const nilai = o.total || (harga * qty + ongkir + feeCod);
     gross += nilai;
     totalQty += qty;
 
-    const metode = (ord.metode || snap.metode || st.metode_bayar || 'cod').toLowerCase();
+    const metode = (o.metode || 'cod').toLowerCase();
     if (metode === 'transfer') { tfCount++; tfRp += nilai; }
     else { codCount++; codRp += nilai; }
   });
@@ -577,21 +557,18 @@ function calcStats(list, leadsFiltered) {
 
   const userFilter = document.getElementById('filter-user').value;
   const prodFilter = document.getElementById('filter-product').value;
-  let prevFiltered = allConvs;
-  if (userFilter) prevFiltered = prevFiltered.filter(c => c.user_id === userFilter);
-  if (prodFilter) prevFiltered = prevFiltered.filter(c => c.product_id === prodFilter);
+  let prevFiltered = allOrders;
+  if (userFilter) prevFiltered = prevFiltered.filter(o => o.user_id === userFilter);
+  if (prodFilter) prevFiltered = prevFiltered.filter(o => o.product_id === prodFilter);
 
-  const prevList = prevFiltered.filter(c => { const d=new Date(c._orderDate||c.created_at); return d>=prevStart&&d<prevEnd; });
+  const prevList = prevFiltered.filter(o => { const d=new Date(o.created_at); return d>=prevStart&&d<prevEnd; });
   let prevGross = 0;
-  prevList.forEach(c => {
-    const ord = c._order || {};
-    const st = c.state || {};
-    const snap = st.order_snapshot || {};
-    const prod = prodMap[c.product_id] || {};
-    const harga = ord.harga || snap.harga || prod.harga || 0;
-    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
-    prevGross += ord.total || snap.total || (harga + ongkir + feeCod);
+  prevList.forEach(o => {
+    const harga = o.harga || prodMap[o.product_id]?.harga || 0;
+    const qty = parseInt(o.qty || 1);
+    const ongkir = o.ongkir_after_promo ?? o.ongkir ?? 0;
+    const feeCod = o.fee_cod ?? 0;
+    prevGross += o.total || (harga * qty + ongkir + feeCod);
   });
   const prevTotal = prevList.length;
 
@@ -621,9 +598,8 @@ function makeBadge(cur, prev, isCount) {
 
 function renderCharts(list) {
   let cod = 0, tf = 0;
-  list.forEach(c => {
-    const ord = c._order || {};
-    const m = (ord.metode || c.state?.metode_bayar || 'cod').toLowerCase();
+  list.forEach(o => {
+    const m = (o.metode || 'cod').toLowerCase();
     if (m === 'transfer') tf++; else cod++;
   });
   const total = cod + tf || 1;
@@ -647,8 +623,8 @@ function renderCharts(list) {
 
   // Bar chart top produk
   const prodCount = {};
-  list.forEach(c => {
-    const pname = prodMap[c.product_id]?.nama || 'Produk Lain';
+  list.forEach(o => {
+    const pname = o.product_nama || prodMap[o.product_id]?.nama || 'Produk Lain';
     prodCount[pname] = (prodCount[pname] || 0) + 1;
   });
   const sorted = Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
@@ -683,22 +659,19 @@ function renderTable(list) {
     return;
   }
 
-  tbody.innerHTML = list.map(c => {
-    const cu   = custMap[c.customer_id] || {};
-    const nama = cu.nama || cu.wa_number || 'Pelanggan';
-    const prod = prodMap[c.product_id] || {};
-    const st   = c.state || {};
-    const snap = st.order_snapshot || {};
-    const ord  = c._order || {};
-    const qty  = parseInt(ord.qty || snap.qty || st.qty || 1);
-    const harga = ord.harga || snap.harga || prod.harga || 0;
-    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
-    const nilai = ord.total || snap.total || ((harga * qty) + ongkir + feeCod);
-    const metode = (ord.metode || snap.metode || st.metode_bayar || 'cod').toLowerCase();
+  tbody.innerHTML = list.map(o => {
+    const nama = o.customer_nama || 'Pelanggan';
+    const phone = o.customer_phone || '—';
+    const prodNama = o.product_nama || prodMap[o.product_id]?.nama || '(produk lama)';
+    const qty  = parseInt(o.qty || 1);
+    const harga = o.harga || prodMap[o.product_id]?.harga || 0;
+    const ongkir = o.ongkir_after_promo ?? o.ongkir ?? 0;
+    const feeCod = o.fee_cod ?? 0;
+    const nilai = o.total || (harga * qty + ongkir + feeCod);
+    const metode = (o.metode || 'cod').toLowerCase();
     const color = avColor(nama);
     const ini   = avInit(nama);
-    const userName = userMap[c.user_id]?.name || '—';
+    const userName = userMap[o.user_id]?.name || '—';
 
     return `<tr>
       <td><span class="bdg-user">${escH(userName)}</span></td>
@@ -707,17 +680,17 @@ function renderTable(list) {
           <div class="c-av" style="background:${color}">${escH(ini)}</div>
           <div>
             <div style="font-weight:600">${escH(nama)}</div>
-            <div style="font-size:11px;color:var(--text-3)">${escH(cu.wa_number ? cu.wa_number.split('@')[0] : '—')}</div>
+            <div style="font-size:11px;color:var(--text-3)">${escH(phone)}</div>
           </div>
         </div>
       </td>
       <td>
-        <div style="font-weight:500">${escH(prod.nama || snap.produk || st.keluhan || '(produk lama)')}</div>
+        <div style="font-weight:500">${escH(prodNama)}</div>
         <div style="font-size:11px;color:var(--text-3)">×${qty} · @${rp(harga)} · ongkir ${rp(ongkir)}</div>
       </td>
       <td><span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'Transfer':'COD'}</span></td>
       <td style="font-weight:700;color:var(--text)">${rp(nilai)}</td>
-      <td style="color:var(--text-3);font-size:12px">${fmtDt(c._orderDate)}</td>
+      <td style="color:var(--text-3);font-size:12px">${fmtDt(o.created_at)}</td>
     </tr>`;
   }).join('');
 }
@@ -725,32 +698,27 @@ function renderTable(list) {
 function exportCSV() {
   const userFilter = document.getElementById('filter-user').value;
   const prodFilter = document.getElementById('filter-product').value;
-  let filtered = allConvs;
-  if (userFilter) filtered = filtered.filter(c => c.user_id === userFilter);
-  if (prodFilter) filtered = filtered.filter(c => c.product_id === prodFilter);
+  let filtered = allOrders;
+  if (userFilter) filtered = filtered.filter(o => o.user_id === userFilter);
+  if (prodFilter) filtered = filtered.filter(o => o.product_id === prodFilter);
   const list = filterByRange(filtered);
   if (!list.length) return alert('Tidak ada data untuk diekspor.');
 
-  const rows = [['User','Nama','WA','Produk','Qty','Harga Produk','Ongkir','Total','Metode','Waktu Closing']];
-  list.forEach(c => {
-    const cu = custMap[c.customer_id] || {};
-    const prod = prodMap[c.product_id] || {};
-    const st = c.state || {};
-    const snap = st.order_snapshot || {};
-    const ord = c._order || {};
-    const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
-    const harga = ord.harga || snap.harga || prod.harga || 0;
-    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
-    const nilai = ord.total || snap.total || ((harga * qty) + ongkir + feeCod);
-    const metode = (ord.metode || snap.metode || st.metode_bayar || 'COD').toUpperCase();
+  const rows = [['User','Nama','HP','Produk','Qty','Harga','Ongkir','Total','Metode','Waktu Closing']];
+  list.forEach(o => {
+    const qty = parseInt(o.qty || 1);
+    const harga = o.harga || prodMap[o.product_id]?.harga || 0;
+    const ongkir = o.ongkir_after_promo ?? o.ongkir ?? 0;
+    const feeCod = o.fee_cod ?? 0;
+    const nilai = o.total || (harga * qty + ongkir + feeCod);
+    const metode = (o.metode || 'COD').toUpperCase();
     rows.push([
-      userMap[c.user_id]?.name || '—',
-      cu.nama || '—',
-      cu.wa_number?.split('@')[0] || '—',
-      prod.nama || snap.produk || '—',
+      userMap[o.user_id]?.name || '—',
+      o.customer_nama || '—',
+      o.customer_phone || '—',
+      o.product_nama || prodMap[o.product_id]?.nama || '—',
       qty, harga, ongkir, nilai, metode,
-      fmtDt(c._orderDate)
+      fmtDt(o.created_at)
     ]);
   });
 
