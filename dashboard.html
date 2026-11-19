@@ -352,6 +352,7 @@ body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
 .ch-status-badge.eskalasi{background:rgba(239,68,68,.1);color:#fca5a5;border-color:rgba(239,68,68,.2)}
 .ch-status-badge.selesai{background:rgba(34,197,94,.1);color:#86efac;border-color:rgba(34,197,94,.2)}
 .ch-status-badge.live{background:rgba(34,197,94,.1);color:#86efac;border-color:rgba(34,197,94,.2)}
+.ch-status-badge.cancelled{background:rgba(107,114,128,.1);color:#9ca3af;border-color:rgba(107,114,128,.2)}
 
 #messages-area{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
 #messages-area::-webkit-scrollbar{width:4px}
@@ -1233,8 +1234,9 @@ async function renderInbox() {
     const isEsc   = conv.status === 'eskalasi';
     const isLive  = conv.status === 'baru' || conv.status === 'diproses';
     const isDone  = conv.status === 'selesai';
+    const isCancelled = conv.state?.is_cancelled;
     const isNew   = isDone && conv.state?.has_new_message;
-    const tags    = `<span class="ctag wa">WA</span>${isLive?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone?'<span class="ctag ai">Closing</span>':''}`;
+    const tags    = `<span class="ctag wa">WA</span>${isLive && !isCancelled?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone?'<span class="ctag ai">Closing</span>':''}${isCancelled?'<span class="ctag eskalasi">Cancel</span>':''}`;
     const unreadDot = (conv.status === 'baru' || isNew) ? '<div class="conv-unread"></div>' : '';
     return `<div class="conv-item${activeConvId===conv.id?' active':''}" onclick="selectConv('${conv.id}')">
       <div class="conv-av" style="background:${color}">${initials(nama)}</div>
@@ -1314,7 +1316,9 @@ async function renderChat() {
 
   // Status badge
   const statusArea = document.getElementById('ch-status-area');
-  if (activeConv.status === 'eskalasi') {
+  if (activeConv.state?.is_cancelled) {
+    statusArea.innerHTML = `<div class="ch-status-badge cancelled">❌ Cancelled</div>`;
+  } else if (activeConv.status === 'eskalasi') {
     statusArea.innerHTML = `<div class="ch-status-badge eskalasi" onclick="resumeAI()">⚠️ Eskalasi <span style="font-size:10px;opacity:.7;margin-left:4px">Klik untuk aktifkan AI</span></div>`;
   } else if (activeConv.status === 'selesai') {
     statusArea.innerHTML = `<div class="ch-status-badge selesai">✅ Selesai</div>`;
@@ -1371,7 +1375,8 @@ async function renderChat() {
 
     const st = activeConv.status;
     const stEl = document.getElementById('cm-status');
-    if (st === 'eskalasi') { stEl.textContent = 'Eskalasi'; stEl.className = 'cm-value cm-status-eskalasi'; }
+    if (activeConv.state?.is_cancelled) { stEl.textContent = 'Cancelled'; stEl.className = 'cm-value cm-status-eskalasi'; }
+    else if (st === 'eskalasi') { stEl.textContent = 'Eskalasi'; stEl.className = 'cm-value cm-status-eskalasi'; }
     else if (st === 'selesai') { stEl.textContent = 'Selesai'; stEl.className = 'cm-value cm-status-selesai'; }
     else { stEl.textContent = 'Live'; stEl.className = 'cm-value cm-status-live'; }
 
