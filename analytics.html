@@ -567,9 +567,9 @@ async function init() {
   // Render stat cards
   document.getElementById('stat-grid').innerHTML = `
     <div class="stat-box blue">
-      <div class="s-lbl">💬 Total percakapan</div>
-      <div class="s-num">${convs.length}</div>
-      <div class="s-sub">sepanjang waktu</div>
+      <div class="s-lbl">📩 Lead</div>
+      <div class="s-num">${totalLead}</div>
+      <div class="s-sub">form lead masuk</div>
       <div class="s-spark"><canvas id="spark-conv" height="36"></canvas></div>
     </div>
     <div class="stat-box green">
@@ -599,7 +599,7 @@ async function init() {
 
   // Render sparklines
   const leadSpark = [];
-  for (let i=6;i>=0;i--){const d=new Date(Date.now()-i*864e5);const s=new Date(d);s.setHours(0,0,0,0);const e=new Date(d);e.setHours(23,59,59,999);leadSpark.push(convsRange.filter(c=>new Date(c.created_at)>=s&&new Date(c.created_at)<=e).length);}
+  for (let i=6;i>=0;i--){const d=new Date(Date.now()-i*864e5);const s=new Date(d);s.setHours(0,0,0,0);const e=new Date(d);e.setHours(23,59,59,999);leadSpark.push(convsRange.filter(c=>c.state?.is_form_lead&&!c.state?.skipped&&new Date(c.created_at)>=s&&new Date(c.created_at)<=e).length);}
   setTimeout(() => {
     renderSpark('spark-conv',    leadSpark, 'rgb(59,130,246)');
     renderSpark('spark-closing', sparkData, 'rgb(34,197,94)');
