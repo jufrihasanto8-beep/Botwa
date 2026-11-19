@@ -223,8 +223,8 @@ body.light .prod-all.active{background:rgba(59,130,246,.08);color:#2563eb}
 #stats-row{background:#161b22;border-bottom:1px solid rgba(255,255,255,.06);padding:0 20px;height:72px;display:flex;gap:6px;flex-shrink:0;overflow-x:auto;overflow-y:hidden;align-items:center}
 #stats-row::-webkit-scrollbar{height:3px}
 #stats-row::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
-.stat-card{flex:1;min-width:110px;height:62px;background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:0 10px;display:flex;align-items:center;gap:10px;transition:border-color .15s;cursor:default}
-.stat-card:hover{border-color:rgba(59,130,246,.3)}
+.stat-card{flex:1;min-width:110px;height:62px;background:#0d1117;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:0 10px;display:flex;align-items:center;gap:10px;transition:all .15s;cursor:pointer}
+.stat-card:hover{border-color:rgba(59,130,246,.3);background:#161b22;transform:translateY(-1px)}
 .stat-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
 .stat-icon.blue{background:rgba(59,130,246,.13);color:#3b82f6}
 .stat-icon.red{background:rgba(239,68,68,.13);color:#ef4444}
@@ -562,7 +562,7 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
 
   <!-- STATS ROW -->
   <div id="stats-row">
-    <div class="stat-card">
+    <div class="stat-card" onclick="clickStat('all')" style="cursor:pointer" title="Lihat semua percakapan">
       <div class="stat-icon blue">💬</div>
       <div class="stat-text">
         <div class="stat-label">Open Tickets</div>
@@ -570,7 +570,7 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
         <div class="stat-sub muted" id="st-open-sub">percakapan aktif</div>
       </div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" onclick="clickStat('eskalasi')" style="cursor:pointer" title="Lihat eskalasi">
       <div class="stat-icon red">⚠️</div>
       <div class="stat-text">
         <div class="stat-label">Eskalasi</div>
@@ -578,15 +578,15 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
         <div class="stat-sub danger" id="st-esc-sub">perlu penanganan</div>
       </div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" onclick="clickStat('live')" style="cursor:pointer" title="Lihat live chat">
       <div class="stat-icon purple">🤖</div>
       <div class="stat-text">
         <div class="stat-label">AI Response</div>
         <div class="stat-num" id="st-ai">0</div>
-        <div class="stat-sub ok" id="st-ai-sub">balasan AI hari ini</div>
+        <div class="stat-sub ok" id="st-ai-sub">balasan AI</div>
       </div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" onclick="clickStat('live')" style="cursor:pointer" title="Lihat sesi aktif">
       <div class="stat-icon green">⚡</div>
       <div class="stat-text">
         <div class="stat-label">Sesi Aktif</div>
@@ -594,12 +594,12 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
         <div class="stat-sub muted" id="st-aktif-sub">aktif dalam 24 jam</div>
       </div>
     </div>
-    <div class="stat-card">
-      <div class="stat-icon amber">👥</div>
+    <div class="stat-card" onclick="clickStat('selesai')" style="cursor:pointer" title="Lihat closing">
+      <div class="stat-icon amber">🏆</div>
       <div class="stat-text">
-        <div class="stat-label">Customer Unik</div>
-        <div class="stat-num" id="st-unik">0</div>
-        <div class="stat-sub muted" id="st-unik-sub">pelanggan hari ini</div>
+        <div class="stat-label">Closing</div>
+        <div class="stat-num" id="st-closing">0</div>
+        <div class="stat-sub muted" id="st-closing-sub">total closing</div>
       </div>
     </div>
     <div class="ai-engine-card">
@@ -631,9 +631,9 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
   <!-- FILTER BAR -->
   <div id="filter-bar">
     <button class="ftab active" onclick="setTab('all',this)" id="ftab-all">Semua <span class="fn" id="fn-all">0</span></button>
-    <button class="ftab eskalasi" onclick="setTab('eskalasi',this)">Eskalasi <span class="fn" id="fn-esc">0</span></button>
-    <button class="ftab" onclick="setTab('live',this)">Live <span class="fn" id="fn-live">0</span></button>
-    <button class="ftab" onclick="setTab('selesai',this)">Closing <span class="fn" id="fn-selesai">0</span></button>
+    <button class="ftab eskalasi" onclick="setTab('eskalasi',this)" id="ftab-eskalasi">Eskalasi <span class="fn" id="fn-esc">0</span></button>
+    <button class="ftab" onclick="setTab('live',this)" id="ftab-live">Live <span class="fn" id="fn-live">0</span></button>
+    <button class="ftab" onclick="setTab('selesai',this)" id="ftab-selesai">Closing <span class="fn" id="fn-selesai">0</span></button>
     <select class="filter-sort" onchange="setSortOrder(this.value)">
       <option value="desc">Terbaru</option>
       <option value="asc">Terlama</option>
@@ -1092,20 +1092,30 @@ async function loadStats() {
     if (!c.last_msg_at) return false;
     return (new Date() - new Date(c.last_msg_at)) < 86400000;
   }).length;
-  const custIds   = [...new Set(convs.map(c=>c.customer_id).filter(Boolean))];
-  const aiMsgs    = await sbGet('conv_messages', `?conversation_id=in.(${convs.map(c=>c.id).join(',') || 'null'})&role=eq.ai`).catch(()=>[]);
+  // AI response count: hitung dari conversation state (ada ai reply = punya last_msg_at + status bukan baru)
+  const aiResponded = convs.filter(c => c.last_msg_at && c.status !== 'baru').length;
+
+  // Closing count: dari orders_new dalam date range
+  let closingCount = 0;
+  try {
+    const convIds = convs.map(c => c.id).filter(Boolean);
+    if (convIds.length) {
+      const orders = await sbGet('orders_new', `?conversation_id=in.(${convIds.join(',')})&select=id`);
+      closingCount = orders.length;
+    }
+  } catch(e) { closingCount = selesai; }
 
   document.getElementById('st-open').textContent      = open;
   document.getElementById('st-eskalasi').textContent  = esc;
-  document.getElementById('st-ai').textContent        = aiMsgs.length||0;
+  document.getElementById('st-ai').textContent        = aiResponded;
   document.getElementById('st-aktif').textContent     = aktif;
-  document.getElementById('st-unik').textContent      = custIds.length;
+  document.getElementById('st-closing').textContent   = closingCount;
   document.getElementById('st-open-sub').textContent  = open + ' percakapan aktif';
   document.getElementById('st-esc-sub').textContent   = esc > 0 ? esc + ' perlu penanganan' : 'aman terkendali';
   document.getElementById('st-esc-sub').className     = 'stat-sub ' + (esc > 0 ? 'danger' : 'ok');
-  document.getElementById('st-ai-sub').textContent    = (aiMsgs.length||0) + ' balasan AI hari ini';
+  document.getElementById('st-ai-sub').textContent    = aiResponded + ' balasan AI';
   document.getElementById('st-aktif-sub').textContent = aktif + ' aktif dalam 24 jam';
-  document.getElementById('st-unik-sub').textContent  = custIds.length + ' pelanggan hari ini';
+  document.getElementById('st-closing-sub').textContent = closingCount + ' total closing';
   const lancar = convs.length > 0 ? Math.round(((convs.length-esc)/convs.length)*100)+'%' : '—';
 
   // Filter counts
@@ -1214,6 +1224,14 @@ function setTab(tab, btn) {
 }
 function setSortOrder(val) { sortOrder = val; renderInbox(); }
 function filterConvs(val) { searchFilter = val.toLowerCase(); renderInbox(); }
+
+function clickStat(tab) {
+  tabFilter = tab;
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('active'));
+  const tabBtn = document.querySelector(`#ftab-${tab}`) || document.querySelector(`.ftab[onclick*="${tab}"]`);
+  if (tabBtn) tabBtn.classList.add('active');
+  renderInbox();
+}
 
 /* ── SELECT CONVERSATION ── */
 async function selectConv(id) {
