@@ -349,8 +349,9 @@ function renderCards() {
         <button class="btn-acc" onclick="doApprove('${d.id}',this)">ACC</button>
         <button class="btn-rej" onclick="openRejectModal('${d.id}')">Tolak</button>
       </div>` : `
-      <div class="qc-done">
-        <b>${isApproved ? 'Di-ACC' : 'Ditolak'}</b> ${qcTime}${d.qc_note ? ` — ${esc(d.qc_note)}` : ''}
+      <div class="qc-done" style="display:flex;align-items:center;justify-content:space-between">
+        <div><b>${isApproved ? 'Di-ACC' : 'Ditolak'}</b> ${qcTime}${d.qc_note ? ` — ${esc(d.qc_note)}` : ''}</div>
+        ${d.conversation_id ? `<a class="qc-phone-link" style="font-size:11px" onclick="openChat('${esc(d.conversation_id)}','${esc(d.customer_id||'')}','${esc(d.customer_nama||'')}','${esc(d.customer_phone||'')}')">💬 Chat</a>` : ''}
       </div>`}
     </div>`;
   }).join('');
