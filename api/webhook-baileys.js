@@ -695,12 +695,16 @@ function extractProposedWilayah(aiMsg) {
 
     if (m) {
       let candidate = m[1].trim().replace(/[,?!]+$/, '');
+      // Strip kata wrapper wilayah: "Kelurahannya Kota Baru" → "Kota Baru"
+      candidate = candidate.replace(/\b(kelurahannya|kelurahan|desanya|desa|kecamatannya|kecamatan|kabupatennya|kabupaten|kotanya|provinsinya|provinsi|alamatnya|alamat|daerahnya|daerah|wilayahnya|wilayah)\b/gi, '').replace(/\s+/g, ' ').trim();
       // Kalau candidate diawali kata bukan-wilayah (misal "Baik kak, Sewon, Bantul") → strip prefix sebelum koma pertama
       if (BUKAN_WILAYAH.test(candidate)) {
         const firstComma = candidate.indexOf(',');
         if (firstComma > 0) candidate = candidate.slice(firstComma + 1).trim();
       }
       const wordCount = candidate.split(/\s+/).length;
+      // Filter: reject garbage ("atau kecamatan lain", "mana ya", dll)
+      if (/\b(atau|lain|mana|yang|belum|tidak|bukan|apakah)\b/i.test(candidate)) continue;
       // Filter dasar saja, validasi utama via Supabase
       if (candidate.length >= 3 && wordCount <= 8 && !BUKAN_WILAYAH.test(candidate)) {
         return candidate;
@@ -733,6 +737,96 @@ Isi field yang ada saja, kosongkan yang tidak disebutkan. Jangan mengarang.`;
     if (!parsed.kecamatan && !parsed.kabupaten && !parsed.kelurahan) return null;
     return parsed;
   } catch { return null; }
+}
+
+/* ── VALIDASI WILAYAH via DB wilayah_id ────────────────────── */
+// Terima object dari Haiku extract, validasi & lengkapi dari DB
+// Return: { valid: true, row: {kelurahan,kecamatan,kabupaten,provinsi}, missing: [] }
+//    atau { valid: false, row: partial|null, missing: ['kelurahan'|'kecamatan'|'kabupaten'], candidates: [...] }
+async function validateWilayahDB(lokasi) {
+  if (!lokasi) return { valid: false, row: null, missing: ['kelurahan','kecamatan','kabupaten'] };
+  const kel = (lokasi.kelurahan || '').trim();
+  const kec = (lokasi.kecamatan || '').trim();
+  const kab = (lokasi.kabupaten || '').trim();
+
+  // Case 1: ketiga field ada → cek exact match di DB
+  if (kel && kec && kab) {
+    const exact = await sbGet('wilayah_id',
+      `?kelurahan=ilike.${encodeURIComponent(kel)}&kecamatan=ilike.${encodeURIComponent(kec)}&kabupaten=ilike.*${encodeURIComponent(kab)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=1`
+    ).catch(() => []);
+    if (exact.length) return { valid: true, row: exact[0], missing: [] };
+    // Mungkin kelurahan typo → coba kec+kab aja, nanti tanya kelurahan
+    const kecKab = await sbGet('wilayah_id',
+      `?kecamatan=ilike.${encodeURIComponent(kec)}&kabupaten=ilike.*${encodeURIComponent(kab)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=20`
+    ).catch(() => []);
+    if (kecKab.length) {
+      // kec+kab valid tapi kelurahan ga cocok
+      const kelList = [...new Set(kecKab.map(r => r.kelurahan))];
+      return { valid: false, row: { kecamatan: kecKab[0].kecamatan, kabupaten: kecKab[0].kabupaten, provinsi: kecKab[0].provinsi }, missing: ['kelurahan'], candidates: kelList };
+    }
+  }
+
+  // Case 2: kecamatan + kabupaten ada, kelurahan kosong
+  if (kec && kab) {
+    const rows = await sbGet('wilayah_id',
+      `?kecamatan=ilike.${encodeURIComponent(kec)}&kabupaten=ilike.*${encodeURIComponent(kab)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=20`
+    ).catch(() => []);
+    if (rows.length) {
+      const kelList = [...new Set(rows.map(r => r.kelurahan))];
+      return { valid: false, row: { kecamatan: rows[0].kecamatan, kabupaten: rows[0].kabupaten, provinsi: rows[0].provinsi }, missing: ['kelurahan'], candidates: kelList };
+    }
+  }
+
+  // Case 3: kelurahan + kabupaten ada, kecamatan kosong → lookup
+  if (kel && kab) {
+    const rows = await sbGet('wilayah_id',
+      `?kelurahan=ilike.${encodeURIComponent(kel)}&kabupaten=ilike.*${encodeURIComponent(kab)}*&select=kelurahan,kecamatan,kabupaten,provinsi&limit=20`
+    ).catch(() => []);
+    const kecUnik = [...new Set(rows.map(r => r.kecamatan))];
+    if (kecUnik.length === 1) return { valid: true, row: rows[0], missing: [] };
+    if (kecUnik.length > 1) return { valid: false, row: { kelurahan: kel, kabupaten: rows[0].kabupaten, provinsi: rows[0].provinsi }, missing: ['kecamatan'], candidates: kecUnik };
+  }
+
+  // Case 4: kelurahan + kecamatan ada, kabupaten kosong → lookup
+  if (kel && kec) {
+    const rows = await sbGet('wilayah_id',
+      `?kelurahan=ilike.${encodeURIComponent(kel)}&kecamatan=ilike.${encodeURIComponent(kec)}&select=kelurahan,kecamatan,kabupaten,provinsi&limit=5`
+    ).catch(() => []);
+    if (rows.length === 1) return { valid: true, row: rows[0], missing: [] };
+    if (rows.length > 1) {
+      const kabList = [...new Set(rows.map(r => r.kabupaten))];
+      return { valid: false, row: { kelurahan: kel, kecamatan: kec }, missing: ['kabupaten'], candidates: kabList };
+    }
+  }
+
+  // Case 5: cuma kecamatan → cek berapa kabupaten
+  if (kec) {
+    const rows = await sbGet('wilayah_id',
+      `?kecamatan=ilike.${encodeURIComponent(kec)}&select=kelurahan,kecamatan,kabupaten,provinsi&limit=50`
+    ).catch(() => []);
+    const kabUnik = [...new Set(rows.map(r => r.kabupaten))];
+    if (kabUnik.length === 1) {
+      const kelList = [...new Set(rows.map(r => r.kelurahan))];
+      return { valid: false, row: { kecamatan: rows[0].kecamatan, kabupaten: rows[0].kabupaten, provinsi: rows[0].provinsi }, missing: ['kelurahan'], candidates: kelList };
+    }
+    if (kabUnik.length > 1) return { valid: false, row: { kecamatan: kec }, missing: ['kabupaten','kelurahan'], candidates: kabUnik };
+  }
+
+  // Case 6: cuma kelurahan → cek berapa kecamatan
+  if (kel) {
+    const rows = await sbGet('wilayah_id',
+      `?kelurahan=ilike.${encodeURIComponent(kel)}&select=kelurahan,kecamatan,kabupaten,provinsi&limit=50`
+    ).catch(() => []);
+    const kecUnik = [...new Set(rows.map(r => `${r.kecamatan}||${r.kabupaten}`))];
+    if (kecUnik.length === 1) return { valid: true, row: rows[0], missing: [] };
+    if (kecUnik.length > 1) {
+      const candidates = [...new Set(rows.map(r => `${r.kecamatan}, ${r.kabupaten}`))];
+      return { valid: false, row: { kelurahan: kel }, missing: ['kecamatan','kabupaten'], candidates };
+    }
+  }
+
+  // Case 7: cuma kabupaten atau ga ada sama sekali
+  return { valid: false, row: kab ? { kabupaten: kab } : null, missing: ['kelurahan','kecamatan','kabupaten'] };
 }
 
 /* ── SEARCH WILAYAH LOKAL (tabel wilayah_id di Supabase) ─── */
@@ -830,6 +924,7 @@ async function getKelurahanByKecamatan(kecamatan, kabupaten) {
 // Contoh: "sewon kak" → "sewon", "pendowoharjo ya" → "pendowoharjo"
 function cleanKelInput(msg) {
   return msg.trim().toLowerCase()
+    .replace(/\b(kelurahannya|kelurahan|desanya|desa|kecamatannya|kecamatan|kabupatennya|kabupaten|kotanya|kota|provinsinya|provinsi|alamatnya|alamat|daerah|daerahnya|wilayah|wilayahnya|di\s+daerah|dari)\b/gi, '')
     .replace(/\b(kak|bang|pak|bu|mbak|mas|kang|mba|ya|iya|ok|oke|siap|dong|deh|lah|nih|sih|gan|bro|sis|sudah|sdh|udah|betul|bener|benar|yep|yup|boleh|lanjut|yoi|ini)\b/g, '')
     .replace(/\s+/g, ' ').trim();
 }
@@ -886,12 +981,24 @@ async function mengantarFetch(path, timeoutMs = 20000) {
 }
 
 /* ── HITUNG ONGKIR via Mengantar public API ───────────────── */
-async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
-  console.log(`[hitungOngkir] START wilayah="${wilayah}" qty=${qty} originId=${userMngOriginId || MENGANTAR_ORIGIN_ID}`);
-  try {
-    // Step 1: Cari di tabel lokal wilayah_id
+// Terima object {kelurahan, kecamatan, kabupaten, provinsi} ATAU string (backward compat)
+async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = null) {
+  const stripKab = s => (s || '').replace(/^(kabupaten|kota|kab\.?)\s*/i, '').trim();
+  let lokal = null;
+
+  // ── Normalisasi input: object (preferred) vs string (legacy) ──
+  if (typeof wilayahInput === 'object' && wilayahInput !== null && (wilayahInput.kecamatan || wilayahInput.kelurahan)) {
+    // Object dari wilayah_data — sudah bersih, langsung pakai
+    lokal = wilayahInput;
+    console.log(`[hitungOngkir] START object: kel="${lokal.kelurahan}" kec="${lokal.kecamatan}" kab="${lokal.kabupaten}" qty=${qty}`);
+  } else {
+    // String legacy — strip prefix & cari di DB lokal
+    let wilayah = String(wilayahInput || '');
+    wilayah = wilayah.replace(/\b(kelurahannya|kelurahan|kel\.?|desanya|desa|ds\.?|kecamatannya|kecamatan|kec\.?|kabupatennya|kabupaten|kab\.?|kotanya|kota|provinsinya|provinsi|prov\.?|alamatnya|alamat|daerahnya|daerah|wilayahnya|wilayah)\b/gi, '').replace(/\s+/g, ' ').trim();
+    console.log(`[hitungOngkir] START string="${wilayah}" qty=${qty} originId=${userMngOriginId || MENGANTAR_ORIGIN_ID}`);
+
     const lokalMatch = await cariWilayah(wilayah, 3);
-    let lokal = lokalMatch[0] || null;
+    lokal = lokalMatch[0] || null;
     if (lokalMatch.length > 1) {
       const kw = wilayah.toLowerCase();
       const scored = lokalMatch.map(r => {
@@ -906,39 +1013,22 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
       scored.sort((a, b) => b.score - a.score);
       lokal = scored[0].row;
     }
+  }
 
-    // Step 2: Bangun query Mengantar
-    const stripKab = s => (s || '').replace(/^(kabupaten|kota|kab\.?)\s*/i, '').trim();
-    let queryMengantar = wilayah;
-    let queryDisplay   = wilayah;
-    if (lokal) {
-      queryMengantar = formatWilayahMengantar(lokal);
-      queryDisplay   = formatWilayah(lokal);
-      console.log(`[hitungOngkir] lokal: "${lokal.kelurahan}, ${lokal.kecamatan}, ${lokal.kabupaten}" → query: "${queryMengantar}"`);
-    }
-
-    // Step 3: Cari destination_id — dengan fallback query bertahap
-    // API baru lebih cocok dengan keyword tunggal (satu kata/frasa) daripada comma-separated
-    // Pecah wilayah string jadi bagian-bagian (format: kelurahan, kecamatan, kabupaten, provinsi)
-    const wParts = wilayah.split(',').map(s => s.trim()).filter(Boolean);
-    const [wKel = '', wKec = '', wKab = '', wProv = ''] = wParts;
-
+  try {
+    // ── Bangun query Mengantar ──
+    // Paling akurat: "kelurahan kecamatan" — 1 result tepat
     const queryFallbacks = lokal ? [
-      // Pakai data lokal yang sudah terstruktur
+      lokal.kelurahan && lokal.kecamatan ? `${lokal.kelurahan} ${lokal.kecamatan}` : null,
       lokal.kelurahan,
-      [lokal.kelurahan, lokal.kecamatan].filter(Boolean).join(' '),
       lokal.kecamatan,
-      [lokal.kecamatan, stripKab(lokal.kabupaten)].filter(Boolean).join(' '),
-    ] : [
-      // Tidak ada di DB lokal — gunakan parts dari wilayah string
-      // Prioritas: kelurahan+kecamatan dulu (paling spesifik), baru satu per satu
-      wKel && wKec ? `${wKel} ${wKec}` : null,
-      wKec && wKab ? `${wKec} ${stripKab(wKab)}` : null,
-      wKel,
-      wKec,
-    ].filter(Boolean);
+      lokal.kecamatan && lokal.kabupaten ? `${lokal.kecamatan} ${stripKab(lokal.kabupaten)}` : null,
+    ].filter(Boolean) : [String(wilayahInput || '')];
 
-    // Kirim semua query fallback secara parallel, gabung SEMUA hasil untuk scoring
+    let queryDisplay = lokal ? formatWilayah(lokal) : String(wilayahInput || '');
+    if (lokal) console.log(`[hitungOngkir] lokal: "${lokal.kelurahan}, ${lokal.kecamatan}, ${lokal.kabupaten}" → queries: ${queryFallbacks.join(' | ')}`);
+
+    // Kirim semua query fallback secara parallel
     const searchResults = await Promise.all(
       queryFallbacks.map(q =>
         mengantarFetch(`address/autofill?keyword=${encodeURIComponent(q)}`, 15000)
@@ -950,7 +1040,6 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
           .catch(() => [])
       )
     );
-    // Gabung semua hasil (deduplikasi by _id) untuk scoring komprehensif
     const seenIds = new Set();
     const allAreas = searchResults.flat().filter(a => {
       const id = a._id || a.id;
@@ -960,31 +1049,30 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
     });
 
     if (!allAreas.length) {
-      console.error(`[hitungOngkir] Semua search fallback gagal untuk "${queryMengantar}"`);
+      console.error(`[hitungOngkir] Semua search fallback gagal untuk "${queryDisplay}"`);
       return null;
     }
 
-    // Step 3b: Pilih area terbaik — scoring dari SEMUA hasil semua keyword
+    // ── Pilih area terbaik — scoring ──
     const normStr = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const aSubdistrict = a => a.SUBDISTRICT_NAME || a.subdistrict || '';
     const aDistrict    = a => a.DISTRICT_NAME    || a.district    || '';
     const aCity        = a => a.CITY_NAME        || a.city        || a.regency || '';
     const aProvince    = a => a.PROVINCE_NAME    || a.province    || '';
-    // Pecah wilayah penuh jadi parts untuk scoring (kelurahan, kecamatan, kabupaten, provinsi)
-    const wilayahParts = wilayah.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+
     let bestArea = allAreas[0], bestScore = -1;
     for (const a of allAreas) {
       let score = 0;
       if (lokal) {
         if (normStr(aSubdistrict(a)) === normStr(lokal.kelurahan)) score += 50;
-        else if (aSubdistrict(a).toLowerCase().includes(lokal.kelurahan.toLowerCase())) score += 30;
+        else if (lokal.kelurahan && aSubdistrict(a).toLowerCase().includes(lokal.kelurahan.toLowerCase())) score += 30;
         if (normStr(aDistrict(a)) === normStr(lokal.kecamatan)) score += 30;
-        else if (aDistrict(a).toLowerCase().includes(lokal.kecamatan.toLowerCase())) score += 15;
+        else if (lokal.kecamatan && aDistrict(a).toLowerCase().includes(lokal.kecamatan.toLowerCase())) score += 15;
         if (normStr(aCity(a)) === normStr(lokal.kabupaten)) score += 20;
         if (normStr(aProvince(a)) === normStr(lokal.provinsi)) score += 10;
       } else {
-        const aFull = [aSubdistrict(a), aDistrict(a), aCity(a), aProvince(a)].filter(Boolean).join(' ').toLowerCase();
-        for (const part of wilayahParts) {
+        const parts = String(wilayahInput || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+        for (const part of parts) {
           if (normStr(aSubdistrict(a)) === normStr(part)) score += 50;
           else if (aSubdistrict(a).toLowerCase().includes(part)) score += 25;
           if (normStr(aDistrict(a)) === normStr(part)) score += 30;
@@ -996,7 +1084,7 @@ async function hitungOngkir(wilayah, product, qty = 1, userMngOriginId = null) {
       }
       if (score > bestScore) { bestScore = score; bestArea = a; }
     }
-    const areas = allAreas; // untuk kompatibilitas log di bawah
+    const areas = allAreas;
 
     const areaId  = bestArea._id || bestArea.id;
     const areaNama = aSubdistrict(bestArea) || bestArea.name || wilayah;
@@ -2162,74 +2250,92 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       }
     }
 
-    // ── Auto-load wilayah: prioritas form_alamat (Haiku extract) → customer.alamat (inbound) ──
-    // Re-open conversation: TIDAK auto-load — customer mungkin ganti alamat, biarkan bot tanya natural
+    // ── Auto-load wilayah: extract dari form_alamat / customer.alamat → validasi DB → simpan ──
+    // TIDAK hitung ongkir di sini — cuma extract & simpan wilayah_data yang valid
+    // Re-open conversation: TIDAK auto-load — customer mungkin ganti alamat
     const isReopenedConv = !!(convState.reopened_at && !convState.wilayah);
     let autoLoadedOngkir = null;
-    if (!convState.wilayah && !isReopenedConv && product) {
+    if (!convState.wilayah_data && !convState.wilayah && !isReopenedConv && product) {
 
-      // Prioritas 1: form_alamat dari form lead — pakai Haiku AI extract (lebih akurat dari parseAlamat)
-      const hasFormAlamat = convState.is_form_lead && convState.form_alamat;
-
-      // Prioritas 2: customer.alamat — hanya untuk inbound baru (bukan form lead, bukan re-open)
-      const isInboundWithSavedAddress = !convState.is_form_lead
-        && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten;
-
-      let wilayahAuto = null;
+      let lokasi = null;
       let sumber = '';
 
+      // Prioritas 1: form_alamat dari form lead — pakai Haiku AI extract
+      const hasFormAlamat = convState.is_form_lead && convState.form_alamat;
       if (hasFormAlamat) {
-        // Gunakan Haiku AI untuk extract lokasi dari form_alamat (lebih reliable dari comma-split)
-        const lokasi = await extractLokasiHaiku(convState.form_alamat, userAnthropicKey).catch(() => null);
+        lokasi = await extractLokasiHaiku(convState.form_alamat, userAnthropicKey).catch(() => null);
         console.log(`[auto-load] Haiku extract form_alamat: "${convState.form_alamat}" →`, lokasi);
-        if (lokasi?.kecamatan || lokasi?.kabupaten) {
-          wilayahAuto = [lokasi.kelurahan, lokasi.kecamatan, lokasi.kabupaten].filter(Boolean).join(', ');
-          sumber = 'form_alamat (Haiku extract)';
-        }
-      } else if (isInboundWithSavedAddress) {
-        const alamatParts = [customer.alamat.kelurahan, customer.alamat.kecamatan, customer.alamat.kabupaten, customer.alamat.provinsi].filter(Boolean);
-        wilayahAuto = alamatParts.join(', ');
-        sumber = 'customer.alamat (inbound)';
+        sumber = 'form_alamat';
       }
 
-      if (wilayahAuto) {
-        try {
-          const hasilAuto = await hitungOngkir(wilayahAuto, product, parseInt(convState.qty) || 1, userMngAreaId);
-          if (hasilAuto) {
-            // Validasi silang: cek hasil ongkir cocok dengan alamat asli
-            // Cegah kasus "form isi Bekasi tapi ongkir dapet Sidrap"
-            const alamatRef = (convState.form_alamat || wilayahAuto).toLowerCase();
-            const hasilKota = (hasilAuto.area?.kota || '').toLowerCase().replace(/^(kabupaten|kota|kab\.?)\s*/i, '');
-            const hasilProv = (hasilAuto.area?.provinsi || '').toLowerCase();
-            const hasilKec  = (hasilAuto.area?.kecamatan || '').toLowerCase();
+      // Prioritas 2: customer.alamat — hanya untuk inbound baru
+      if (!lokasi && !convState.is_form_lead && customer?.alamat?.kecamatan && customer?.alamat?.kabupaten) {
+        lokasi = { kelurahan: customer.alamat.kelurahan, kecamatan: customer.alamat.kecamatan, kabupaten: customer.alamat.kabupaten };
+        sumber = 'customer.alamat';
+      }
 
-            // Minimal salah satu (kota/provinsi/kecamatan) harus ada di teks alamat asli
-            const kotaMatch = hasilKota && alamatRef.includes(hasilKota);
-            const provMatch = hasilProv && alamatRef.includes(hasilProv);
-            const kecMatch  = hasilKec  && alamatRef.includes(hasilKec);
+      if (lokasi) {
+        const validasi = await validateWilayahDB(lokasi);
+        console.log(`[auto-load] validateWilayahDB (${sumber}):`, JSON.stringify({ valid: validasi.valid, row: validasi.row, missing: validasi.missing }));
 
-            if (kotaMatch || provMatch || kecMatch) {
-              await updateConvState(conversation.id, { wilayah: wilayahAuto, ongkir: hasilAuto });
-              convState.wilayah = wilayahAuto;
-              convState.ongkir  = hasilAuto;
-              autoLoadedOngkir  = hasilAuto;
-              console.log(`[auto-load] ✅ Wilayah dari ${sumber}: ${wilayahAuto}`);
-            } else {
-              // Hasil ongkir tidak cocok dengan alamat form — jangan pakai, biar bot tanya
-              console.warn(`[auto-load] ❌ Validasi gagal! form="${alamatRef.slice(0,60)}" vs hasil="${hasilKota}, ${hasilProv}" — skip auto-ongkir`);
-              await updateConvState(conversation.id, { waiting_for_location: true });
-              convState.waiting_for_location = true;
-            }
+        if (validasi.valid) {
+          // Semua field match DB → simpan wilayah_data, siap hitung ongkir nanti
+          const wd = validasi.row;
+          const wilayahStr = `${wd.kelurahan}, ${wd.kecamatan}, ${wd.kabupaten}, ${wd.provinsi}`;
+          await updateConvState(conversation.id, {
+            wilayah_data: wd,
+            wilayah: wilayahStr,
+            waiting_for_location: false,
+            proposed_wilayah: null,
+            pending_kecamatan: null,
+          });
+          convState.wilayah_data = wd;
+          convState.wilayah = wilayahStr;
+          convState.waiting_for_location = false;
+          console.log(`[auto-load] ✅ Wilayah valid dari ${sumber}: ${wilayahStr}`);
+
+          // Simpan ke customers.alamat juga
+          if (customer?.id) {
+            const alamatBaru = { ...(customer.alamat || {}), kelurahan: wd.kelurahan, kecamatan: wd.kecamatan, kabupaten: wd.kabupaten, provinsi: wd.provinsi };
+            await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru }).catch(() => {});
+            customer.alamat = alamatBaru;
           }
-        } catch(e) { console.error('[auto-load] Gagal:', e.message); }
+        } else {
+          // Partial match → simpan apa yang ada + info field yang kurang
+          const stateUpdate = {
+            wilayah_data_partial: validasi.row || null,
+            wilayah_missing: validasi.missing || [],
+            wilayah_candidates: (validasi.candidates || []).slice(0, 10),
+            waiting_for_location: true,
+          };
+          await updateConvState(conversation.id, stateUpdate);
+          Object.assign(convState, stateUpdate);
+          console.log(`[auto-load] ⚠️ Wilayah partial dari ${sumber}, missing: ${validasi.missing?.join(', ')}`);
+        }
       }
+    }
+
+    // ── Auto hitung ongkir jika wilayah_data valid tapi ongkir belum ada ──
+    if (convState.wilayah_data && !convState.ongkir && product) {
+      try {
+        const wd = convState.wilayah_data;
+        const hasilAuto = await hitungOngkir(wd, product, parseInt(convState.qty) || 1, userMngAreaId);
+        if (hasilAuto) {
+          await updateConvState(conversation.id, { ongkir: hasilAuto });
+          convState.ongkir = hasilAuto;
+          autoLoadedOngkir = hasilAuto;
+          console.log(`[auto-load] ✅ Ongkir dihitung dari wilayah_data: ${wd.kelurahan}, ${wd.kecamatan}`);
+        }
+      } catch(e) { console.error('[auto-load] Ongkir gagal:', e.message); }
     }
 
     // ── Refresh ongkir jika wilayah sudah diketahui (ambil promo terbaru) ──
     // Skip kalau baru di-load oleh auto-load (tidak perlu hitung 2x)
-    if (convState.wilayah && product && !autoLoadedOngkir) {
+    // Prefer wilayah_data (object) over wilayah (string)
+    if ((convState.wilayah_data || convState.wilayah) && product && !autoLoadedOngkir) {
       try {
-        const freshOngkir = await hitungOngkir(convState.wilayah, product, parseInt(convState.qty) || 1, userMngAreaId);
+        const ongkirInput = convState.wilayah_data || convState.wilayah;
+        const freshOngkir = await hitungOngkir(ongkirInput, product, parseInt(convState.qty) || 1, userMngAreaId);
         if (freshOngkir) {
           await updateConvState(conversation.id, { ongkir: freshOngkir });
           convState.ongkir = freshOngkir;
@@ -2266,7 +2372,26 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       if (customer?.nama && customer.nama !== wa_number) ctx += `\n- Nama: ${customer.nama}`;
       if (savedKeluhan) ctx += `\n- Keluhan: ${savedKeluhan}`;
       if (savedAlamat)  ctx += `\n- Alamat: ${savedAlamat}`;
-      if (convState.wilayah) ctx += `\n- Wilayah pengiriman: ${convState.wilayah} (SUDAH DIKETAHUI — jangan tanya alamat/wilayah lagi)`;
+      if (convState.wilayah_data) {
+        const wd = convState.wilayah_data;
+        ctx += `\n- Wilayah pengiriman: ${wd.kelurahan}, ${wd.kecamatan}, ${wd.kabupaten}, ${wd.provinsi} (SUDAH VALID & DIKETAHUI — JANGAN tanya kelurahan/kecamatan/kabupaten lagi)`;
+      } else if (convState.wilayah_data_partial) {
+        const wp = convState.wilayah_data_partial;
+        const missing = convState.wilayah_missing || [];
+        const candidates = convState.wilayah_candidates || [];
+        ctx += `\n- Wilayah PARTIAL (belum lengkap):`;
+        if (wp.kelurahan) ctx += `\n  • Kelurahan: ${wp.kelurahan} ✅`;
+        if (wp.kecamatan) ctx += `\n  • Kecamatan: ${wp.kecamatan} ✅`;
+        if (wp.kabupaten) ctx += `\n  • Kabupaten: ${wp.kabupaten} ✅`;
+        if (wp.provinsi) ctx += `\n  • Provinsi: ${wp.provinsi} ✅`;
+        ctx += `\n  • KURANG: ${missing.join(', ')} — TANYAKAN field ini SAJA ke customer, jangan tanya yang sudah ada.`;
+        if (candidates.length > 0 && candidates.length <= 10) {
+          ctx += `\n  • Pilihan yang tersedia: ${candidates.join(', ')}`;
+          ctx += `\n  → Tawarkan pilihan ini ke customer, contoh: "Kelurahannya di ${candidates.slice(0,3).join(', ')}... yang mana ya kak?"`;
+        }
+      } else if (convState.wilayah) {
+        ctx += `\n- Wilayah pengiriman: ${convState.wilayah} (SUDAH DIKETAHUI — jangan tanya alamat/wilayah lagi)`;
+      }
       systemPrompt += ctx;
     }
 
@@ -2280,16 +2405,18 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
 
       if (convState.form_alamat) {
         formCtx += `\n- Alamat dari form: "${convState.form_alamat}"`;
-        if (convState.alamat_lengkap) {
-          formCtx += `\n  → Alamat LENGKAP. Tampilkan alamat ini ke customer untuk dikonfirmasi, contoh:`;
-          formCtx += `\n    "Kami konfirmasi alamat pengirimannya ya kak: 📍 ${convState.form_alamat} — sudah benar kak?"`;
-          formCtx += `\n  → Kalau customer bilang benar/iya → langsung proses (hitung ongkir, lanjut order).`;
-          formCtx += `\n  → JANGAN tanya alamat dari awal lagi.`;
+        if (convState.wilayah_data) {
+          formCtx += `\n  → Wilayah SUDAH VALID: ${convState.wilayah_data.kelurahan}, ${convState.wilayah_data.kecamatan}, ${convState.wilayah_data.kabupaten}`;
+          formCtx += `\n  → JANGAN tanya kelurahan/kecamatan/kabupaten lagi. Konfirmasi alamat lalu lanjut ke ongkir/metode bayar.`;
+          formCtx += `\n  → Contoh: "Siap kak! Alamat pengiriman ke 📍 ${convState.form_alamat} ya — sudah benar kak? 🙏"`;
+        } else if (convState.wilayah_missing?.length) {
+          const missing = convState.wilayah_missing;
+          formCtx += `\n  → Alamat dari form KURANG: ${missing.join(', ')} belum valid.`;
+          formCtx += `\n  → Tampilkan alamat form, lalu tanya HANYA field yang kurang: "${missing.join(' & ')}"`;
+          formCtx += `\n  → JANGAN tanya ulang seluruh alamat.`;
         } else {
-          formCtx += `\n  → Alamat KURANG LENGKAP (belum ada kecamatan/kabupaten).`;
-          formCtx += `\n  → Tampilkan alamat yang ada lalu minta customer melengkapi, contoh:`;
-          formCtx += `\n    "Dari form tadi alamatnya: ${convState.form_alamat} — boleh dilengkapin kak, kecamatan & kota/kabupatennya apa? 🙏"`;
-          formCtx += `\n  → JANGAN minta customer mengulang seluruh alamat dari awal.`;
+          formCtx += `\n  → Tampilkan alamat ini ke customer untuk dikonfirmasi.`;
+          formCtx += `\n  → JANGAN tanya alamat dari awal lagi.`;
         }
       }
 
@@ -2840,101 +2967,104 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
 
     // ── Deteksi lokasi dari pesan customer (hanya aktif kalau flag waiting_for_location nyala) ──
     // Flag di-set setelah AI nanya alamat/wilayah ke customer
-    if (convState.waiting_for_location && !convState.ongkir && !isConfirmation(message) && !(proposedWilayah && containsConfirmation(message))) {
+    if (convState.waiting_for_location && !convState.ongkir && !convState.wilayah_data && !isConfirmation(message) && !(proposedWilayah && containsConfirmation(message))) {
       console.log(`[location] waiting_for_location aktif, extract dari: "${message.slice(0,80)}"`);
       const lokasi = await extractLokasiHaiku(message, userAnthropicKey);
       console.log(`[location] Haiku extract:`, lokasi);
 
       if (lokasi?.kecamatan || lokasi?.kabupaten || lokasi?.kelurahan) {
-        // Bangun query ke wilayah_id dari hasil extract
-        const queryParts = [lokasi.kelurahan, lokasi.kecamatan, lokasi.kabupaten].filter(Boolean);
-        let cariHasil = await cariWilayah(queryParts.join(', '), 20);
+        // Gabung dengan partial data yang sudah ada (kalau customer jawab field yang kurang)
+        const partial = convState.wilayah_data_partial || {};
+        const merged = {
+          kelurahan: lokasi.kelurahan || partial.kelurahan || '',
+          kecamatan: lokasi.kecamatan || partial.kecamatan || '',
+          kabupaten: lokasi.kabupaten || partial.kabupaten || '',
+        };
 
-        // Fallback: coba kecamatan+kabupaten saja
-        if (!cariHasil.length && lokasi.kecamatan && lokasi.kabupaten) {
-          cariHasil = await cariWilayah(`${lokasi.kecamatan}, ${lokasi.kabupaten}`, 20);
-        }
-        // Fallback: coba kelurahan saja (customer jawab "Pendowoharjo" tanpa kecamatan)
-        if (!cariHasil.length && lokasi.kelurahan) {
-          cariHasil = await cariWilayah(lokasi.kelurahan, 20);
-        }
-        // Fallback: coba kecamatan saja
-        if (!cariHasil.length && lokasi.kecamatan) {
-          cariHasil = await cariWilayah(lokasi.kecamatan, 20);
-        }
+        const validasi = await validateWilayahDB(merged);
+        console.log(`[location] validateWilayahDB:`, JSON.stringify({ valid: validasi.valid, row: validasi.row, missing: validasi.missing }));
 
-        const kecUnik = [...new Set(cariHasil.map(r => `${r.kecamatan}||${r.kabupaten}`))];
-        const kelUnik = [...new Set(cariHasil.map(r => r.kelurahan))];
+        if (validasi.valid) {
+          // Semua field valid → simpan wilayah_data + hitung ongkir
+          const wd = validasi.row;
+          const wilayahStr = `${wd.kelurahan}, ${wd.kecamatan}, ${wd.kabupaten}, ${wd.provinsi}`;
+          const hasilOngkir = await hitungOngkir(wd, product, parseInt(convState.qty) || 1, userMngAreaId).catch(() => null);
 
-        if (kecUnik.length === 1) {
-          const w = cariHasil[0];
-          const wilayahBaru = `${w.kecamatan}, ${w.kabupaten}, ${w.provinsi}`;
+          const stateUpdate = {
+            wilayah_data: wd, wilayah: wilayahStr,
+            proposed_wilayah: null, pending_kecamatan: null,
+            waiting_for_location: false,
+            wilayah_data_partial: null, wilayah_missing: null, wilayah_candidates: null,
+          };
+          if (hasilOngkir) stateUpdate.ongkir = hasilOngkir;
+          await updateConvState(conversation.id, stateUpdate);
+          Object.assign(convState, stateUpdate);
+          proposedWilayah = null;
+          if (hasilOngkir) {
+            autoOngkirResult = { wilayah: wilayahStr, hasil: hasilOngkir, fromAddress: true };
+          }
+          console.log(`[location] ✅ Wilayah valid: ${wilayahStr}${hasilOngkir ? ' + ongkir OK' : ''}`);
 
-          // Simpan ke customers.alamat
           if (customer?.id) {
-            const alamatBaru = {
-              ...(customer.alamat || {}),
-              ...(w.kelurahan ? { kelurahan: w.kelurahan } : {}),
-              kecamatan: w.kecamatan, kabupaten: w.kabupaten, provinsi: w.provinsi,
-            };
+            const alamatBaru = { ...(customer.alamat || {}), kelurahan: wd.kelurahan, kecamatan: wd.kecamatan, kabupaten: wd.kabupaten, provinsi: wd.provinsi };
             await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru }).catch(() => {});
             customer.alamat = alamatBaru;
           }
-
-          if (kelUnik.length === 1) {
-            // Kelurahan spesifik → langsung hitung ongkir
-            const hasilOngkir = await hitungOngkir(wilayahBaru, product, parseInt(convState.qty) || 1, userMngAreaId).catch(() => null);
-            if (hasilOngkir) {
-              await updateConvState(conversation.id, { wilayah: wilayahBaru, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasilOngkir, waiting_for_location: false });
-              convState.wilayah = wilayahBaru;
-              convState.ongkir  = hasilOngkir;
-              convState.waiting_for_location = false;
-              proposedWilayah = null;
-              autoOngkirResult = { wilayah: wilayahBaru, hasil: hasilOngkir, fromAddress: true };
-              console.log(`[location] Ongkir berhasil: ${wilayahBaru}`);
-            } else {
-              // Hitung ongkir gagal → proposed, AI akan konfirmasi
-              await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru, waiting_for_location: false });
-              convState.proposed_wilayah = wilayahBaru;
-              convState.waiting_for_location = false;
-              proposedWilayah = wilayahBaru;
-            }
-          } else {
-            // Banyak kelurahan → simpan proposed, AI tanya kelurahan spesifik
-            console.log(`[location] ${kelUnik.length} kelurahan di ${wilayahBaru}, simpan proposed`);
-            await updateConvState(conversation.id, { proposed_wilayah: wilayahBaru, waiting_for_location: true });
-            convState.proposed_wilayah = wilayahBaru;
-            proposedWilayah = wilayahBaru;
-          }
-        } else if (kecUnik.length > 1) {
-          // Ambigu → biarkan AI tanya lebih spesifik, flag tetap aktif
-          console.log(`[location] Ambigu: ${kecUnik.length} kecamatan ditemukan, tunggu AI tanya lebih spesifik`);
         } else {
-          // Tidak ketemu di DB → flag tetap aktif, AI akan tanya ulang
-          console.log(`[location] Tidak ketemu di wilayah_id: ${JSON.stringify(lokasi)}`);
+          // Partial → simpan progress, AI akan tanya field yang kurang
+          const stateUpdate = {
+            wilayah_data_partial: validasi.row || partial,
+            wilayah_missing: validasi.missing || [],
+            wilayah_candidates: (validasi.candidates || []).slice(0, 10),
+            waiting_for_location: true,
+          };
+          await updateConvState(conversation.id, stateUpdate);
+          Object.assign(convState, stateUpdate);
+          console.log(`[location] ⚠️ Partial, missing: ${validasi.missing?.join(', ')}`);
         }
       } else {
-        // Haiku tidak nemukan lokasi (customer balas hal lain) → flag tetap aktif
         console.log(`[location] Tidak ada lokasi dalam pesan, waiting_for_location tetap aktif`);
       }
     }
 
     // pending_kecamatan tidak lagi memblokir — kalau proposed_wilayah sudah spesifik (ada kelurahan),
     // customer konfirmasi → langsung hitung ongkir. pending_kecamatan akan di-clear di bawah.
-    if (proposedWilayah && containsConfirmation(message) && !convState.ongkir) {
-      console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
-      const hasil = await hitungOngkir(proposedWilayah, product, parseInt(convState.qty) || 1, userMngAreaId);
+    // ── Auto-trigger ongkir: customer konfirmasi & wilayah_data sudah valid ──
+    // Prioritas: pakai wilayah_data (object bersih) kalau ada
+    if (convState.wilayah_data && !convState.ongkir && containsConfirmation(message)) {
+      console.log(`[autoOngkir] wilayah_data ada, trigger ongkir dari object bersih`);
+      const wd = convState.wilayah_data;
+      const hasil = await hitungOngkir(wd, product, parseInt(convState.qty) || 1, userMngAreaId);
       if (hasil) {
-        await updateConvState(conversation.id, {
-          wilayah: proposedWilayah,
-          proposed_wilayah: null,
-          pending_kecamatan: null,
-          ongkir: hasil,
-        });
+        await updateConvState(conversation.id, { ongkir: hasil, proposed_wilayah: null, pending_kecamatan: null });
+        convState.ongkir = hasil;
         convState.pending_kecamatan = null;
-        autoOngkirResult = { wilayah: proposedWilayah, hasil };
+        autoOngkirResult = { wilayah: `${wd.kelurahan}, ${wd.kecamatan}, ${wd.kabupaten}`, hasil };
+        if (customer?.id) {
+          const alamatBaru = { ...(customer.alamat || {}), kelurahan: wd.kelurahan, kecamatan: wd.kecamatan, kabupaten: wd.kabupaten, provinsi: wd.provinsi, ekspedisi: hasil.ekspedisi, ongkirAsli: hasil.ongkirAsli, ongkirPromo: hasil.ongkirPromo, feeCOD: hasil.feeCOD, harga: hasil.harga };
+          await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru }).catch(() => {});
+          customer.alamat = alamatBaru;
+        }
+      }
+    }
 
-        // Simpan ke customers.alamat (hanya overwrite field non-null dari API)
+    // Fallback: proposed_wilayah (legacy string) + konfirmasi
+    if (!autoOngkirResult && proposedWilayah && containsConfirmation(message) && !convState.ongkir) {
+      console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
+      // Coba validasi proposed_wilayah dulu via DB
+      const lokasiParsed = await extractLokasiHaiku(proposedWilayah, userAnthropicKey).catch(() => null);
+      const validasi = lokasiParsed ? await validateWilayahDB(lokasiParsed) : { valid: false };
+
+      const ongkirInput = validasi.valid ? validasi.row : proposedWilayah;
+      const hasil = await hitungOngkir(ongkirInput, product, parseInt(convState.qty) || 1, userMngAreaId);
+      if (hasil) {
+        const wilayahStr = validasi.valid ? `${validasi.row.kelurahan}, ${validasi.row.kecamatan}, ${validasi.row.kabupaten}, ${validasi.row.provinsi}` : proposedWilayah;
+        const stateUpdate = { wilayah: wilayahStr, proposed_wilayah: null, pending_kecamatan: null, ongkir: hasil };
+        if (validasi.valid) stateUpdate.wilayah_data = validasi.row;
+        await updateConvState(conversation.id, stateUpdate);
+        Object.assign(convState, stateUpdate);
+        autoOngkirResult = { wilayah: wilayahStr, hasil };
+
         if (customer?.id) {
           const alamatBaru = {
             ...(customer.alamat || {}),
@@ -2942,26 +3072,19 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             ...(hasil.area?.kecamatan ? { kecamatan: hasil.area.kecamatan } : {}),
             ...(hasil.area?.kota      ? { kabupaten: hasil.area.kota }      : {}),
             ...(hasil.area?.provinsi  ? { provinsi:  hasil.area.provinsi }  : {}),
-            ...(hasil.area?.kodePos   ? { kodepos:   hasil.area.kodePos }   : {}),
-            ekspedisi:   hasil.ekspedisi,
-            ongkirAsli:  hasil.ongkirAsli,
-            ongkirPromo: hasil.ongkirPromo,
-            feeCOD:      hasil.feeCOD,
-            harga:       hasil.harga,
+            ekspedisi: hasil.ekspedisi, ongkirAsli: hasil.ongkirAsli, ongkirPromo: hasil.ongkirPromo, feeCOD: hasil.feeCOD, harga: hasil.harga,
           };
-          await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru })
-            .catch(e => console.error('[autoOngkir] Gagal save customer.alamat:', e.message));
+          await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: alamatBaru }).catch(() => {});
           customer.alamat = alamatBaru;
         }
       } else {
-        // hitungOngkir gagal tapi wilayah sudah dikonfirmasi → inject hint ke Claude agar tulis [WILAYAH_OK:]
         console.warn(`[autoOngkir] hitungOngkir gagal untuk "${proposedWilayah}", inject hint WILAYAH_OK ke Claude`);
         history.push({ role: 'user', content: `[SISTEM] Customer mengkonfirmasi wilayah "${proposedWilayah}". WAJIB tulis [WILAYAH_OK:${proposedWilayah}] di balasanmu sekarang agar sistem bisa hitung ongkir.` });
       }
     }
 
     // ── Fallback: customer konfirmasi tapi proposed_wilayah null → coba extract dari last AI message ──
-    if (!proposedWilayah && !convState.ongkir && !convState.wilayah && isConfirmation(message)) {
+    if (!autoOngkirResult && !proposedWilayah && !convState.ongkir && !convState.wilayah && !convState.wilayah_data && isConfirmation(message)) {
       const lastAiFallback = [...history].reverse().find(h => h.role === 'assistant');
       if (lastAiFallback?.content) {
         const extracted = extractProposedWilayah(lastAiFallback.content);
