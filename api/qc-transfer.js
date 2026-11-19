@@ -365,6 +365,16 @@ module.exports = async function handler(req, res) {
 /* ── REMINDER HANDLER (cron tiap 15 menit) ────────────────── */
 async function handleReminder(res) {
   try {
+    // ── Cek jam kerja WIB (08:30 - 16:00) ──
+    const nowR = new Date();
+    const jamWIB  = (nowR.getUTCHours() + 7) % 24;
+    const menitWIB = nowR.getUTCMinutes();
+    const wibMinutes = jamWIB * 60 + menitWIB; // total menit dari 00:00
+    if (wibMinutes < 510 || wibMinutes >= 960) { // 08:30=510, 16:00=960
+      console.log(`[qc-reminder] Di luar jam kerja WIB (${jamWIB}:${String(menitWIB).padStart(2,'0')}), skip`);
+      return res.status(200).json({ ok: true, skipped: 'outside_business_hours' });
+    }
+
     // Hanya ambil pending yang sudah > 10 menit (hindari spam untuk TF yang baru masuk)
     const minAgo10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const pending = await sbGet(
