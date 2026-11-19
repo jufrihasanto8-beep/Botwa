@@ -562,12 +562,12 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
 
   <!-- STATS ROW -->
   <div id="stats-row">
-    <div class="stat-card" onclick="clickStat('all')" style="cursor:pointer" title="Lihat semua percakapan">
-      <div class="stat-icon blue">💬</div>
+    <div class="stat-card" onclick="clickStat('all')" style="cursor:pointer" title="Lihat semua lead">
+      <div class="stat-icon blue">📩</div>
       <div class="stat-text">
-        <div class="stat-label">Open Tickets</div>
-        <div class="stat-num" id="st-open">0</div>
-        <div class="stat-sub muted" id="st-open-sub">percakapan aktif</div>
+        <div class="stat-label">Lead</div>
+        <div class="stat-num" id="st-lead">0</div>
+        <div class="stat-sub muted" id="st-lead-sub">lead masuk</div>
       </div>
     </div>
     <div class="stat-card" onclick="clickStat('eskalasi')" style="cursor:pointer" title="Lihat eskalasi">
@@ -578,28 +578,20 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
         <div class="stat-sub danger" id="st-esc-sub">perlu penanganan</div>
       </div>
     </div>
-    <div class="stat-card" onclick="clickStat('live')" style="cursor:pointer" title="Lihat live chat">
-      <div class="stat-icon purple">🤖</div>
+    <div class="stat-card" onclick="clickStat('selesai')" style="cursor:pointer" title="Lihat closing">
+      <div class="stat-icon green">🏆</div>
       <div class="stat-text">
-        <div class="stat-label">AI Response</div>
-        <div class="stat-num" id="st-ai">0</div>
-        <div class="stat-sub ok" id="st-ai-sub">balasan AI</div>
+        <div class="stat-label">Closing</div>
+        <div class="stat-num" id="st-closing">0</div>
+        <div class="stat-sub ok" id="st-closing-sub">total closing</div>
       </div>
     </div>
     <div class="stat-card" onclick="clickStat('live')" style="cursor:pointer" title="Lihat sesi aktif">
-      <div class="stat-icon green">⚡</div>
+      <div class="stat-icon amber">⚡</div>
       <div class="stat-text">
         <div class="stat-label">Sesi Aktif</div>
         <div class="stat-num" id="st-aktif">0</div>
         <div class="stat-sub muted" id="st-aktif-sub">aktif dalam 24 jam</div>
-      </div>
-    </div>
-    <div class="stat-card" onclick="clickStat('selesai')" style="cursor:pointer" title="Lihat closing">
-      <div class="stat-icon amber">🏆</div>
-      <div class="stat-text">
-        <div class="stat-label">Closing</div>
-        <div class="stat-num" id="st-closing">0</div>
-        <div class="stat-sub muted" id="st-closing-sub">total closing</div>
       </div>
     </div>
     <div class="ai-engine-card">
@@ -1085,15 +1077,13 @@ async function loadStats() {
   // Filter per tanggal lead masuk (created_at)
   convs = filterByDateRange(convs);
 
-  const open      = convs.filter(c => c.status !== 'selesai').length;
+  const totalLead = convs.length;
   const esc       = convs.filter(c => c.status === 'eskalasi').length;
   const selesai   = convs.filter(c => c.status === 'selesai').length;
   const aktif     = convs.filter(c => {
     if (!c.last_msg_at) return false;
     return (new Date() - new Date(c.last_msg_at)) < 86400000;
   }).length;
-  // AI response count: hitung dari conversation state (ada ai reply = punya last_msg_at + status bukan baru)
-  const aiResponded = convs.filter(c => c.last_msg_at && c.status !== 'baru').length;
 
   // Closing count: dari orders_new dalam date range
   let closingCount = 0;
@@ -1105,18 +1095,18 @@ async function loadStats() {
     }
   } catch(e) { closingCount = selesai; }
 
-  document.getElementById('st-open').textContent      = open;
+  const closingRate = totalLead > 0 ? Math.round((closingCount / totalLead) * 100) : 0;
+
+  document.getElementById('st-lead').textContent      = totalLead;
   document.getElementById('st-eskalasi').textContent  = esc;
-  document.getElementById('st-ai').textContent        = aiResponded;
-  document.getElementById('st-aktif').textContent     = aktif;
   document.getElementById('st-closing').textContent   = closingCount;
-  document.getElementById('st-open-sub').textContent  = open + ' percakapan aktif';
+  document.getElementById('st-aktif').textContent     = aktif;
+  document.getElementById('st-lead-sub').textContent  = totalLead + ' lead masuk';
   document.getElementById('st-esc-sub').textContent   = esc > 0 ? esc + ' perlu penanganan' : 'aman terkendali';
   document.getElementById('st-esc-sub').className     = 'stat-sub ' + (esc > 0 ? 'danger' : 'ok');
-  document.getElementById('st-ai-sub').textContent    = aiResponded + ' balasan AI';
+  document.getElementById('st-closing-sub').textContent = closingRate + '% closing rate';
+  document.getElementById('st-closing-sub').className = 'stat-sub ' + (closingRate >= 30 ? 'ok' : closingRate >= 15 ? 'muted' : 'danger');
   document.getElementById('st-aktif-sub').textContent = aktif + ' aktif dalam 24 jam';
-  document.getElementById('st-closing-sub').textContent = closingCount + ' total closing';
-  const lancar = convs.length > 0 ? Math.round(((convs.length-esc)/convs.length)*100)+'%' : '—';
 
   // Filter counts
   document.getElementById('fn-all').textContent     = convs.length;
