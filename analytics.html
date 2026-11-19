@@ -515,16 +515,24 @@ async function init() {
 
   const prodFilter = window.__activeProductFilter || null;
   const prodQ = prodFilter ? `&product_id=eq.${prodFilter}` : '';
-  const [convs, convsRange] = await Promise.all([
+  const [convs, convsRange, allOrders] = await Promise.all([
     sbGet('conversations', `?user_id=eq.${userId}${prodQ}&select=id,status,customer_id,product_id,state,created_at,last_msg_at`),
     sbGet('conversations', `?user_id=eq.${userId}${prodQ}&created_at=gte.${sinceISO}&created_at=lte.${rangeEnd.toISOString()}&select=id,status,state,created_at,last_msg_at,product_id`),
+    sbGet('orders_new', `?user_id=eq.${userId}&select=id,qty,product_id,created_at,harga`),
   ]);
 
+  // Filter orders by date range + product
+  let ordersInRange = allOrders.filter(o => {
+    const d = new Date(o.created_at);
+    return d >= rangeStart && d <= rangeEnd;
+  });
+  if (prodFilter) ordersInRange = ordersInRange.filter(o => o.product_id === prodFilter);
+
   // Stat kalkulasi dalam range
-  const leadsHariIni   = convsRange.length;
-  const closingAll     = convsRange.filter(c => c.status === 'selesai');
-  const closingHariIni = closingAll.filter(c => new Date(c.last_msg_at||c.created_at) >= today).length;
-  const convRate       = leadsHariIni > 0 ? Math.round((closingHariIni/leadsHariIni)*100) : 0;
+  const totalLead      = convsRange.filter(c => c.state?.is_form_lead && !c.state?.skipped).length;
+  const closingCount   = ordersInRange.length;
+  const ordersToday    = ordersInRange.filter(o => new Date(o.created_at) >= today).length;
+  const convRate       = totalLead > 0 ? Math.round((closingCount/totalLead)*100) : 0;
   const esc            = convs.filter(c => c.status === 'eskalasi').length;
   const convIds        = convs.map(c=>c.id);
 
@@ -541,26 +549,19 @@ async function init() {
   const custIds = [...new Set(convs.map(c=>c.customer_id).filter(Boolean))];
   const custs   = custIds.length ? await sbGet('customers', `?id=in.(${custIds.slice(0,200).join(',')})`) : [];
 
-  // Hitung nilai closing (harga × qty)
+  // Hitung nilai closing dari orders_new (harga × qty)
   let nilaiClosing = 0;
-  const prodIds = [...new Set(closingAll.map(c=>c.product_id).filter(Boolean))];
-  if (prodIds.length) {
-    const prods = await sbGet('products', `?id=in.(${prodIds.join(',')})&select=id,harga`);
-    const prodMap = Object.fromEntries(prods.map(p=>[p.id, p.harga||0]));
-    closingAll.forEach(c => {
-      const harga = prodMap[c.product_id] || 0;
-      const qty   = c.state?.qty || 1;
-      nilaiClosing += harga * qty;
-    });
-  }
+  ordersInRange.forEach(o => {
+    nilaiClosing += (o.harga || 0) * (o.qty || 1);
+  });
 
-  // Spark data — closing per hari 7 hari (untuk sparkline)
+  // Spark data — closing per hari 7 hari (dari orders_new)
   const sparkData = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(Date.now()-i*864e5);
     const start = new Date(d); start.setHours(0,0,0,0);
     const end   = new Date(d); end.setHours(23,59,59,999);
-    sparkData.push(convsRange.filter(c=>c.status==='selesai'&&new Date(c.last_msg_at||c.created_at)>=start&&new Date(c.last_msg_at||c.created_at)<=end).length);
+    sparkData.push(ordersInRange.filter(o=>{ const od=new Date(o.created_at); return od>=start&&od<=end; }).length);
   }
 
   // Render stat cards
@@ -573,7 +574,7 @@ async function init() {
     </div>
     <div class="stat-box green">
       <div class="s-lbl">✅ Total closing</div>
-      <div class="s-num">${closingAll.length}</div>
+      <div class="s-num">${closingCount}</div>
       <div class="s-sub">order tertutup</div>
       <div class="s-spark"><canvas id="spark-closing" height="36"></canvas></div>
     </div>
@@ -617,7 +618,7 @@ async function init() {
     const d=new Date(rangeEnd.getTime()-i*864e5);
     days.push(d.toLocaleDateString('id-ID',{day:'numeric',month:'short'}));
     const s=new Date(d);s.setHours(0,0,0,0);const e=new Date(d);e.setHours(23,59,59,999);
-    closingCounts.push(convsRange.filter(c=>c.status==='selesai'&&new Date(c.last_msg_at||c.created_at)>=s&&new Date(c.last_msg_at||c.created_at)<=e).length);
+    closingCounts.push(ordersInRange.filter(o=>{ const od=new Date(o.created_at); return od>=s&&od<=e; }).length);
   }
   const totalClosing14 = closingCounts.reduce((a,b)=>a+b,0);
   document.getElementById('chart-total-num').textContent = totalClosing14;
@@ -648,7 +649,7 @@ async function init() {
   });
 
   // Update resolusi badge
-  document.getElementById('resolusi-badge').textContent = `✓ ${closingAll.length} selesai`;
+  document.getElementById('resolusi-badge').textContent = `✓ ${closingCount} closing`;
 }
 
 async function generateInsights() {
@@ -669,7 +670,7 @@ async function generateInsights() {
       return;
     }
 
-    const closing   = convs.filter(c=>c.status==='selesai').length;
+    const closing   = (await sbGet('orders_new', `?user_id=eq.${userId}&select=id`)).length;
     const ekskalasi = convs.filter(c=>c.status==='eskalasi').length;
     const keluhanList = [...new Set(convs.map(c=>c.state?.keluhan).filter(Boolean))].slice(0,10);
     const sample    = msgs.slice(0,40).map(m=>`[${m.role}]: ${(m.isi||'').replace(/\[.*?\]/g,'').trim()}`).filter(l=>l.split(': ')[1]).join('\n');
