@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="img/logo-adsy.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Closing Overview · Adsy CS</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
+
+/* Top bar */
+.top-bar{background:var(--white);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.page-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.4px;margin-right:4px}
+.live-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2)}
+.live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn-export{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;background:#22c55e;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-decoration:none}
+.btn-export:hover{background:#16a34a}
+.theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.filter-select{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;min-width:140px}
+.filter-select:focus{outline:none;border-color:#3b82f6}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Date range picker */
+.drp-trigger{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.drp-trigger:hover{border-color:#3b82f6}
+.drp-icon{color:#3b82f6;font-size:13px}
+.drp-wrap{position:relative}
+.drp-dropdown{position:fixed;z-index:9999;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.25);display:none;overflow:hidden;min-width:540px}
+body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.drp-dropdown.open{display:flex}
+.drp-presets{width:160px;border-right:1px solid var(--border);padding:10px 0;flex-shrink:0}
+.drp-preset{display:block;width:100%;text-align:left;padding:8px 16px;font-size:12px;color:var(--text-2);border:none;background:none;cursor:pointer;transition:all .12s}
+.drp-preset:hover{background:rgba(59,130,246,.08);color:#3b82f6}
+.drp-preset.active{color:#3b82f6;font-weight:600;background:rgba(59,130,246,.08)}
+.drp-cal{padding:16px;flex:1}
+.drp-cal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.drp-cal-title{font-size:14px;font-weight:600;color:var(--text)}
+.drp-nav{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .12s}
+.drp-nav:hover{border-color:#3b82f6;color:#3b82f6}
+.drp-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px}
+.drp-days-hdr span{text-align:center;font-size:11px;font-weight:600;color:var(--text-3);padding:4px 0}
+.drp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.drp-day{height:34px;border-radius:7px;border:none;background:none;color:var(--text);font-size:12px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
+.drp-day:hover:not(.empty){background:rgba(59,130,246,.12);color:#3b82f6}
+.drp-day.other-month{color:var(--text-3)}
+.drp-day.today{font-weight:700;color:#3b82f6}
+.drp-day.selected{background:#3b82f6!important;color:#fff!important;font-weight:600}
+.drp-day.in-range{background:rgba(59,130,246,.1);border-radius:0;color:var(--text)}
+.drp-day.range-start{border-radius:7px 0 0 7px;background:#3b82f6;color:#fff;font-weight:600}
+.drp-day.range-end{border-radius:0 7px 7px 0;background:#3b82f6;color:#fff;font-weight:600}
+.drp-day.range-start.range-end{border-radius:7px}
+.drp-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border)}
+.drp-selected-txt{font-size:11px;color:var(--text-3)}
+.drp-apply{padding:6px 16px;border-radius:7px;border:none;background:#3b82f6;color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.drp-apply:hover{background:#2563eb}
+.drp-cancel{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;cursor:pointer}
+
+/* Stat cards */
+.stat-section{padding:16px 24px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;flex-shrink:0}
+.stat-row2{padding:0 24px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
+.sc{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+.sc-icon{font-size:18px;margin-bottom:10px;opacity:.8}
+.sc-label{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.sc-val{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.5px;line-height:1}
+.sc-val.green{color:#22c55e}
+.sc-sub{font-size:12px;color:var(--text-3);margin-top:6px}
+.sc-sub b{color:var(--text-2)}
+.sc-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-top:6px}
+.sc-badge.up{background:rgba(34,197,94,.12);color:#22c55e}
+.sc-badge.dn{background:rgba(239,68,68,.1);color:#ef4444}
+.sc-badge.neu{background:rgba(148,163,184,.1);color:var(--text-3)}
+
+/* Charts row */
+.charts-row{display:grid;grid-template-columns:300px 1fr;gap:16px;padding:0 24px 16px;flex-shrink:0}
+.chart-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:20px}
+.chart-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px}
+.donut-wrap{display:flex;align-items:center;gap:20px}
+.donut-canvas{width:120px!important;height:120px!important;flex-shrink:0}
+.donut-legend{display:flex;flex-direction:column;gap:10px}
+.dl-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.dl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dl-label{color:var(--text-2)}
+.dl-val{font-weight:700;color:var(--text);margin-left:4px}
+
+/* Table */
+.tbl-wrap{overflow-x:auto;margin:0 24px 24px;background:var(--white);border:1px solid var(--border);border-radius:14px}
+.tbl-wrap::-webkit-scrollbar{width:4px;height:4px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:4px}
+table{width:100%;border-collapse:collapse;min-width:800px}
+thead th{padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0}
+tbody td{padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;color:var(--text)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(59,130,246,.03)}
+.c-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.bdg{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.bdg-cod{background:rgba(251,146,60,.12);color:#fb923c}
+.bdg-tf{background:rgba(99,102,241,.12);color:#818cf8}
+.bdg-user{background:rgba(59,130,246,.1);color:#3b82f6;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
+
+/* Empty */
+.empty-cell{text-align:center;padding:60px 20px;color:var(--text-3)}
+.empty-cell h4{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text-2)}
+.empty-cell p{font-size:13px;line-height:1.6}
+
+/* Responsive */
+@media(max-width:768px){
+  .stat-section{grid-template-columns:repeat(2,1fr)}
+  .stat-row2{grid-template-columns:repeat(2,1fr)}
+  .charts-row{grid-template-columns:1fr}
+  .top-bar{padding:12px 16px}
+  .stat-section,.stat-row2{padding-left:16px;padding-right:16px}
+  .charts-row{padding-left:16px;padding-right:16px}
+  .tbl-wrap{margin-left:16px;margin-right:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div>
+    <div class="page-title">Closing Overview</div>
+    <div class="live-dot" style="margin-top:2px">Semua user · real-time</div>
+  </div>
+
+  <!-- Filter User -->
+  <select class="filter-select" id="filter-user" onchange="render()">
+    <option value="">Semua User</option>
+  </select>
+
+  <!-- Filter Produk -->
+  <select class="filter-select" id="filter-product" onchange="render()">
+    <option value="">Semua Produk</option>
+  </select>
+
+  <!-- Date range -->
+  <div class="drp-wrap">
+    <button class="drp-trigger" onclick="drpToggle()" id="drp-trigger">
+      <span class="drp-icon">📅</span>
+      <span id="drp-label">7 hari terakhir</span>
+      <span style="color:var(--text-3)">▾</span>
+    </button>
+    <div class="drp-dropdown" id="drp-dropdown">
+      <div class="drp-presets">
+        <button class="drp-preset active" onclick="drpPreset(7,'7 hari terakhir',this)">7 Hari Terakhir</button>
+        <button class="drp-preset" onclick="drpPreset(14,'14 hari terakhir',this)">14 Hari Terakhir</button>
+        <button class="drp-preset" onclick="drpPreset(30,'30 hari terakhir',this)">30 Hari Terakhir</button>
+        <button class="drp-preset" onclick="drpPreset(90,'90 hari terakhir',this)">90 Hari Terakhir</button>
+        <button class="drp-preset" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
+        <button class="drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
+        <button class="drp-preset" onclick="drpPreset(1,'Hari ini',this)">Hari Ini</button>
+        <button class="drp-preset" onclick="drpPresetYesterday(this)">Kemarin</button>
+      </div>
+      <div style="display:flex;flex-direction:column;flex:1">
+        <div class="drp-cal" id="drp-cal"></div>
+        <div class="drp-footer">
+          <div class="drp-selected-txt">
+            <span id="drp-sel-start">—</span> → <span id="drp-sel-end">—</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="drp-cancel" onclick="drpClose()">Batal</button>
+            <button class="drp-apply" onclick="drpApply()">Terapkan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="top-right">
+    <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
+  </div>
+</div>
+
+<!-- STAT CARDS ROW 1 -->
+<div class="stat-section">
+  <div class="sc">
+    <div class="sc-icon">📥</div>
+    <div class="sc-label">Total Lead</div>
+    <div class="sc-val" id="s-lead">—</div>
+    <div class="sc-sub" id="s-lead-sub">— per hari</div>
+  </div>
+  <div class="sc">
+    <div class="sc-icon">🛒</div>
+    <div class="sc-label">Total Closing</div>
+    <div class="sc-val" id="s-total">—</div>
+    <div id="s-total-badge"></div>
+  </div>
+  <div class="sc">
+    <div class="sc-icon">🎯</div>
+    <div class="sc-label">Closing Rate</div>
+    <div class="sc-val green" id="s-rate">—</div>
+    <div class="sc-sub">closing ÷ lead</div>
+  </div>
+  <div class="sc">
+    <div class="sc-icon">💰</div>
+    <div class="sc-label">Gross Sales</div>
+    <div class="sc-val green" id="s-gross">—</div>
+    <div id="s-gross-badge"></div>
+  </div>
+  <div class="sc">
+    <div class="sc-icon">📈</div>
+    <div class="sc-label">Net Sales</div>
+    <div class="sc-val green" id="s-net">—</div>
+    <div class="sc-sub">Gross – RTS</div>
+  </div>
+</div>
+
+<!-- STAT CARDS ROW 2 -->
+<div class="stat-row2">
+  <div class="sc">
+    <div class="sc-icon">🚚</div>
+    <div class="sc-label">COD</div>
+    <div class="sc-val" id="s-cod">0</div>
+    <div class="sc-sub">Rp <b id="s-cod-rp">0</b></div>
+  </div>
+  <div class="sc">
+    <div class="sc-icon">🏦</div>
+    <div class="sc-label">Transfer (TF)</div>
+    <div class="sc-val" id="s-tf">0</div>
+    <div class="sc-sub">Rp <b id="s-tf-rp">0</b></div>
+  </div>
+  <div class="sc">
+    <div class="sc-icon">📊</div>
+    <div class="sc-label">Rata-rata Order</div>
+    <div class="sc-val green" id="s-avg">—</div>
+  </div>
+  <div class="sc">
+    <div class="sc-icon">📦</div>
+    <div class="sc-label">Total Produk Terjual</div>
+    <div class="sc-val" id="s-qty">—</div>
+    <div class="sc-sub">unit</div>
+  </div>
+</div>
+
+<!-- CHARTS -->
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">COD vs Transfer</div>
+    <div class="donut-wrap">
+      <canvas class="donut-canvas" id="donut-chart"></canvas>
+      <div class="donut-legend">
+        <div class="dl-item">
+          <div class="dl-dot" style="background:#fb923c"></div>
+          <div class="dl-label">COD</div>
+          <div class="dl-val" id="leg-cod">0%</div>
+        </div>
+        <div class="dl-item">
+          <div class="dl-dot" style="background:#818cf8"></div>
+          <div class="dl-label">Transfer</div>
+          <div class="dl-val" id="leg-tf">0%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Top Produk</div>
+    <canvas id="bar-chart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Pelanggan</th>
+        <th>Produk</th>
+        <th>Metode</th>
+        <th>Nilai</th>
+        <th>Waktu Closing</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="6" class="empty-cell">Memuat data...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+/* ── Theme ── */
+function toggleTheme(){
+  document.body.classList.toggle('light');
+  localStorage.setItem('cs_theme', document.body.classList.contains('light')?'light':'dark');
+}
+
+const SB_URL = window.SUPABASE_URL || '';
+const SB_KEY = window.SUPABASE_ANON_KEY || '';
+
+function sbFetch(table, query) {
+  return fetch(`${SB_URL}/rest/v1/${table}${query}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' }
+  }).then(r => r.json()).catch(() => []);
+}
+
+function rp(n) { return 'Rp ' + (n||0).toLocaleString('id-ID'); }
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function avColor(n) { const c=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4']; let h=0; for(let i=0;i<(n||'').length;i++) h=(h*31+n.charCodeAt(i))%c.length; return c[h]; }
+function avInit(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function fmtDt(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+// ── DATE RANGE PICKER ──────────────────────────────────────
+let filterStart = null, filterEnd = null;
+let drpSelStart = null, drpSelEnd = null, drpPickingEnd = false;
+let drpViewYear = new Date().getFullYear(), drpViewMonth = new Date().getMonth();
+const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DAYS_ID   = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+(function(){
+  filterStart = new Date(Date.now()-6*864e5); filterStart.setHours(0,0,0,0);
+  filterEnd   = new Date(); filterEnd.setHours(23,59,59,999);
+  drpSelStart = new Date(filterStart); drpSelEnd = new Date(filterEnd);
+})();
+
+function drpFmt(d) {
+  if (!d) return '—';
+  return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+}
+function drpToggle() {
+  const dd = document.getElementById('drp-dropdown');
+  const tr = document.getElementById('drp-trigger');
+  const rect = tr.getBoundingClientRect();
+  dd.style.top  = (rect.bottom + 8) + 'px';
+  dd.style.right = (window.innerWidth - rect.right) + 'px';
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) { drpRender(); drpUpdateSel(); document.addEventListener('click', drpOutside); }
+  else document.removeEventListener('click', drpOutside);
+}
+function drpClose() {
+  document.getElementById('drp-dropdown').classList.remove('open');
+  document.removeEventListener('click', drpOutside);
+}
+function drpOutside(e) {
+  const dd = document.getElementById('drp-dropdown');
+  const tr = document.getElementById('drp-trigger');
+  if (!dd.contains(e.target) && !tr.contains(e.target)) drpClose();
+}
+function drpPreset(days, label, btn) {
+  drpSelStart = new Date(Date.now()-(days-1)*864e5); drpSelStart.setHours(0,0,0,0);
+  drpSelEnd   = new Date(); drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpRender();
+}
+function drpPresetThisMonth(btn) {
+  drpSelStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  drpSelEnd   = new Date(); drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpRender();
+}
+function drpPresetLastMonth(btn) {
+  const n = new Date();
+  drpSelStart = new Date(n.getFullYear(), n.getMonth()-1, 1);
+  drpSelEnd   = new Date(n.getFullYear(), n.getMonth(), 0); drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpRender();
+}
+function drpPresetYesterday(btn) {
+  drpSelStart = new Date(Date.now()-864e5); drpSelStart.setHours(0,0,0,0);
+  drpSelEnd   = new Date(Date.now()-864e5); drpSelEnd.setHours(23,59,59,999);
+  document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpRender();
+}
+function drpUpdateSel() {
+  document.getElementById('drp-sel-start').textContent = drpFmt(drpSelStart);
+  document.getElementById('drp-sel-end').textContent   = drpFmt(drpSelEnd);
+}
+function drpApply() {
+  if (!drpSelStart) return;
+  filterStart = new Date(drpSelStart);
+  filterEnd   = drpSelEnd ? new Date(drpSelEnd) : new Date(drpSelStart);
+  filterEnd.setHours(23,59,59,999);
+  document.getElementById('drp-label').textContent = `${drpFmt(filterStart)} — ${drpFmt(filterEnd)}`;
+  drpClose();
+  render();
+}
+function drpClickDay(y, m, d) {
+  const clicked = new Date(y, m, d);
+  if (!drpSelStart || (drpSelStart && drpSelEnd)) {
+    drpSelStart = clicked; drpSelEnd = null; drpPickingEnd = true;
+  } else {
+    if (clicked < drpSelStart) { drpSelEnd = drpSelStart; drpSelStart = clicked; }
+    else drpSelEnd = clicked;
+    drpPickingEnd = false;
+  }
+  drpUpdateSel(); drpRender();
+}
+function drpRender() {
+  const y = drpViewYear, m = drpViewMonth;
+  const firstDay = new Date(y, m, 1).getDay();
+  const startPad = firstDay === 0 ? 6 : firstDay - 1;
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const prevDays = new Date(y, m, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  let html = `<div class="drp-cal-hdr">
+    <button class="drp-nav" onclick="drpNav(-1)">‹</button>
+    <div class="drp-cal-title">${MONTHS_ID[m]} ${y}</div>
+    <button class="drp-nav" onclick="drpNav(1)">›</button>
+  </div>
+  <div class="drp-days-hdr">${DAYS_ID.map(d=>`<span>${d}</span>`).join('')}</div>
+  <div class="drp-days">`;
+  for (let i=startPad;i>0;i--) html += `<button class="drp-day other-month" onclick="drpNav(-1)">${prevDays-i+1}</button>`;
+  for (let d=1;d<=daysInMonth;d++) {
+    const cur = new Date(y,m,d);
+    const isToday = cur.getTime()===today.getTime();
+    const isStart = drpSelStart && cur.getTime()===new Date(drpSelStart.getFullYear(),drpSelStart.getMonth(),drpSelStart.getDate()).getTime();
+    const isEnd   = drpSelEnd   && cur.getTime()===new Date(drpSelEnd.getFullYear(),drpSelEnd.getMonth(),drpSelEnd.getDate()).getTime();
+    const inRange = drpSelStart && drpSelEnd && cur>drpSelStart && cur<drpSelEnd;
+    let cls = 'drp-day';
+    if (isStart && isEnd) cls += ' selected';
+    else if (isStart) cls += ' range-start';
+    else if (isEnd)   cls += ' range-end';
+    else if (inRange) cls += ' in-range';
+    if (isToday) cls += ' today';
+    html += `<button class="${cls}" onclick="drpClickDay(${y},${m},${d})">${d}</button>`;
+  }
+  const total = startPad + daysInMonth;
+  const rem = total%7===0?0:7-(total%7);
+  for (let d=1;d<=rem;d++) html += `<button class="drp-day other-month" onclick="drpNav(1)">${d}</button>`;
+  html += '</div>';
+  document.getElementById('drp-cal').innerHTML = html;
+}
+function drpNav(dir) {
+  drpViewMonth += dir;
+  if (drpViewMonth>11){drpViewMonth=0;drpViewYear++;}
+  if (drpViewMonth<0) {drpViewMonth=11;drpViewYear--;}
+  drpRender();
+}
+
+// ── DATA ──────────────────────────────────────────────────
+let allConvs = [], allLeads = [];
+let prodMap = {}, custMap = {}, convMap = {}, userMap = {};
+let donutChart = null, barChart = null;
+
+function filterByRange(list) {
+  return list.filter(c => {
+    const d = new Date(c._orderDate || c.created_at);
+    return d >= filterStart && d <= filterEnd;
+  });
+}
+function filterLeadsByRange(leads) {
+  return leads.filter(c => {
+    const d = new Date(c.created_at);
+    return d >= filterStart && d <= filterEnd;
+  });
+}
+
+async function init() {
+  // Fetch ALL data (no user_id filter)
+  const [users, convs, custs, prods, orders] = await Promise.all([
+    sbFetch('cs_team', '?select=id,name&order=name'),
+    sbFetch('conversations', '?select=id,user_id,customer_id,product_id,status,state,last_msg_at,created_at&order=last_msg_at.desc'),
+    sbFetch('customers', '?select=id,wa_number,nama'),
+    sbFetch('products', '?aktif=eq.true&select=id,user_id,nama,harga'),
+    sbFetch('orders_new', '?select=id,user_id,conversation_id,customer_id,product_id,qty,harga,ongkir_after_promo,fee_cod,total,metode,ekspedisi,created_at&order=created_at.desc')
+  ]);
+
+  // Build maps
+  (users || []).forEach(u => { userMap[u.id] = u; });
+  (custs || []).forEach(c => { custMap[c.id] = c; });
+  (prods || []).forEach(p => { prodMap[p.id] = p; });
+  (convs || []).forEach(c => { convMap[c.id] = c; });
+
+  // Populate user filter dropdown
+  const userSelect = document.getElementById('filter-user');
+  (users || []).forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = u.name;
+    userSelect.appendChild(opt);
+  });
+
+  // Populate product filter dropdown (unique product names)
+  const prodSelect = document.getElementById('filter-product');
+  const seenProds = new Set();
+  (prods || []).forEach(p => {
+    if (!seenProds.has(p.id)) {
+      seenProds.add(p.id);
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.nama;
+      prodSelect.appendChild(opt);
+    }
+  });
+
+  // Lead = form lead, !skipped
+  allLeads = (convs || []).filter(c => c.state?.is_form_lead && !c.state?.skipped);
+
+  // Closing from orders_new
+  allConvs = (orders || []).map(o => {
+    const conv = convMap[o.conversation_id] || {};
+    return {
+      ...conv,
+      id: conv.id || o.conversation_id,
+      user_id: o.user_id || conv.user_id,
+      customer_id: conv.customer_id || o.customer_id,
+      product_id: conv.product_id || o.product_id,
+      _order: o,
+      _orderDate: o.created_at,
+    };
+  });
+
+  render();
+}
+
+function render() {
+  const userFilter = document.getElementById('filter-user').value;
+  const prodFilter = document.getElementById('filter-product').value;
+
+  let filtered = allConvs;
+  let filteredLeads = allLeads;
+
+  if (userFilter) {
+    filtered = filtered.filter(c => c.user_id === userFilter);
+    filteredLeads = filteredLeads.filter(c => c.user_id === userFilter);
+  }
+  if (prodFilter) {
+    filtered = filtered.filter(c => c.product_id === prodFilter);
+    filteredLeads = filteredLeads.filter(c => c.product_id === prodFilter);
+  }
+
+  const list = filterByRange(filtered);
+  calcStats(list, filteredLeads);
+  renderCharts(list);
+  renderTable(list);
+}
+
+function calcStats(list, leadsFiltered) {
+  let gross = 0, codCount = 0, codRp = 0, tfCount = 0, tfRp = 0, totalQty = 0;
+
+  list.forEach(c => {
+    const ord = c._order || {};
+    const st = c.state || {};
+    const snap = st.order_snapshot || {};
+    const prod = prodMap[c.product_id] || {};
+    const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
+    const harga = ord.harga || snap.harga || prod.harga || 0;
+    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
+    const nilai = ord.total || snap.total || (harga + ongkir + feeCod);
+    gross += nilai;
+    totalQty += qty;
+
+    const metode = (ord.metode || snap.metode || st.metode_bayar || 'cod').toLowerCase();
+    if (metode === 'transfer') { tfCount++; tfRp += nilai; }
+    else { codCount++; codRp += nilai; }
+  });
+
+  const total  = list.length;
+  const avg    = total ? Math.round(gross / total) : 0;
+
+  const leadList = filterLeadsByRange(leadsFiltered || allLeads);
+  const totalLead = leadList.length;
+  const days = Math.max(1, Math.round((filterEnd - filterStart) / (1000*60*60*24)));
+  const leadPerHari = (totalLead / days).toFixed(1);
+  const closingRate = totalLead ? Math.round((total / totalLead) * 100) : 0;
+
+  // Prev period comparison
+  const dur = filterEnd - filterStart;
+  const prevStart = new Date(filterStart - dur);
+  const prevEnd   = new Date(filterStart);
+
+  const userFilter = document.getElementById('filter-user').value;
+  const prodFilter = document.getElementById('filter-product').value;
+  let prevFiltered = allConvs;
+  if (userFilter) prevFiltered = prevFiltered.filter(c => c.user_id === userFilter);
+  if (prodFilter) prevFiltered = prevFiltered.filter(c => c.product_id === prodFilter);
+
+  const prevList = prevFiltered.filter(c => { const d=new Date(c._orderDate||c.created_at); return d>=prevStart&&d<prevEnd; });
+  let prevGross = 0;
+  prevList.forEach(c => {
+    const ord = c._order || {};
+    const st = c.state || {};
+    const snap = st.order_snapshot || {};
+    const prod = prodMap[c.product_id] || {};
+    const harga = ord.harga || snap.harga || prod.harga || 0;
+    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
+    prevGross += ord.total || snap.total || (harga + ongkir + feeCod);
+  });
+  const prevTotal = prevList.length;
+
+  document.getElementById('s-lead').textContent = totalLead;
+  document.getElementById('s-lead-sub').textContent = leadPerHari + ' per hari';
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-total-badge').innerHTML = makeBadge(total, prevTotal, true);
+  document.getElementById('s-rate').textContent = closingRate + '%';
+  document.getElementById('s-gross').textContent = rp(gross);
+  document.getElementById('s-gross-badge').innerHTML = makeBadge(gross, prevGross, false);
+  document.getElementById('s-net').textContent = rp(gross);
+  document.getElementById('s-cod').textContent = codCount;
+  document.getElementById('s-cod-rp').textContent = codRp.toLocaleString('id-ID');
+  document.getElementById('s-tf').textContent = tfCount;
+  document.getElementById('s-tf-rp').textContent = tfRp.toLocaleString('id-ID');
+  document.getElementById('s-avg').textContent = avg ? rp(avg) : '—';
+  document.getElementById('s-qty').textContent = totalQty;
+}
+
+function makeBadge(cur, prev, isCount) {
+  if (!prev || prev === 0) return `<div class="sc-badge neu">— vs lalu</div>`;
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  const cls = pct >= 0 ? 'up' : 'dn';
+  const arrow = pct >= 0 ? '▲' : '▼';
+  return `<div class="sc-badge ${cls}">${arrow} ${Math.abs(pct)}% vs lalu</div>`;
+}
+
+function renderCharts(list) {
+  let cod = 0, tf = 0;
+  list.forEach(c => {
+    const ord = c._order || {};
+    const m = (ord.metode || c.state?.metode_bayar || 'cod').toLowerCase();
+    if (m === 'transfer') tf++; else cod++;
+  });
+  const total = cod + tf || 1;
+  document.getElementById('leg-cod').textContent = Math.round(cod/total*100) + '%';
+  document.getElementById('leg-tf').textContent  = Math.round(tf/total*100) + '%';
+
+  if (donutChart) donutChart.destroy();
+  donutChart = new Chart(document.getElementById('donut-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['COD','Transfer'],
+      datasets: [{ data: [cod||0.001, tf||0.001], backgroundColor: ['#fb923c','#818cf8'], borderWidth: 0, hoverOffset: 4 }]
+    },
+    options: {
+      cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: {
+        label: ctx => ` ${ctx.label}: ${ctx.raw} order`
+      }}},
+      animation: { duration: 400 }
+    }
+  });
+
+  // Bar chart top produk
+  const prodCount = {};
+  list.forEach(c => {
+    const pname = prodMap[c.product_id]?.nama || 'Produk Lain';
+    prodCount[pname] = (prodCount[pname] || 0) + 1;
+  });
+  const sorted = Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  if (barChart) barChart.destroy();
+  barChart = new Chart(document.getElementById('bar-chart'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([n])=>n),
+      datasets: [{ data: sorted.map(([,v])=>v), backgroundColor: '#22c55e', borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw} order` }}},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#64748b', font: { size: 11 } } },
+        y: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }
+      },
+      animation: { duration: 400 }
+    }
+  });
+}
+
+function renderTable(list) {
+  const tbody = document.getElementById('tbody');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-cell">
+      <div style="font-size:32px;margin-bottom:12px">📭</div>
+      <h4>Belum ada closing di periode ini</h4>
+      <p>Order yang dikonfirmasi bot akan muncul di sini secara otomatis.</p>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(c => {
+    const cu   = custMap[c.customer_id] || {};
+    const nama = cu.nama || cu.wa_number || 'Pelanggan';
+    const prod = prodMap[c.product_id] || {};
+    const st   = c.state || {};
+    const snap = st.order_snapshot || {};
+    const ord  = c._order || {};
+    const qty  = parseInt(ord.qty || snap.qty || st.qty || 1);
+    const harga = ord.harga || snap.harga || prod.harga || 0;
+    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
+    const nilai = ord.total || snap.total || ((harga * qty) + ongkir + feeCod);
+    const metode = (ord.metode || snap.metode || st.metode_bayar || 'cod').toLowerCase();
+    const color = avColor(nama);
+    const ini   = avInit(nama);
+    const userName = userMap[c.user_id]?.name || '—';
+
+    return `<tr>
+      <td><span class="bdg-user">${escH(userName)}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="c-av" style="background:${color}">${escH(ini)}</div>
+          <div>
+            <div style="font-weight:600">${escH(nama)}</div>
+            <div style="font-size:11px;color:var(--text-3)">${escH(cu.wa_number ? cu.wa_number.split('@')[0] : '—')}</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div style="font-weight:500">${escH(prod.nama || snap.produk || st.keluhan || '(produk lama)')}</div>
+        <div style="font-size:11px;color:var(--text-3)">×${qty} · @${rp(harga)} · ongkir ${rp(ongkir)}</div>
+      </td>
+      <td><span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'Transfer':'COD'}</span></td>
+      <td style="font-weight:700;color:var(--text)">${rp(nilai)}</td>
+      <td style="color:var(--text-3);font-size:12px">${fmtDt(c._orderDate)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportCSV() {
+  const userFilter = document.getElementById('filter-user').value;
+  const prodFilter = document.getElementById('filter-product').value;
+  let filtered = allConvs;
+  if (userFilter) filtered = filtered.filter(c => c.user_id === userFilter);
+  if (prodFilter) filtered = filtered.filter(c => c.product_id === prodFilter);
+  const list = filterByRange(filtered);
+  if (!list.length) return alert('Tidak ada data untuk diekspor.');
+
+  const rows = [['User','Nama','WA','Produk','Qty','Harga Produk','Ongkir','Total','Metode','Waktu Closing']];
+  list.forEach(c => {
+    const cu = custMap[c.customer_id] || {};
+    const prod = prodMap[c.product_id] || {};
+    const st = c.state || {};
+    const snap = st.order_snapshot || {};
+    const ord = c._order || {};
+    const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
+    const harga = ord.harga || snap.harga || prod.harga || 0;
+    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
+    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
+    const nilai = ord.total || snap.total || ((harga * qty) + ongkir + feeCod);
+    const metode = (ord.metode || snap.metode || st.metode_bayar || 'COD').toUpperCase();
+    rows.push([
+      userMap[c.user_id]?.name || '—',
+      cu.nama || '—',
+      cu.wa_number?.split('@')[0] || '—',
+      prod.nama || snap.produk || '—',
+      qty, harga, ongkir, nilai, metode,
+      fmtDt(c._orderDate)
+    ]);
+  });
+
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = `closing_overview_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+init();
+</script>
+</body>
+</html>
