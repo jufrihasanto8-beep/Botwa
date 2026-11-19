@@ -146,6 +146,7 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
       const prevState = conv.state || {};
       const newState = {
         tahap: 'sambut',
+        is_form_lead: prevState.is_form_lead || false,
         produk_locked: !!prevState.produk_locked,
         reopened_at: reopenedAt,
         has_new_message: true, // tampil badge "Pelanggan Baru" di tab Closing
@@ -635,16 +636,12 @@ function resolveAI(product, userAnthropicKey) {
   if (userAnthropicKey) {
     return { key: userAnthropicKey, base: ANTHROPIC_BASE };
   }
-  // 3. Fallback ke env (legacy, akan dihapus nanti)
-  if (ANTHROPIC_KEY) {
-    return { key: ANTHROPIC_KEY, base: ANTHROPIC_BASE };
-  }
   return { key: null, base: ANTHROPIC_BASE };
 }
 
 /* ── CALL CLAUDE ──────────────────────────────────────────── */
 async function callClaude(systemPrompt, messages, model = 'claude-sonnet-4-6', apiKey = null, baseUrl = null) {
-  const key = apiKey || ANTHROPIC_KEY;
+  const key = apiKey;
   if (!key) throw new Error('API key AI belum diset (cek Settings atau Product)');
   const base = baseUrl || ANTHROPIC_BASE;
 
@@ -740,7 +737,7 @@ function extractProposedWilayah(aiMsg) {
 
 /* ── EXTRACT LOKASI PAKAI HAIKU (untuk reply customer setelah AI tanya alamat) ── */
 async function extractLokasiHaiku(text, apiKey, baseUrl = null) {
-  const key = apiKey || ANTHROPIC_KEY;
+  const key = apiKey;
   if (!key) return null;
   const base = baseUrl || ANTHROPIC_BASE;
   const prompt = `Dari teks berikut, ekstrak nama kelurahan/desa, kecamatan, dan kabupaten/kota di Indonesia jika ada.
@@ -1808,11 +1805,11 @@ module.exports = async function handler(req, res) {
         const mediaType = `image/${imageFormat}`;
         const base64Data = mediaUrl.replace(/^data:image\/[a-z0-9]+;base64,/i, '');
 
-        const visionRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+        const visionRes = await fetchWithTimeout(`${aiBase}/v1/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': ANTHROPIC_KEY,
+            'x-api-key': aiKey,
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
