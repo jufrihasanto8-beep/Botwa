@@ -494,8 +494,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChatMod
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function parseNominal(s) {
   if (!s) return 0;
-  const n = String(s).replace(/[^\d]/g, '');
-  return parseInt(n) || 0;
+  // Hapus bagian desimal (.00) dulu, baru strip non-digit
+  const clean = String(s).replace(/\.\d{1,2}$/, '').replace(/[^\d]/g, '');
+  return parseInt(clean) || 0;
 }
 function formatTime(iso) {
   if (!iso) return '';
