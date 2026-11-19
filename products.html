@@ -904,14 +904,15 @@ function resetFUConfig() {
 /* ══════════════════════════════════════
    KATALOG PRODUK
 ══════════════════════════════════════ */
-let activeSessions = {}; // { session_id: { status, waNumber } }
+let activeSessions = new Set();
 
 async function fetchActiveSessions() {
   try {
     const res = await fetch(`/api/baileys-proxy?path=/active-sessions&session_id=${currentUserId}`);
     const data = await res.json();
-    activeSessions = data.sessions || data || {};
-  } catch(e) { activeSessions = {}; }
+    const list = Array.isArray(data.sessions) ? data.sessions : Object.keys(data.sessions || {});
+    activeSessions = new Set(list);
+  } catch(e) { activeSessions = new Set(); }
 }
 
 async function loadProducts() {
@@ -964,7 +965,7 @@ function renderGrid() {
       <div class="prod-footer">
         <button class="btn btn-sm" onclick="toggleAktif('${p.id}',${p.aktif})">${p.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>
         <button class="btn btn-sm" onclick="openEdit('${p.id}')">✏️ Edit</button>
-        ${p.wa_session_id && activeSessions[p.wa_session_id]?.status === 'connected'
+        ${p.wa_session_id && activeSessions.has(p.wa_session_id)
           ? `<button class="btn btn-sm" style="color:#22c55e;border-color:rgba(34,197,94,.3)" onclick="location.href='connect-wa'" title="WA Terhubung">📱 WA ✓</button>`
           : p.wa_session_id
             ? `<button class="btn btn-sm" style="color:#ef4444;border-color:rgba(239,68,68,.3)" onclick="location.href='connect-wa'" title="WA Terputus">📱 WA ✗</button>`
