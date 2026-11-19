@@ -586,6 +586,14 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
         <div class="stat-sub ok" id="st-closing-sub">total closing</div>
       </div>
     </div>
+    <div class="stat-card" onclick="clickStat('selesai')" style="cursor:pointer" title="Lihat closing botol">
+      <div class="stat-icon purple">📦</div>
+      <div class="stat-text">
+        <div class="stat-label">Closing Botol</div>
+        <div class="stat-num" id="st-botol">0</div>
+        <div class="stat-sub muted" id="st-botol-sub">total botol</div>
+      </div>
+    </div>
     <div class="stat-card" onclick="clickStat('live')" style="cursor:pointer" title="Lihat sesi aktif">
       <div class="stat-icon amber">⚡</div>
       <div class="stat-text">
@@ -1077,7 +1085,7 @@ async function loadStats() {
   // Filter per tanggal lead masuk (created_at)
   convs = filterByDateRange(convs);
 
-  const totalLead = convs.length;
+  const totalLead = convs.filter(c => c.state?.is_form_lead && !c.state?.skipped).length;
   const esc       = convs.filter(c => c.status === 'eskalasi').length;
   const selesai   = convs.filter(c => c.status === 'selesai').length;
   const aktif     = convs.filter(c => {
@@ -1085,13 +1093,14 @@ async function loadStats() {
     return (new Date() - new Date(c.last_msg_at)) < 86400000;
   }).length;
 
-  // Closing count: dari orders_new dalam date range
-  let closingCount = 0;
+  // Closing count + botol: dari orders_new dalam date range
+  let closingCount = 0, totalBotol = 0;
   try {
     const convIds = convs.map(c => c.id).filter(Boolean);
     if (convIds.length) {
-      const orders = await sbGet('orders_new', `?conversation_id=in.(${convIds.join(',')})&select=id`);
+      const orders = await sbGet('orders_new', `?conversation_id=in.(${convIds.join(',')})&select=id,qty`);
       closingCount = orders.length;
+      totalBotol = orders.reduce((sum, o) => sum + (o.qty || 1), 0);
     }
   } catch(e) { closingCount = selesai; }
 
@@ -1100,12 +1109,14 @@ async function loadStats() {
   document.getElementById('st-lead').textContent      = totalLead;
   document.getElementById('st-eskalasi').textContent  = esc;
   document.getElementById('st-closing').textContent   = closingCount;
+  document.getElementById('st-botol').textContent     = totalBotol;
   document.getElementById('st-aktif').textContent     = aktif;
   document.getElementById('st-lead-sub').textContent  = totalLead + ' lead masuk';
   document.getElementById('st-esc-sub').textContent   = esc > 0 ? esc + ' perlu penanganan' : 'aman terkendali';
   document.getElementById('st-esc-sub').className     = 'stat-sub ' + (esc > 0 ? 'danger' : 'ok');
   document.getElementById('st-closing-sub').textContent = closingRate + '% closing rate';
   document.getElementById('st-closing-sub').className = 'stat-sub ' + (closingRate >= 30 ? 'ok' : closingRate >= 15 ? 'muted' : 'danger');
+  document.getElementById('st-botol-sub').textContent = totalBotol + ' total botol';
   document.getElementById('st-aktif-sub').textContent = aktif + ' aktif dalam 24 jam';
 
   // Filter counts
