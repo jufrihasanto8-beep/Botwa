@@ -646,9 +646,9 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
       </button>
       <div class="drp-dropdown" id="drp-dropdown">
         <div class="drp-presets">
-          <button class="drp-preset" onclick="drpPreset(7,'7 hari terakhir',this)">7 Hari Terakhir</button>
+          <button class="drp-preset active" onclick="drpPreset(7,'7 hari terakhir',this)">7 Hari Terakhir</button>
           <button class="drp-preset" onclick="drpPreset(14,'14 hari terakhir',this)">14 Hari Terakhir</button>
-          <button class="drp-preset active" onclick="drpPreset(30,'30 hari terakhir',this)">30 Hari Terakhir</button>
+          <button class="drp-preset" onclick="drpPreset(30,'30 hari terakhir',this)">30 Hari Terakhir</button>
           <button class="drp-preset" onclick="drpPreset(90,'90 hari terakhir',this)">90 Hari Terakhir</button>
           <button class="drp-preset" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
           <button class="drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
@@ -867,9 +867,9 @@ let drpViewYear = new Date().getFullYear(), drpViewMonth = new Date().getMonth()
 const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const DAYS_ID   = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 
-// Default: 30 hari terakhir
+// Default: 7 hari terakhir (sama dengan orders.html)
 (function() {
-  drpSelStart = new Date(Date.now() - 29*864e5); drpSelStart.setHours(0,0,0,0);
+  drpSelStart = new Date(Date.now() - 6*864e5); drpSelStart.setHours(0,0,0,0);
   drpSelEnd   = new Date(); drpSelEnd.setHours(23,59,59,999);
   drpFilterStart = new Date(drpSelStart);
   drpFilterEnd   = new Date(drpSelEnd);
@@ -1093,14 +1093,17 @@ async function loadStats() {
     return (new Date() - new Date(c.last_msg_at)) < 86400000;
   }).length;
 
-  // Closing count + botol: dari orders_new, filter by orders_new.created_at (sama kayak orders.html)
+  // Closing count + botol: dari orders_new, filter by orders_new.created_at + product (sama kayak orders.html)
   let closingCount = 0, totalBotol = 0;
   try {
-    const allOrders = await sbGet('orders_new', `?user_id=eq.${userId}&select=id,qty,created_at`);
-    const ordersInRange = allOrders.filter(o => {
+    let orderQuery = `?user_id=eq.${userId}&select=id,qty,product_id,created_at`;
+    const allOrders = await sbGet('orders_new', orderQuery);
+    let ordersInRange = allOrders.filter(o => {
       const d = new Date(o.created_at);
       return d >= drpFilterStart && d <= drpFilterEnd;
     });
+    // Filter per produk aktif (ikut product switcher)
+    if (prodFilter) ordersInRange = ordersInRange.filter(o => o.product_id === prodFilter);
     closingCount = ordersInRange.length;
     totalBotol = ordersInRange.reduce((sum, o) => sum + (o.qty || 1), 0);
   } catch(e) { closingCount = selesai; }
