@@ -695,6 +695,7 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
         <div id="ch-status-area"></div>
         <div class="ch-acts">
           <button class="act-btn" title="Ambil alih dari AI" onclick="manualEscalate()" id="btn-ambil">🙋</button>
+          <button class="act-btn" title="Upload Bukti Transfer" onclick="openUploadBuktiTF()" id="btn-upload-tf">📎</button>
           <button class="act-btn" title="Closing Manual" onclick="openClosingManual()" id="btn-closing-manual">✍️</button>
           <button class="act-btn" title="Tandai selesai" onclick="markSelesai()" id="btn-selesai">✅</button>
           <button class="act-btn" title="Hapus chat" onclick="clearChat()">🗑</button>
@@ -828,6 +829,23 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
 
   </div><!-- /content-area -->
 </div><!-- /main -->
+
+<!-- Upload Bukti TF Modal -->
+<div id="tf-modal-overlay" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.5);align-items:center;justify-content:center" onclick="if(event.target===this)closeTFModal()">
+  <div style="background:var(--white);border-radius:14px;padding:24px;width:420px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.3)">
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px">📎 Upload Bukti Transfer</div>
+    <div id="tf-info" style="font-size:12px;color:var(--text-2);margin-bottom:12px;line-height:1.6"></div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;font-weight:600;color:var(--text-3);display:block;margin-bottom:4px">Foto Bukti Transfer</label>
+      <input type="file" id="tf-file" accept="image/*" style="font-size:12px;color:var(--text)">
+      <img id="tf-preview" style="display:none;max-width:100%;max-height:200px;margin-top:8px;border-radius:8px;border:1px solid var(--border)">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button onclick="closeTFModal()" style="padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer">Batal</button>
+      <button id="tf-submit-btn" onclick="submitBuktiTF()" style="padding:8px 18px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Upload & Kirim ke QC</button>
+    </div>
+  </div>
+</div>
 
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
@@ -2130,6 +2148,108 @@ async function submitClosingManual() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Simpan Closing';
+  }
+}
+
+/* ── UPLOAD BUKTI TRANSFER ── */
+function openUploadBuktiTF() {
+  if (!activeConv || !activeCustomer) { showToast('Pilih percakapan dulu'); return; }
+  const info = document.getElementById('tf-info');
+  const state = activeConv.state || {};
+  info.innerHTML = `<b>${esc(activeCustomer.nama || '-')}</b> · ${formatPhone(activeCustomer.wa_number)}<br>Qty: ${state.qty || 1}`;
+  document.getElementById('tf-file').value = '';
+  document.getElementById('tf-preview').style.display = 'none';
+  document.getElementById('tf-modal-overlay').style.display = 'flex';
+}
+
+function closeTFModal() {
+  document.getElementById('tf-modal-overlay').style.display = 'none';
+}
+
+// Preview image
+document.addEventListener('DOMContentLoaded', () => {
+  const fileInput = document.getElementById('tf-file');
+  if (fileInput) fileInput.addEventListener('change', () => {
+    const prev = document.getElementById('tf-preview');
+    if (fileInput.files[0]) {
+      const reader = new FileReader();
+      reader.onload = e => { prev.src = e.target.result; prev.style.display = 'block'; };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else { prev.style.display = 'none'; }
+  });
+});
+
+async function submitBuktiTF() {
+  const file = document.getElementById('tf-file').files[0];
+  if (!file) { showToast('Pilih foto bukti transfer dulu'); return; }
+  if (!activeConv || !activeCustomer) return;
+
+  const btn = document.getElementById('tf-submit-btn');
+  btn.disabled = true; btn.textContent = 'Mengupload...';
+
+  try {
+    // 1. Upload ke Supabase storage bucket bukti-tf
+    const ext = file.name.split('.').pop() || 'jpg';
+    const filename = `manual_${activeConv.id}_${Date.now()}.${ext}`;
+    const uploadRes = await fetch(`${SB_URL}/storage/v1/object/bukti-tf/${filename}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': file.type },
+      body: file,
+    });
+    if (!uploadRes.ok) throw new Error('Upload gagal: ' + await uploadRes.text());
+    const buktiUrl = `${SB_URL}/storage/v1/object/public/bukti-tf/${filename}`;
+
+    // 2. Ambil data produk
+    let prodName = '', prodId = activeConv.product_id || null;
+    if (prodId) {
+      const prods = await sbGet('products', `?id=eq.${prodId}&select=id,nama,harga&limit=1`).catch(() => []);
+      if (prods[0]) prodName = prods[0].nama || '';
+    }
+
+    const state = activeConv.state || {};
+    const qty   = parseInt(state.qty || 1) || 1;
+    const phone = (activeCustomer.wa_number || '').replace(/^62/, '0');
+
+    // 3. Insert ke transfer_qc
+    const qcData = {
+      user_id:          activeConv.user_id,
+      customer_id:      activeCustomer.id,
+      conversation_id:  activeConv.id,
+      product_id:       prodId,
+      bukti_url:        buktiUrl,
+      nominal:          null,
+      bank:             null,
+      tanggal_tf:       null,
+      rekening_tujuan:  null,
+      order_snapshot: {
+        alamat:    state.alamat || '',
+        keluhan:   state.keluhan || '',
+        ekspedisi: state.ongkir?.ekspedisi || '',
+        harga:     state.harga || 0,
+        ongkirPromo: state.ongkir?.ongkirPromo || 0,
+      },
+      customer_nama:    activeCustomer.nama || '',
+      customer_phone:   phone,
+      product_nama:     prodName,
+      qty:              qty,
+      total:            (state.harga || 0) + (state.ongkir?.ongkirPromo || 0),
+      qc_status:        'pending',
+    };
+
+    const insertRes = await fetch(`${SB_URL}/rest/v1/transfer_qc`, {
+      method: 'POST',
+      headers: { ...sbH, 'Prefer': 'return=representation' },
+      body: JSON.stringify(qcData),
+    });
+    if (!insertRes.ok) throw new Error('Insert QC gagal: ' + await insertRes.text());
+
+    showToast('✅ Bukti transfer berhasil dikirim ke QC');
+    closeTFModal();
+  } catch(e) {
+    showToast('❌ ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Upload & Kirim ke QC';
   }
 }
 </script>
