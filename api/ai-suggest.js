@@ -337,12 +337,24 @@ Saran balasan: minta customer balas ulang dengan kecamatan saja supaya sistem bi
       alternating.push({ ...msg });
     }
   }
-  // Harus mulai dari 'user'
-  if (alternating.length && alternating[0].role === 'assistant') alternating.shift();
-  // Harus berakhir dengan 'user' (Claude API tidak bisa generate kalau last message assistant)
-  while (alternating.length && alternating[alternating.length - 1].role === 'assistant') {
-    alternating.pop();
+
+  // Simpan pesan yang akan di-strip ke extraContext (biar tetap terbaca di system prompt)
+  let extraContext = '';
+
+  // Strip leading assistant → simpan ke extraContext
+  if (alternating.length && alternating[0].role === 'assistant') {
+    extraContext += `\n\nPESAN AWAL BOT (sambutan/konteks form):\n"${alternating[0].content}"`;
+    alternating.shift();
   }
+  // Strip trailing assistant → simpan ke extraContext
+  const trailingBot = [];
+  while (alternating.length && alternating[alternating.length - 1].role === 'assistant') {
+    trailingBot.unshift(alternating.pop());
+  }
+  if (trailingBot.length) {
+    extraContext += `\n\nPESAN TERAKHIR BOT (belum dibalas customer):\n"${trailingBot.map(m => m.content).join('\n')}"`;
+  }
+
   if (!alternating.length) return res.status(400).json({ error: 'Tidak ada pesan customer yang valid' });
 
   // Build info harga produk (bundling jika ada, satuan jika tidak)
@@ -358,6 +370,21 @@ Saran balasan: minta customer balas ulang dengan kecamatan saja supaya sistem bi
     }
   }
 
+  // Build konteks state conversation biar Haiku tau situasi
+  let stateContext = '';
+  if (convState) {
+    const parts = [];
+    if (convState.tahap) parts.push(`Tahap: ${convState.tahap}`);
+    if (convState.nama_customer) parts.push(`Nama customer: ${convState.nama_customer}`);
+    if (convState.form_alamat) parts.push(`Alamat dari form: ${convState.form_alamat}`);
+    if (convState.wilayah) parts.push(`Wilayah: ${convState.wilayah}`);
+    if (convState.proposed_wilayah && !convState.wilayah) parts.push(`Wilayah (belum konfirm): ${convState.proposed_wilayah}`);
+    if (convState.metode_bayar) parts.push(`Metode bayar: ${convState.metode_bayar}`);
+    if (convState.qty) parts.push(`Qty: ${convState.qty}`);
+    if (convState.order_placed) parts.push(`Status: ORDER SUDAH DIKIRIM`);
+    if (parts.length) stateContext = `\n\nSTATUS PERCAKAPAN:\n${parts.join('\n')}`;
+  }
+
   const sysPrompt = `Kamu CS toko yang membalas pesan WhatsApp customer. Nama kamu "Sari".
 Tugas: buat SATU balasan terbaik untuk melanjutkan percakapan ini.
 ${produkInfo}
@@ -366,7 +393,7 @@ Rules:
 - DILARANG markdown (*bold*, _italic_, dll) — ini WhatsApp
 - Panggil "Kak", emoji secukupnya
 - Jangan ulangi apa yang sudah dibahas
-- Baca seluruh konteks percakapan dan buat balasan yang RELEVAN dengan pesan terakhir${ongkirContext}`;
+- Baca seluruh konteks percakapan dan buat balasan yang RELEVAN dengan pesan terakhir${stateContext}${extraContext}${ongkirContext}`;
 
   try {
     const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
