@@ -510,7 +510,7 @@ function filterByRange(list) {
 
 function filterLeadsByRange(leads) {
   return leads.filter(c => {
-    const d = new Date(c.last_msg_at || c.created_at);
+    const d = new Date(c.created_at);
     return d >= filterStart && d <= filterEnd;
   });
 }
@@ -529,7 +529,7 @@ async function init() {
   prods.forEach(p => { prodMap[p.id] = p; });
   convs.forEach(c => { convMap[c.id] = c; });
 
-  allLeads = (convs || []).filter(c => c.state?.is_form_lead);
+  allLeads = (convs || []).filter(c => c.state?.is_form_lead && !c.state?.skipped);
 
   // Closing dihitung dari orders_new (bukan conversations)
   // Tanggal = orders_new.created_at (waktu closing sebenarnya)
