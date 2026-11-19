@@ -762,15 +762,25 @@ Isi field yang ada saja, kosongkan yang tidak disebutkan. Jangan mengarang.`;
   } catch { return null; }
 }
 
+/* ── NORMALISASI ANGKA → HURUF untuk nama wilayah Indonesia ── */
+const ANGKA_MAP = { '1':'Satu','2':'Dua','3':'Tiga','4':'Empat','5':'Lima','6':'Enam','7':'Tujuh','8':'Delapan','9':'Sembilan','10':'Sepuluh',
+  '11':'Sebelas','12':'Dua Belas','13':'Tiga Belas','14':'Empat Belas','15':'Lima Belas' };
+function normalizeAngkaWilayah(str) {
+  if (!str) return str;
+  // "Woloan 1 Utara" → "Woloan Satu Utara", "Taratara 2" → "Taratara Dua"
+  return str.replace(/\b(\d{1,2})\b/g, (m, num) => ANGKA_MAP[num] || m);
+}
+
 /* ── VALIDASI WILAYAH via DB wilayah_id ────────────────────── */
 // Terima object dari Haiku extract, validasi & lengkapi dari DB
 // Return: { valid: true, row: {kelurahan,kecamatan,kabupaten,provinsi}, missing: [] }
 //    atau { valid: false, row: partial|null, missing: ['kelurahan'|'kecamatan'|'kabupaten'], candidates: [...] }
 async function validateWilayahDB(lokasi) {
   if (!lokasi) return { valid: false, row: null, missing: ['kelurahan','kecamatan','kabupaten'] };
-  const kel = (lokasi.kelurahan || '').trim();
-  const kec = (lokasi.kecamatan || '').trim();
-  const kab = (lokasi.kabupaten || '').trim();
+  // Normalisasi angka → huruf (1→Satu, 2→Dua, dst) karena DB pakai huruf
+  const kel = normalizeAngkaWilayah((lokasi.kelurahan || '').trim());
+  const kec = normalizeAngkaWilayah((lokasi.kecamatan || '').trim());
+  const kab = (lokasi.kabupaten || '').trim(); // kabupaten jarang pakai angka
 
   // Case 1: ketiga field ada → cek exact match di DB
   if (kel && kec && kab) {
@@ -1691,7 +1701,7 @@ module.exports = async function handler(req, res) {
     const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_origin_id,mengantar_area_id,default_sumber&limit=1`).catch(() => []);
     const userRekening      = userRows[0]?.rekening            || null;
     const userAnthropicKey  = userRows[0]?.anthropic_key       || null;
-    const ai = resolveAI(product, aiKey);
+    const ai = resolveAI(product, userAnthropicKey);
     const aiKey = ai.key;
     const aiBase = ai.base;
     const userGroupJid      = userRows[0]?.group_jid            || WA_GROUP_JID;
@@ -2069,7 +2079,7 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
               'Kamu CS herbal yang hangat dan peduli. Balas singkat, natural, gaya WA.',
               [{ role: 'user', content: closingPrompt }],
               'claude-haiku-4-5-20251001',
-              aiKey
+              aiKey, aiBase
             );
           } catch(e) {
             closingCustomer = null;
@@ -2172,7 +2182,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
               'Kamu asisten CRM. Buat catatan singkat dan padat.',
               [{ role: 'user', content: catatanPrompt }],
               'claude-haiku-4-5-20251001',
-              aiKey
+              aiKey, aiBase
             );
 
             if (catatanBaru) {
