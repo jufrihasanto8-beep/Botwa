@@ -585,12 +585,14 @@ function calcStats(list, leadsFiltered) {
 
   list.forEach(o => {
     const qty = parseInt(o.qty || 1);
-    const harga = o.harga || prodMap[o.product_id]?.harga || 0;
+    // Gross = harga produk saja (sudah include bundling, tanpa ongkir/feeCOD)
+    const hargaProduk = o.harga || 0;
+    gross += hargaProduk;
+    totalQty += qty;
+
     const ongkir = o.ongkir_after_promo ?? o.ongkir ?? 0;
     const feeCod = o.fee_cod ?? 0;
-    const nilai = o.total || (harga * qty + ongkir + feeCod);
-    gross += nilai;
-    totalQty += qty;
+    const nilai = o.total || (hargaProduk + ongkir + feeCod);
 
     const metode = (o.metode || 'cod').toLowerCase();
     if (metode === 'transfer') { tfCount++; tfRp += nilai; }
@@ -620,11 +622,7 @@ function calcStats(list, leadsFiltered) {
   const prevList = prevFiltered.filter(o => { const d=new Date(o.created_at); return d>=prevStart&&d<prevEnd; });
   let prevGross = 0;
   prevList.forEach(o => {
-    const harga = o.harga || prodMap[o.product_id]?.harga || 0;
-    const qty = parseInt(o.qty || 1);
-    const ongkir = o.ongkir_after_promo ?? o.ongkir ?? 0;
-    const feeCod = o.fee_cod ?? 0;
-    prevGross += o.total || (harga * qty + ongkir + feeCod);
+    prevGross += o.harga || 0;
   });
   const prevTotal = prevList.length;
 

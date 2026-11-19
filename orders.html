@@ -567,14 +567,15 @@ function calcStats(list, leadsFiltered) {
     const ord = c._order || {};
     const st = c.state || {};
     const snap = st.order_snapshot || {};
-    const prod = prodMap[c.product_id] || {};
     const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
-    const harga = ord.harga || snap.harga || prod.harga || 0;
+    // Gross = harga produk saja (sudah include bundling, tanpa ongkir/feeCOD)
+    const hargaProduk = ord.harga || snap.harga || 0;
+    gross += hargaProduk;
+    totalQty += qty;
+
     const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
     const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
-    const nilai = ord.total || snap.total || (harga + ongkir + feeCod);
-    gross += nilai;
-    totalQty += qty;
+    const nilai = ord.total || snap.total || (hargaProduk + ongkir + feeCod);
 
     const metode = (ord.metode || snap.metode || st.metode_bayar || 'cod').toLowerCase();
     if (metode === 'transfer') { tfCount++; tfRp += nilai; }
@@ -600,14 +601,8 @@ function calcStats(list, leadsFiltered) {
   let prevGross = 0;
   prevList.forEach(c => {
     const ord = c._order || {};
-    const st = c.state || {};
-    const snap = st.order_snapshot || {};
-    const prod = prodMap[c.product_id] || {};
-    const qty = parseInt(ord.qty || snap.qty || st.qty || 1);
-    const harga = ord.harga || snap.harga || prod.harga || 0;
-    const ongkir = ord.ongkir_after_promo ?? snap.ongkirPromo ?? st.ongkir?.ongkirPromo ?? st.ongkir?.ongkirAsli ?? 0;
-    const feeCod = ord.fee_cod ?? snap.feeCOD ?? 0;
-    prevGross += ord.total || snap.total || (harga + ongkir + feeCod);
+    const snap = (c.state || {}).order_snapshot || {};
+    prevGross += ord.harga || snap.harga || 0;
   });
   const prevTotal = prevList.length;
 
