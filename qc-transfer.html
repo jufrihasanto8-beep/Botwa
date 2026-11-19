@@ -369,6 +369,7 @@ async function doApprove(qcId, btn) {
     });
     const j = await r.json();
     if (j.ok) {
+      document.getElementById('filter-status').value = 'all';
       loadData();
     } else {
       alert('Error: ' + (j.error || 'Gagal approve'));
@@ -407,6 +408,7 @@ async function confirmReject() {
     const j = await r.json();
     if (j.ok) {
       closeRejectModal();
+      document.getElementById('filter-status').value = 'all';
       loadData();
     } else {
       alert('Error: ' + (j.error || 'Gagal reject'));
