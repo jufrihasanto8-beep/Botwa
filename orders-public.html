@@ -462,11 +462,10 @@ function filterLeadsByRange(leads) {
 
 async function init() {
   // Fetch ALL data tanpa user_id filter — sama kayak all-orders.html
-  const [orders, prods, users, convs] = await Promise.all([
+  const [orders, prods, users] = await Promise.all([
     sbFetch('orders_new', '?select=id,user_id,customer_id,conversation_id,product_id,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,metode,ekspedisi,customer_nama,customer_phone,product_nama,created_at&order=created_at.desc'),
     sbFetch('products', '?select=id,nama,harga'),
-    sbFetch('users', '?select=id,name&order=name'),
-    sbFetch('conversations', '?select=id,user_id,product_id,state,created_at')
+    sbFetch('users', '?select=id,name&order=name')
   ]);
 
   (prods || []).forEach(p => { prodMap[p.id] = p; });
@@ -496,8 +495,19 @@ async function init() {
 
   allOrders = orders || [];
 
-  // Lead = conversations with is_form_lead && !skipped
-  allLeads = (convs || []).filter(c => c.state?.is_form_lead && !c.state?.skipped);
+  // Fetch lead per user (sama persis kayak orders.html)
+  allLeads = [];
+  const userIds = (users || []).map(u => u.id);
+  const leadBatches = await Promise.all(
+    userIds.map(uid =>
+      sbFetch('conversations', `?user_id=eq.${uid}&select=id,user_id,product_id,state,created_at&order=last_msg_at.desc&limit=10000`)
+    )
+  );
+  leadBatches.forEach(convs => {
+    (convs || []).forEach(c => {
+      if (c.state?.is_form_lead && !c.state?.skipped) allLeads.push(c);
+    });
+  });
 
   render();
 }
