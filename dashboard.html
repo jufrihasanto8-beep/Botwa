@@ -1093,15 +1093,16 @@ async function loadStats() {
     return (new Date() - new Date(c.last_msg_at)) < 86400000;
   }).length;
 
-  // Closing count + botol: dari orders_new dalam date range
+  // Closing count + botol: dari orders_new, filter by orders_new.created_at (sama kayak orders.html)
   let closingCount = 0, totalBotol = 0;
   try {
-    const convIds = convs.map(c => c.id).filter(Boolean);
-    if (convIds.length) {
-      const orders = await sbGet('orders_new', `?conversation_id=in.(${convIds.join(',')})&select=id,qty`);
-      closingCount = orders.length;
-      totalBotol = orders.reduce((sum, o) => sum + (o.qty || 1), 0);
-    }
+    const allOrders = await sbGet('orders_new', `?user_id=eq.${userId}&select=id,qty,created_at`);
+    const ordersInRange = allOrders.filter(o => {
+      const d = new Date(o.created_at);
+      return d >= drpFilterStart && d <= drpFilterEnd;
+    });
+    closingCount = ordersInRange.length;
+    totalBotol = ordersInRange.reduce((sum, o) => sum + (o.qty || 1), 0);
   } catch(e) { closingCount = selesai; }
 
   const closingRate = totalLead > 0 ? Math.round((closingCount / totalLead) * 100) : 0;
