@@ -377,7 +377,7 @@ ATURAN HARGA, ONGKIR & COD
   JANGAN tulis [WILAYAH_OK:...] sebelum provinsi dipastikan oleh customer.
 - Wilayah tak konsisten → konfirmasi halus, jangan asal proses.
 - Kurir dipilih SISTEM berdasarkan grade + ongkir daerah itu.
-- Fee COD 3% ke customer, dibulatkan ke terdekat.
+- Fee COD sudah DIGABUNG ke angka ongkir. DILARANG KERAS menyebut "admin COD", "fee COD", atau "biaya admin" ke customer — cukup sebut "ongkir" saja.
 - Kalau ditanya "pengiriman dari mana" → jawab dari DATA PRODUK di atas (Asal pengiriman). Jangan bilang "tidak bisa info".
 - Promo ongkir diterapkan SISTEM (berlaku COD & transfer).
 
@@ -394,6 +394,7 @@ Via {ekspedisi} ya kak 🚗
 Kakak enaknya COD atau transfer? 🙏
 
 Catatan format: ~text~ adalah strikethrough di WhatsApp. Kalau tidak ada promo ongkir, jangan pakai strikethrough — tulis angka ongkir langsung.
+⚠️ PENTING: TOTAL WAJIB dihitung pakai ongkir_promo (angka SETELAH diskon), BUKAN ongkir_asli. Angka ongkir_asli hanya untuk ditampilkan dengan strikethrough (~coret~), JANGAN dipakai untuk menghitung total.
 
 ALUR CATAT ORDER
 Urutan WAJIB diikuti:
@@ -1425,7 +1426,7 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
 
 Paket ${defaultPaket.qty} box ${product?.nama || 'Produk'}:
 💳 Transfer: ${fmt(defaultHarga)} + ongkir ${defaultOngkirDisplay} = TOTAL ${fmt(defaultTotalTF)}
-📦 COD: ${fmt(defaultHarga)} + ongkir ${defaultOngkirDisplay} + admin ${fmt(defaultFeeCOD)} = TOTAL ${fmt(defaultTotalCOD)}
+📦 COD: ${fmt(defaultHarga)} + ongkir ${fmt(defaultOngkir + defaultFeeCOD)} = TOTAL ${fmt(defaultTotalCOD)}
 
 Via ${hasil.ekspedisi} ya kak 🚗
 
@@ -1456,7 +1457,7 @@ ${tabelSemuaPaket}
 HARGA 1 BOX (kalau customer minta 1 saja):
 ${codOk
   ? `💳 Transfer: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} = TOTAL ${fmt(satuanTotalTF)}
-📦 COD: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} + admin ${fmt(satuanFeeCOD)} = TOTAL ${fmt(satuanTotalCOD)}`
+📦 COD: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir + satuanFeeCOD)} = TOTAL ${fmt(satuanTotalCOD)}`
   : `💳 Transfer: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} = TOTAL ${fmt(satuanTotalTF)}`}
 Kalau customer pilih 1 box: berikan harga di atas, lalu SEKALI rekomendasikan paket bundling lebih hemat. Kalau tetap pilih 1 → langsung proses, jangan paksa.`;
 
@@ -1467,11 +1468,8 @@ Kalau customer pilih 1 box: berikan harga di atas, lalu SEKALI rekomendasikan pa
 
 ${product?.nama || 'Produk'} ${fmt(hasil.harga)}
 
-💳 Transfer
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
-
-📦 COD
-${product?.nama || 'Produk'} ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(hasil.feeCOD)} = TOTAL ${fmt(hasil.totalCOD)}
+💳 Transfer: ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
+📦 COD: ${fmt(hasil.harga)} + ongkir ${fmt((hasil.ongkirPromo || hasil.ongkirAsli || 0) + (hasil.feeCOD || 0))} = TOTAL ${fmt(hasil.totalCOD)}
 
 Via ${hasil.ekspedisi} ya kak 🚗
 
@@ -1576,12 +1574,14 @@ function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, sat
   const oa = ongkirAsli  || op;
   const fc = isCOD ? (feeCOD || 0) : 0;
   const total = h + op + fc;
-  const adaDiskonOngkir = oa > 0 && oa > op;
+  // Untuk COD: gabungkan ongkir + fee COD jadi 1 angka "ongkir"
+  const ongkirTampil = isCOD ? (op + fc) : op;
+  const ongkirAsliTampil = isCOD ? (oa + fc) : oa;
+  const adaDiskonOngkir = ongkirAsliTampil > 0 && ongkirAsliTampil > ongkirTampil;
 
-  // Tampilkan ongkir dengan diskon kalau ada
   const ongkirStr = adaDiskonOngkir
-    ? `~Rp ${oa.toLocaleString('id-ID')}~ Rp ${op.toLocaleString('id-ID')}`
-    : `Rp ${op.toLocaleString('id-ID')}`;
+    ? `~Rp ${ongkirAsliTampil.toLocaleString('id-ID')}~ Rp ${ongkirTampil.toLocaleString('id-ID')}`
+    : `Rp ${ongkirTampil.toLocaleString('id-ID')}`;
 
   const fmt = (n) => `Rp ${n.toLocaleString('id-ID')}`;
 
@@ -1604,7 +1604,7 @@ function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, sat
 
 *Jumlah Pesanan:* ${qty} ${satuanLabel} ${productNama || '-'}
 *Harga Produk:* ${fmt(h)}
-*Ongkir:* ${ongkirStr}${adaDiskonOngkir ? ` 🎉` : ''}${isCOD && fc > 0 ? `\n*Admin COD:* ${fmt(fc)}` : ''}
+*Ongkir:* ${ongkirStr}${adaDiskonOngkir ? ` 🎉` : ''}
 *Pembayaran:* ${isCOD ? 'COD' : 'Transfer'} ${ekspLabel}
 *Total Pembayaran:* ${fmt(total)}${rekeningBlock}
 
@@ -3233,7 +3233,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
               + `WAJIB lakukan SEKARANG dalam 1 pesan:\n`
               + `1. Tampilkan total:\n`
               + `📦 COD\n`
-              + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(d.feeCOD)} = TOTAL ${fmt(d.totalCOD)}\n`
+              + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${fmt((d.ongkirPromo || 0) + (d.feeCOD || 0))} = TOTAL ${fmt(d.totalCOD)}\n`
               + `Via ${ekspLabel} ya kak 🚗\n\n`
               + `2. Langsung tulis marker di AKHIR pesan (jangan tanya konfirmasi lagi):\n`
               + `[ORDER_CONFIRMED]\n`
@@ -3257,7 +3257,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           if (pilihCOD) {
             hint = `[SISTEM] Customer memilih COD. WAJIB tampilkan ULANG total lengkap ke customer PERSIS seperti ini:\n\n`
               + `📦 COD\n`
-              + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${ongkirDisplay} + admin ${fmt(d.feeCOD)} = TOTAL ${fmt(d.totalCOD)}\n`
+              + `${product?.nama || 'Produk'} ${fmt(d.harga)} + ongkir ${fmt((d.ongkirPromo || 0) + (d.feeCOD || 0))} = TOTAL ${fmt(d.totalCOD)}\n`
               + `Via ${ekspLabel} ya kak 🚗\n\n`
               + `Setelah tampilkan total di atas, minta data yang BELUM ADA saja (nama, nomor HP, alamat lengkap). `
               + `Cek dulu dari data customer yang sudah diketahui — jangan tanya ulang yang sudah ada. JANGAN hanya bilang "Siap kak" tanpa total.`;
@@ -4044,7 +4044,7 @@ ${ongkirInfo}`;
     }
 
     // ── Auto-kirim gambar produk kalau customer tanya foto ────
-    const tanyaFoto = /\b(foto|gambar|pic|photo|tampilan|bentuk|wujud|lihat produk|gambarnya|fotonya|kirim dong|kirimnya|mana fotonya|mana gambarnya|belum terkirim|belum muncul|kirim ulang|kirim lagi)\b/i.test(message);
+    const tanyaFoto = /\b(foto\w*|gambar\w*|pic|photo\w*|tampilan\w*|bentuk\w*|wujud\w*|lihat produk|kirim dong|kirimnya|mana foto|mana gambar|belum terkirim|belum muncul|kirim ulang|kirim lagi)/i.test(message);
     const adaGambarProduk = product?.gambar_url;
     const sudahKirimFoto  = convState.foto_terkirim;
 
@@ -4096,12 +4096,30 @@ ${ongkirInfo}`;
       }
     }
 
-    // ── Auto-kirim foto testimoni kalau customer minta bukti/review ────
-    const tanyaTestimoni = /\b(testimoni|testi|bukti|review|hasil|nyata|beneran|real|ada yang sudah|yang udah pakai|yang sudah pakai|ada hasilnya|ada fotonya|foto hasilnya|foto buktinya|sebelum sesudah|before after|ada reviewnya|ada buktiny)\b/i.test(message);
+    // ── Detect cancel: customer bilang batal/cancel 2x+ → label cancelled ────
+    const isCancelMsg = /\b(cancel|batal|tidak jadi|tdk jadi|ga jadi|gak jadi|gk jadi|ngga jadi)\b/i.test(message);
+    if (isCancelMsg && !convState.is_cancelled) {
+      // Cek apakah customer sudah bilang cancel sebelumnya (2x baru label)
+      const prevCancelCount = (convState.cancel_count || 0) + 1;
+      if (prevCancelCount >= 2) {
+        // Customer sudah 2x bilang cancel → tandai cancelled di state
+        await updateConvState(conversation.id, { is_cancelled: true, cancel_count: prevCancelCount });
+        console.log(`[CANCEL] Conv ${conversation.id} ditandai cancelled (customer bilang ${prevCancelCount}x)`);
+      } else {
+        // Pertama kali bilang cancel → catat tapi belum label (bot masih coba retain)
+        await updateConvState(conversation.id, { cancel_count: prevCancelCount });
+        console.log(`[CANCEL] Conv ${conversation.id} cancel_count=${prevCancelCount} (bot akan coba retain)`);
+      }
+    }
+
+    // ── Auto-kirim foto testimoni ────
+    // Trigger: customer minta ATAU bot reply menyebut testimoni/bukti
+    const tanyaTestimoni = /\b(testimoni\w*|testi\w*|bukti\w*|review\w*|hasil\w*|nyata|beneran|real|ada yang sudah|yang udah pakai|yang sudah pakai|ada hasilnya|ada fotonya|foto hasilnya|foto buktinya|sebelum sesudah|before after|ada reviewnya|ada buktiny)/i.test(message);
+    const botSebutTesti = /\b(testimoni\w*|testi\w*|bukti.*pakai|kirimkan.*testi|kirim.*testi|ini testimoni)/i.test(reply);
     const testiList = Array.isArray(product?.testimoni_urls) ? product.testimoni_urls.filter(Boolean) : [];
     const sudahKirimTesti = convState.testimoni_terkirim;
 
-    if (tanyaTestimoni && testiList.length > 0 && !sudahKirimTesti) {
+    if ((tanyaTestimoni || botSebutTesti) && testiList.length > 0 && !sudahKirimTesti) {
       await new Promise(r => setTimeout(r, 800));
       try {
         for (let i = 0; i < testiList.length; i++) {

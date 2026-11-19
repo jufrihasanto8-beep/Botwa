@@ -3,7 +3,7 @@
  * Semua endpoint: GET/POST ke /api/baileys-proxy?path=/session/status/xxx
  */
 
-const BAILEYS_URL    = process.env.BAILEYS_URL    || 'http://13.140.178.4:3000';
+const BAILEYS_URL    = process.env.BAILEYS_URL    || 'http://13.140.178.4:3003';
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 
 module.exports = async function handler(req, res) {

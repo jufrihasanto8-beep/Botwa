@@ -148,6 +148,8 @@ function resolveAI(product) {
 
 // ── Stage Detection — tentuin delay berdasarkan state ────
 function getStageDelay(state) {
+  // cancelled → stop semua follow-up
+  if (state.is_cancelled) return null;
   // awaiting_order_confirm di-handle order reminder terpisah
   if (state.awaiting_order_confirm || state.awaiting_order_correction) return null;
   // order sudah masuk → stop
@@ -482,7 +484,7 @@ module.exports = async function handler(req, res) {
 
     const eligibleAwaiting = awaitingConvs.filter(c => {
       const state = c.state || {};
-      return state.awaiting_order_confirm && !state.order_placed;
+      return state.awaiting_order_confirm && !state.order_placed && !state.is_cancelled;
     });
 
     if (eligibleAwaiting.length) {
