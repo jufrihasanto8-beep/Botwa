@@ -621,12 +621,34 @@ async function saveMessage(conversationId, role, isi, wamid = null) {
   return sbPost('conv_messages', payload);
 }
 
-/* ── CALL CLAUDE ──────────────────────────────────────────── */
-async function callClaude(systemPrompt, messages, model = 'claude-sonnet-4-6', apiKey = null) {
-  const key = apiKey || ANTHROPIC_KEY;
-  if (!key) throw new Error('ANTHROPIC_KEY belum diset');
+/* ── RESOLVE AI ENDPOINT — product-level → user-level fallback ── */
+const MWAPI_BASE = 'https://api.mwapi.dev';
+const ANTHROPIC_BASE = 'https://api.anthropic.com';
 
-  const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+function resolveAI(product, userAnthropicKey) {
+  // 1. Product punya ai_api_key → pakai sesuai provider
+  if (product?.ai_api_key) {
+    const base = product.ai_provider === 'mwapi' ? MWAPI_BASE : ANTHROPIC_BASE;
+    return { key: product.ai_api_key, base };
+  }
+  // 2. Fallback ke user anthropic_key dari Settings
+  if (userAnthropicKey) {
+    return { key: userAnthropicKey, base: ANTHROPIC_BASE };
+  }
+  // 3. Fallback ke env (legacy, akan dihapus nanti)
+  if (ANTHROPIC_KEY) {
+    return { key: ANTHROPIC_KEY, base: ANTHROPIC_BASE };
+  }
+  return { key: null, base: ANTHROPIC_BASE };
+}
+
+/* ── CALL CLAUDE ──────────────────────────────────────────── */
+async function callClaude(systemPrompt, messages, model = 'claude-sonnet-4-6', apiKey = null, baseUrl = null) {
+  const key = apiKey || ANTHROPIC_KEY;
+  if (!key) throw new Error('API key AI belum diset (cek Settings atau Product)');
+  const base = baseUrl || ANTHROPIC_BASE;
+
+  const res = await fetchWithTimeout(`${base}/v1/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -717,15 +739,16 @@ function extractProposedWilayah(aiMsg) {
 // extractConfirmedWilayah dihapus — pakai [WILAYAH_OK:] marker saja
 
 /* ── EXTRACT LOKASI PAKAI HAIKU (untuk reply customer setelah AI tanya alamat) ── */
-async function extractLokasiHaiku(text, apiKey) {
+async function extractLokasiHaiku(text, apiKey, baseUrl = null) {
   const key = apiKey || ANTHROPIC_KEY;
   if (!key) return null;
+  const base = baseUrl || ANTHROPIC_BASE;
   const prompt = `Dari teks berikut, ekstrak nama kelurahan/desa, kecamatan, dan kabupaten/kota di Indonesia jika ada.
 Teks: "${text}"
 Jawab dengan JSON saja tanpa penjelasan: {"kelurahan":"...","kecamatan":"...","kabupaten":"..."} atau null jika tidak ada nama wilayah Indonesia yang jelas.
 Isi field yang ada saja, kosongkan yang tidak disebutkan. Jangan mengarang.`;
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(`${base}/v1/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 80, messages: [{ role: 'user', content: prompt }] }),
@@ -1667,7 +1690,10 @@ module.exports = async function handler(req, res) {
     // ── Ambil rekening dari users table ───────────────────────
     const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_origin_id,mengantar_area_id,default_sumber&limit=1`).catch(() => []);
     const userRekening      = userRows[0]?.rekening            || null;
-    const userAnthropicKey  = userRows[0]?.anthropic_key       || ANTHROPIC_KEY;
+    const userAnthropicKey  = userRows[0]?.anthropic_key       || null;
+    const ai = resolveAI(product, aiKey);
+    const aiKey = ai.key;
+    const aiBase = ai.base;
     const userGroupJid      = userRows[0]?.group_jid            || WA_GROUP_JID;
     const QC_GROUP_JID      = process.env.QC_GROUP_JID          || userGroupJid; // global, fallback ke grup recap
     const userMngOriginId   = userRows[0]?.mengantar_origin_id  || MENGANTAR_ORIGIN_ID; // warehouse ID (buat order)
@@ -1914,9 +1940,9 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
         } else {
         // ── Customer kirim koreksi — extract via Claude Haiku ──
         try {
-          const extractRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+          const extractRes = await fetchWithTimeout(`${aiBase}/v1/messages`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-api-key': userAnthropicKey, 'anthropic-version': '2023-06-01' },
+            headers: { 'Content-Type': 'application/json', 'x-api-key': aiKey, 'anthropic-version': '2023-06-01' },
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 200,
@@ -2043,7 +2069,7 @@ Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet 
               'Kamu CS herbal yang hangat dan peduli. Balas singkat, natural, gaya WA.',
               [{ role: 'user', content: closingPrompt }],
               'claude-haiku-4-5-20251001',
-              userAnthropicKey
+              aiKey
             );
           } catch(e) {
             closingCustomer = null;
@@ -2146,7 +2172,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
               'Kamu asisten CRM. Buat catatan singkat dan padat.',
               [{ role: 'user', content: catatanPrompt }],
               'claude-haiku-4-5-20251001',
-              userAnthropicKey
+              aiKey
             );
 
             if (catatanBaru) {
@@ -2263,7 +2289,7 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       // Prioritas 1: form_alamat dari form lead — pakai Haiku AI extract
       const hasFormAlamat = convState.is_form_lead && convState.form_alamat;
       if (hasFormAlamat) {
-        lokasi = await extractLokasiHaiku(convState.form_alamat, userAnthropicKey).catch(() => null);
+        lokasi = await extractLokasiHaiku(convState.form_alamat, aiKey, aiBase).catch(() => null);
         console.log(`[auto-load] Haiku extract form_alamat: "${convState.form_alamat}" →`, lokasi);
         sumber = 'form_alamat';
       }
@@ -2969,7 +2995,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     // Flag di-set setelah AI nanya alamat/wilayah ke customer
     if (convState.waiting_for_location && !convState.ongkir && !convState.wilayah_data && !isConfirmation(message) && !(proposedWilayah && containsConfirmation(message))) {
       console.log(`[location] waiting_for_location aktif, extract dari: "${message.slice(0,80)}"`);
-      const lokasi = await extractLokasiHaiku(message, userAnthropicKey);
+      const lokasi = await extractLokasiHaiku(message, aiKey, aiBase);
       console.log(`[location] Haiku extract:`, lokasi);
 
       if (lokasi?.kecamatan || lokasi?.kabupaten || lokasi?.kelurahan) {
@@ -3052,7 +3078,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
     if (!autoOngkirResult && proposedWilayah && containsConfirmation(message) && !convState.ongkir) {
       console.log(`Auto-trigger ongkir untuk wilayah: ${proposedWilayah}`);
       // Coba validasi proposed_wilayah dulu via DB
-      const lokasiParsed = await extractLokasiHaiku(proposedWilayah, userAnthropicKey).catch(() => null);
+      const lokasiParsed = await extractLokasiHaiku(proposedWilayah, aiKey, aiBase).catch(() => null);
       const validasi = lokasiParsed ? await validateWilayahDB(lokasiParsed) : { valid: false };
 
       const ongkirInput = validasi.valid ? validasi.row : proposedWilayah;
@@ -3187,9 +3213,9 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         ...history,
         { role: 'user', content: injeksi },
       ];
-      rawReply = await callClaude(systemPrompt, historyWithOngkir, chatModel, userAnthropicKey);
+      rawReply = await callClaude(systemPrompt, historyWithOngkir, chatModel, aiKey, aiBase);
     } else {
-      rawReply = await callClaude(systemPrompt, history, chatModel, userAnthropicKey);
+      rawReply = await callClaude(systemPrompt, history, chatModel, aiKey, aiBase);
     }
 
     if (!rawReply) return res.status(200).json({ ok: true, skipped: 'no_reply' });
@@ -3202,7 +3228,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
         { role: 'user', content: buildOngkirInjeksi(precomputedOngkir, product,
             `Lanjutkan balasan di atas dan langsung tampilkan total harga ke customer sekarang juga. Wilayah customer: ${precomputedFirst?.kelurahan}, ${precomputedFirst?.kecamatan}, ${precomputedFirst?.kabupaten}. `) },
       ];
-      const ongkirReply = await callClaude(systemPrompt, histWithPrecomputed, chatModel, userAnthropicKey);
+      const ongkirReply = await callClaude(systemPrompt, histWithPrecomputed, chatModel, aiKey, aiBase);
       if (ongkirReply) rawReply = ongkirReply;
       // Strip [WILAYAH_OK:] dari rawReply supaya handler di bawah tidak proses ulang
       rawReply = rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/g, '').trim();
@@ -3278,7 +3304,7 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
           { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, histTanya, chatModel, userAnthropicKey);
+        rawReply = await callClaude(systemPrompt, histTanya, chatModel, aiKey, aiBase);
 
       } else if (lokalCek.length > 0 && kecamatanUnik.length === 1) {
         const first = lokalCek[0];
@@ -3399,7 +3425,7 @@ ${ongkirInfo}`;
               { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
               { role: 'user', content: injeksi },
             ];
-            rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, userAnthropicKey);
+            rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, aiKey, aiBase);
           } else {
             console.warn(`[WILAYAH_OK] hitungOngkir gagal untuk "${wilayah}" (kelurahan spesifik)`);
             await updateConvState(conversation.id, { proposed_wilayah: wilayah });
@@ -3410,7 +3436,7 @@ ${ongkirInfo}`;
               { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
               { role: 'user', content: injeksiFail },
             ];
-            rawReply = await callClaude(systemPrompt, histFail, chatModel, userAnthropicKey);
+            rawReply = await callClaude(systemPrompt, histFail, chatModel, aiKey, aiBase);
           }
 
         } else {
@@ -3449,7 +3475,7 @@ ${ongkirInfo}`;
             { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
             { role: 'user', content: injeksi },
           ];
-          rawReply = await callClaude(systemPrompt, histTanya, chatModel, userAnthropicKey);
+          rawReply = await callClaude(systemPrompt, histTanya, chatModel, aiKey, aiBase);
         }
 
       } else {
@@ -3489,7 +3515,7 @@ ${ongkirInfo}`;
             { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
             { role: 'user', content: injeksi },
           ];
-          rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, userAnthropicKey);
+          rawReply = await callClaude(systemPrompt, histWithOngkir, chatModel, aiKey, aiBase);
         } else {
           console.warn(`[WILAYAH_OK fallback] hitungOngkir gagal untuk wilayah: ${wilayah}`);
           await updateConvState(conversation.id, { proposed_wilayah: wilayah });
@@ -3499,7 +3525,7 @@ ${ongkirInfo}`;
             { role: 'assistant', content: rawReply.replace(/\[WILAYAH_OK:[^\]]+\]/, '').trim() },
             { role: 'user', content: injeksiFail },
           ];
-          rawReply = await callClaude(systemPrompt, histFail, chatModel, userAnthropicKey);
+          rawReply = await callClaude(systemPrompt, histFail, chatModel, aiKey, aiBase);
         }
       }
       } // end else (wilayah.length >= 5)
@@ -3541,7 +3567,7 @@ ${ongkirInfo}`;
           { role: 'assistant', content: rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() },
           { role: 'user', content: injeksi },
         ];
-        rawReply = await callClaude(systemPrompt, historyWithOngkir, chatModel, userAnthropicKey);
+        rawReply = await callClaude(systemPrompt, historyWithOngkir, chatModel, aiKey, aiBase);
       } else {
         rawReply = rawReply.replace(/\[CEK_ONGKIR:[^\]]+\]/, '').trim() ||
           'Maaf kak, aku belum bisa cek ongkir ke wilayah itu. Bisa sebutkan nama kota/kabupatennya lengkap? 🙏';
@@ -3682,7 +3708,7 @@ ${ongkirInfo}`;
         + `Tanyakan kelurahan customer dulu dengan ramah (contoh: ${contoh}). `
         + `Setelah customer sebut kelurahan, tulis [WILAYAH_OK:kelurahan, ${pendingKecGuard.kecamatan}, ${pendingKecGuard.kabupaten}, ${pendingKecGuard.provinsi}].`;
       const histGuard = [...history, { role: 'user', content: injeksi }];
-      const replyGuard = await callClaude(systemPrompt, histGuard, chatModel, userAnthropicKey);
+      const replyGuard = await callClaude(systemPrompt, histGuard, chatModel, aiKey, aiBase);
       if (replyGuard) {
         const replyClean = replyGuard.replace(/\[ORDER_CONFIRMED\]/g, '').replace(/\[ORDER_DATA:[^\]]+\]/g, '').trim();
         const { wamid: wamid_rc } = await sendWA(waSession, reply_jid, replyClean).catch(()=>({}));
@@ -3770,7 +3796,7 @@ ${ongkirInfo}`;
           // 2b. Fallback AI: alamat tanpa koma / split gagal → pakai Haiku extract wilayah
           if (!localAreaFallback) {
             console.log(`[ORDER_CONFIRMED] Split koma gagal (${alamatParts.length} part), coba AI extract...`);
-            const aiExtract = await extractLokasiHaiku(orderDataParsed.alamat, userAnthropicKey).catch(() => null);
+            const aiExtract = await extractLokasiHaiku(orderDataParsed.alamat, aiKey, aiBase).catch(() => null);
             if (aiExtract) {
               const searchKey = [aiExtract.kelurahan, aiExtract.kecamatan, aiExtract.kabupaten].filter(Boolean).join(', ');
               console.log(`[ORDER_CONFIRMED] AI extract: ${searchKey}`);
