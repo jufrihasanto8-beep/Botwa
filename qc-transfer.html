@@ -105,6 +105,40 @@ body.light .qc-badge-rejected{color:#dc2626;border-color:rgba(220,38,38,.3);back
 .modal-btn-cancel{background:var(--bg);color:var(--text-2);border:1px solid var(--border)}
 .modal-btn-reject{background:#ef4444;color:#fff}
 
+/* Phone link */
+.qc-phone-link{font-family:monospace;font-size:12px;color:#3b82f6;cursor:pointer;border-bottom:1px dashed rgba(59,130,246,.4);transition:all .15s}
+.qc-phone-link:hover{color:#2563eb;border-bottom-color:#2563eb}
+
+/* Chat Modal */
+.chat-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center}
+.chat-overlay.open{display:flex}
+.chat-modal{background:var(--white);border-radius:14px;width:420px;max-width:95vw;height:80vh;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+body.light .chat-modal{box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.chat-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-modal-head h3{font-size:14px;font-weight:700;color:var(--text)}
+.chat-modal-head .chat-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);line-height:1;padding:4px}
+.chat-modal-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-height:0}
+.chat-modal-body::-webkit-scrollbar{width:4px}
+.chat-modal-body::-webkit-scrollbar-thumb{background:rgba(100,100,100,.2);border-radius:4px}
+.chat-bubble{max-width:78%;min-width:40px;padding:7px 11px;border-radius:10px;font-size:13px;line-height:1.5;word-break:break-word;white-space:pre-wrap;text-align:left}
+.chat-row{display:flex;margin-bottom:1px}
+.chat-row.from-customer{justify-content:flex-start}
+.chat-row.from-bot{justify-content:flex-end}
+.chat-row.from-customer .chat-bubble{background:#f0f0f0;color:#1a1a1a;border-bottom-left-radius:3px}
+.chat-row.from-bot .chat-bubble{background:#3b82f6;color:#fff;border-bottom-right-radius:3px}
+.chat-row.from-system{justify-content:center}
+.chat-row.from-system .chat-bubble{background:rgba(100,116,139,.08);color:var(--text-2);font-size:11px;max-width:90%;text-align:center;border-radius:8px}
+.chat-time-inline{font-size:10px;color:rgba(0,0,0,.35);float:right;margin:6px 0 -3px 10px;line-height:1}
+.chat-time-bot{color:rgba(255,255,255,.55)}
+.chat-label{font-size:10px;font-weight:600;display:block;margin-bottom:2px}
+.chat-label.ai{color:rgba(255,255,255,.7)}
+.chat-label.cs{color:#fbbf24}
+.chat-loading{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
+.chat-empty{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
+.chat-date-div{text-align:center;font-size:10px;color:var(--text-3);margin:8px 0;font-weight:600}
+body.light .chat-row.from-customer .chat-bubble{background:#f0f0f0;color:#1a1a1a}
+body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
+
 @media(max-width:768px){
   .top-bar,.filter-bar,.summary-bar{padding:10px 14px;gap:8px}
   .cards-wrap{padding:10px 14px 14px;grid-template-columns:1fr}
@@ -176,7 +210,30 @@ body.light .qc-badge-rejected{color:#dc2626;border-color:rgba(220,38,38,.3);back
   </div>
 </div>
 
+<!-- Chat Modal -->
+<div class="chat-overlay" id="chat-overlay" onclick="if(event.target===this)closeChatModal()">
+  <div class="chat-modal">
+    <div class="chat-modal-head">
+      <h3 id="chat-title">Percakapan</h3>
+      <button class="chat-close" onclick="closeChatModal()">&times;</button>
+    </div>
+    <div class="chat-modal-body" id="chat-body">
+      <div class="chat-empty">Klik nomor WA untuk lihat percakapan</div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
 <script>
+const SB_URL = window.SUPABASE_URL || '';
+const SB_KEY = window.SUPABASE_ANON_KEY || '';
+const sbH = { 'Content-Type':'application/json', apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
+async function sbFetch(table, query) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}${query}`, { headers: sbH });
+  if (!r.ok) return [];
+  return r.json();
+}
+
 const API = '/api/qc-transfer';
 let allData = [];
 let rejectTargetId = null;
@@ -247,7 +304,7 @@ function renderCards() {
     return;
   }
 
-  container.innerHTML = filtered.map(d => {
+  container.innerHTML = filtered.map((d, idx) => {
     const isPending  = d.qc_status === 'pending';
     const isApproved = d.qc_status === 'approved';
     const isRejected = d.qc_status === 'rejected';
@@ -267,7 +324,10 @@ function renderCards() {
       <div class="qc-body">
         <div class="qc-row">
           <div>
-            <div class="qc-name">${esc(d.customer_nama || '-')}</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:11px;color:var(--text-3);font-weight:700">#${idx+1}</span>
+              <div class="qc-name">${esc(d.customer_nama || '-')}</div>
+            </div>
             <div class="qc-produk">${esc(d.product_nama || '-')} x${d.qty || 1}</div>
           </div>
           <span class="qc-badge ${badgeClass}">${badgeText}</span>
@@ -277,7 +337,7 @@ function renderCards() {
         <div class="qc-row"><span class="qc-label">Tanggal TF</span><span class="qc-val">${esc(d.tanggal_tf || '?')}</span></div>
         <div class="qc-row"><span class="qc-label">Rek. Tujuan</span><span class="qc-val">${esc(d.rekening_tujuan || '?')}</span></div>
         <div class="qc-row"><span class="qc-label">Total Order</span><span class="qc-val-bold">Rp ${(d.total || 0).toLocaleString('id-ID')}</span></div>
-        <div class="qc-row"><span class="qc-label">HP Customer</span><span class="qc-val" style="font-family:monospace">${esc(d.customer_phone || '-')}</span></div>
+        <div class="qc-row"><span class="qc-label">HP Customer</span><span class="qc-val">${d.customer_phone ? `<a class="qc-phone-link" onclick="openChat('${esc(d.conversation_id||'')}','${esc(d.customer_id||'')}','${esc(d.customer_nama||'')}','${esc(d.customer_phone||'')}')" title="Lihat percakapan">${esc(d.customer_phone)}</a>` : '-'}</span></div>
         <div class="qc-row"><span class="qc-label">Alamat</span><span class="qc-val" style="max-width:200px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(snap.alamat || '-')}">${esc(snap.alamat || '-')}</span></div>
         <div class="qc-time">${time}</div>
       </div>
@@ -364,6 +424,71 @@ function openLightbox(url) {
 function closeLightbox() {
   document.getElementById('lightbox').classList.remove('open');
 }
+
+// ── Chat Modal ──
+function closeChatModal() {
+  document.getElementById('chat-overlay').classList.remove('open');
+}
+
+async function openChat(conversationId, customerId, nama, phone) {
+  const overlay = document.getElementById('chat-overlay');
+  const body    = document.getElementById('chat-body');
+  const title   = document.getElementById('chat-title');
+
+  title.textContent = nama || 'Percakapan';
+  body.innerHTML = '<div class="chat-loading">Memuat percakapan...</div>';
+  overlay.classList.add('open');
+
+  try {
+    let convId = conversationId;
+    if (!convId && customerId) {
+      const convs = await sbFetch('conversations', `?customer_id=eq.${customerId}&order=created_at.desc&limit=1&select=id`);
+      convId = convs[0]?.id;
+    }
+    if (!convId) {
+      body.innerHTML = '<div class="chat-empty">Belum ada percakapan untuk customer ini</div>';
+      return;
+    }
+
+    const msgs = await sbFetch('conv_messages',
+      `?conversation_id=eq.${convId}&order=created_at.asc&limit=300&select=role,isi,created_at`);
+
+    if (!msgs || !msgs.length) {
+      body.innerHTML = '<div class="chat-empty">Tidak ada pesan ditemukan.</div>';
+      return;
+    }
+
+    let html = '';
+    let lastDate = '';
+    msgs.forEach(m => {
+      const dt = new Date(m.created_at);
+      const dateStr = dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' });
+      if (dateStr !== lastDate) {
+        html += `<div class="chat-date-div">${dateStr}</div>`;
+        lastDate = dateStr;
+      }
+      const time = dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+      const safe = (m.isi || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      if (m.role === 'system') {
+        html += `<div class="chat-row from-system"><div class="chat-bubble">${safe}</div></div>`;
+      } else if (m.role === 'customer') {
+        html += `<div class="chat-row from-customer"><div class="chat-bubble">${safe}<span class="chat-time-inline">${time}</span></div></div>`;
+      } else {
+        const label = m.role === 'cs' ? 'CS' : 'AI';
+        const cls   = m.role === 'cs' ? 'cs' : 'ai';
+        html += `<div class="chat-row from-bot"><div class="chat-bubble"><span class="chat-label ${cls}">${label}</span>${safe}<span class="chat-time-inline chat-time-bot">${time}</span></div></div>`;
+      }
+    });
+
+    body.innerHTML = html;
+    body.scrollTop = body.scrollHeight;
+  } catch(e) {
+    body.innerHTML = `<div class="chat-empty">Gagal memuat: ${e.message}</div>`;
+  }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChatModal(); });
 
 // ── Helpers ──
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
