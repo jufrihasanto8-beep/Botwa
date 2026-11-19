@@ -537,6 +537,28 @@ body.light .fu-msg-lbl{color:#94a3b8}
             <input type="text" id="f-persona-gaya" placeholder="hangat, sabar, konsultatif">
           </div>
         </div>
+
+        <!-- AI Provider & API Key -->
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">🔑 AI API Key (opsional — override Settings)</div>
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;">
+            <div class="form-group">
+              <label>Provider</label>
+              <select id="f-ai-provider">
+                <option value="anthropic">Anthropic (default)</option>
+                <option value="mwapi">MWAPI</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>API Key</label>
+              <div style="display:flex;gap:8px;">
+                <input type="password" id="f-ai-api-key" placeholder="Kosongkan = pakai key di Settings" autocomplete="off" style="font-family:monospace;flex:1">
+                <button type="button" class="btn" onclick="document.getElementById('f-ai-api-key').type = document.getElementById('f-ai-api-key').type === 'password' ? 'text' : 'password'" style="padding:6px 10px">👁</button>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:4px;">Kalau diisi, produk ini pakai API key sendiri. Kalau kosong, fallback ke API key di halaman Settings.</div>
+        </div>
       </div>
 
       <!-- Tab: Ongkir & Promo -->
@@ -1079,6 +1101,8 @@ function openAdd() {
   document.getElementById('f-knowledge').value = '';
   document.getElementById('f-persona-nama').value = 'Sari';
   document.getElementById('f-persona-gaya').value = 'hangat, sabar, konsultatif';
+  document.getElementById('f-ai-provider').value = 'anthropic';
+  document.getElementById('f-ai-api-key').value = '';
   document.getElementById('f-promo-tipe').value = 'none';
   document.getElementById('f-promo-nilai').value = '';
   document.getElementById('f-promo-jawa').value = '';
@@ -1133,6 +1157,8 @@ async function openEdit(id) {
   mappingRows = maps.map(m => ({ id: m.id, sumber: m.sumber, identifier: m.identifier }));
   renderTags('keluhan'); renderTags('diagnosa');
   document.getElementById('f-skip-diagnosa').checked = !!p.skip_diagnosa;
+  document.getElementById('f-ai-provider').value = p.ai_provider || 'anthropic';
+  document.getElementById('f-ai-api-key').value = p.ai_api_key || '';
   loadDiskonOngkir(p.diskon_ongkir_per_qty || []);
   renderMappingList();
   togglePromoNilai();
@@ -1272,6 +1298,8 @@ async function saveProduk() {
     diskon_ongkir_per_qty: getDiskonOngkirData(),
     persona_cs_nama: document.getElementById('f-persona-nama').value.trim() || 'Sari',
     persona_cs_gaya: document.getElementById('f-persona-gaya').value.trim(),
+    ai_provider: document.getElementById('f-ai-provider').value || 'anthropic',
+    ai_api_key: document.getElementById('f-ai-api-key').value.trim() || null,
     promo_ongkir: {
       tipe:       document.getElementById('f-promo-tipe').value,
       unit:       getPromoUnit(),
