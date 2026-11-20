@@ -2071,9 +2071,11 @@ Isi field yang berubah saja, sisanya null.` }],
         const msgNorm = msgLower.replace(/([aeiou])\1+$/g, '$1').replace(/([aeiou])\1+\b/g, '$1');
         const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|suda|udah|uda|siap|sip|fix|setuju|benar|yap|yep|yoi|mantap|mantab|jadi|boleh|lanjut|gas|okey|baik|deal|acc|gass)\b/i.test(msgNorm)
                        || (msgLower.length <= 20 && /\b(oke|ok|iya|ya|suda|sudah|udah|siap|baik|bener|benar|betul|setuju|deal|fix|jadi|boleh|lanjut|mantap|sip|yoi|acc)\b/i.test(msgLower));
-        // isDeny: hanya kalau jelas nolak/minta ubah order — jangan trigger dari "gak" / "ga" yang sering muncul di kalimat biasa
+        // isDeny: nolak/cancel/minta ubah order
         const isDeny    = /\b(salah|ganti|ubah|bukan|koreksi|ralat|perbaiki|enggak|nggak|ngga|wrong|nope)\b/i.test(msgLower)
-                       || /\b(tidak|belum)\s+(benar|bener|betul|sesuai|cocok|iya|ya|oke)\b/i.test(msgLower);
+                       || /\b(tidak|belum)\s+(benar|bener|betul|sesuai|cocok|iya|ya|oke)\b/i.test(msgLower)
+                       || /\b(tidak|tdk|ga|gak|gk|ngga|nggak|g)\s*(jadi|mau|usah|perlu)\b/i.test(msgLower)
+                       || /\b(cancel|batal|batalkan)\b/i.test(msgLower);
         // Deteksi pertanyaan: kalau customer nanya hal lain → jangan paksa confirm/deny, teruskan ke Claude
         const isQuestion = message.includes('?') || /^(apa|gimana|berapa|kapan|kenapa|bagaimana|apakah|udah|sudah|ada|bisa|boleh|kalau)/i.test(msgLower);
 
@@ -2085,7 +2087,7 @@ Isi field yang berubah saja, sisanya null.` }],
             confirm_fu_stage: 0,
           });
           // Fall through ke Claude di bawah (sudah ada inject konteks awaiting_order_confirm di system prompt)
-        } else if (isConfirm) {
+        } else if (isConfirm && !isDeny) {
           // ── Cek metode bayar: Transfer → jangan closing dulu, tunggu bukti TF ──
           const snapMetode = (convState.order_snapshot?.metode || convState.metode_bayar || 'cod').toLowerCase();
           if (snapMetode === 'transfer' || snapMetode === 'tf') {
@@ -2284,15 +2286,30 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
           return res.status(200).json({ ok: true, action: 'order_closed' });
 
         } else if (isDeny) {
-          // ❌ Ada yang salah — minta koreksi
-          await updateConvState(conversation.id, {
-            awaiting_order_confirm: false,
-            awaiting_order_correction: true,
-          });
-          const tanyaKoreksi = `Maaf kak! 🙏 Bagian mana yang perlu diperbaiki?\nSilakan sebutkan ya kak (misal: alamatnya, nama, jumlah pesanan, dll).`;
-          const { wamid: wamid_tk } = await sendWA(waSession, reply_jid, tanyaKoreksi).catch(()=>({}));
-          await saveMessage(conversation.id, 'ai', tanyaKoreksi, wamid_tk);
-          return res.status(200).json({ ok: true, action: 'awaiting_correction' });
+          // Bedakan cancel (tidak jadi, batal) vs koreksi (salah, ganti, ubah)
+          const isCancel = /\b(tidak|tdk|ga|gak|gk|ngga|nggak|g)\s*(jadi|mau|usah|perlu)\b/i.test(msgLower)
+                        || /\b(cancel|batal|batalkan)\b/i.test(msgLower);
+          if (isCancel) {
+            // ❌ Customer batal — hapus awaiting, biarkan Claude tangani dengan natural
+            await updateConvState(conversation.id, {
+              awaiting_order_confirm: false,
+              awaiting_order_correction: false,
+              order_snapshot: null,
+              cancel_count: (convState.cancel_count || 0) + 1,
+            });
+            console.log(`[confirm] Customer cancel order di awaiting_order_confirm`);
+            // Fall through ke Claude di bawah — bot akan respon "baik kak, tidak apa-apa" dll
+          } else {
+            // ❌ Ada yang salah — minta koreksi
+            await updateConvState(conversation.id, {
+              awaiting_order_confirm: false,
+              awaiting_order_correction: true,
+            });
+            const tanyaKoreksi = `Maaf kak! 🙏 Bagian mana yang perlu diperbaiki?\nSilakan sebutkan ya kak (misal: alamatnya, nama, jumlah pesanan, dll).`;
+            const { wamid: wamid_tk } = await sendWA(waSession, reply_jid, tanyaKoreksi).catch(()=>({}));
+            await saveMessage(conversation.id, 'ai', tanyaKoreksi, wamid_tk);
+            return res.status(200).json({ ok: true, action: 'awaiting_correction' });
+          }
         }
         // Kalau ambigu (tidak jelas iya/tidak) → reset timer FU, lanjut ke Claude biasa
           await updateConvState(conversation.id, {
