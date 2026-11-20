@@ -2268,15 +2268,40 @@ async function submitBuktiTF() {
     const buktiUrl = `${SB_URL}/storage/v1/object/public/bukti-tf/${filename}`;
 
     // 2. Ambil data produk
-    let prodName = '', prodId = activeConv.product_id || null;
+    let prodName = '', prodHarga = 0, prodId = activeConv.product_id || null;
     if (prodId) {
       const prods = await sbGet('products', `?id=eq.${prodId}&select=id,nama,harga&limit=1`).catch(() => []);
-      if (prods[0]) prodName = prods[0].nama || '';
+      if (prods[0]) { prodName = prods[0].nama || ''; prodHarga = prods[0].harga || 0; }
     }
 
     const state = activeConv.state || {};
     const qty   = parseInt(state.qty || 1) || 1;
     const phone = (activeCustomer.wa_number || '').replace(/^62/, '0');
+    const harga = state.ongkir?.harga || prodHarga * qty;
+    const ongkirPromo = state.ongkir?.ongkirPromo || 0;
+    const totalOrder = harga + ongkirPromo;
+
+    // 2b. Vision analysis: convert image → base64 → extract info bukti TF
+    btn.textContent = 'Menganalisa bukti TF...';
+    let visionResult = { nominal: null, bank: null, tanggal_tf: null, rekening_tujuan: null };
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const vRes = await fetch('/api/qc-transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'analyze-bukti', image_base64: base64, user_id: activeConv.user_id }),
+      });
+      if (vRes.ok) {
+        const vData = await vRes.json();
+        if (vData.ok) visionResult = vData.result;
+      }
+    } catch (e) { console.warn('Vision analysis skip:', e.message); }
+    btn.textContent = 'Mengupload...';
 
     // 3. Insert ke transfer_qc
     const qcData = {
@@ -2285,22 +2310,22 @@ async function submitBuktiTF() {
       conversation_id:  activeConv.id,
       product_id:       prodId,
       bukti_url:        buktiUrl,
-      nominal:          null,
-      bank:             null,
-      tanggal_tf:       null,
-      rekening_tujuan:  null,
+      nominal:          visionResult.nominal || null,
+      bank:             visionResult.bank || null,
+      tanggal_tf:       visionResult.tanggal_tf || null,
+      rekening_tujuan:  visionResult.rekening_tujuan || null,
       order_snapshot: {
         alamat:    state.alamat || '',
         keluhan:   state.keluhan || '',
         ekspedisi: state.ongkir?.ekspedisi || '',
-        harga:     state.harga || 0,
-        ongkirPromo: state.ongkir?.ongkirPromo || 0,
+        harga:     harga,
+        ongkirPromo: ongkirPromo,
       },
       customer_nama:    activeCustomer.nama || '',
       customer_phone:   phone,
       product_nama:     prodName,
       qty:              qty,
-      total:            (state.harga || 0) + (state.ongkir?.ongkirPromo || 0),
+      total:            totalOrder,
       qc_status:        'pending',
     };
 
