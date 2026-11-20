@@ -1100,4 +1100,7 @@ module.exports = async function handler(req, res) {
     console.error('[tracking] Fatal error:', err.message);
     return res.status(500).json({ error: err.message });
   }
+
+  // Fallback: route tidak dikenal
+  return res.status(400).json({ error: 'Unknown action: ' + (req.body?.action || 'none') });
 };
