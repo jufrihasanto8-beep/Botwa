@@ -158,6 +158,52 @@ module.exports = async function handler(req, res) {
 
       const { action, qc_id, note } = req.body || {};
 
+      // ── Route: analyze-bukti — Vision AI extract info dari foto bukti TF ──
+      if (action === 'analyze-bukti') {
+        const { image_base64, user_id } = req.body;
+        if (!image_base64) return res.status(400).json({ error: 'image_base64 wajib' });
+
+        // Ambil API key user
+        const userR = await sbGet(`users?id=eq.${user_id}&select=anthropic_key,rekening&limit=1`).catch(() => []);
+        const apiKey = userR[0]?.anthropic_key || process.env.ANTHROPIC_KEY;
+        const rekening = userR[0]?.rekening || '';
+        if (!apiKey) return res.status(200).json({ ok: true, result: {} });
+
+        try {
+          const mediaTypeMatch = image_base64.match(/^data:image\/([a-z0-9]+);base64,/i);
+          const mediaType = `image/${(mediaTypeMatch?.[1] || 'jpeg').toLowerCase()}`;
+          const base64Data = image_base64.replace(/^data:image\/[a-z0-9]+;base64,/i, '');
+
+          const vRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 300,
+              messages: [{ role: 'user', content: [
+                { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } },
+                { type: 'text', text: `Analisa bukti transfer ini. Jawab JSON saja:\n{"nominal":"angka tanpa Rp","bank":"nama bank pengirim","tanggal":"tanggal transfer","no_rekening_tujuan":"nomor rekening tujuan"}\nIsi null kalau tidak terbaca.` },
+              ]}],
+            }),
+          });
+          const vData = await vRes.json();
+          const raw = vData.content?.[0]?.text || '';
+          const jsonMatch = raw.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return res.status(200).json({ ok: true, result: {
+              nominal: parsed.nominal || null,
+              bank: parsed.bank || null,
+              tanggal_tf: parsed.tanggal || null,
+              rekening_tujuan: parsed.no_rekening_tujuan || null,
+            }});
+          }
+        } catch (e) {
+          console.error('[analyze-bukti] Vision error:', e.message);
+        }
+        return res.status(200).json({ ok: true, result: {} });
+      }
+
       // ── Route: notify-qc-group — kirim notif bukti TF baru ke grup QC ──
       if (action === 'notify-qc-group') {
         const { user_id, customer_nama, customer_phone, product_nama, qty, total, metode, bukti_url } = req.body;
