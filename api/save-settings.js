@@ -34,7 +34,7 @@ module.exports = async function handler(req, res) {
     // Catalog/produk list dari Laporan Akuisisi Supabase (untuk dropdown di Edit Produk)
     if (action === 'catalog-list') {
       const LAPORAN_URL = (process.env.LAPORAN_SUPABASE_URL || '').replace(/\/$/, '');
-      const LAPORAN_KEY = process.env.LAPORAN_SUPABASE_ANON_KEY || '';
+      const LAPORAN_KEY = process.env.LAPORAN_SUPABASE_SERVICE_KEY || '';
       if (!LAPORAN_URL || !LAPORAN_KEY) return res.status(500).json({ error: 'Laporan Supabase tidak dikonfigurasi' });
       try {
         const r = await fetch(`${LAPORAN_URL}/rest/v1/catalog?select=id,name&order=name.asc`, {
