@@ -738,7 +738,8 @@ window.checkAllResi = async () => {
     if (!r.ok) throw new Error(`Server error ${r.status}`);
     const d = await r.json();
     if (d.ok) {
-      btn.textContent = `✅ ${d.total} resi dicek · ${d.updated} update · ${d.notifSent} notif`;
+      const partial = d.partial ? ` (${d.processed}/${d.total} dicek)` : '';
+      btn.textContent = `✅ ${d.total} resi${partial} · ${d.updated} update · ${d.notifSent} notif`;
       btn.style.color = '#10b981';
       // Reload data setelah cek
       await loadData();
