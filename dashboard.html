@@ -335,6 +335,10 @@ body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
 .ctag.eskalasi{background:rgba(239,68,68,.1);color:#fca5a5}
 .ctag.ai{background:rgba(99,102,241,.1);color:#a5b4fc}
 .ctag.new-msg{background:rgba(245,158,11,.15);color:#fbbf24;font-weight:700}
+.ctag.sampai{background:rgba(34,197,94,.12);color:#4ade80;font-weight:600}
+.ctag.dikirim{background:rgba(59,130,246,.1);color:#93c5fd}
+.ctag.bermasalah{background:rgba(239,68,68,.1);color:#fca5a5}
+.ctag.retur{background:rgba(236,72,153,.1);color:#f9a8d4}
 .conv-unread{width:8px;height:8px;background:#3b82f6;border-radius:50%;position:absolute;right:12px;top:50%;transform:translateY(-50%)}
 .empty-inbox{text-align:center;padding:40px 16px;color:#475569}
 
@@ -1221,6 +1225,14 @@ async function renderInbox() {
     custs.forEach(c => custMapCache[c.id] = c);
   }
 
+  // Fetch order status per conversation (batch)
+  const convIds = convs.map(c => c.id);
+  let orderMap = {}; // conversation_id → { no_resi, sampai, tracking_events }
+  try {
+    const orders = await sbGet('orders_new', `?user_id=eq.${userId}&conversation_id=in.(${convIds.join(',')})&select=conversation_id,no_resi,sampai,tracking_events`);
+    orders.forEach(o => { if (o.conversation_id) orderMap[o.conversation_id] = o; });
+  } catch(e) { console.error('orderMap error:', e); }
+
   const lastMsgs = await Promise.all(convs.map(c =>
     sbGet('conv_messages', `?conversation_id=eq.${c.id}&order=created_at.desc&limit=1`)
   ));
@@ -1236,7 +1248,18 @@ async function renderInbox() {
     const isDone  = conv.status === 'selesai';
     const isCancelled = conv.state?.is_cancelled;
     const isNew   = isDone && conv.state?.has_new_message;
-    const tags    = `<span class="ctag wa">WA</span>${isLive && !isCancelled?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone?'<span class="ctag ai">Closing</span>':''}${isCancelled?'<span class="ctag eskalasi">Cancel</span>':''}`;
+
+    // Order/resi label
+    const ord = orderMap[conv.id];
+    const ev  = ord?.tracking_events || {};
+    let resiTag = '';
+    if (ord?.sampai)        resiTag = '<span class="ctag sampai">✅ Sampai</span>';
+    else if (ev.retur)      resiTag = '<span class="ctag retur">🔄 Retur</span>';
+    else if (ev.bermasalah) resiTag = '<span class="ctag bermasalah">⚠️ Masalah</span>';
+    else if (ev.dikirim || ev.tiba_kota || ev.out_for_delivery) resiTag = '<span class="ctag dikirim">🚚 Dikirim</span>';
+    else if (ord?.no_resi)  resiTag = '<span class="ctag dikirim">📋 Resi</span>';
+
+    const tags    = `<span class="ctag wa">WA</span>${isLive && !isCancelled?'<span class="ctag live">Live</span>':''}${isEsc?'<span class="ctag eskalasi">Eskalasi</span>':''}${isDone?'<span class="ctag ai">Closing</span>':''}${isCancelled?'<span class="ctag eskalasi">Cancel</span>':''}${resiTag}`;
     const unreadDot = (conv.status === 'baru' || isNew) ? '<div class="conv-unread"></div>' : '';
     return `<div class="conv-item${activeConvId===conv.id?' active':''}" onclick="selectConv('${conv.id}')">
       <div class="conv-av" style="background:${color}">${initials(nama)}</div>
