@@ -9,43 +9,59 @@
 <link rel="stylesheet" href="css/style.css">
 <style>
 body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
-.ps-layout{display:flex;flex-direction:column;flex:1;overflow:hidden}
-.ps-toolbar{padding:12px 20px;border-bottom:1px solid var(--border);background:var(--white);display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
-.ps-tabs{display:flex;gap:4px}
-.ps-tab{padding:6px 16px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
-.ps-tab.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
-.ps-search{flex:1;max-width:260px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px}
-.ps-search:focus{outline:none;border-color:#3b82f6}
-.ps-count{margin-left:auto;font-size:12px;color:var(--text-2)}
-.ps-list{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
-.ps-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;transition:box-shadow .15s}
-.ps-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.06)}
-.ps-card-left{display:flex;flex-direction:column;gap:6px}
-.ps-card-top{display:flex;align-items:center;gap:10px}
-.ps-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
-.ps-nama{font-size:13px;font-weight:700;color:var(--text)}
-.ps-phone{font-size:11px;color:var(--text-2)}
-.ps-produk{font-size:12px;color:var(--text-2);margin-top:2px}
-.ps-resi{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);margin-top:2px}
-.ps-resi span{font-weight:600;color:var(--text);font-family:monospace}
-.ps-pipeline{display:flex;align-items:center;gap:0;margin-top:10px}
-.ps-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative}
-.ps-step-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:9px;z-index:1;flex-shrink:0;transition:all .2s}
-.ps-step-dot.done{background:#22c55e;border-color:#22c55e;color:#fff}
-.ps-step-dot.active{background:#3b82f6;border-color:#3b82f6;color:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
-.ps-step-label{font-size:9px;color:var(--text-3);white-space:nowrap;font-weight:500}
-.ps-step-label.done{color:#22c55e}
-.ps-step-label.active{color:#3b82f6;font-weight:700}
-.ps-connector{height:2px;background:var(--border);flex:1;margin-top:-10px;z-index:0;transition:background .2s}
-.ps-connector.done{background:#22c55e}
-.ps-card-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}
-.ps-nilai{font-size:14px;font-weight:800;color:var(--text)}
-.ps-date{font-size:10px;color:var(--text-3)}
-.ps-tracking-info{font-size:11px;color:var(--text-2);background:var(--bg);border-radius:7px;padding:5px 9px;max-width:200px;text-align:right;line-height:1.4}
-.ps-tracking-info b{color:var(--text)}
 
-/* Badges */
-.bdg{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+/* ── Stat Cards ── */
+.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:20px}
+.stat-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:20px;position:relative;overflow:hidden;cursor:pointer;transition:all .2s;border:2px solid transparent}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.stat-card.active{border-color:var(--primary)}
+.stat-label{font-size:.78rem;font-weight:600;color:var(--text-2);margin-bottom:8px}
+.stat-value{font-size:1.5rem;font-weight:800;line-height:1.1}
+.stat-pct{font-size:.72rem;opacity:.75;margin-top:4px}
+.stat-icon{position:absolute;top:16px;right:16px;width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+body.light .stat-icon{background:rgba(0,0,0,.06)}
+
+/* ── Main Card ── */
+.tr-card-wrap{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:22px;transition:background .25s}
+.tr-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
+.tr-card-header-left h3{font-size:1rem;font-weight:700;color:var(--text)}
+.tr-card-sub{font-size:.75rem;color:var(--text-3)}
+
+/* ── Filter Controls ── */
+.tr-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ctrl-select{padding:7px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:.82rem;background:var(--bg);color:var(--text);outline:none;cursor:pointer;transition:border-color .2s}
+.ctrl-select:focus{border-color:var(--primary)}
+
+/* ── Tabs ── */
+.tr-tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.tr-tab{padding:8px 14px;border-radius:10px;font-size:.78rem;font-weight:700;background:var(--white);color:var(--text-2);border:1.5px solid var(--border);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;white-space:nowrap}
+.tr-tab:hover{border-color:var(--primary);color:var(--primary)}
+.tr-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ── Toolbar ── */
+.tr-toolbar{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.tr-search-wrap{flex:1;min-width:220px}
+.tr-search{width:100%;padding:9px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem;outline:none;transition:border-color .2s}
+.tr-search:focus{border-color:var(--primary)}
+.tr-count{font-size:.75rem;font-weight:700;color:var(--text-3);white-space:nowrap}
+
+/* ── Order Card Grid ── */
+.tr-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.tr-order{background:var(--white);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);transition:all .15s}
+.tr-order:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.tr-order-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.tr-order-left{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.tr-avatar{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.85rem}
+.tr-name{font-size:.85rem;font-weight:700;color:var(--text)}
+.tr-phone{font-size:.72rem;color:var(--text-3);margin-top:1px}
+.tr-meta{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+.tr-produk{font-size:.75rem;color:var(--text-2);margin-top:6px}
+.tr-price{font-size:.9rem;font-weight:800;color:var(--text);text-align:right;white-space:nowrap}
+.tr-date{font-size:.68rem;color:var(--text-3);text-align:right;margin-top:2px;white-space:nowrap}
+.tr-resi{font-size:.68rem;font-weight:700;color:var(--text-2);background:var(--bg);padding:3px 9px;border-radius:6px;margin-top:6px;display:inline-block}
+
+/* ── Badges ── */
+.bdg{font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:999px;display:inline-block;white-space:nowrap}
 .bdg-menunggu{background:rgba(148,163,184,.12);color:#94a3b8}
 .bdg-dikirim{background:rgba(59,130,246,.12);color:#60a5fa}
 .bdg-transit{background:rgba(251,191,36,.12);color:#d97706}
@@ -57,8 +73,71 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
 .bdg-cod{background:rgba(251,146,60,.12);color:#fb923c}
 .bdg-tf{background:rgba(99,102,241,.12);color:#818cf8}
 
+/* ── Stepper ── */
+.tr-divider{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.tr-stepper{display:flex;align-items:flex-start}
+.tr-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+.tr-step-circle{width:20px;height:20px;border-radius:50%;background:var(--border);color:var(--text-3);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;z-index:1}
+body.light .tr-step-circle{background:rgba(0,0,0,.08);color:#94a3b8}
+.tr-step-label{font-size:.62rem;color:var(--text-3);margin-top:6px;font-weight:600;white-space:nowrap}
+.tr-step-line{position:absolute;top:10px;left:50%;width:100%;height:2px;background:var(--border);z-index:0}
+body.light .tr-step-line{background:rgba(0,0,0,.1)}
+.tr-step:last-child .tr-step-line{display:none}
+.tr-step-done .tr-step-circle{background:var(--success);color:#fff}
+.tr-step-done .tr-step-label{color:var(--success)}
+.tr-step-done .tr-step-line{background:var(--success)}
+.tr-step-active .tr-step-circle{background:var(--primary);color:#fff}
+.tr-step-active .tr-step-label{color:var(--primary);font-weight:800}
+.tr-step-problem .tr-step-circle{background:var(--danger);color:#fff}
+.tr-step-problem .tr-step-label{color:var(--danger);font-weight:800}
+
+/* ── Pagination ── */
+.tr-pagination{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px 0 4px;flex-wrap:wrap}
+.pg-btn{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--white);color:var(--text);cursor:pointer;font-size:.82rem;transition:all .15s}
+.pg-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+.pg-btn:disabled{opacity:.4;cursor:not-allowed}
+.pg-info{font-size:.82rem;color:var(--text-2)}
+
+/* ── Date Range Picker ── */
+.drp-wrap{position:relative;display:inline-block}
+.drp-trigger{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--white);color:var(--text-2);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.drp-trigger:hover{border-color:var(--primary);color:var(--primary)}
+.drp-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:200;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.2);display:none;overflow:hidden;min-width:480px}
+.drp-dropdown.open{display:flex}
+.drp-presets{width:145px;border-right:1px solid var(--border);padding:10px 0;flex-shrink:0}
+.drp-preset{display:block;width:100%;text-align:left;padding:8px 16px;font-size:.78rem;color:var(--text-2);border:none;background:none;cursor:pointer;transition:all .12s}
+.drp-preset:hover{background:rgba(59,130,246,.08);color:var(--primary)}
+.drp-preset.active{color:var(--primary);font-weight:700;background:rgba(59,130,246,.08)}
+.drp-cal{padding:16px;flex:1}
+.drp-cal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.drp-cal-title{font-size:.85rem;font-weight:700;color:var(--text)}
+.drp-nav{width:26px;height:26px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;transition:all .12s}
+.drp-nav:hover{border-color:var(--primary);color:var(--primary)}
+.drp-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px}
+.drp-days-hdr span{text-align:center;font-size:.68rem;font-weight:700;color:var(--text-3);padding:4px 0}
+.drp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.drp-day{height:30px;border-radius:7px;border:none;background:none;color:var(--text-2);font-size:.75rem;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
+.drp-day:hover:not(.other-month){background:rgba(59,130,246,.08);color:var(--primary)}
+.drp-day.other-month{color:var(--text-3);opacity:.4}
+.drp-day.today{font-weight:800;color:var(--primary)}
+.drp-day.selected{background:var(--primary)!important;color:#fff!important;font-weight:700}
+.drp-day.in-range{background:rgba(59,130,246,.1);border-radius:0;color:var(--text)}
+.drp-day.range-start{border-radius:7px 0 0 7px;background:var(--primary);color:#fff;font-weight:700}
+.drp-day.range-end{border-radius:0 7px 7px 0;background:var(--primary);color:#fff;font-weight:700}
+.drp-day.range-start.range-end{border-radius:7px}
+.drp-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border)}
+.drp-selected-txt{font-size:.7rem;color:var(--text-3)}
+.drp-selected-txt span{color:var(--text);font-weight:600}
+.drp-apply{padding:6px 16px;border-radius:7px;border:none;background:var(--primary);color:#fff;font-size:.75rem;font-weight:700;cursor:pointer;transition:opacity .15s}
+.drp-apply:hover{opacity:.85}
+.drp-cancel{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:.75rem;cursor:pointer}
+.drp-cancel:hover{border-color:var(--danger);color:var(--danger)}
+
 .empty-state{text-align:center;padding:60px 20px;color:var(--text-2)}
 .empty-state div:first-child{font-size:40px;margin-bottom:12px}
+
+/* ── Page Content Area ── */
+.ps-page{flex:1;overflow-y:auto;padding:22px 26px}
 
 /* ── Template Modal ── */
 .tpl-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
@@ -76,6 +155,27 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
 .tpl-textarea:focus{outline:none;border-color:#3b82f6}
 .tpl-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
 .tpl-status{font-size:12px;color:#22c55e;align-self:center;margin-right:auto}
+
+/* ── Responsive ── */
+@media(max-width:1200px){
+  .stat-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+  .tr-list{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+}
+@media(max-width:768px){
+  .ps-page{padding:14px}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .tr-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px}
+  .tr-tabs::-webkit-scrollbar{display:none}
+  .tr-list{grid-template-columns:1fr}
+  .tr-card-header{flex-direction:column}
+  .tr-controls{width:100%}
+  .drp-dropdown{min-width:300px;flex-direction:column;right:-40px}
+  .drp-presets{width:100%;border-right:none;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px;padding:8px}
+  .drp-preset{padding:5px 10px;border-radius:7px;border:1px solid var(--border)}
+}
+@media(max-width:420px){
+  .stat-grid{grid-template-columns:1fr 1fr}
+}
 </style>
 </head>
 <body>
@@ -129,46 +229,18 @@ body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;
     </div>
     <div class="tpl-footer">
       <span class="tpl-status" id="tpl-status"></span>
-      <button class="ps-tab" onclick="closeTplModal()">Batal</button>
-      <button class="ps-tab" style="background:#3b82f6;color:#fff;border-color:#3b82f6" onclick="saveTplModal()">Simpan Template</button>
+      <button class="tr-tab" onclick="closeTplModal()">Batal</button>
+      <button class="tr-tab" style="background:#3b82f6;color:#fff;border-color:#3b82f6" onclick="saveTplModal()">Simpan Template</button>
     </div>
   </div>
 </div>
+
 <div class="app-layout">
   <div id="sidebar-container"></div>
   <div class="main-content" style="overflow:hidden;display:flex;flex-direction:column;">
-
-    <div class="page-header">
-      <div>
-        <h1>📦 Pesanan</h1>
-        <p>Monitor status pengiriman semua order</p>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
-        <button onclick="openTplModal()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(59,130,246,.4);background:rgba(59,130,246,.08);color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer">✏️ Template Notif</button>
-        <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
-      </div>
+    <div class="ps-page" id="pageContent">
+      <div class="empty-state"><div>📦</div>Memuat pesanan...</div>
     </div>
-
-    <div class="ps-layout">
-      <div class="ps-toolbar">
-        <div class="ps-tabs">
-          <button class="ps-tab active" onclick="setTab('semua',this)">Semua</button>
-          <button class="ps-tab" onclick="setTab('menunggu',this)">⏳ Menunggu Resi</button>
-          <button class="ps-tab" onclick="setTab('dikirim',this)">📦 Dikirim</button>
-          <button class="ps-tab" onclick="setTab('tiba_kota',this)">🏙️ Kota Tujuan</button>
-          <button class="ps-tab" onclick="setTab('out_for_delivery',this)">🚚 OTW</button>
-          <button class="ps-tab" onclick="setTab('sampai',this)">✅ Sampai</button>
-          <button class="ps-tab" onclick="setTab('bermasalah',this)">⚠️ Bermasalah</button>
-          <button class="ps-tab" onclick="setTab('retur',this)">🔄 Retur</button>
-        </div>
-        <input class="ps-search" type="text" placeholder="Cari nama / resi / produk..." oninput="render()" id="ps-search">
-        <div class="ps-count" id="ps-count"></div>
-      </div>
-      <div class="ps-list" id="ps-list">
-        <div class="empty-state"><div>📦</div>Memuat pesanan...</div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -183,16 +255,31 @@ checkBotStatus();
 
 const uid = Auth.getUser()?.id;
 let allConvs = [], custMap = {}, prodMap = {};
-let activeTab = 'semua';
+let activeTab = 'semua', activeStatFilter = 'SEMUA';
+let page = 1, pageSize = 50;
+let ekspedisiFilter = '', produkFilter = '';
+let lastUpdated = null;
 
+// Date range state — default Bulan Ini
+const _today = new Date();
+let filterStart = new Date(_today.getFullYear(), _today.getMonth(), 1);
+let filterEnd   = new Date(_today.getFullYear(), _today.getMonth(), _today.getDate());
+let drpSelStart = filterStart, drpSelEnd = filterEnd;
+let drpViewYear = _today.getFullYear(), drpViewMonth = _today.getMonth();
+let drpLabelText = 'Bulan Ini';
 
 function rp(n) { return 'Rp ' + (n||0).toLocaleString('id-ID'); }
 function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 function avColor(n) { const c=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4']; let h=0; for(let i=0;i<(n||'').length;i++) h=(h*31+n.charCodeAt(i))%c.length; return c[h]; }
 function avInit(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function fmtDt(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  if (!iso) return '-';
+  return new Date(iso).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+}
+function fmtTime(d) {
+  if (!d) return '';
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
 }
 
 function getStatus(c) {
@@ -207,147 +294,388 @@ function getStatus(c) {
   return 'menunggu';
 }
 
-function setTab(tab, btn) {
-  activeTab = tab;
-  document.querySelectorAll('.ps-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  render();
+function statusGroup(s) {
+  if (s === 'sampai') return 'DELIVERY';
+  if (s === 'retur')  return 'RETUR';
+  if (s === 'bermasalah') return 'UNDEL';
+  return 'ON_PROSES';
 }
 
-async function init() {
+/* ── Stepper HTML ── */
+const STEP_LABELS = ['Konfirmasi','Dikirim','Kota Tujuan','OTW','Sampai'];
+function stepperHtml(status) {
+  const isProb = status === 'bermasalah' || status === 'retur';
+  const labels = isProb
+    ? ['Konfirmasi','Dikirim', status === 'retur' ? 'Retur' : 'Bermasalah']
+    : STEP_LABELS;
+  const step = isProb ? 3
+    : status === 'menunggu' ? 1
+    : status === 'dikirim' || status === 'transit' ? 2
+    : status === 'tiba_kota' ? 3
+    : status === 'out_for_delivery' ? 4
+    : 5;
+  const allDone = status === 'sampai';
+
+  return `<div class="tr-stepper">${labels.map((label, i) => {
+    const idx = i + 1;
+    let cls = 'tr-step';
+    if (allDone || idx < step) cls += ' tr-step-done';
+    else if (idx === step) cls += isProb ? ' tr-step-problem' : ' tr-step-active';
+    const icon = (allDone || idx < step) ? '✓' : idx;
+    return `<div class="${cls}"><div class="tr-step-line"></div><div class="tr-step-circle">${icon}</div><div class="tr-step-label">${label}</div></div>`;
+  }).join('')}</div>`;
+}
+
+/* ── Ekspedisi & Produk options (dynamic from loaded data) ── */
+function ekspedisiOptions() { return [...new Set(allConvs.map(c=>c.ekspedisi).filter(Boolean))].sort(); }
+function produkOptions() { return Object.values(prodMap).map(p=>({id:p.id,nama:p.nama})); }
+
+/* ── Date Range Picker ── */
+const DRP_MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DRP_DAYS = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+function drpFmtDate(d) { return d ? `${d.getDate()} ${DRP_MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}` : '-'; }
+
+function drpMakeCalendar() {
+  const firstDay = new Date(drpViewYear, drpViewMonth, 1).getDay();
+  const startPad = firstDay === 0 ? 6 : firstDay - 1;
+  const daysInMonth = new Date(drpViewYear, drpViewMonth + 1, 0).getDate();
+  const prevDays = new Date(drpViewYear, drpViewMonth, 0).getDate();
+  const today = new Date();
+
+  let html = `<div class="drp-cal-hdr">
+    <button class="drp-nav" onclick="drpNav(-1)">‹</button>
+    <div class="drp-cal-title">${DRP_MONTHS[drpViewMonth]} ${drpViewYear}</div>
+    <button class="drp-nav" onclick="drpNav(1)">›</button>
+  </div>
+  <div class="drp-days-hdr">${DRP_DAYS.map(d=>`<span>${d}</span>`).join('')}</div>
+  <div class="drp-days">`;
+  for (let i = startPad; i > 0; i--) html += `<button class="drp-day other-month">${prevDays - i + 1}</button>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cur = new Date(drpViewYear, drpViewMonth, d);
+    const isToday = drpViewYear===today.getFullYear() && drpViewMonth===today.getMonth() && d===today.getDate();
+    const isStart = drpSelStart && cur.getTime()===new Date(drpSelStart.getFullYear(),drpSelStart.getMonth(),drpSelStart.getDate()).getTime();
+    const isEnd = drpSelEnd && cur.getTime()===new Date(drpSelEnd.getFullYear(),drpSelEnd.getMonth(),drpSelEnd.getDate()).getTime();
+    const inRange = drpSelStart && drpSelEnd && cur > drpSelStart && cur < drpSelEnd;
+    let cls = 'drp-day';
+    if (isStart && isEnd) cls += ' selected';
+    else if (isStart) cls += ' range-start';
+    else if (isEnd) cls += ' range-end';
+    else if (inRange) cls += ' in-range';
+    if (isToday) cls += ' today';
+    html += `<button class="${cls}" onclick="drpClickDay(${drpViewYear},${drpViewMonth},${d})">${d}</button>`;
+  }
+  const total = startPad + daysInMonth;
+  const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= rem; d++) html += `<button class="drp-day other-month">${d}</button>`;
+  html += '</div>';
+  const el = document.getElementById('drpCal');
+  if (el) el.innerHTML = html;
+}
+function drpUpdateSel() {
+  const s = document.getElementById('drpSelStart'), e = document.getElementById('drpSelEnd');
+  if (s) s.textContent = drpFmtDate(drpSelStart);
+  if (e) e.textContent = drpFmtDate(drpSelEnd);
+}
+window.drpToggle = () => {
+  const dd = document.getElementById('drpDropdown');
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) { drpMakeCalendar(); drpUpdateSel(); }
+};
+window.drpClose = () => document.getElementById('drpDropdown')?.classList.remove('open');
+window.drpNav = (dir) => {
+  drpViewMonth += dir;
+  if (drpViewMonth > 11) { drpViewMonth = 0; drpViewYear++; }
+  if (drpViewMonth < 0)  { drpViewMonth = 11; drpViewYear--; }
+  drpMakeCalendar();
+};
+window.drpClickDay = (y,m,d) => {
+  const clicked = new Date(y,m,d);
+  if (!drpSelStart || (drpSelStart && drpSelEnd)) { drpSelStart = clicked; drpSelEnd = null; }
+  else if (clicked < drpSelStart) { drpSelEnd = drpSelStart; drpSelStart = clicked; }
+  else { drpSelEnd = clicked; }
+  document.querySelectorAll('#drpDropdown .drp-preset').forEach(b=>b.classList.remove('active'));
+  drpUpdateSel(); drpMakeCalendar();
+};
+window.drpPreset = (days, label, btn) => {
+  const t = new Date();
+  drpSelEnd = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  const s = new Date(t); s.setDate(s.getDate() - (days - 1));
+  drpSelStart = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+  document.querySelectorAll('#drpDropdown .drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpMakeCalendar();
+};
+window.drpPresetThisMonth = (btn) => {
+  const t = new Date();
+  drpSelStart = new Date(t.getFullYear(), t.getMonth(), 1);
+  drpSelEnd = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  document.querySelectorAll('#drpDropdown .drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpMakeCalendar();
+};
+window.drpPresetLastMonth = (btn) => {
+  const t = new Date();
+  drpSelStart = new Date(t.getFullYear(), t.getMonth() - 1, 1);
+  drpSelEnd = new Date(t.getFullYear(), t.getMonth(), 0);
+  document.querySelectorAll('#drpDropdown .drp-preset').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drpUpdateSel(); drpMakeCalendar();
+};
+window.drpApply = () => {
+  if (!drpSelStart) return;
+  filterStart = drpSelStart;
+  filterEnd = drpSelEnd || drpSelStart;
+  drpLabelText = `${drpFmtDate(filterStart)} — ${drpFmtDate(filterEnd)}`;
+  drpClose();
+  loadData();
+};
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  const dd = document.getElementById('drpDropdown'), tr = document.getElementById('drpTrigger');
+  if (dd && tr && !dd.contains(e.target) && !tr.contains(e.target)) dd.classList.remove('open');
+});
+
+/* ── Tab & Stat Filter ── */
+window.setTab = (tab) => { activeTab = tab; page = 1; renderAll(); };
+window.setStatFilter = (key) => {
+  activeStatFilter = activeStatFilter === key ? 'SEMUA' : key;
+  // Map stat filter to matching tab
+  if (activeStatFilter === 'SEMUA')    activeTab = 'semua';
+  else if (activeStatFilter === 'DELIVERY') activeTab = 'sampai';
+  else if (activeStatFilter === 'RETUR')    activeTab = 'retur';
+  else if (activeStatFilter === 'UNDEL')    activeTab = 'bermasalah';
+  else activeTab = 'semua'; // ON_PROSES = semua minus sampai/retur/bermasalah
+  page = 1;
+  renderAll();
+};
+window.setEkspedisiFilter = (val) => { ekspedisiFilter = val; page = 1; renderAll(); };
+window.setProdukFilter = (val) => { produkFilter = val; page = 1; renderAll(); };
+window.goPage = (p) => { page = p; renderAll(); document.getElementById('trList')?.scrollIntoView({behavior:'smooth',block:'start'}); };
+
+window.addEventListener('productSwitch', () => renderAll());
+
+/* ── Load Data ── */
+async function loadData() {
+  const startStr = ymd(filterStart);
+  const endStr   = ymd(filterEnd);
   const [orders, custs, prods] = await Promise.all([
-    SB.get('orders_new', `?user_id=eq.${uid}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,status_tracking,tracking_lokasi,tracking_events,sampai,created_at&order=created_at.desc&limit=1000`),
+    SB.get('orders_new', `?user_id=eq.${uid}&created_at=gte.${startStr}T00:00:00&created_at=lte.${endStr}T23:59:59&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,status_tracking,tracking_lokasi,tracking_events,sampai,created_at&order=created_at.desc&limit=5000`),
     SB.get('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,reply_jid`),
     SB.get('products',  `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga`),
   ]);
-
+  custMap = {}; prodMap = {};
   custs.forEach(c => custMap[c.id] = c);
   prods.forEach(p => prodMap[p.id] = p);
-
   allConvs = orders || [];
-  render();
+  lastUpdated = new Date();
+  renderAll();
 }
 
-window.addEventListener('productSwitch', () => render());
+/* ── Render Full Page ── */
+function renderAll() {
+  const q = (document.getElementById('trSearch')?.value || '').toLowerCase();
+  const prodSwitcher = window.__activeProductFilter || null;
 
-function render() {
-  const q = document.getElementById('ps-search').value.toLowerCase();
-  const prodFilter = window.__activeProductFilter || null;
-  let list = prodFilter ? allConvs.filter(c => c.product_id === prodFilter) : allConvs;
+  // Base filter: search + ekspedisi + produk
+  let baseList = allConvs.filter(c => {
+    if (ekspedisiFilter && c.ekspedisi !== ekspedisiFilter) return false;
+    if (produkFilter && c.product_id !== produkFilter) return false;
+    if (prodSwitcher && c.product_id !== prodSwitcher) return false;
+    if (q) {
+      const cu = custMap[c.customer_id] || {};
+      const pr = prodMap[c.product_id] || {};
+      if (!((cu.nama||'').toLowerCase().includes(q) || (cu.wa_number||'').includes(q) || (pr.nama||'').toLowerCase().includes(q) || (c.no_resi||'').toLowerCase().includes(q))) return false;
+    }
+    return true;
+  });
 
-  // Filter tab
-  if (activeTab !== 'semua') {
+  // Stats
+  const counts = { ON_PROSES:0, UNDEL:0, RETUR:0, DELIVERY:0 };
+  baseList.forEach(c => counts[statusGroup(getStatus(c))]++);
+  const total = baseList.length;
+  const pct = n => total > 0 ? (n/total*100).toFixed(1)+'%' : '';
+
+  // Apply tab/stat filter
+  let list = baseList;
+  if (activeStatFilter === 'ON_PROSES_GROUP') {
+    list = list.filter(c => statusGroup(getStatus(c)) === 'ON_PROSES');
+  } else if (activeTab !== 'semua') {
     list = list.filter(c => getStatus(c) === activeTab);
   }
 
-  // Filter search
-  if (q) {
-    list = list.filter(c => {
-      const cu = custMap[c.customer_id] || {};
-      const pr = prodMap[c.product_id] || {};
-      return (cu.nama||'').toLowerCase().includes(q)
-        || (cu.wa_number||'').includes(q)
-        || (pr.nama||'').toLowerCase().includes(q)
-        || (c.no_resi||'').toLowerCase().includes(q);
-    });
-  }
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+  if (page > totalPages) page = totalPages;
+  const pageList = list.slice((page-1)*pageSize, page*pageSize);
 
-  document.getElementById('ps-count').textContent = `${list.length} pesanan`;
+  // Build page
+  const container = document.getElementById('pageContent');
+  const statCardClass = (key) => `stat-card${activeStatFilter===key?' active':''}`;
+  const tabClass = (key) => `tr-tab${activeTab===key && activeStatFilter!=='ON_PROSES_GROUP'?' active':''}`;
 
-  const container = document.getElementById('ps-list');
-  if (!list.length) {
-    container.innerHTML = `<div class="empty-state"><div>📭</div><div style="font-weight:600;margin-bottom:6px">Tidak ada pesanan</div><div style="font-size:12px">Coba ganti filter atau cari dengan kata lain</div></div>`;
-    return;
-  }
+  container.innerHTML = `
+    <!-- Stat Cards -->
+    <div class="stat-grid">
+      <div class="${statCardClass('SEMUA')}" onclick="setStatFilter('SEMUA')">
+        <div class="stat-label">Total</div>
+        <div class="stat-value">${total}</div>
+        <div class="stat-icon">📦</div>
+      </div>
+      <div class="${statCardClass('ON_PROSES_GROUP')}" onclick="setStatFilter('ON_PROSES_GROUP')">
+        <div class="stat-label">On Proses</div>
+        <div class="stat-value" style="color:var(--primary)">${counts.ON_PROSES}</div>
+        <div class="stat-pct" style="color:var(--primary)">${pct(counts.ON_PROSES)}</div>
+        <div class="stat-icon">🔄</div>
+      </div>
+      <div class="${statCardClass('UNDEL')}" onclick="setStatFilter('UNDEL')">
+        <div class="stat-label">Bermasalah</div>
+        <div class="stat-value" style="color:var(--danger)">${counts.UNDEL}</div>
+        <div class="stat-pct" style="color:var(--danger)">${pct(counts.UNDEL)}</div>
+        <div class="stat-icon">⚠️</div>
+      </div>
+      <div class="${statCardClass('RETUR')}" onclick="setStatFilter('RETUR')">
+        <div class="stat-label">Retur</div>
+        <div class="stat-value" style="color:var(--danger)">${counts.RETUR}</div>
+        <div class="stat-pct" style="color:var(--danger)">${pct(counts.RETUR)}</div>
+        <div class="stat-icon">↩️</div>
+      </div>
+      <div class="${statCardClass('DELIVERY')}" onclick="setStatFilter('DELIVERY')">
+        <div class="stat-label">Terkirim</div>
+        <div class="stat-value" style="color:var(--success)">${counts.DELIVERY}</div>
+        <div class="stat-pct" style="color:var(--success)">${pct(counts.DELIVERY)}</div>
+        <div class="stat-icon">✅</div>
+      </div>
+    </div>
 
-  container.innerHTML = list.map(c => {
-    const cu    = custMap[c.customer_id] || {};
-    const pr    = prodMap[c.product_id]  || {};
-    const nama  = cu.nama || cu.wa_number || 'Pelanggan';
-    const color = avColor(nama);
-    const qty   = parseInt(c.qty || 1);
-    const ongkir= c.ongkir_after_promo ?? c.ongkir ?? 0;
-    const nilai = c.total || ((pr.harga||0) * qty) + ongkir;
-    const metode= (c.metode || 'cod').toLowerCase();
-    const status= getStatus(c);
-
-    // Pipeline steps
-    const isProb = status === 'bermasalah' || status === 'retur';
-    const steps = isProb ? [
-      { key:'confirmed',       label:'Konfirmasi' },
-      { key:'dikirim',         label:'Dikirim' },
-      { key:'bermasalah_retur',label: status === 'retur' ? '🔄 Retur' : '⚠️ Bermasalah' },
-    ] : [
-      { key:'confirmed',       label:'Konfirmasi' },
-      { key:'dikirim',         label:'Dikirim' },
-      { key:'tiba_kota',       label:'Kota Tujuan' },
-      { key:'out_for_delivery',label:'OTW' },
-      { key:'sampai',          label:'Sampai' },
-    ];
-    const currentIdx = isProb ? 2
-      : status === 'menunggu'          ? 0
-      : status === 'dikirim'           ? 1
-      : status === 'transit'           ? 1
-      : status === 'tiba_kota'         ? 2
-      : status === 'out_for_delivery'  ? 3
-      : 4;
-
-    const pipelineHtml = steps.map((s, i) => {
-      const isDone   = i < currentIdx;
-      const isActive = i === currentIdx;
-      const dotClass = isDone ? 'done' : isActive ? 'active' : '';
-      const lblClass = isDone ? 'done' : isActive ? 'active' : '';
-      const connector = i < steps.length - 1
-        ? `<div class="ps-connector${isDone ? ' done' : ''}"></div>`
-        : '';
-      return `<div class="ps-step">
-        <div class="ps-step-dot ${dotClass}">${isDone ? '✓' : i+1}</div>
-        <div class="ps-step-label ${lblClass}">${s.label}</div>
-      </div>${connector}`;
-    }).join('');
-
-    // Status badge
-    const statusMap = {
-      menunggu:         `<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>`,
-      dikirim:          `<span class="bdg bdg-dikirim">📦 Dikirim</span>`,
-      transit:          `<span class="bdg bdg-transit">🚚 ${escH((c.status_tracking||'').slice(0,20))}</span>`,
-      tiba_kota:        `<span class="bdg bdg-tiba_kota">🏙️ Kota Tujuan</span>`,
-      out_for_delivery: `<span class="bdg bdg-out_for_delivery">🚚 OTW ke Rumah</span>`,
-      sampai:           `<span class="bdg bdg-sampai">✅ Sampai</span>`,
-      bermasalah:       `<span class="bdg bdg-bermasalah">⚠️ Bermasalah</span>`,
-      retur:            `<span class="bdg bdg-retur">🔄 Retur</span>`,
-    };
-
-    // Tracking info
-    let trackingInfo = '';
-    if (c.no_resi) {
-      trackingInfo = `<div class="ps-tracking-info"><b>${escH(c.no_resi)}</b> · ${escH((c.ekspedisi||'').toUpperCase())}${c.tracking_lokasi ? `<br>${escH(c.tracking_lokasi)}` : ''}</div>`;
-    }
-
-    return `<div class="ps-card">
-      <div class="ps-card-left">
-        <div class="ps-card-top">
-          <div class="ps-av" style="background:${color}">${escH(avInit(nama))}</div>
-          <div>
-            <div class="ps-nama">${escH(nama)}</div>
-            <div class="ps-phone">${escH((cu.wa_number||'').replace('@s.whatsapp.net',''))}</div>
+    <!-- Main Card -->
+    <div class="tr-card-wrap">
+      <div class="tr-card-header">
+        <div class="tr-card-header-left">
+          <h3>Tracking Pesanan</h3>
+          <div class="tr-card-sub">Monitor status pengiriman${lastUpdated ? ' · diperbarui '+fmtTime(lastUpdated) : ''}</div>
+        </div>
+        <div class="tr-controls">
+          <select class="ctrl-select" onchange="setEkspedisiFilter(this.value)">
+            <option value="">Semua Ekspedisi</option>
+            ${ekspedisiOptions().map(e=>`<option value="${escH(e)}"${ekspedisiFilter===e?' selected':''}>${escH(e)}</option>`).join('')}
+          </select>
+          <select class="ctrl-select" onchange="setProdukFilter(this.value)">
+            <option value="">Semua Produk</option>
+            ${produkOptions().map(p=>`<option value="${p.id}"${produkFilter===p.id?' selected':''}>${escH(p.nama)}</option>`).join('')}
+          </select>
+          <div class="drp-wrap">
+            <button class="drp-trigger" id="drpTrigger" onclick="drpToggle()">
+              <span>📅</span><span>${drpLabelText}</span><span style="color:var(--text-3)">▾</span>
+            </button>
+            <div class="drp-dropdown" id="drpDropdown">
+              <div class="drp-presets">
+                <button class="drp-preset" onclick="drpPreset(1,'Hari Ini',this)">Hari Ini</button>
+                <button class="drp-preset" onclick="drpPreset(7,'7 Hari',this)">7 Hari</button>
+                <button class="drp-preset" onclick="drpPreset(14,'14 Hari',this)">14 Hari</button>
+                <button class="drp-preset" onclick="drpPreset(30,'30 Hari',this)">30 Hari</button>
+                <hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
+                <button class="drp-preset active" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
+                <button class="drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
+              </div>
+              <div style="display:flex;flex-direction:column;flex:1">
+                <div class="drp-cal" id="drpCal"></div>
+                <div class="drp-footer">
+                  <div class="drp-selected-txt"><span id="drpSelStart">-</span> → <span id="drpSelEnd">-</span></div>
+                  <div style="display:flex;gap:6px">
+                    <button class="drp-cancel" onclick="drpClose()">Batal</button>
+                    <button class="drp-apply" onclick="drpApply()">Terapkan</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div style="margin-left:8px">${statusMap[status]}</div>
-          <span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}" style="margin-left:4px">${metode==='transfer'?'TF':'COD'}</span>
+          <button class="tr-tab" onclick="openTplModal()" style="border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08);color:#3b82f6">✏️ Template</button>
         </div>
-        <div class="ps-produk">
-          ${escH(pr.nama || '—')} × ${qty}
-          ${c.ekspedisi ? `· <b>${escH(c.ekspedisi.toUpperCase())}</b>` : ''}
+      </div>
+
+      <!-- Tabs -->
+      <div class="tr-tabs">
+        <div class="${tabClass('semua')}" onclick="setTab('semua')">Semua</div>
+        <div class="${tabClass('menunggu')}" onclick="setTab('menunggu')">⏳ Menunggu Resi</div>
+        <div class="${tabClass('dikirim')}" onclick="setTab('dikirim')">📦 Dikirim</div>
+        <div class="${tabClass('tiba_kota')}" onclick="setTab('tiba_kota')">🏙️ Kota Tujuan</div>
+        <div class="${tabClass('out_for_delivery')}" onclick="setTab('out_for_delivery')">🚚 OTW</div>
+        <div class="${tabClass('sampai')}" onclick="setTab('sampai')">✅ Sampai</div>
+        <div class="${tabClass('bermasalah')}" onclick="setTab('bermasalah')">⚠️ Bermasalah</div>
+        <div class="${tabClass('retur')}" onclick="setTab('retur')">🔄 Retur</div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="tr-toolbar">
+        <div class="tr-search-wrap">
+          <input type="text" id="trSearch" class="tr-search" placeholder="🔍 Cari resi / nama / produk..." value="${escH(q)}" onkeyup="page=1;renderAll()">
         </div>
-        <div class="ps-pipeline">${pipelineHtml}</div>
+        <div class="tr-count">${list.length} pesanan</div>
       </div>
-      <div class="ps-card-right">
-        <div class="ps-nilai">${rp(nilai)}</div>
-        <div class="ps-date">${fmtDt(c.created_at)}</div>
-        ${trackingInfo}
+
+      <!-- Order Cards -->
+      <div class="tr-list" id="trList">
+        ${pageList.length ? pageList.map(c => cardHtml(c)).join('') : '<div class="empty-state" style="grid-column:1/-1"><div>📭</div><div style="font-weight:600;margin-bottom:6px">Tidak ada pesanan</div><div style="font-size:12px">Coba ganti filter atau cari dengan kata lain</div></div>'}
       </div>
-    </div>`;
-  }).join('');
+
+      <!-- Pagination -->
+      ${totalPages > 1 ? `
+      <div class="tr-pagination">
+        <button class="pg-btn" ${page<=1?'disabled':''} onclick="goPage(${page-1})">← Sebelumnya</button>
+        <span class="pg-info">${(page-1)*pageSize+1}–${Math.min(page*pageSize,list.length)} dari ${list.length} · Hal. ${page}/${totalPages}</span>
+        <button class="pg-btn" ${page>=totalPages?'disabled':''} onclick="goPage(${page+1})">Selanjutnya →</button>
+      </div>` : ''}
+    </div>
+  `;
+}
+
+/* ── Card HTML ── */
+function cardHtml(c) {
+  const cu = custMap[c.customer_id] || {};
+  const pr = prodMap[c.product_id] || {};
+  const nama = cu.nama || cu.wa_number || 'Pelanggan';
+  const phone = (cu.wa_number||'').replace('@s.whatsapp.net','');
+  const color = avColor(nama);
+  const qty = parseInt(c.qty || 1);
+  const ongkir = c.ongkir_after_promo ?? c.ongkir ?? 0;
+  const nilai = c.total || ((pr.harga||0) * qty) + ongkir;
+  const metode = (c.metode || 'cod').toLowerCase();
+  const status = getStatus(c);
+
+  const statusBadgeMap = {
+    menunggu:         '<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>',
+    dikirim:          '<span class="bdg bdg-dikirim">📦 Dikirim</span>',
+    transit:          `<span class="bdg bdg-transit">🚚 ${escH((c.status_tracking||'').slice(0,20))}</span>`,
+    tiba_kota:        '<span class="bdg bdg-tiba_kota">🏙️ Kota Tujuan</span>',
+    out_for_delivery: '<span class="bdg bdg-out_for_delivery">🚚 OTW</span>',
+    sampai:           '<span class="bdg bdg-sampai">✅ Sampai</span>',
+    bermasalah:       '<span class="bdg bdg-bermasalah">⚠️ Bermasalah</span>',
+    retur:            '<span class="bdg bdg-retur">🔄 Retur</span>',
+  };
+
+  return `<div class="tr-order">
+    <div class="tr-order-top">
+      <div class="tr-order-left">
+        <div class="tr-avatar" style="background:${color}">${escH(avInit(nama))}</div>
+        <div style="min-width:0">
+          <div class="tr-name">${escH(nama)}</div>
+          <div class="tr-phone">${escH(phone)}</div>
+          <div class="tr-meta">
+            ${statusBadgeMap[status] || ''}
+            ${c.ekspedisi ? `<span class="bdg" style="background:rgba(255,255,255,.07);color:var(--text-2)">${escH(c.ekspedisi.toUpperCase())}</span>` : ''}
+            <span class="bdg ${metode==='transfer'?'bdg-tf':'bdg-cod'}">${metode==='transfer'?'TF':'COD'}</span>
+          </div>
+          <div class="tr-produk">${escH(pr.nama || '-')} × ${qty}</div>
+        </div>
+      </div>
+      <div>
+        <div class="tr-price">${rp(nilai)}</div>
+        <div class="tr-date">${fmtDt(c.created_at)}</div>
+        ${c.no_resi ? `<div class="tr-resi">${escH(c.no_resi)}</div>` : ''}
+      </div>
+    </div>
+    <div class="tr-divider">${stepperHtml(status)}</div>
+  </div>`;
 }
 
 /* ── TEMPLATE NOTIF ── */
@@ -365,11 +693,7 @@ async function openTplModal() {
     document.getElementById('tpl-retur').value            = row.template_retur            || '';
   } catch(e) { console.error('loadTpl:', e.message); }
 }
-
-function closeTplModal() {
-  document.getElementById('tpl-overlay').classList.remove('open');
-}
-
+function closeTplModal() { document.getElementById('tpl-overlay').classList.remove('open'); }
 async function saveTplModal() {
   const status = document.getElementById('tpl-status');
   status.textContent = 'Menyimpan...';
@@ -399,7 +723,7 @@ async function saveTplModal() {
   }
 }
 
-init();
+loadData();
 </script>
 </body>
 </html>

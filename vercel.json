@@ -25,10 +25,7 @@
     "api/followup.js": {
       "maxDuration": 60
     },
-    "api/resi-poller.js": {
-      "maxDuration": 60
-    },
-    "api/tracking.js": {
+    "api/mengantar-webhook.js": {
       "maxDuration": 60
     },
     "api/gmail.js": {
