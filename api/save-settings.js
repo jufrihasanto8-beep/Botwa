@@ -31,6 +31,25 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     const { userId, user_id, action, key } = req.query || {};
 
+    // Advertiser list dari Autopilot Supabase (untuk dropdown Laporan Akuisisi)
+    if (action === 'adv-list') {
+      const AUTOPILOT_URL = (process.env.AUTOPILOT_SUPABASE_URL || '').replace(/\/$/, '');
+      const AUTOPILOT_KEY = process.env.AUTOPILOT_SUPABASE_SERVICE_KEY;
+      if (!AUTOPILOT_URL || !AUTOPILOT_KEY) return res.status(500).json({ error: 'Autopilot tidak dikonfigurasi' });
+      try {
+        const q = new URLSearchParams({ role: 'in.(advertiser,admin,superadmin)', status: 'eq.active', select: 'name', order: 'name.asc' });
+        const r = await fetch(`${AUTOPILOT_URL}/rest/v1/profiles?${q}`, {
+          headers: { apikey: AUTOPILOT_KEY, Authorization: `Bearer ${AUTOPILOT_KEY}` },
+          signal: AbortSignal.timeout(8000)
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const profiles = await r.json();
+        return res.json({ names: profiles.map(p => p.name).filter(Boolean) });
+      } catch(e) {
+        return res.status(500).json({ error: e.message || 'Gagal memuat advertiser' });
+      }
+    }
+
     // Autofill area: wilayah_id (kabupaten/provinsi) + Mengantar (kodepos)
     if (action === 'area-autofill') {
       const kel = (req.query.kel || '').trim();
