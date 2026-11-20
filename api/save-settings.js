@@ -271,15 +271,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  if (body.userId && body.table === 'users_laporan_cs') {
-    if (!body.laporan_cs_nama) return res.status(400).json({ error: 'laporan_cs_nama wajib' });
-    try {
-      await sbReq('PATCH', `users?id=eq.${body.userId}`, { laporan_cs_nama: body.laporan_cs_nama });
-      return res.json({ ok: true });
-    } catch(e) { return res.status(500).json({ error: e.message }); }
-  }
-
-  if (body.userId && body.table === 'users_template' && body.payload) {
+if (body.userId && body.table === 'users_template' && body.payload) {
     const allowedUsers    = ['template_resi_dikirim', 'template_tiba_kota', 'template_out_for_delivery', 'template_delivered', 'template_bermasalah', 'template_retur'];
     const allowedProducts = ['template_form_lead']; // disimpan di products, bukan users
 
