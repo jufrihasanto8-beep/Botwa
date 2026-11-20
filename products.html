@@ -413,6 +413,7 @@ body.light .fu-msg-lbl{color:#94a3b8}
         <button class="tab-btn" onclick="switchTab('ai',this)">AI & Konsultasi</button>
         <button class="tab-btn" onclick="switchTab('ongkir',this)">Ongkir & Promo</button>
         <button class="tab-btn" onclick="switchTab('mapping',this)">CTWA Mapping</button>
+        <button class="tab-btn" onclick="switchTab('laporan',this);loadLaporanAdvList()">Laporan Akuisisi</button>
       </div>
 
       <!-- Tab: Info Dasar -->
@@ -639,6 +640,43 @@ body.light .fu-msg-lbl{color:#94a3b8}
         </p>
         <div id="mapping-list"></div>
         <button class="btn btn-sm" onclick="addMappingRow()" style="margin-top:8px;">+ Tambah Mapping</button>
+      </div>
+
+      <!-- Tab: Laporan Akuisisi -->
+      <div class="tab-pane" id="tab-laporan">
+        <p style="font-size:13px;color:#64748b;margin-bottom:16px;">
+          Konfigurasi sinkronisasi otomatis ke Laporan Akuisisi. Closing dan lead BotWA akan masuk laporan harian secara realtime.
+        </p>
+        <div class="form-group">
+          <label>Advertiser</label>
+          <select id="f-laporan-advertiser">
+            <option value="">-- Pilih Advertiser --</option>
+          </select>
+          <div style="font-size:11px;color:#64748b;margin-top:4px">Nama advertiser persis seperti di Laporan Akuisisi</div>
+        </div>
+        <div class="form-group">
+          <label>Nama Produk (Laporan)</label>
+          <input type="text" id="f-laporan-produk" placeholder="Sesuai nama produk di Laporan Akuisisi">
+          <div style="font-size:11px;color:#64748b;margin-top:4px">Harus cocok persis dengan nama di Laporan Akuisisi</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label>Platform</label>
+            <select id="f-laporan-platform">
+              <option value="Meta">Meta</option>
+              <option value="Google">Google</option>
+              <option value="TikTok">TikTok</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Channel</label>
+            <select id="f-laporan-channel">
+              <option value="CTWA">CTWA</option>
+              <option value="Web">Web</option>
+            </select>
+          </div>
+        </div>
+        <div id="laporan-adv-status" style="font-size:12px;color:#64748b;margin-top:4px;"></div>
       </div>
 
     </div>
@@ -1126,6 +1164,11 @@ function openAdd() {
   renderTags('keluhan'); renderTags('diagnosa');
   renderMappingList();
   togglePromoNilai();
+  // Reset laporan fields
+  document.getElementById('f-laporan-advertiser').value = '';
+  document.getElementById('f-laporan-produk').value = '';
+  document.getElementById('f-laporan-platform').value = 'Meta';
+  document.getElementById('f-laporan-channel').value = 'CTWA';
   switchTab('info', document.querySelector('.tab-btn'));
   document.getElementById('prod-modal').classList.add('open');
 }
@@ -1176,12 +1219,45 @@ async function openEdit(id) {
   loadDiskonOngkir(p.diskon_ongkir_per_qty || []);
   renderMappingList();
   togglePromoNilai();
+  // Laporan Akuisisi fields
+  document.getElementById('f-laporan-produk').value = p.laporan_produk || '';
+  document.getElementById('f-laporan-platform').value = p.laporan_platform || 'Meta';
+  document.getElementById('f-laporan-channel').value = p.laporan_channel || 'CTWA';
+  // Load adv list first then set saved value
+  loadLaporanAdvList().then(() => {
+    document.getElementById('f-laporan-advertiser').value = p.laporan_advertiser || '';
+  });
   switchTab('info', document.querySelector('.tab-btn'));
   document.getElementById('prod-modal').classList.add('open');
 }
 
 function closeModal() {
   document.getElementById('prod-modal').classList.remove('open');
+}
+
+/* ── Laporan Akuisisi: load advertiser list ── */
+let _laporanAdvLoaded = false;
+async function loadLaporanAdvList() {
+  if (_laporanAdvLoaded) return;
+  const sel = document.getElementById('f-laporan-advertiser');
+  const status = document.getElementById('laporan-adv-status');
+  status.textContent = 'Memuat daftar advertiser…';
+  try {
+    const r = await fetch(`/api/save-settings?action=adv-list&user_id=${currentUserId}`);
+    const d = await r.json();
+    const names = d.names || [];
+    // Clear existing options except placeholder
+    while (sel.options.length > 1) sel.remove(1);
+    names.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    _laporanAdvLoaded = true;
+    status.textContent = names.length ? `${names.length} advertiser tersedia` : 'Tidak ada advertiser ditemukan';
+  } catch(e) {
+    status.textContent = 'Gagal memuat advertiser';
+  }
 }
 
 /* ── Tags ── */
@@ -1303,6 +1379,10 @@ async function saveProduk() {
     asal_pengiriman: document.getElementById('f-asal-pengiriman').value.trim(),
     advertiser: document.getElementById('f-advertiser').value.trim() || null,
     admin_nama: document.getElementById('f-admin-nama').value.trim() || null,
+    laporan_advertiser: document.getElementById('f-laporan-advertiser').value || null,
+    laporan_produk: document.getElementById('f-laporan-produk').value.trim() || null,
+    laporan_platform: document.getElementById('f-laporan-platform').value || 'Meta',
+    laporan_channel: document.getElementById('f-laporan-channel').value || 'CTWA',
     gambar_url: document.getElementById('f-gambar-url').value || null,
     testimoni_urls: getTestiUrls(),
     product_knowledge: document.getElementById('f-knowledge').value.trim(),
