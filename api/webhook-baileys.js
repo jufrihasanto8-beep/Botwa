@@ -4199,6 +4199,49 @@ ${ongkirInfo}`;
       }
     }
 
+    // ── Forward feedback bermasalah ke grup OPS ──
+    if (convState.delivery_issue && !convState.delivery_issue_forwarded) {
+      try {
+        const opsGroupJid = process.env.OPS_GROUP_JID;
+        if (opsGroupJid) {
+          const issueResi = convState.delivery_issue_resi || '';
+          const issueEkspedisi = (() => {
+            // Cari ekspedisi dari order
+            const snap = convState.order_snapshot || {};
+            return snap.ekspedisi || '';
+          })();
+          const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
+          const custNama = customer?.nama || 'Customer';
+
+          // Ambil 6 chat terakhir untuk screenshot
+          const recentMsgs = await sbGet('conv_messages',
+            `?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=6&select=role,isi,created_at`
+          ).catch(() => []);
+          const chatMsgs = recentMsgs.reverse(); // urut lama → baru
+
+          // A: Generate screenshot chat
+          try {
+            const { generateChatImage } = require('./_chat-image');
+            const pngBuffer = await generateChatImage(chatMsgs, custNama, issueResi, issueEkspedisi);
+            const base64Img = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            const caption = `📦 *${issueResi}*\n👤 ${custNama} (${custPhone})\n💬 "${(message || '').slice(0, 100)}"`;
+            await sendWA(waSession, opsGroupJid, null, true, base64Img, caption).catch(() => {});
+            console.log(`[BERMASALAH-FWD] Screenshot + caption terkirim ke grup OPS`);
+          } catch (imgErr) {
+            console.error(`[BERMASALAH-FWD] Image error, fallback ke teks:`, imgErr.message);
+            // B: Fallback teks kalau gambar gagal
+            const txtNotif = `📦 *${issueResi}*\n👤 ${custNama} (${custPhone})\n🚚 ${issueEkspedisi}\n\n💬 Customer bilang:\n"${(message || '').slice(0, 200)}"\n\n📋 Bot reply:\n"${(reply || '').slice(0, 200)}"`;
+            await sendWA(waSession, opsGroupJid, txtNotif, true).catch(() => {});
+          }
+
+          // Mark as forwarded biar ga kirim ulang tiap customer chat
+          await updateConvState(conversation.id, { delivery_issue_forwarded: true });
+        }
+      } catch (e) {
+        console.error('[BERMASALAH-FWD] Error:', e.message);
+      }
+    }
+
     // ── Update ringkasan berjalan (setiap 5 pesan) ──
     try {
       const allMsgs = await sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`);
