@@ -36,6 +36,9 @@
     },
     "api/validate-order.js": {
       "maxDuration": 60
+    },
+    "api/tracking.js": {
+      "maxDuration": 60
     }
   },
   "crons": []

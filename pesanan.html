@@ -285,7 +285,7 @@ body.light .tr-step-line{background:rgba(0,0,0,.1)}
       <div id="dtlBody"></div>
       <div class="dtl-footer">
         <button class="dtl-btn" onclick="closeDetail()">Tutup</button>
-        <button class="dtl-btn dtl-btn-primary" id="dtlTrackBtn" onclick="openTrackingLink()">🔗 Lacak Resi</button>
+        <button class="dtl-btn dtl-btn-primary" id="dtlCheckBtn" onclick="cekUlangResi()">🔄 Cek Ulang</button>
       </div>
     </div>
   </div>
@@ -580,89 +580,84 @@ function fmtDtFull(iso) {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${hm}`;
 }
 
-window.openDetail = (id) => {
-  dtlOrderId = id;
-  const c = allConvs.find(x => x.id === id);
-  if (!c) return;
-  const cu = custMap[c.customer_id] || {};
-  const pr = prodMap[c.product_id] || {};
-  const nama = cu.nama || cu.wa_number || 'Pelanggan';
-  const phone = (cu.wa_number||'').replace('@s.whatsapp.net','');
+const EKSPEDISI_LIST = ['JNE','J&T','SICEPAT','ANTERAJA','NINJA','IDEXPRESS','LION','POS','SPX','SAP'];
+const statusLabels = {
+  menunggu:'🚚 Menunggu Resi', dikirim:'🚚 Dikirim', transit:'🚚 Transit',
+  tiba_kota:'🏙️ Kota Tujuan', out_for_delivery:'🚚 OTW', sampai:'✅ Sampai',
+  bermasalah:'⚠️ Bermasalah', retur:'🔄 Retur'
+};
+
+function renderModalBody(c, records) {
   const status = getStatus(c);
-  const qty = parseInt(c.qty || 1);
-  const ongkir = c.ongkir_after_promo ?? c.ongkir ?? 0;
-  const nilai = c.total || ((pr.harga||0) * qty) + ongkir;
-  const metode = (c.metode || 'cod').toUpperCase();
+  const pr = prodMap[c.product_id] || {};
 
-  document.getElementById('dtlTitle').textContent = pr.nama || 'Detail Pesanan';
-  document.getElementById('dtlSub').textContent = (c.no_resi || '-') + (c.ekspedisi ? ' · ' + c.ekspedisi : '');
+  // Ekspedisi dropdown
+  const ekspedisiHtml = `
+    <div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:.78rem;color:var(--text-3);white-space:nowrap">Ekspedisi:</span>
+      <select id="dtlEkspedisiSelect" style="font-size:.78rem;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);flex:1;min-width:120px">
+        <option value="">— Tidak diketahui —</option>
+        ${EKSPEDISI_LIST.map(e => `<option value="${e}" ${(c.ekspedisi||'').toUpperCase()===e?'selected':''}>${e}</option>`).join('')}
+      </select>
+      <button class="dtl-btn dtl-btn-primary" onclick="saveEkspedisi()" style="flex:0;padding:6px 16px;font-size:.78rem">Simpan</button>
+    </div>`;
 
-  // Status badge
-  const statusLabels = {
-    menunggu:'⏳ Menunggu Resi', dikirim:'📦 Dikirim', transit:'🚚 Transit',
-    tiba_kota:'🏙️ Kota Tujuan', out_for_delivery:'🚚 OTW', sampai:'✅ Sampai',
-    bermasalah:'⚠️ Bermasalah', retur:'🔄 Retur'
-  };
-
-  // Tracking events timeline
-  const ev = c.tracking_events || {};
-  const EVENT_META = [
-    { key:'dikirim',          label:'Dikirim',         icon:'📦', color:'var(--primary)' },
-    { key:'tiba_kota',        label:'Kota Tujuan',     icon:'🏙️', color:'#6366f1' },
-    { key:'out_for_delivery', label:'OTW ke Penerima', icon:'🚚', color:'#06b6d4' },
-    { key:'delivered',        label:'Sampai',          icon:'✅', color:'var(--success)' },
-    { key:'bermasalah',       label:'Bermasalah',      icon:'⚠️', color:'var(--danger)' },
-    { key:'retur',            label:'Retur',           icon:'🔄', color:'#ec4899' },
-  ];
-  const timeline = EVENT_META.filter(e => ev[e.key]).sort((a,b) => new Date(ev[b.key]) - new Date(ev[a.key]));
-
+  // History timeline dari Mengantar API
   let historyHtml = '';
-  if (timeline.length) {
-    historyHtml = timeline.map((e, i) => `
-      <div class="dtl-history-item">
-        <div class="dtl-history-dot" style="background:${i === 0 ? e.color : 'var(--border)'}"></div>
+  if (records && records.length) {
+    historyHtml = records.map((r, i) => {
+      const ts = r.time ? fmtDtFull(typeof r.time === 'number' ? new Date(r.time * 1000).toISOString() : r.time) : '';
+      const loc = r.location || '';
+      const meta = [ts, loc].filter(Boolean).join(' · ');
+      return `<div class="dtl-history-item">
+        <div class="dtl-history-dot" style="background:${i === 0 ? 'var(--primary)' : 'var(--border)'}"></div>
         <div>
-          <div class="dtl-history-desc" ${i===0?'style="font-weight:700"':''}>${e.icon} ${e.label}</div>
-          <div class="dtl-history-time">${fmtDtFull(ev[e.key])}</div>
+          <div class="dtl-history-desc" ${i===0?'style="font-weight:700"':''}>${escH(r.desc || '-')}</div>
+          ${meta ? `<div class="dtl-history-time">${escH(meta)}</div>` : ''}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } else {
-    historyHtml = '<div style="font-size:.78rem;color:var(--text-3);padding:8px 0">Belum ada update tracking.</div>';
+    historyHtml = '<div style="font-size:.78rem;color:var(--text-3);padding:8px 0">Belum ada history — klik "Cek Ulang".</div>';
   }
-
-  // Tracking status raw dari Mengantar
-  const statusTrackingHtml = c.status_tracking
-    ? `<div class="dtl-row"><div class="dtl-label">Status Kurir</div><div class="dtl-value">${escH(c.status_tracking)}</div></div>` : '';
 
   document.getElementById('dtlBody').innerHTML = `
     <div style="margin-top:10px;margin-bottom:4px">
       <span class="bdg bdg-${status}">${statusLabels[status] || status}</span>
-      <span class="bdg ${metode==='TRANSFER'?'bdg-tf':'bdg-cod'}">${metode==='TRANSFER'?'TF':'COD'}</span>
     </div>
     ${stepperHtml(status)}
-
-    <div class="dtl-section">
-      <div class="dtl-section-title">Info Pesanan</div>
-      <div class="dtl-row"><div class="dtl-label">Pelanggan</div><div class="dtl-value">${escH(nama)}</div></div>
-      <div class="dtl-row"><div class="dtl-label">No. HP</div><div class="dtl-value">${escH(phone)}</div></div>
-      <div class="dtl-row"><div class="dtl-label">Produk</div><div class="dtl-value">${escH(pr.nama || '-')} × ${qty}</div></div>
-      <div class="dtl-row"><div class="dtl-label">Total</div><div class="dtl-value" style="font-weight:800">${rp(nilai)}</div></div>
-      <div class="dtl-row"><div class="dtl-label">Resi</div><div class="dtl-value">${c.no_resi ? escH(c.no_resi) : '<span style="color:var(--text-3)">Belum ada</span>'}</div></div>
-      ${c.ekspedisi ? `<div class="dtl-row"><div class="dtl-label">Ekspedisi</div><div class="dtl-value">${escH(c.ekspedisi)}</div></div>` : ''}
-      ${statusTrackingHtml}
-      <div class="dtl-row"><div class="dtl-label">Tanggal Order</div><div class="dtl-value">${fmtDtFull(c.created_at)}</div></div>
-      ${c.alamat ? `<div class="dtl-row"><div class="dtl-label">Alamat</div><div class="dtl-value" style="font-size:.72rem;line-height:1.4">${escH(c.alamat)}</div></div>` : ''}
-    </div>
-
-    <div class="dtl-section">
-      <div class="dtl-section-title">Riwayat Tracking</div>
-      ${historyHtml}
-    </div>
+    ${ekspedisiHtml}
+    ${historyHtml}
   `;
+}
 
-  // Hide track button kalau belum ada resi
-  document.getElementById('dtlTrackBtn').style.display = c.no_resi ? '' : 'none';
+window.openDetail = async (id) => {
+  dtlOrderId = id;
+  const c = allConvs.find(x => x.id === id);
+  if (!c) return;
+  const pr = prodMap[c.product_id] || {};
+
+  document.getElementById('dtlTitle').textContent = pr.nama || 'Detail Pesanan';
+  document.getElementById('dtlSub').textContent = (c.no_resi || '-') + (c.ekspedisi ? ' · ' + c.ekspedisi : '');
+  document.getElementById('dtlBody').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-3);font-size:.85rem">Memuat detail...</div>';
   document.getElementById('dtl-overlay').classList.add('open');
+
+  // Fetch tracking detail dari Mengantar API
+  if (c.no_resi) {
+    try {
+      const r = await fetch('/api/tracking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check-single', resi: c.no_resi, ekspedisi: c.ekspedisi, order_id: c.id }),
+      });
+      const d = await r.json();
+      renderModalBody(c, d.records || []);
+    } catch (e) {
+      renderModalBody(c, []);
+    }
+  } else {
+    renderModalBody(c, []);
+  }
 };
 
 window.closeDetail = () => {
@@ -670,10 +665,82 @@ window.closeDetail = () => {
   dtlOrderId = null;
 };
 
-window.openTrackingLink = () => {
+window.cekUlangResi = async () => {
   const c = allConvs.find(x => x.id === dtlOrderId);
   if (!c?.no_resi) return;
-  window.open(trackingUrl(c.ekspedisi, c.no_resi), '_blank');
+  const btn = document.getElementById('dtlCheckBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Mengecek...'; }
+  try {
+    const r = await fetch('/api/tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check-single', resi: c.no_resi, ekspedisi: c.ekspedisi, order_id: c.id }),
+    });
+    const d = await r.json();
+    // Reload order data dari DB untuk dapat tracking_events terbaru
+    const freshOrders = await SB.get('orders_new', `?id=eq.${c.id}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,status_tracking,tracking_lokasi,tracking_events,sampai,created_at&limit=1`);
+    if (freshOrders[0]) Object.assign(c, freshOrders[0]);
+    renderModalBody(c, d.records || []);
+    renderAll();
+  } catch (e) {
+    console.error('cekUlang error:', e);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 Cek Ulang'; }
+};
+
+window.saveEkspedisi = async () => {
+  const c = allConvs.find(x => x.id === dtlOrderId);
+  if (!c) return;
+  const val = document.getElementById('dtlEkspedisiSelect')?.value || '';
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/orders_new?id=eq.${c.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY, 'Prefer':'return=minimal' },
+      body: JSON.stringify({ ekspedisi: val || null }),
+    });
+    c.ekspedisi = val || null;
+    document.getElementById('dtlSub').textContent = (c.no_resi || '-') + (val ? ' · ' + val : '');
+    renderAll();
+  } catch (e) {
+    console.error('saveEkspedisi error:', e);
+  }
+};
+
+/* ── Cek Semua Resi ── */
+window.checkAllResi = async () => {
+  const btn = document.getElementById('btnCheckAll');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Mengecek...';
+  btn.style.opacity = '.6';
+
+  try {
+    const r = await fetch('/api/tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check-all', user_id: uid }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      btn.textContent = `✅ ${d.total} resi dicek · ${d.updated} update · ${d.notifSent} notif`;
+      btn.style.color = '#10b981';
+      // Reload data setelah cek
+      await loadData();
+    } else {
+      btn.textContent = '❌ Gagal: ' + (d.error || 'Unknown');
+      btn.style.color = '#ef4444';
+    }
+  } catch (e) {
+    btn.textContent = '❌ Error: ' + e.message;
+    btn.style.color = '#ef4444';
+  }
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = '🔄 Cek Semua Resi';
+    btn.style.opacity = '1';
+    btn.style.color = '#10b981';
+  }, 5000);
 };
 
 /* ── Load Data ── */
@@ -841,6 +908,7 @@ function renderAll() {
               </div>
             </div>
           </div>
+          <button class="tr-tab" id="btnCheckAll" onclick="checkAllResi()" style="border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.08);color:#10b981">🔄 Cek Semua Resi</button>
           <button class="tr-tab" onclick="openTplModal()" style="border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08);color:#3b82f6">✏️ Template</button>
         </div>
       </div>
