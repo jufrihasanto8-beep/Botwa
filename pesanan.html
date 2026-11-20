@@ -133,6 +133,17 @@ body.light .tr-step-line{background:rgba(0,0,0,.1)}
 .drp-cancel{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-2);font-size:.75rem;cursor:pointer}
 .drp-cancel:hover{border-color:var(--danger);color:var(--danger)}
 
+/* ── Sub-filter Cards ── */
+.tr-sub-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}
+.tr-sub-card{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:14px 10px;cursor:pointer;gap:4px;box-shadow:var(--shadow);transition:all .18s;user-select:none}
+.tr-sub-card:hover{border-color:var(--primary);background:rgba(67,97,238,.05);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.1)}
+.tr-sub-card.active{border-color:var(--primary);background:rgba(67,97,238,.08)}
+.tr-sub-card.active .tr-sub-count{color:var(--primary)}
+.tr-sub-card.active .tr-sub-label{color:var(--primary);font-weight:600}
+.tr-sub-icon{font-size:1.3rem;line-height:1;margin-bottom:2px}
+.tr-sub-count{font-size:1.35rem;font-weight:800;color:var(--text);line-height:1.1}
+.tr-sub-label{font-size:.7rem;font-weight:500;color:var(--text-3);text-align:center;white-space:nowrap}
+
 .empty-state{text-align:center;padding:60px 20px;color:var(--text-2)}
 .empty-state div:first-child{font-size:40px;margin-bottom:12px}
 
@@ -164,6 +175,7 @@ body.light .tr-step-line{background:rgba(0,0,0,.1)}
 @media(max-width:768px){
   .ps-page{padding:14px}
   .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .tr-sub-grid{grid-template-columns:repeat(3,1fr)}
   .tr-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px}
   .tr-tabs::-webkit-scrollbar{display:none}
   .tr-list{grid-template-columns:1fr}
@@ -255,7 +267,7 @@ checkBotStatus();
 
 const uid = Auth.getUser()?.id;
 let allConvs = [], custMap = {}, prodMap = {};
-let activeTab = 'semua', activeStatFilter = 'SEMUA';
+let activeTab = 'semua', activeStatFilter = 'SEMUA', subFilter = '';
 let page = 1, pageSize = 50;
 let ekspedisiFilter = '', produkFilter = '';
 let lastUpdated = null;
@@ -299,6 +311,42 @@ function statusGroup(s) {
   if (s === 'retur')  return 'RETUR';
   if (s === 'bermasalah') return 'UNDEL';
   return 'ON_PROSES';
+}
+
+/* ── Sub-filter Meta (sesuai tracking akuisisi) ── */
+const SUB_FILTER_STAGES = [
+  { key: 'menunggu',         icon: '⏳', label: 'Menunggu Resi' },
+  { key: 'dikirim',          icon: '📦', label: 'Dikirim' },
+  { key: 'tiba_kota',        icon: '🏙️', label: 'Kota Tujuan' },
+  { key: 'out_for_delivery', icon: '🛵', label: 'OTW' },
+];
+const BERMASALAH_KATEGORI_META = {
+  UNDELIVERED:      { label: 'Gagal Antar',       icon: '🚪' },
+  DELIVERY_PROBLEM: { label: 'Masalah Pengiriman', icon: '📍' },
+  SHIPPING_PROBLEM: { label: 'Masalah Shipping',  icon: '⚠️' },
+  PICKUP_FAILED:    { label: 'Gagal Pickup',      icon: '📵' },
+  REJECTED:         { label: 'Ditolak',           icon: '🚫' },
+  LAINNYA:          { label: 'Lainnya',           icon: '❓' },
+};
+const RETUR_KATEGORI_META = {
+  RTS:              { label: 'Return to Shipper', icon: '↩️' },
+  RETURN_TO_SHIPPER:{ label: 'Return to Shipper', icon: '↩️' },
+  DELIVERY_RETURN:  { label: 'Delivery Return',  icon: '📦' },
+  CANCELED:         { label: 'Dibatalkan',        icon: '🚫' },
+  CANCELLED:        { label: 'Dibatalkan',        icon: '🚫' },
+  LAINNYA:          { label: 'Lainnya',           icon: '❓' },
+};
+
+// Normalize status_tracking ke kategori meta key
+function normBermasalahKat(st) {
+  if (!st) return 'LAINNYA';
+  const u = st.toUpperCase().replace(/\s+/g, '_');
+  return BERMASALAH_KATEGORI_META[u] ? u : 'LAINNYA';
+}
+function normReturKat(st) {
+  if (!st) return 'LAINNYA';
+  const u = st.toUpperCase().replace(/\s+/g, '_');
+  return RETUR_KATEGORI_META[u] ? u : 'LAINNYA';
 }
 
 /* ── Stepper HTML ── */
@@ -439,12 +487,18 @@ document.addEventListener('click', e => {
 window.setTab = (tab) => { activeTab = tab; page = 1; renderAll(); };
 window.setStatFilter = (key) => {
   activeStatFilter = activeStatFilter === key ? 'SEMUA' : key;
+  subFilter = ''; // reset sub-filter saat ganti stat
   // Map stat filter to matching tab
   if (activeStatFilter === 'SEMUA')    activeTab = 'semua';
   else if (activeStatFilter === 'DELIVERY') activeTab = 'sampai';
   else if (activeStatFilter === 'RETUR')    activeTab = 'retur';
   else if (activeStatFilter === 'UNDEL')    activeTab = 'bermasalah';
   else activeTab = 'semua'; // ON_PROSES = semua minus sampai/retur/bermasalah
+  page = 1;
+  renderAll();
+};
+window.setSubFilter = (key) => {
+  subFilter = subFilter === key ? '' : key;
   page = 1;
   renderAll();
 };
@@ -495,10 +549,35 @@ function renderAll() {
   const total = baseList.length;
   const pct = n => total > 0 ? (n/total*100).toFixed(1)+'%' : '';
 
+  // Sub-filter counts (computed before filtering)
+  const subCounts = { menunggu:0, dikirim:0, transit:0, tiba_kota:0, out_for_delivery:0 };
+  const bermasalahSubs = {};
+  const returSubs = {};
+  baseList.forEach(c => {
+    const st = getStatus(c);
+    if (subCounts[st] !== undefined) subCounts[st]++;
+    if (st === 'bermasalah') {
+      const k = normBermasalahKat(c.status_tracking);
+      bermasalahSubs[k] = (bermasalahSubs[k] || 0) + 1;
+    }
+    if (st === 'retur') {
+      const k = normReturKat(c.status_tracking);
+      returSubs[k] = (returSubs[k] || 0) + 1;
+    }
+  });
+
   // Apply tab/stat filter
   let list = baseList;
   if (activeStatFilter === 'ON_PROSES_GROUP') {
     list = list.filter(c => statusGroup(getStatus(c)) === 'ON_PROSES');
+    if (subFilter === 'dikirim') list = list.filter(c => { const s = getStatus(c); return s === 'dikirim' || s === 'transit'; });
+    else if (subFilter) list = list.filter(c => getStatus(c) === subFilter);
+  } else if (activeStatFilter === 'UNDEL') {
+    list = list.filter(c => getStatus(c) === 'bermasalah');
+    if (subFilter) list = list.filter(c => normBermasalahKat(c.status_tracking) === subFilter);
+  } else if (activeStatFilter === 'RETUR') {
+    list = list.filter(c => getStatus(c) === 'retur');
+    if (subFilter) list = list.filter(c => normReturKat(c.status_tracking) === subFilter);
   } else if (activeTab !== 'semua') {
     list = list.filter(c => getStatus(c) === activeTab);
   }
@@ -546,6 +625,11 @@ function renderAll() {
         <div class="stat-icon">✅</div>
       </div>
     </div>
+
+    <!-- Sub-filter Cards -->
+    <div id="trSubFilter"></div>
+    <div id="trMasalahSubFilter"></div>
+    <div id="trReturSubFilter"></div>
 
     <!-- Main Card -->
     <div class="tr-card-wrap">
@@ -627,6 +711,63 @@ function renderAll() {
       </div>` : ''}
     </div>
   `;
+
+  // Render sub-filter cards (setelah innerHTML, ke placeholder divs)
+  renderSubFilter(subCounts);
+  renderMasalahSubFilter(bermasalahSubs);
+  renderReturSubFilter(returSubs);
+}
+
+/* ── Sub-filter Render Functions (match tracking-akuisisi) ── */
+function renderSubFilter(subCounts) {
+  const el = document.getElementById('trSubFilter');
+  if (!el) return;
+  if (activeStatFilter !== 'ON_PROSES_GROUP') { el.innerHTML = ''; return; }
+
+  const items = SUB_FILTER_STAGES.map(({ key, icon, label }) => {
+    const count = key === 'dikirim' ? (subCounts.dikirim + subCounts.transit) : (subCounts[key] || 0);
+    const isActive = subFilter === key;
+    return `<div class="tr-sub-card ${isActive ? 'active' : ''}" onclick="setSubFilter('${key}')">
+      <div class="tr-sub-icon">${icon}</div>
+      <div class="tr-sub-count">${count}</div>
+      <div class="tr-sub-label">${label}</div>
+    </div>`;
+  });
+  el.innerHTML = `<div class="tr-sub-grid">${items.join('')}</div>`;
+}
+
+function renderMasalahSubFilter(bermasalahSubs) {
+  const el = document.getElementById('trMasalahSubFilter');
+  if (!el) return;
+  if (activeStatFilter !== 'UNDEL') { el.innerHTML = ''; return; }
+
+  const items = Object.entries(BERMASALAH_KATEGORI_META).map(([key, meta]) => {
+    const count = bermasalahSubs[key] || 0;
+    const isActive = subFilter === key;
+    return `<div class="tr-sub-card ${isActive ? 'active' : ''}" onclick="setSubFilter('${key}')">
+      <div class="tr-sub-icon">${meta.icon}</div>
+      <div class="tr-sub-count">${count}</div>
+      <div class="tr-sub-label">${meta.label}</div>
+    </div>`;
+  });
+  el.innerHTML = `<div class="tr-sub-grid">${items.join('')}</div>`;
+}
+
+function renderReturSubFilter(returSubs) {
+  const el = document.getElementById('trReturSubFilter');
+  if (!el) return;
+  if (activeStatFilter !== 'RETUR') { el.innerHTML = ''; return; }
+
+  const items = Object.entries(RETUR_KATEGORI_META).map(([key, meta]) => {
+    const count = returSubs[key] || 0;
+    const isActive = subFilter === key;
+    return `<div class="tr-sub-card ${isActive ? 'active' : ''}" onclick="setSubFilter('${key}')">
+      <div class="tr-sub-icon">${meta.icon}</div>
+      <div class="tr-sub-count">${count}</div>
+      <div class="tr-sub-label">${meta.label}</div>
+    </div>`;
+  });
+  el.innerHTML = `<div class="tr-sub-grid">${items.join('')}</div>`;
 }
 
 /* ── Card HTML ── */
