@@ -856,6 +856,125 @@ module.exports = async function handler(req, res) {
     return handleCreateMengantar(req, res);
   }
 
+  // Route: cek detail 1 resi (untuk modal)
+  if (req.method === 'POST' && req.body?.action === 'check-single') {
+    const { resi, ekspedisi, order_id } = req.body;
+    if (!resi) return res.status(400).json({ error: 'resi wajib' });
+    try {
+      const courier = normalizeKurir(ekspedisi);
+      let d = await fetchMengantar(resi, courier);
+      if (!d || !(d.statusCategory || d.status || d.connote_state)) {
+        d = await fetchMengantar(resi, null);
+      }
+      if (!d) return res.status(200).json({ ok: true, records: [], status: null });
+
+      const history = d.history || d.connote_history || [];
+      const statusCat = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
+
+      const records = history.map(h => ({
+        desc: h.desc || h.content || h.description || '',
+        location: h.location || h.city || h.city_name || '',
+        time: h.actual_time || h.timestamp || null,
+      })).reverse(); // terbaru di atas
+
+      // Kalau ada order_id, update juga status_tracking di DB
+      if (order_id) {
+        const tracking = await cekResi(resi, ekspedisi);
+        if (tracking) {
+          const orders = await sbGet('orders_new', `?id=eq.${order_id}&select=id,tracking_events,status_tracking,tracking_lokasi&limit=1`);
+          const order = orders[0];
+          if (order) {
+            const doneEvents = order.tracking_events || {};
+            const patch = { status_tracking: tracking.statusCat, tracking_lokasi: tracking.lokasi || order.tracking_lokasi };
+            if (tracking.eventType !== 'update' && !doneEvents[tracking.eventType]) {
+              patch.tracking_events = { ...doneEvents, [tracking.eventType]: new Date().toISOString() };
+              if (tracking.eventType === 'delivered') { patch.status = 'selesai'; patch.sampai = true; patch.sampai_at = new Date().toISOString(); }
+            }
+            await sbPatch('orders_new', `?id=eq.${order_id}`, patch);
+          }
+        }
+      }
+
+      return res.status(200).json({ ok: true, records, status: statusCat });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // Route: cek semua resi manual (dari frontend)
+  if (req.method === 'POST' && req.body?.action === 'check-all') {
+    const userId = req.body.user_id;
+    if (!userId) return res.status(400).json({ error: 'user_id wajib' });
+
+    try {
+      const orders = await sbGet('orders_new',
+        `?user_id=eq.${userId}&status=eq.dikirim&no_resi=not.is.null&no_resi=neq.&select=id,user_id,customer_id,product_id,no_resi,ekspedisi,metode,status_tracking,tracking_lokasi,tracking_events`
+      );
+      if (!orders.length) return res.status(200).json({ ok: true, total: 0, message: 'Tidak ada order aktif' });
+
+      const custIds = [...new Set(orders.map(o => o.customer_id))];
+      const customers = await sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,wa_number,nama,reply_jid`);
+      const custMap2 = Object.fromEntries(customers.map(c => [c.id, c]));
+
+      const userRows = await sbGet('users',
+        `?id=eq.${userId}&select=id,template_tiba_kota,template_out_for_delivery,template_delivered,template_bermasalah,template_retur&limit=1`
+      );
+      const userTpl = userRows[0] || {};
+
+      let updated = 0, notifSent = 0, errors = 0;
+
+      for (const order of orders) {
+        try {
+          const tracking = await cekResi(order.no_resi, order.ekspedisi);
+          if (!tracking) continue;
+
+          const { statusCat, eventType, lokasi, deskripsi } = tracking;
+          const doneEvents = order.tracking_events || {};
+
+          // Update status & lokasi terbaru
+          if (statusCat !== order.status_tracking || lokasi !== order.tracking_lokasi) {
+            await sbPatch('orders_new', `?id=eq.${order.id}`, {
+              status_tracking: statusCat,
+              tracking_lokasi: lokasi || order.tracking_lokasi,
+            });
+            updated++;
+          }
+
+          // Skip kalau event sudah pernah dicatat atau hanya update
+          if ((doneEvents[eventType] && eventType !== 'update') || eventType === 'update') continue;
+
+          // Catat event baru
+          const patch = { tracking_events: { ...doneEvents, [eventType]: new Date().toISOString() } };
+          if (eventType === 'delivered') { patch.status = 'selesai'; patch.sampai = true; patch.sampai_at = new Date().toISOString(); }
+          await sbPatch('orders_new', `?id=eq.${order.id}`, patch);
+
+          // Kirim notif WA
+          const cust = custMap2[order.customer_id];
+          if (cust) {
+            const waTarget = cust.reply_jid || cust.wa_number;
+            const namaKak = (cust.nama || '').split(' ')[0];
+            const urlLacak = trackingUrl(order.ekspedisi, order.no_resi);
+            const isCOD = (order.metode || '').toLowerCase() === 'cod';
+            const pesan = await buildPesan({ namaKak, resi: order.no_resi, ekspedisi: order.ekspedisi, eventType, deskripsi, lokasi, isCOD, urlLacak, userTpl });
+            if (pesan && waTarget) {
+              const waSession = await getWaSession(order.user_id, order.product_id);
+              await kirimNotif(waSession, waTarget, pesan);
+              notifSent++;
+            }
+          }
+          await new Promise(r => setTimeout(r, 600));
+        } catch (e) {
+          errors++;
+          console.error(`[tracking] check-all error ${order.no_resi}:`, e.message);
+        }
+      }
+
+      return res.status(200).json({ ok: true, total: orders.length, updated, notifSent, errors });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // Verifikasi cron secret
   const CRON_SECRET = process.env.CRON_SECRET;
   if (CRON_SECRET) {
