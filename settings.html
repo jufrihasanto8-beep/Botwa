@@ -286,7 +286,6 @@ body.light .grup-item-nama{color:#0f172a}
       <a href="#" onclick="showSection('group',this)">💬 Grup WA Recap</a>
       <a href="#" onclick="showSection('mengantar',this)">🚚 Mengantar</a>
       <a href="#" onclick="showSection('template',this)">📝 Template Pesan</a>
-      <a href="#" onclick="showSection('laporan',this)">📊 Laporan Akuisisi</a>
     </div>
 
     <div class="settings-body">
@@ -595,21 +594,6 @@ Bisa isi lebih dari satu rekening."></textarea>
         </div>
       </div>
 
-      <!-- ── LAPORAN AKUISISI ── -->
-      <div class="settings-section" id="sec-laporan">
-        <div class="section-title">📊 Laporan Akuisisi</div>
-        <div class="section-desc">Set nama CS kamu sesuai yang terdaftar di Laporan Akuisisi. Dipakai saat sync otomatis closing &amp; lead.</div>
-        <div class="form-group" style="margin-top:20px">
-          <label style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#64748b">Nama CS di Laporan Akuisisi</label>
-          <input type="text" id="laporan-cs-nama" placeholder="cth: CS Ambar" style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:14px;width:100%;box-sizing:border-box">
-          <div style="font-size:11px;color:#64748b;margin-top:4px">Harus sama persis dengan nama CS di halaman Penugasan Tim Laporan Akuisisi</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
-          <div id="laporan-cs-status" style="font-size:12px;color:#64748b"></div>
-          <button onclick="saveLaporanCSNama()" style="padding:8px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Simpan</button>
-        </div>
-      </div>
-
     </div><!-- settings-body -->
   </div><!-- settings-layout -->
 </div><!-- main-content -->
@@ -900,7 +884,6 @@ window.showSection = function(name, el) {
   if (name === 'group') loadGroupJid();
   if (name === 'mengantar') loadMengantarSettings();
   if (name === 'template') loadTemplates();
-  if (name === 'laporan') loadLaporanCSNama();
 };
 
 /* ── GMAIL INTEGRATION (per produk) ── */
@@ -1688,42 +1671,6 @@ async function saveTemplate(field, textareaId, statusId) {
   } catch(e) { toast('❌ Error: ' + e.message); }
 }
 
-/* ── LAPORAN AKUISISI CS NAMA ── */
-async function loadLaporanCSNama() {
-  const userId = Auth.getUser()?.id;
-  if (!userId) return;
-  const status = document.getElementById('laporan-cs-status');
-  try {
-    const r = await fetch(`${SB_URL}/rest/v1/users?id=eq.${userId}&select=laporan_cs_nama&limit=1`, {
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${Auth.getToken()}` }
-    });
-    const rows = await r.json();
-    const nama = rows[0]?.laporan_cs_nama || '';
-    document.getElementById('laporan-cs-nama').value = nama;
-    status.textContent = nama ? `Tersimpan: ${nama}` : 'Belum diisi';
-    status.style.color = nama ? '#22c55e' : '#64748b';
-  } catch(e) { status.textContent = 'Gagal memuat'; }
-}
-
-async function saveLaporanCSNama() {
-  const userId = Auth.getUser()?.id;
-  const nama = document.getElementById('laporan-cs-nama').value.trim();
-  const status = document.getElementById('laporan-cs-status');
-  if (!nama) { toast('⚠️ Nama CS wajib diisi'); return; }
-  try {
-    const r = await fetch('/api/save-settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ table: 'users_laporan_cs', userId, laporan_cs_nama: nama })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      status.textContent = `Tersimpan: ${nama}`;
-      status.style.color = '#22c55e';
-      toast('✅ Nama CS disimpan');
-    } else { toast('❌ ' + (d.error || 'Gagal')); }
-  } catch(e) { toast('❌ Error: ' + e.message); }
-}
 </script>
 </body>
 </html>
