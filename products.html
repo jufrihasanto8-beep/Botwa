@@ -655,9 +655,11 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <div style="font-size:11px;color:#64748b;margin-top:4px">Nama advertiser persis seperti di Laporan Akuisisi</div>
         </div>
         <div class="form-group">
-          <label>Nama Produk (Laporan)</label>
-          <input type="text" id="f-laporan-produk" placeholder="Sesuai nama produk di Laporan Akuisisi">
-          <div style="font-size:11px;color:#64748b;margin-top:4px">Harus cocok persis dengan nama di Laporan Akuisisi</div>
+          <label>Produk (Laporan Akuisisi)</label>
+          <select id="f-laporan-produk">
+            <option value="">-- Pilih Produk --</option>
+          </select>
+          <div style="font-size:11px;color:#64748b;margin-top:4px">Produk sesuai yang ada di Laporan Akuisisi</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
@@ -1223,9 +1225,10 @@ async function openEdit(id) {
   document.getElementById('f-laporan-produk').value = p.laporan_produk || '';
   document.getElementById('f-laporan-platform').value = p.laporan_platform || 'Meta';
   document.getElementById('f-laporan-channel').value = p.laporan_channel || 'CTWA';
-  // Load adv list first then set saved value
+  // Load dropdowns first then set saved values
   loadLaporanAdvList().then(() => {
     document.getElementById('f-laporan-advertiser').value = p.laporan_advertiser || '';
+    document.getElementById('f-laporan-produk').value = p.laporan_produk || '';
   });
   switchTab('info', document.querySelector('.tab-btn'));
   document.getElementById('prod-modal').classList.add('open');
@@ -1235,28 +1238,47 @@ function closeModal() {
   document.getElementById('prod-modal').classList.remove('open');
 }
 
-/* ── Laporan Akuisisi: load advertiser list ── */
-let _laporanAdvLoaded = false;
+/* ── Laporan Akuisisi: load advertiser + produk dropdown ── */
+let _laporanDropdownsLoaded = false;
 async function loadLaporanAdvList() {
-  if (_laporanAdvLoaded) return;
-  const sel = document.getElementById('f-laporan-advertiser');
+  if (_laporanDropdownsLoaded) return;
+  const advSel = document.getElementById('f-laporan-advertiser');
+  const prodSel = document.getElementById('f-laporan-produk');
   const status = document.getElementById('laporan-adv-status');
-  status.textContent = 'Memuat daftar advertiser…';
+  status.textContent = 'Memuat data Laporan Akuisisi…';
   try {
-    const r = await fetch(`/api/save-settings?action=adv-list&user_id=${currentUserId}`);
-    const d = await r.json();
-    const names = d.names || [];
-    // Clear existing options except placeholder
-    while (sel.options.length > 1) sel.remove(1);
+    const [advRes, prodRes] = await Promise.all([
+      fetch(`/api/save-settings?action=adv-list&user_id=${currentUserId}`),
+      fetch(`/api/save-settings?action=catalog-list&user_id=${currentUserId}`)
+    ]);
+    const advData = await advRes.json();
+    const prodData = await prodRes.json();
+
+    // Populate advertiser dropdown
+    const names = advData.names || [];
+    while (advSel.options.length > 1) advSel.remove(1);
     names.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name; opt.textContent = name;
-      sel.appendChild(opt);
+      advSel.appendChild(opt);
     });
-    _laporanAdvLoaded = true;
-    status.textContent = names.length ? `${names.length} advertiser tersedia` : 'Tidak ada advertiser ditemukan';
+
+    // Populate produk dropdown
+    const products = prodData.products || [];
+    while (prodSel.options.length > 1) prodSel.remove(1);
+    products.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.name; opt.textContent = p.name;
+      prodSel.appendChild(opt);
+    });
+
+    _laporanDropdownsLoaded = true;
+    const parts = [];
+    if (names.length) parts.push(`${names.length} advertiser`);
+    if (products.length) parts.push(`${products.length} produk`);
+    status.textContent = parts.length ? parts.join(', ') + ' tersedia' : 'Tidak ada data ditemukan';
   } catch(e) {
-    status.textContent = 'Gagal memuat advertiser';
+    status.textContent = 'Gagal memuat data Laporan Akuisisi';
   }
 }
 
