@@ -29,11 +29,12 @@ async function loadDeps() {
  * Generate PNG screenshot of chat — WA dark mode style
  * @param {Array} messages - [{role:'customer'|'ai'|'cs', isi:string, created_at:string}]
  * @param {string} customerName
+ * @param {string} customerPhone - nomor HP customer
  * @param {string} resi - nomor resi
  * @param {string} ekspedisi - nama kurir
  * @returns {Buffer} PNG buffer
  */
-async function generateChatImage(messages, customerName, resi, ekspedisi) {
+async function generateChatImage(messages, customerName, customerPhone, resi, ekspedisi) {
   await loadDeps();
 
   const WIDTH = 390; // phone-width portrait
@@ -92,14 +93,14 @@ async function generateChatImage(messages, customerName, resi, ekspedisi) {
             children: (customerName || '?')[0].toUpperCase(),
           },
         },
-        // Name + resi
+        // Phone + status
         {
           type: 'div',
           props: {
             style: { display: 'flex', flexDirection: 'column', flexGrow: '1' },
             children: [
-              { type: 'div', props: { style: { fontSize: '14px', fontWeight: '600', color: '#e9edef' }, children: customerName || 'Customer' } },
-              { type: 'div', props: { style: { fontSize: '11px', color: '#8696a0' }, children: resi ? `${resi} · ${ekspedisi || ''}` : 'online' } },
+              { type: 'div', props: { style: { fontSize: '14px', fontWeight: '600', color: '#e9edef' }, children: customerPhone || customerName || 'Customer' } },
+              { type: 'div', props: { style: { fontSize: '11px', color: '#8696a0' }, children: 'online' } },
             ],
           },
         },
@@ -159,22 +160,21 @@ async function generateChatImage(messages, customerName, resi, ekspedisi) {
       },
     });
 
-    // Time + checkmark row
-    const timeChildren = [time];
-    if (!isCustomer) timeChildren.push(' ✓✓');
+    // Time row (same gray color both sides)
+    const timeText = time + (!isCustomer ? '  \u2713\u2713' : '');
 
     bubbleChildren.push({
       type: 'div',
       props: {
         style: {
           display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-          gap: '2px', marginTop: '2px',
+          marginTop: '2px',
         },
         children: {
           type: 'span',
           props: {
-            style: { fontSize: '10px', color: isCustomer ? '#8696a0' : '#53bdeb' },
-            children: timeChildren.join(''),
+            style: { fontSize: '10px', color: '#8696a0' },
+            children: timeText,
           },
         },
       },

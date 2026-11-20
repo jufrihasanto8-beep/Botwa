@@ -4222,7 +4222,7 @@ ${ongkirInfo}`;
           // A: Generate screenshot chat
           try {
             const { generateChatImage } = require('./_chat-image');
-            const pngBuffer = await generateChatImage(chatMsgs, custNama, issueResi, issueEkspedisi);
+            const pngBuffer = await generateChatImage(chatMsgs, custNama, custPhone, issueResi, issueEkspedisi);
             const base64Img = `data:image/png;base64,${pngBuffer.toString('base64')}`;
             const caption = `📦 *${issueResi}*\n👤 ${custNama} (${custPhone})\n💬 "${(message || '').slice(0, 100)}"`;
             await sendWA(waSession, opsGroupJid, null, true, base64Img, caption).catch(() => {});
