@@ -663,9 +663,11 @@ window.openDetail = async (id) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'check-single', resi: c.no_resi, ekspedisi: c.ekspedisi, order_id: c.id }),
       });
+      if (!r.ok) { console.error('check-single HTTP', r.status); renderModalBody(c, []); return; }
       const d = await r.json();
       renderModalBody(c, d.records || []);
     } catch (e) {
+      console.error('openDetail error:', e);
       renderModalBody(c, []);
     }
   } else {
@@ -689,7 +691,7 @@ window.cekUlangResi = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'check-single', resi: c.no_resi, ekspedisi: c.ekspedisi, order_id: c.id }),
     });
-    const d = await r.json();
+    const d = r.ok ? await r.json() : { records: [] };
     // Reload order data dari DB untuk dapat tracking_events terbaru
     const freshOrders = await SB.get('orders_new', `?id=eq.${c.id}&select=id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,status_tracking,tracking_lokasi,tracking_events,sampai,created_at&limit=1`);
     if (freshOrders[0]) Object.assign(c, freshOrders[0]);
@@ -733,6 +735,7 @@ window.checkAllResi = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'check-all', user_id: uid }),
     });
+    if (!r.ok) throw new Error(`Server error ${r.status}`);
     const d = await r.json();
     if (d.ok) {
       btn.textContent = `✅ ${d.total} resi dicek · ${d.updated} update · ${d.notifSent} notif`;
