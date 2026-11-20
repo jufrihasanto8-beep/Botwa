@@ -2279,6 +2279,24 @@ async function submitBuktiTF() {
 
     showToast('✅ Bukti transfer berhasil dikirim ke QC');
     closeTFModal();
+
+    // Kirim notif ke Grup WA (jika group_jid tersimpan)
+    try {
+      const userRows = await sbGet('users', `?id=eq.${userId}&select=group_jid&limit=1`);
+      const groupJid = userRows[0]?.group_jid;
+      if (groupJid) {
+        const totalRp = (qcData.total || 0).toLocaleString('id-ID');
+        const metode = (activeConv?.state?.metode || 'transfer').toUpperCase();
+        const notifMsg = `📎 *Bukti TF Baru*\n\n👤 ${qcData.customer_nama} (${qcData.customer_phone})\n🛒 ${prodName || '-'} x${qty}\n💰 Rp ${totalRp} (${metode})\n📋 Status: Menunggu QC\n\n${buktiUrl}`;
+        await fetch(`${PROXY}?path=${encodeURIComponent('/send')}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: userId, wa_number: groupJid, message: notifMsg, is_outbound: true }),
+        });
+      }
+    } catch (e) {
+      console.error('Notif group error:', e.message);
+    }
   } catch(e) {
     showToast('❌ ' + e.message);
   } finally {
