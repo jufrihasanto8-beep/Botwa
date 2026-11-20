@@ -227,7 +227,13 @@ body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
       <option value="">Semua Produk</option>
     </select>
 
-    <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
+    <!-- Search box -->
+    <div style="position:relative;margin-left:auto">
+      <input type="text" id="search-box" class="filter-select" placeholder="Cari nama, telpon, alamat, resi..." oninput="render()" style="min-width:260px;padding-left:32px">
+      <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:13px;pointer-events:none">&#x1F50D;</span>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-export btn-csv" onclick="exportCSV()">&#x2B07; CSV</button>
       <button class="btn-export btn-xlsx" onclick="exportExcel()">&#x2B07; Excel (.xlsx)</button>
     </div>
@@ -456,10 +462,28 @@ async function init() {
 
 function getFiltered() {
   const prodFilter = document.getElementById('filter-product').value;
+  const searchRaw = (document.getElementById('search-box').value || '').trim().toLowerCase();
+  const searchTerms = searchRaw ? searchRaw.split(/\s+/) : [];
+
   return allOrders.filter(o => {
     const d = new Date(o.created_at);
     if (d < filterStart || d > filterEnd) return false;
     if (prodFilter && o.product_id !== prodFilter) return false;
+
+    // Search filter — semua term harus match (AND)
+    if (searchTerms.length) {
+      const alamat = o.alamat || {};
+      const haystack = [
+        o.customer_nama || (custMap[o.customer_id]||{}).nama || '',
+        o.customer_phone || fmtWA((custMap[o.customer_id]||{}).wa_number) || '',
+        o.product_nama || (prodMap[o.product_id]||{}).nama || '',
+        alamat.jalan || '', alamat.kelurahan || '', alamat.kecamatan || '',
+        alamat.kabupaten || '', alamat.provinsi || '',
+        o.no_resi || '', o.ekspedisi || '', o.metode || '',
+      ].join(' ').toLowerCase();
+      if (!searchTerms.every(t => haystack.includes(t))) return false;
+    }
+
     return true;
   });
 }
