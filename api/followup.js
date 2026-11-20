@@ -479,7 +479,8 @@ module.exports = async function handler(req, res) {
 
     const awaitingConvs = await sbGet('conversations',
       `?status=in.(baru,diproses)&created_at=gte.${cutoff3d}&last_msg_at=lte.${cutoff30m}${activeProductFilter}` +
-      `&select=id,user_id,customer_id,product_id,state,last_msg_at&limit=50`
+      `&state->>awaiting_order_confirm=eq.true&state->>order_placed=neq.true` +
+      `&select=id,user_id,customer_id,product_id,state,last_msg_at&order=last_msg_at.asc&limit=200`
     ).catch(() => []);
 
     const eligibleAwaiting = awaitingConvs.filter(c => {
