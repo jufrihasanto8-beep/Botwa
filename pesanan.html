@@ -144,6 +144,32 @@ body.light .tr-step-line{background:rgba(0,0,0,.1)}
 .tr-sub-count{font-size:1.35rem;font-weight:800;color:var(--text);line-height:1.1}
 .tr-sub-label{font-size:.7rem;font-weight:500;color:var(--text-3);text-align:center;white-space:nowrap}
 
+/* ── Detail Modal ── */
+.dtl-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
+.dtl-overlay.open{display:flex}
+.dtl-modal{background:var(--white);border-radius:18px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto;transition:background .25s}
+.dtl-header{display:flex;align-items:center;justify-content:space-between;padding:22px 26px 0}
+.dtl-header h3{font-size:1.1rem;font-weight:800;color:var(--text)}
+.dtl-close{width:32px;height:32px;border-radius:8px;border:none;background:var(--bg);color:var(--text-2);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.dtl-close:hover{background:var(--border)}
+.dtl-body{padding:20px 26px 26px}
+.dtl-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:.8rem}
+.dtl-row:last-child{border-bottom:none}
+.dtl-label{color:var(--text-3);font-weight:500}
+.dtl-value{color:var(--text);font-weight:600;text-align:right;max-width:60%;word-break:break-all}
+.dtl-section{margin-top:16px}
+.dtl-section-title{font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:10px}
+.dtl-history-item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.dtl-history-item:last-child{border-bottom:none}
+.dtl-history-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.dtl-history-desc{font-size:.78rem;color:var(--text)}
+.dtl-history-time{font-size:.68rem;color:var(--text-3);margin-top:2px}
+.dtl-footer{display:flex;gap:10px;margin-top:18px}
+.dtl-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--white);color:var(--text-2);font-size:.82rem;font-weight:700;cursor:pointer;text-align:center;transition:all .15s}
+.dtl-btn:hover{border-color:var(--primary);color:var(--primary)}
+.dtl-btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.dtl-btn-primary:hover{opacity:.85;color:#fff}
+
 .empty-state{text-align:center;padding:60px 20px;color:var(--text-2)}
 .empty-state div:first-child{font-size:40px;margin-bottom:12px}
 
@@ -243,6 +269,24 @@ body.light .tr-step-line{background:rgba(0,0,0,.1)}
       <span class="tpl-status" id="tpl-status"></span>
       <button class="tr-tab" onclick="closeTplModal()">Batal</button>
       <button class="tr-tab" style="background:#3b82f6;color:#fff;border-color:#3b82f6" onclick="saveTplModal()">Simpan Template</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="dtl-overlay" id="dtl-overlay" onclick="if(event.target===this)closeDetail()">
+  <div class="dtl-modal">
+    <div class="dtl-header">
+      <h3 id="dtlTitle">Detail Pesanan</h3>
+      <button class="dtl-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="dtl-body">
+      <div style="font-size:.78rem;color:var(--text-3)" id="dtlSub"></div>
+      <div id="dtlBody"></div>
+      <div class="dtl-footer">
+        <button class="dtl-btn" onclick="closeDetail()">Tutup</button>
+        <button class="dtl-btn dtl-btn-primary" id="dtlTrackBtn" onclick="openTrackingLink()">🔗 Lacak Resi</button>
+      </div>
     </div>
   </div>
 </div>
@@ -507,6 +551,130 @@ window.setProdukFilter = (val) => { produkFilter = val; page = 1; renderAll(); }
 window.goPage = (p) => { page = p; renderAll(); document.getElementById('trList')?.scrollIntoView({behavior:'smooth',block:'start'}); };
 
 window.addEventListener('productSwitch', () => renderAll());
+
+/* ── Detail Modal ── */
+let dtlOrderId = null;
+
+function trackingUrl(kurir, resi) {
+  const k = (kurir || '').toLowerCase();
+  if (k.includes('jne'))      return `https://www.jne.co.id/id/tracking/trace/${resi}`;
+  if (k.includes('jt') || k.includes('j&t')) return `https://jet.id/tracking?awb=${resi}`;
+  if (k.includes('sicepat'))  return `https://www.sicepat.com/checkAwb?awb=${resi}`;
+  if (k.includes('sap'))      return `https://sap-express.id/track?awb=${resi}`;
+  if (k.includes('lion'))     return `https://lion.parcel.id/tracking?awb=${resi}`;
+  if (k.includes('ninja'))    return `https://www.ninjaxpress.co/id-id/tracking?id=${resi}`;
+  if (k.includes('anteraja')) return `https://anteraja.id/tracking/${resi}`;
+  if (k.includes('pos'))      return `https://www.posindonesia.co.id/id/tracking/${resi}`;
+  return `https://cekresi.com/?noresi=${resi}`;
+}
+
+function fmtDtFull(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+  const hm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const now = new Date();
+  const diffDays = Math.floor((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - new Date(d.getFullYear(),d.getMonth(),d.getDate())) / 86400000);
+  if (diffDays === 0) return `Hari ini ${hm}`;
+  if (diffDays === 1) return `Kemarin ${hm}`;
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${hm}`;
+}
+
+window.openDetail = (id) => {
+  dtlOrderId = id;
+  const c = allConvs.find(x => x.id === id);
+  if (!c) return;
+  const cu = custMap[c.customer_id] || {};
+  const pr = prodMap[c.product_id] || {};
+  const nama = cu.nama || cu.wa_number || 'Pelanggan';
+  const phone = (cu.wa_number||'').replace('@s.whatsapp.net','');
+  const status = getStatus(c);
+  const qty = parseInt(c.qty || 1);
+  const ongkir = c.ongkir_after_promo ?? c.ongkir ?? 0;
+  const nilai = c.total || ((pr.harga||0) * qty) + ongkir;
+  const metode = (c.metode || 'cod').toUpperCase();
+
+  document.getElementById('dtlTitle').textContent = pr.nama || 'Detail Pesanan';
+  document.getElementById('dtlSub').textContent = (c.no_resi || '-') + (c.ekspedisi ? ' · ' + c.ekspedisi : '');
+
+  // Status badge
+  const statusLabels = {
+    menunggu:'⏳ Menunggu Resi', dikirim:'📦 Dikirim', transit:'🚚 Transit',
+    tiba_kota:'🏙️ Kota Tujuan', out_for_delivery:'🚚 OTW', sampai:'✅ Sampai',
+    bermasalah:'⚠️ Bermasalah', retur:'🔄 Retur'
+  };
+
+  // Tracking events timeline
+  const ev = c.tracking_events || {};
+  const EVENT_META = [
+    { key:'dikirim',          label:'Dikirim',         icon:'📦', color:'var(--primary)' },
+    { key:'tiba_kota',        label:'Kota Tujuan',     icon:'🏙️', color:'#6366f1' },
+    { key:'out_for_delivery', label:'OTW ke Penerima', icon:'🚚', color:'#06b6d4' },
+    { key:'delivered',        label:'Sampai',          icon:'✅', color:'var(--success)' },
+    { key:'bermasalah',       label:'Bermasalah',      icon:'⚠️', color:'var(--danger)' },
+    { key:'retur',            label:'Retur',           icon:'🔄', color:'#ec4899' },
+  ];
+  const timeline = EVENT_META.filter(e => ev[e.key]).sort((a,b) => new Date(ev[b.key]) - new Date(ev[a.key]));
+
+  let historyHtml = '';
+  if (timeline.length) {
+    historyHtml = timeline.map((e, i) => `
+      <div class="dtl-history-item">
+        <div class="dtl-history-dot" style="background:${i === 0 ? e.color : 'var(--border)'}"></div>
+        <div>
+          <div class="dtl-history-desc" ${i===0?'style="font-weight:700"':''}>${e.icon} ${e.label}</div>
+          <div class="dtl-history-time">${fmtDtFull(ev[e.key])}</div>
+        </div>
+      </div>`).join('');
+  } else {
+    historyHtml = '<div style="font-size:.78rem;color:var(--text-3);padding:8px 0">Belum ada update tracking.</div>';
+  }
+
+  // Tracking status raw dari Mengantar
+  const statusTrackingHtml = c.status_tracking
+    ? `<div class="dtl-row"><div class="dtl-label">Status Kurir</div><div class="dtl-value">${escH(c.status_tracking)}</div></div>` : '';
+
+  document.getElementById('dtlBody').innerHTML = `
+    <div style="margin-top:10px;margin-bottom:4px">
+      <span class="bdg bdg-${status}">${statusLabels[status] || status}</span>
+      <span class="bdg ${metode==='TRANSFER'?'bdg-tf':'bdg-cod'}">${metode==='TRANSFER'?'TF':'COD'}</span>
+    </div>
+    ${stepperHtml(status)}
+
+    <div class="dtl-section">
+      <div class="dtl-section-title">Info Pesanan</div>
+      <div class="dtl-row"><div class="dtl-label">Pelanggan</div><div class="dtl-value">${escH(nama)}</div></div>
+      <div class="dtl-row"><div class="dtl-label">No. HP</div><div class="dtl-value">${escH(phone)}</div></div>
+      <div class="dtl-row"><div class="dtl-label">Produk</div><div class="dtl-value">${escH(pr.nama || '-')} × ${qty}</div></div>
+      <div class="dtl-row"><div class="dtl-label">Total</div><div class="dtl-value" style="font-weight:800">${rp(nilai)}</div></div>
+      <div class="dtl-row"><div class="dtl-label">Resi</div><div class="dtl-value">${c.no_resi ? escH(c.no_resi) : '<span style="color:var(--text-3)">Belum ada</span>'}</div></div>
+      ${c.ekspedisi ? `<div class="dtl-row"><div class="dtl-label">Ekspedisi</div><div class="dtl-value">${escH(c.ekspedisi)}</div></div>` : ''}
+      ${statusTrackingHtml}
+      <div class="dtl-row"><div class="dtl-label">Tanggal Order</div><div class="dtl-value">${fmtDtFull(c.created_at)}</div></div>
+      ${c.alamat ? `<div class="dtl-row"><div class="dtl-label">Alamat</div><div class="dtl-value" style="font-size:.72rem;line-height:1.4">${escH(c.alamat)}</div></div>` : ''}
+    </div>
+
+    <div class="dtl-section">
+      <div class="dtl-section-title">Riwayat Tracking</div>
+      ${historyHtml}
+    </div>
+  `;
+
+  // Hide track button kalau belum ada resi
+  document.getElementById('dtlTrackBtn').style.display = c.no_resi ? '' : 'none';
+  document.getElementById('dtl-overlay').classList.add('open');
+};
+
+window.closeDetail = () => {
+  document.getElementById('dtl-overlay').classList.remove('open');
+  dtlOrderId = null;
+};
+
+window.openTrackingLink = () => {
+  const c = allConvs.find(x => x.id === dtlOrderId);
+  if (!c?.no_resi) return;
+  window.open(trackingUrl(c.ekspedisi, c.no_resi), '_blank');
+};
 
 /* ── Load Data ── */
 async function loadData() {
@@ -794,7 +962,7 @@ function cardHtml(c) {
     retur:            '<span class="bdg bdg-retur">🔄 Retur</span>',
   };
 
-  return `<div class="tr-order">
+  return `<div class="tr-order" onclick="openDetail('${c.id}')" style="cursor:pointer">
     <div class="tr-order-top">
       <div class="tr-order-left">
         <div class="tr-avatar" style="background:${color}">${escH(avInit(nama))}</div>
