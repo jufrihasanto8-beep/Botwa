@@ -120,6 +120,13 @@ function processTrackingData(d, courier) {
 
       if (isOTW)           eventType = 'out_for_delivery';
       else if (isTibaKota) eventType = 'tiba_kota';
+      else {
+        // Status transit umum → dikirim (agar tracking_events terisi)
+        const TRANSIT_PATTERN = /ON PROCESS|CARGO|TRANSIT|CRROTW|CRRNFD|SHPSCD|BKD|STI|PICKUP|MANIFESTED|SHIPMENT|PROCESSED|SORTING|RECEIVED/;
+        if (TRANSIT_PATTERN.test(statusCat) || TRANSIT_PATTERN.test(descUp)) {
+          eventType = 'dikirim';
+        }
+      }
     }
   }
 
@@ -895,7 +902,7 @@ module.exports = async function handler(req, res) {
 
     try {
       const orders = await sbGet('orders_new',
-        `?user_id=eq.${userId}&status=eq.dikirim&no_resi=not.is.null&no_resi=neq.&select=id,user_id,customer_id,product_id,no_resi,ekspedisi,metode,status_tracking,tracking_lokasi,tracking_events`
+        `?user_id=eq.${userId}&status=eq.dikirim&no_resi=not.is.null&no_resi=neq.&select=id,user_id,customer_id,conversation_id,product_id,no_resi,ekspedisi,metode,status_tracking,tracking_lokasi,tracking_events`
       );
       if (!orders.length) return res.status(200).json({ ok: true, total: 0, message: 'Tidak ada order aktif' });
 
@@ -932,14 +939,17 @@ module.exports = async function handler(req, res) {
             updated++;
           }
 
+          // Skip kalau event sudah pernah dicatat, atau eventType masih 'update' (tidak dikenal)
           if ((doneEvents[eventType] && eventType !== 'update') || eventType === 'update') return;
 
-          const patch = { tracking_events: { ...doneEvents, [eventType]: new Date().toISOString() } };
-          if (eventType === 'delivered') { patch.status = 'selesai'; patch.sampai = true; patch.sampai_at = new Date().toISOString(); }
+          const now = new Date().toISOString();
+          const patch = { tracking_events: { ...doneEvents, [eventType]: now } };
+          if (eventType === 'delivered') { patch.status = 'selesai'; patch.sampai = true; patch.sampai_at = now; }
           await sbPatch('orders_new', `?id=eq.${order.id}`, patch);
 
+          // Kirim notif WA ke customer untuk event penting
           const cust = custMap2[order.customer_id];
-          if (cust) {
+          if (cust && ['tiba_kota','out_for_delivery','delivered','bermasalah','retur'].includes(eventType)) {
             const waTarget = cust.reply_jid || cust.wa_number;
             const namaKak = (cust.nama || '').split(' ')[0];
             const urlLacak = trackingUrl(order.ekspedisi, order.no_resi);
@@ -949,6 +959,21 @@ module.exports = async function handler(req, res) {
               const waSession = await getWaSession(order.user_id, order.product_id);
               await kirimNotif(waSession, waTarget, pesan);
               notifSent++;
+
+              // Bermasalah/Retur: update conversation state + simpan ke conv_messages
+              if ((eventType === 'bermasalah' || eventType === 'retur') && order.conversation_id) {
+                try {
+                  const convs = await sbGet('conversations', `?id=eq.${order.conversation_id}&select=id,state&limit=1`).catch(() => []);
+                  if (convs[0]) {
+                    const convState = convs[0].state || {};
+                    await sbPost('conv_messages', { conversation_id: convs[0].id, role: 'ai', isi: pesan }).catch(() => {});
+                    await sbPatch('conversations', `?id=eq.${convs[0].id}`, {
+                      state: { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: statusCat, delivery_issue_resi: order.no_resi },
+                      last_msg_at: now,
+                    }).catch(() => {});
+                  }
+                } catch (e) { console.error(`[check-all] conv update error: ${e.message}`); }
+              }
             }
           }
         } catch (e) {
@@ -984,7 +1009,7 @@ module.exports = async function handler(req, res) {
 
     // Ambil semua order yang status=dikirim dan punya no_resi
     const orders = await sbGet('orders_new',
-      `?status=eq.dikirim&no_resi=not.is.null&no_resi=neq.&select=id,user_id,customer_id,no_resi,ekspedisi,metode,status_tracking,tracking_lokasi,tracking_events`
+      `?status=eq.dikirim&no_resi=not.is.null&no_resi=neq.&select=id,user_id,customer_id,conversation_id,product_id,no_resi,ekspedisi,metode,status_tracking,tracking_lokasi,tracking_events`
     );
 
     if (!orders.length) {
@@ -1062,10 +1087,26 @@ module.exports = async function handler(req, res) {
           userTpl: userTplMap[order.user_id],
         });
 
-        if (pesan) {
+        if (pesan && ['tiba_kota','out_for_delivery','delivered','bermasalah','retur'].includes(eventType)) {
           const waSession = await getWaSession(order.user_id, order.product_id);
           await kirimNotif(waSession, waTarget, pesan);
           notified++;
+
+          // Bermasalah/Retur: update conversation state + simpan ke conv_messages
+          if ((eventType === 'bermasalah' || eventType === 'retur') && order.conversation_id) {
+            try {
+              const convs = await sbGet('conversations', `?id=eq.${order.conversation_id}&select=id,state&limit=1`).catch(() => []);
+              if (convs[0]) {
+                const convState = convs[0].state || {};
+                const now = new Date().toISOString();
+                await sbPost('conv_messages', { conversation_id: convs[0].id, role: 'ai', isi: pesan }).catch(() => {});
+                await sbPatch('conversations', `?id=eq.${convs[0].id}`, {
+                  state: { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: statusCat, delivery_issue_resi: order.no_resi },
+                  last_msg_at: now,
+                }).catch(() => {});
+              }
+            } catch (e2) { console.error(`[tracking-cron] conv update error: ${e2.message}`); }
+          }
         }
       } catch (e) {
         errors++;
