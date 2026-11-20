@@ -150,18 +150,6 @@ async function generateChatImage(messages, customerName, resi, ekspedisi) {
     // Build bubble content
     const bubbleChildren = [];
 
-    // Label for bot/cs
-    if (!isCustomer) {
-      const label = msg.role === 'cs' ? 'CS Adsy' : 'Bot Adsy';
-      bubbleChildren.push({
-        type: 'div',
-        props: {
-          style: { fontSize: '11px', fontWeight: '600', color: '#53bdeb', marginBottom: '2px' },
-          children: label,
-        },
-      });
-    }
-
     // Message text
     bubbleChildren.push({
       type: 'div',
