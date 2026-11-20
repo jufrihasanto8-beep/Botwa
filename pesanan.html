@@ -345,8 +345,8 @@ function getStatus(c) {
   if (ev.bermasalah)       return 'bermasalah';
   if (ev.out_for_delivery) return 'out_for_delivery';
   if (ev.tiba_kota)        return 'tiba_kota';
-  if (c.status_tracking)   return 'transit';
-  if (c.no_resi)           return 'dikirim';
+  if (ev.dikirim)          return 'dikirim';
+  if (c.no_resi)           return 'menunggu_pickup';
   return 'menunggu';
 }
 
@@ -360,6 +360,7 @@ function statusGroup(s) {
 /* ── Sub-filter Meta (sesuai tracking akuisisi) ── */
 const SUB_FILTER_STAGES = [
   { key: 'menunggu',         icon: '⏳', label: 'Menunggu Resi' },
+  { key: 'menunggu_pickup',  icon: '📋', label: 'Menunggu Pickup' },
   { key: 'dikirim',          icon: '📦', label: 'Dikirim' },
   { key: 'tiba_kota',        icon: '🏙️', label: 'Kota Tujuan' },
   { key: 'out_for_delivery', icon: '🛵', label: 'OTW' },
@@ -394,18 +395,19 @@ function normReturKat(st) {
 }
 
 /* ── Stepper HTML ── */
-const STEP_LABELS = ['Konfirmasi','Dikirim','Kota Tujuan','OTW','Sampai'];
+const STEP_LABELS = ['Konfirmasi','Pickup','Dikirim','Kota Tujuan','OTW','Sampai'];
 function stepperHtml(status) {
   const isProb = status === 'bermasalah' || status === 'retur';
   const labels = isProb
-    ? ['Konfirmasi','Dikirim', status === 'retur' ? 'Retur' : 'Bermasalah']
+    ? ['Konfirmasi','Pickup','Dikirim', status === 'retur' ? 'Retur' : 'Bermasalah']
     : STEP_LABELS;
-  const step = isProb ? 3
+  const step = isProb ? 4
     : status === 'menunggu' ? 1
-    : status === 'dikirim' || status === 'transit' ? 2
-    : status === 'tiba_kota' ? 3
-    : status === 'out_for_delivery' ? 4
-    : 5;
+    : status === 'menunggu_pickup' ? 2
+    : status === 'dikirim' ? 3
+    : status === 'tiba_kota' ? 4
+    : status === 'out_for_delivery' ? 5
+    : 6;
   const allDone = status === 'sampai';
 
   return `<div class="tr-stepper">${labels.map((label, i) => {
@@ -582,7 +584,7 @@ function fmtDtFull(iso) {
 
 const EKSPEDISI_LIST = ['JNE','J&T','SICEPAT','ANTERAJA','NINJA','IDEXPRESS','LION','POS','SPX','SAP'];
 const statusLabels = {
-  menunggu:'🚚 Menunggu Resi', dikirim:'🚚 Dikirim', transit:'🚚 Transit',
+  menunggu:'⏳ Menunggu Resi', menunggu_pickup:'📋 Menunggu Pickup', dikirim:'🚚 Dikirim',
   tiba_kota:'🏙️ Kota Tujuan', out_for_delivery:'🚚 OTW', sampai:'✅ Sampai',
   bermasalah:'⚠️ Bermasalah', retur:'🔄 Retur'
 };
@@ -606,7 +608,18 @@ function renderModalBody(c, records) {
   let historyHtml = '';
   if (records && records.length) {
     historyHtml = records.map((r, i) => {
-      const ts = r.time ? fmtDtFull(typeof r.time === 'number' ? new Date(r.time * 1000).toISOString() : r.time) : '';
+      let ts = '';
+      if (r.time) {
+        // Format Mengantar: "20-11-2026 01:41" (DD-MM-YYYY HH:mm) atau unix timestamp
+        if (typeof r.time === 'number') ts = fmtDtFull(new Date(r.time * 1000).toISOString());
+        else if (/^\d{2}-\d{2}-\d{4}/.test(r.time)) {
+          const [dd,mm,yyyy,...rest] = r.time.split(/[-\s:]/);
+          const hm = rest.length >= 2 ? ` ${rest[0]}:${rest[1]}` : '';
+          const now = new Date(), d2 = new Date(yyyy,mm-1,dd);
+          const diff = Math.floor((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - d2) / 86400000);
+          ts = (diff===0?'Hari ini':diff===1?'Kemarin':`${dd}-${mm}-${yyyy}`) + hm;
+        } else ts = fmtDtFull(r.time);
+      }
       const loc = r.location || '';
       const meta = [ts, loc].filter(Boolean).join(' · ');
       return `<div class="dtl-history-item">
@@ -785,7 +798,7 @@ function renderAll() {
   const pct = n => total > 0 ? (n/total*100).toFixed(1)+'%' : '';
 
   // Sub-filter counts (computed before filtering)
-  const subCounts = { menunggu:0, dikirim:0, transit:0, tiba_kota:0, out_for_delivery:0 };
+  const subCounts = { menunggu:0, menunggu_pickup:0, dikirim:0, tiba_kota:0, out_for_delivery:0 };
   const bermasalahSubs = {};
   const returSubs = {};
   baseList.forEach(c => {
@@ -805,8 +818,7 @@ function renderAll() {
   let list = baseList;
   if (activeStatFilter === 'ON_PROSES_GROUP') {
     list = list.filter(c => statusGroup(getStatus(c)) === 'ON_PROSES');
-    if (subFilter === 'dikirim') list = list.filter(c => { const s = getStatus(c); return s === 'dikirim' || s === 'transit'; });
-    else if (subFilter) list = list.filter(c => getStatus(c) === subFilter);
+    if (subFilter) list = list.filter(c => getStatus(c) === subFilter);
   } else if (activeStatFilter === 'UNDEL') {
     list = list.filter(c => getStatus(c) === 'bermasalah');
     if (subFilter) list = list.filter(c => normBermasalahKat(c.status_tracking) === subFilter);
@@ -917,6 +929,7 @@ function renderAll() {
       <div class="tr-tabs">
         <div class="${tabClass('semua')}" onclick="setTab('semua')">Semua</div>
         <div class="${tabClass('menunggu')}" onclick="setTab('menunggu')">⏳ Menunggu Resi</div>
+        <div class="${tabClass('menunggu_pickup')}" onclick="setTab('menunggu_pickup')">📋 Menunggu Pickup</div>
         <div class="${tabClass('dikirim')}" onclick="setTab('dikirim')">📦 Dikirim</div>
         <div class="${tabClass('tiba_kota')}" onclick="setTab('tiba_kota')">🏙️ Kota Tujuan</div>
         <div class="${tabClass('out_for_delivery')}" onclick="setTab('out_for_delivery')">🚚 OTW</div>
@@ -961,7 +974,7 @@ function renderSubFilter(subCounts) {
   if (activeStatFilter !== 'ON_PROSES_GROUP') { el.innerHTML = ''; return; }
 
   const items = SUB_FILTER_STAGES.map(({ key, icon, label }) => {
-    const count = key === 'dikirim' ? (subCounts.dikirim + subCounts.transit) : (subCounts[key] || 0);
+    const count = subCounts[key] || 0;
     const isActive = subFilter === key;
     return `<div class="tr-sub-card ${isActive ? 'active' : ''}" onclick="setSubFilter('${key}')">
       <div class="tr-sub-icon">${icon}</div>
@@ -1021,8 +1034,8 @@ function cardHtml(c) {
 
   const statusBadgeMap = {
     menunggu:         '<span class="bdg bdg-menunggu">⏳ Menunggu Resi</span>',
+    menunggu_pickup:  '<span class="bdg bdg-transit">📋 Menunggu Pickup</span>',
     dikirim:          '<span class="bdg bdg-dikirim">📦 Dikirim</span>',
-    transit:          `<span class="bdg bdg-transit">🚚 ${escH((c.status_tracking||'').slice(0,20))}</span>`,
     tiba_kota:        '<span class="bdg bdg-tiba_kota">🏙️ Kota Tujuan</span>',
     out_for_delivery: '<span class="bdg bdg-out_for_delivery">🚚 OTW</span>',
     sampai:           '<span class="bdg bdg-sampai">✅ Sampai</span>',
