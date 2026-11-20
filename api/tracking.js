@@ -1008,22 +1008,20 @@ module.exports = async function handler(req, res) {
 
     console.log(`[tracking] ${orders.length} order akan di-tracking...`);
     let updated = 0, notified = 0, errors = 0;
+    const cronStart = Date.now();
+    const CRON_MAX_TIME = 50000; // 50s safety margin
+    const CRON_BATCH = 10;
 
-    for (const order of orders) {
+    async function processCronOrder(order) {
       try {
-        const tracking = await cekResi(order.no_resi, order.ekspedisi);
-        if (!tracking) {
-          console.log(`[tracking] No data: ${order.no_resi}`);
-          continue;
-        }
+        const courier = normalizeKurir(order.ekspedisi);
+        const d = await fetchMengantar(order.no_resi, courier || null);
+        const tracking = processTrackingData(d, courier);
+        if (!tracking) return;
 
         const { statusCat, eventType, lokasi, deskripsi } = tracking;
-
-        console.log(`[tracking] ${order.no_resi} | kurir: ${order.ekspedisi || '?'} | statusCat: ${statusCat} | event: ${eventType} | lokasi: ${lokasi || '-'} | desc: ${deskripsi?.slice(0,60) || '-'}`);
-
         const doneEvents = order.tracking_events || {};
 
-        // Selalu update status & lokasi terbaru ke DB
         const lokasiUpdate = lokasi || order.tracking_lokasi;
         if (statusCat !== order.status_tracking || lokasi !== order.tracking_lokasi) {
           await sbPatch('orders_new', `?id=eq.${order.id}`, {
@@ -1033,17 +1031,9 @@ module.exports = async function handler(req, res) {
           updated++;
         }
 
-        // Cek apakah ada event baru yang perlu dinotif
-        if (doneEvents[eventType] && eventType !== 'update') {
-          console.log(`[tracking] Event "${eventType}" sudah pernah dinotif: ${order.no_resi}`);
-          continue;
-        }
-        if (eventType === 'update') {
-          console.log(`[tracking] Lokasi update (no notif): ${order.no_resi} → ${lokasiUpdate || '-'}`);
-          continue;
-        }
+        if (doneEvents[eventType] && eventType !== 'update') return;
+        if (eventType === 'update') return;
 
-        // Catat event ke tracking_events
         const patch = {
           tracking_events: { ...doneEvents, [eventType]: new Date().toISOString() },
         };
@@ -1058,9 +1048,9 @@ module.exports = async function handler(req, res) {
         console.log(`[tracking] ${label[eventType] || eventType}: ${order.no_resi} (${statusCat})`);
 
         const cust = custMap[order.customer_id];
-        if (!cust) continue;
+        if (!cust) return;
         const waTarget = cust.reply_jid || cust.wa_number;
-        if (!waTarget) continue;
+        if (!waTarget) return;
 
         const namaKak  = (cust.nama || '').split(' ')[0];
         const urlLacak = trackingUrl(order.ekspedisi, order.no_resi);
@@ -1077,14 +1067,19 @@ module.exports = async function handler(req, res) {
           await kirimNotif(waSession, waTarget, pesan);
           notified++;
         }
-
-        // Jeda antar request ke Mengantar
-        await new Promise(r => setTimeout(r, 600));
-
       } catch (e) {
         errors++;
         console.error(`[tracking] Error order ${order.id} (${order.no_resi}):`, e.message);
       }
+    }
+
+    // Process in parallel batches, stop early if approaching timeout
+    for (let i = 0; i < orders.length; i += CRON_BATCH) {
+      if (Date.now() - cronStart > CRON_MAX_TIME) {
+        console.log(`[tracking] Cron timeout safety: processed ${i}/${orders.length}, stopping`);
+        return res.status(200).json({ ok: true, updated, notified, errors, partial: true, processed: i, total: orders.length });
+      }
+      await Promise.all(orders.slice(i, i + CRON_BATCH).map(processCronOrder));
     }
 
     console.log(`[tracking] ✅ Selesai. Updated: ${updated}, Notified: ${notified}, Errors: ${errors}`);
