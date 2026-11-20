@@ -909,11 +909,16 @@ module.exports = async function handler(req, res) {
       const userTpl = userRows[0] || {};
 
       let updated = 0, notifSent = 0, errors = 0;
-      const BATCH = 10;
+      const BATCH = 15;
+      const startTime = Date.now();
+      const MAX_TIME = 50000; // 50s safety margin (Vercel limit 60s)
 
       async function processOrder(order) {
         try {
-          const tracking = await cekResi(order.no_resi, order.ekspedisi);
+          // Langsung fetch tanpa retry (kurir sudah pasti ada dari data order)
+          const courier = normalizeKurir(order.ekspedisi);
+          const d = await fetchMengantar(order.no_resi, courier || null);
+          const tracking = processTrackingData(d, courier);
           if (!tracking) return;
 
           const { statusCat, eventType, lokasi, deskripsi } = tracking;
@@ -952,8 +957,12 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // Process in parallel batches of 10
+      // Process in parallel batches, stop early if approaching timeout
       for (let i = 0; i < orders.length; i += BATCH) {
+        if (Date.now() - startTime > MAX_TIME) {
+          console.log(`[tracking] check-all timeout safety: processed ${i}/${orders.length}, stopping`);
+          return res.status(200).json({ ok: true, total: orders.length, processed: i, updated, notifSent, errors, partial: true });
+        }
         await Promise.all(orders.slice(i, i + BATCH).map(processOrder));
       }
 
