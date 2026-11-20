@@ -587,7 +587,7 @@ module.exports = async function handler(req, res) {
     // ═══════════════════════════════════════════════════
 
     // 3a. Ambil conversation yang sudah di-FU hari ini (dedup)
-    const todayQueue = await sbGet('followup_queue',
+    const todayQueue = await sbGet('followup_schedule',
       `?fu_day=eq.${todayWIB}&status=eq.sent&select=conversation_id`
     ).catch(() => []);
     const sentTodaySet = new Set(todayQueue.map(q => q.conversation_id));
@@ -680,7 +680,7 @@ module.exports = async function handler(req, res) {
 
           if (pesan !== null) {
             // Insert ke queue — tandai sudah FU hari ini
-            await sbPost('followup_queue', {
+            await sbPost('followup_schedule', {
               conversation_id: conv.id,
               product_id: conv.product_id || null,
               fu_stage: stage,
@@ -697,6 +697,89 @@ module.exports = async function handler(req, res) {
         } catch(e) {
           console.error(`[fu] Error conv ${conv.id}:`, e.message);
         }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  4. FU Bermasalah — paket gagal antar, FU customer 1x/hari max 3x
+    // ═══════════════════════════════════════════════════
+    if (!isTimeUp()) {
+      try {
+        // Cari conversation dengan delivery_issue yang belum resolved
+        const issueConvs = await sbGet('conversations',
+          `?status=in.(baru,diproses)&select=id,user_id,customer_id,product_id,state,last_msg_at`
+          + `&order=last_msg_at.asc&limit=100`
+        ).catch(() => []);
+
+        const bermasalahConvs = issueConvs.filter(c => {
+          const s = c.state || {};
+          return s.delivery_issue && !s.delivery_issue_resolved
+            && (s.delivery_issue_fu_count || 0) < 3;
+        });
+
+        console.log(`[fu-bermasalah] ${bermasalahConvs.length} conversation dengan delivery issue`);
+
+        for (const conv of bermasalahConvs) {
+          if (isTimeUp()) break;
+          const s = conv.state || {};
+          const fuCount = s.delivery_issue_fu_count || 0;
+          // Referensi waktu: FU terakhir, atau waktu pertama kali bermasalah
+          const lastFuAt = s.delivery_issue_fu_last || s.delivery_issue_at;
+          if (!lastFuAt) continue;
+
+          // Cek 24 jam sudah lewat
+          const elapsed = now.getTime() - new Date(lastFuAt).getTime();
+          if (elapsed < 24 * 60 * 60 * 1000) continue;
+
+          // Cek customer sudah bales setelah last FU → skip (sudah di-handle bot)
+          const lastCustMsg = await sbGet('conv_messages',
+            `?conversation_id=eq.${conv.id}&role=eq.customer&order=created_at.desc&limit=1`
+          ).catch(() => []);
+          if (lastCustMsg[0]?.created_at && new Date(lastCustMsg[0].created_at) > new Date(lastFuAt)) {
+            // Customer sudah bales → tandai resolved
+            await sbPatch('conversations', `?id=eq.${conv.id}`, {
+              state: { ...s, delivery_issue_resolved: true },
+            }).catch(() => {});
+            console.log(`[fu-bermasalah] Conv ${conv.id}: customer sudah bales, resolved`);
+            continue;
+          }
+
+          // Ambil data customer
+          const custs = await sbGet('customers', `?id=eq.${conv.customer_id}&select=id,wa_number,nama,reply_jid&limit=1`).catch(() => []);
+          const cust = custs[0];
+          if (!cust?.wa_number) continue;
+
+          const waSession = await getWaSession(conv.user_id, conv.product_id);
+          const jid = cust.reply_jid || cust.wa_number;
+          const namaKak = (cust.nama || '').split(' ')[0] || 'Kak';
+          const resi = s.delivery_issue_resi || '';
+          const stage = fuCount + 1;
+
+          // Template FU bermasalah per stage
+          const fuTemplates = {
+            1: `Halo ${namaKak ? 'Kak '+namaKak : 'Kak'} 🙏\n\nKemarin kami info soal kendala pengiriman paket kakak. Boleh dicek kak:\n\n1️⃣ Alamat sudah lengkap & benar?\n2️⃣ Nomor HP aktif bisa dihubungi kurir?\n3️⃣ Ada orang di rumah saat jam pengiriman?\n\nMohon infonya ya kak biar kami bisa bantu koordinasi 😊`,
+            2: `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket kakak masih belum berhasil dikirim nih 😟\n\nKalau ada kendala di alamat atau kurir belum hubungi, kabari kami ya kak. Kami bantu follow up ke pihak ekspedisi 🙏\n\nResi: ${resi}`,
+            3: `${namaKak ? 'Kak '+namaKak : 'Kak'}, ini reminder terakhir dari kami soal paket yang belum sampai 🙏\n\nKalau memang ada masalah, silakan balas chat ini ya kak. Kami siap bantu.\n\nResi: ${resi}`,
+          };
+          const pesan = fuTemplates[stage];
+          if (!pesan) continue;
+
+          // Kirim + simpan ke conv_messages
+          queueWA(waSession, jid, pesan, null, null, conv.id);
+          await sbPost('conv_messages', { conversation_id: conv.id, role: 'ai', isi: `[FU Bermasalah ${stage}/3] ${pesan}` });
+
+          // Update state
+          await sbPatch('conversations', `?id=eq.${conv.id}`, {
+            state: { ...s, delivery_issue_fu_count: stage, delivery_issue_fu_last: now.toISOString() },
+            last_msg_at: now.toISOString(),
+          }).catch(() => {});
+
+          totalSent++;
+          details.push({ type: 'fu_bermasalah', stage, conv: conv.id, customer: cust.nama });
+          console.log(`[fu-bermasalah] FU ${stage}/3 → ${cust.nama || cust.wa_number} (resi: ${resi})`);
+        }
+      } catch (e) {
+        console.error('[fu-bermasalah] Error:', e.message);
       }
     }
 

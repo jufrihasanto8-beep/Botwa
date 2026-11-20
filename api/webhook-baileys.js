@@ -2800,6 +2800,7 @@ Konfirmasi ke customer bahwa bukti TF sudah diterima dan sedang dicek oleh tim f
 
             // Cek apakah sudah ada pending QC untuk conversation ini → replace
             const existingQC = await sbGet('transfer_qc', `?conversation_id=eq.${conversation.id}&qc_status=eq.pending&limit=1`).catch(() => []);
+            const isNewQC = !existingQC.length;
 
             if (existingQC.length) {
               await sbPatch('transfer_qc', `?id=eq.${existingQC[0].id}`, {
@@ -2815,11 +2816,13 @@ Konfirmasi ke customer bahwa bukti TF sudah diterima dan sedang dicek oleh tim f
             // Update state: menunggu QC finance
             await updateConvState(conversation.id, { awaiting_qc_tf: true });
 
-            // Kirim notif ke grup WA QC (global)
-            if (QC_GROUP_JID) {
+            // Kirim notif ke grup WA QC — HANYA kalau QC baru (bukan update ulang)
+            if (QC_GROUP_JID && isNewQC) {
               const qcNotif = `📋 *Bukti TF Baru*\nNama: ${customer?.nama || '-'}\nProduk: ${product?.nama || '-'} x${qtySnap}\nNominal: ${imageAnalysis.nominal || '?'}\nBank: ${imageAnalysis.bank || '?'}\n\nCek & ACC di:\nhttps://csadsy.vercel.app/qc-transfer`;
               await sendWA(waSession, QC_GROUP_JID, qcNotif, true).catch(() => {});
               console.log(`[qc-tf] Notif QC terkirim ke grup QC`);
+            } else if (existingQC.length) {
+              console.log(`[qc-tf] QC sudah ada (${existingQC[0].id}), skip notif ulang ke grup`);
             }
           } catch(e) {
             console.error('[qc-tf] Error:', e.message);

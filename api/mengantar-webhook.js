@@ -257,6 +257,47 @@ module.exports = async function handler(req, res) {
           const waSession = await getWaSession(order.user_id, order.product_id);
           await kirimNotif(waSession, waTarget, pesan);
           console.log(`[mng-webhook] Notif ${eventType} terkirim ke ${cust.wa_number}`);
+
+          // ── Bermasalah/Retur: simpan ke conv_messages + set state agar bot punya konteks ──
+          if (eventType === 'bermasalah' || eventType === 'retur') {
+            try {
+              // Cari conversation aktif customer ini
+              const convs = await sbGet('conversations',
+                `?customer_id=eq.${order.customer_id}&user_id=eq.${order.user_id}&select=id,state&order=created_at.desc&limit=1`
+              );
+              if (convs[0]) {
+                const convId = convs[0].id;
+                const convState = convs[0].state || {};
+
+                // Simpan pesan ke conv_messages supaya muncul di dashboard & bot punya konteks
+                await fetch(`${SUPABASE_URL}/rest/v1/conv_messages`, {
+                  method: 'POST',
+                  headers: { ...sbH(), 'Prefer': 'return=minimal' },
+                  body: JSON.stringify({ conversation_id: convId, role: 'ai', isi: pesan }),
+                }).catch(() => {});
+
+                // Update state: delivery_issue + status_category
+                const issueData = {
+                  delivery_issue: true,
+                  delivery_issue_type: eventType,
+                  delivery_issue_at: now,
+                  delivery_issue_status: status_category,
+                  delivery_issue_resi: cnote_no,
+                };
+                // Patch conversation state
+                const newState = { ...convState, ...issueData };
+                await sbPatch('conversations', `?id=eq.${convId}`, {
+                  state: newState,
+                  last_msg_at: now,
+                  status: convState.order_placed ? 'diproses' : (convs[0].status || 'baru'),
+                }).catch(() => {});
+
+                console.log(`[mng-webhook] Conv ${convId}: delivery_issue=${eventType} set, pesan saved`);
+              }
+            } catch (e) {
+              console.error('[mng-webhook] Conv update error:', e.message);
+            }
+          }
         }
       } catch (e) {
         console.error('[mng-webhook] Notif error:', e.message);
