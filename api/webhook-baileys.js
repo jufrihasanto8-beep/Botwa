@@ -4213,11 +4213,11 @@ ${ongkirInfo}`;
           const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
           const custNama = customer?.nama || 'Customer';
 
-          // Ambil 6 chat terakhir untuk screenshot
+          // Ambil semua chat (konfirmasi + bermasalah), limit 15, potong jadi max 10 biar gambar ga kebesaran
           const recentMsgs = await sbGet('conv_messages',
-            `?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=6&select=role,isi,created_at`
+            `?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=15&select=role,isi,created_at`
           ).catch(() => []);
-          const chatMsgs = recentMsgs.reverse(); // urut lama → baru
+          const chatMsgs = recentMsgs.reverse().slice(-10); // urut lama → baru, max 10
 
           // A: Generate screenshot chat
           try {
