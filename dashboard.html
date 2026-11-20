@@ -1337,8 +1337,22 @@ async function renderChat() {
   lastMsgCount = msgs.length;
   lastMsgTimestamp = msgs.length ? msgs[msgs.length - 1].created_at : null;
 
-  area.innerHTML = '<div class="day-divider">Hari ini</div>';
+  area.innerHTML = '';
+  let lastDateStr = '';
+  const todayStr = new Date().toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const yesterdayD = new Date(); yesterdayD.setDate(yesterdayD.getDate() - 1);
+  const yesterdayStr = yesterdayD.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' });
   msgs.forEach(m => {
+    const msgDate = new Date(m.created_at);
+    const dateStr = msgDate.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric' });
+    if (dateStr !== lastDateStr) {
+      lastDateStr = dateStr;
+      let label;
+      if (dateStr === todayStr) label = 'Hari ini';
+      else if (dateStr === yesterdayStr) label = 'Kemarin';
+      else label = msgDate.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'long', year: 'numeric' });
+      area.insertAdjacentHTML('beforeend', `<div class="day-divider">${label}</div>`);
+    }
     if (m.role === 'system') appendSystemNote(m.isi, m.created_at);
     else appendBubble(m.role === 'customer' ? 'customer' : 'bot', m.isi, false, m.created_at, m.role, m.id, m.wamid);
   });
