@@ -689,7 +689,7 @@ async function handleCreateMengantar(req, res) {
                 no_resi:          cnote,
                 ekspedisi:        kurir,
                 status:           'dikirim',
-                status_tracking:  'dikirim',
+                status_tracking:  'menunggu_pickup',
                 mengantar_status: 'sent',
                 mengantar_sent_at: new Date().toISOString(),
                 mengantar_error:  null,
@@ -863,26 +863,28 @@ module.exports = async function handler(req, res) {
     try {
       const courier = normalizeKurir(ekspedisi);
       let d = await fetchMengantar(resi, courier);
-      if (!d || !(d.statusCategory || d.status || d.connote_state)) {
+      if (!d || !(d.statusCategory || d.status || d.connote_state) || d.history === '-') {
         d = await fetchMengantar(resi, null);
       }
-      if (!d) return res.status(200).json({ ok: true, records: [], status: null });
 
-      const history = d.history || d.connote_history || [];
-      const statusCat = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
+      let records = [];
+      let statusCat = '';
 
-      const records = history.map(h => ({
-        desc: h.desc || h.content || h.description || '',
-        location: h.location || h.city || h.city_name || '',
-        time: h.actual_time || h.timestamp || null,
-      })).reverse(); // terbaru di atas
+      if (d && d.statusCategory && d.statusCategory !== '-' && Array.isArray(d.history)) {
+        statusCat = (d.statusCategory || '').toUpperCase();
+        records = d.history.map(h => ({
+          desc: h.desc || h.content || h.description || '',
+          location: h.counter_name || h.location || h.city || h.city_name || '',
+          time: h.date || h.actual_time || h.timestamp || null,
+        })).reverse();
+      }
 
-      // Kalau ada order_id, update juga status_tracking di DB
-      if (order_id) {
+      // Update DB kalau ada data baru
+      if (order_id && statusCat) {
         const tracking = await cekResi(resi, ekspedisi);
         if (tracking) {
-          const orders = await sbGet('orders_new', `?id=eq.${order_id}&select=id,tracking_events,status_tracking,tracking_lokasi&limit=1`);
-          const order = orders[0];
+          const ordRows = await sbGet('orders_new', `?id=eq.${order_id}&select=id,tracking_events,status_tracking,tracking_lokasi&limit=1`);
+          const order = ordRows[0];
           if (order) {
             const doneEvents = order.tracking_events || {};
             const patch = { status_tracking: tracking.statusCat, tracking_lokasi: tracking.lokasi || order.tracking_lokasi };
@@ -922,16 +924,16 @@ module.exports = async function handler(req, res) {
       const userTpl = userRows[0] || {};
 
       let updated = 0, notifSent = 0, errors = 0;
+      const BATCH = 10;
 
-      for (const order of orders) {
+      async function processOrder(order) {
         try {
           const tracking = await cekResi(order.no_resi, order.ekspedisi);
-          if (!tracking) continue;
+          if (!tracking) return;
 
           const { statusCat, eventType, lokasi, deskripsi } = tracking;
           const doneEvents = order.tracking_events || {};
 
-          // Update status & lokasi terbaru
           if (statusCat !== order.status_tracking || lokasi !== order.tracking_lokasi) {
             await sbPatch('orders_new', `?id=eq.${order.id}`, {
               status_tracking: statusCat,
@@ -940,15 +942,12 @@ module.exports = async function handler(req, res) {
             updated++;
           }
 
-          // Skip kalau event sudah pernah dicatat atau hanya update
-          if ((doneEvents[eventType] && eventType !== 'update') || eventType === 'update') continue;
+          if ((doneEvents[eventType] && eventType !== 'update') || eventType === 'update') return;
 
-          // Catat event baru
           const patch = { tracking_events: { ...doneEvents, [eventType]: new Date().toISOString() } };
           if (eventType === 'delivered') { patch.status = 'selesai'; patch.sampai = true; patch.sampai_at = new Date().toISOString(); }
           await sbPatch('orders_new', `?id=eq.${order.id}`, patch);
 
-          // Kirim notif WA
           const cust = custMap2[order.customer_id];
           if (cust) {
             const waTarget = cust.reply_jid || cust.wa_number;
@@ -962,11 +961,15 @@ module.exports = async function handler(req, res) {
               notifSent++;
             }
           }
-          await new Promise(r => setTimeout(r, 600));
         } catch (e) {
           errors++;
           console.error(`[tracking] check-all error ${order.no_resi}:`, e.message);
         }
+      }
+
+      // Process in parallel batches of 10
+      for (let i = 0; i < orders.length; i += BATCH) {
+        await Promise.all(orders.slice(i, i + BATCH).map(processOrder));
       }
 
       return res.status(200).json({ ok: true, total: orders.length, updated, notifSent, errors });

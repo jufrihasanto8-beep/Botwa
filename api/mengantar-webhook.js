@@ -36,11 +36,11 @@ async function sbPatch(table, query, body) {
 
 // ── Status mapping dari Mengantar status_category ke event internal ──
 const STATUS_MAP = {
-  'ACTIVE':                 'dikirim',
-  'WAITING NEXT PROCESS':   'dikirim',
-  'PENDING PICKUP':         'dikirim',
+  'ACTIVE':                 'menunggu_pickup',
+  'WAITING NEXT PROCESS':   'menunggu_pickup',
+  'PENDING PICKUP':         'menunggu_pickup',
   'PICKED UP':              'dikirim',
-  'MANIFESTED':             'dikirim',
+  'MANIFESTED':             'menunggu_pickup',
   'INBOUND PROCESS':        'dikirim',
   'OUTBOUND PROCESS':       'dikirim',
   'IN TRANSIT':             'dikirim',
@@ -182,7 +182,7 @@ module.exports = async function handler(req, res) {
 
     // 6. Anti-downgrade: kalau sudah BERMASALAH, jangan turun ke dikirim/out_for_delivery/tiba_kota
     const wasProb = doneEvents.bermasalah && !doneEvents.delivered;
-    const isRetry = ['dikirim', 'out_for_delivery', 'tiba_kota'].includes(eventType);
+    const isRetry = ['menunggu_pickup', 'dikirim', 'out_for_delivery', 'tiba_kota'].includes(eventType);
     if (wasProb && isRetry) {
       console.log(`[mng-webhook] ${cnote_no} retry (${eventType}) — tetap bermasalah`);
       return res.status(200).json({ ok: true, resi: cnote_no, event: eventType, retry: true });
