@@ -4157,7 +4157,8 @@ ${ongkirInfo}`;
         // Notif ke grup Operasional (OPS_GROUP_JID), fallback ke grup recap
         try {
           const opsGroupJid = process.env.OPS_GROUP_JID || userGroupJid || QC_GROUP_JID;
-          const cancelNotif = `❌ *Pembatalan Order*\n\n👤 ${customer?.nama || '-'} (${customer?.wa_number || '-'})\n🛒 ${product?.nama || '-'}\n💬 Alasan: "${message.slice(0, 100)}"\n\nOrder dibatalkan oleh customer setelah closing.`;
+          const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
+          const cancelNotif = `❌ *Pembatalan Order*\n\n👤 ${customer?.nama || '-'}\n📱 ${custPhone || '-'}\n🛒 ${product?.nama || '-'}\n💬 Alasan: "${message.slice(0, 100)}"\n\nOrder dibatalkan oleh customer setelah closing.`;
           if (opsGroupJid) {
             await sendWA(waSession, opsGroupJid, cancelNotif, true).catch(() => {});
             console.log(`[CANCEL-POST] Notif terkirim ke grup ${opsGroupJid}`);
