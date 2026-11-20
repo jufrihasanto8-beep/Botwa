@@ -158,6 +158,24 @@ module.exports = async function handler(req, res) {
 
       const { action, qc_id, note } = req.body || {};
 
+      // ── Route: notify-qc-group — kirim notif bukti TF baru ke grup QC ──
+      if (action === 'notify-qc-group') {
+        const { user_id, customer_nama, customer_phone, product_nama, qty, total, metode, bukti_url } = req.body;
+        // Resolve group JID: user.group_jid → env QC_GROUP_JID → env WA_GROUP_JID
+        const userR = await sbGet(`users?id=eq.${user_id}&select=group_jid&limit=1`).catch(() => []);
+        const groupJid = userR[0]?.group_jid || process.env.QC_GROUP_JID || process.env.WA_GROUP_JID || null;
+        if (!groupJid) return res.status(200).json({ ok: true, skipped: 'no_group_jid' });
+
+        // Resolve wa_session_id
+        const prodR = await sbGet(`products?user_id=eq.${user_id}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []);
+        const waSession = prodR[0]?.wa_session_id || user_id;
+
+        const totalRp = (total || 0).toLocaleString('id-ID');
+        const notifMsg = `📎 *Bukti TF Baru*\n\n👤 ${customer_nama || '-'} (${customer_phone || '-'})\n🛒 ${product_nama || '-'} x${qty || 1}\n💰 Rp ${totalRp} (${(metode || 'TRANSFER').toUpperCase()})\n📋 Status: Menunggu QC\n\n${bukti_url || ''}`;
+        await sendWA(waSession, groupJid, notifMsg);
+        return res.status(200).json({ ok: true, sent: true });
+      }
+
       if (!qc_id) return res.status(400).json({ error: 'qc_id wajib' });
 
       // Fetch QC entry
