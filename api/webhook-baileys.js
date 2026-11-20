@@ -2611,6 +2611,21 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       }
     }
 
+    // Inject delivery issue context jika ada masalah pengiriman
+    if (convState.delivery_issue) {
+      const issueType = convState.delivery_issue_type === 'retur' ? 'RETUR (dikembalikan ke pengirim)' : 'BERMASALAH (kurir gagal antar)';
+      const issueStatus = convState.delivery_issue_status || '';
+      const issueResi = convState.delivery_issue_resi || '';
+      systemPrompt += `\n\n[SISTEM - MASALAH PENGIRIMAN] Paket customer ini sedang ${issueType}.`
+        + `\nStatus terakhir: ${issueStatus}`
+        + `\nResi: ${issueResi}`
+        + `\n\nTugasmu:`
+        + `\n1. Kalau customer bales soal masalah ini → bantu cari solusi dengan empati (cek alamat, HP aktif, ada orang di rumah, dll)`
+        + `\n2. Kalau customer tanya status → jelaskan situasinya dengan jujur tapi tetap positif`
+        + `\n3. Jangan bilang "kami tidak bisa bantu" — selalu tawarkan solusi (koordinasi ulang pengiriman, cek alamat, dll)`
+        + `\n4. Kalau retur: sampaikan bahwa tim sedang koordinasi dan akan dihubungi untuk pengiriman ulang`;
+    }
+
     // Inject wilayah risk agar Claude ingat sepanjang conversation
     const wr = customer?.wilayah_risk;
     if (wr && convState.ongkir && !convState.order_placed) {
