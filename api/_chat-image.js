@@ -2,7 +2,7 @@
  * Chat Image Generator — render chat messages jadi PNG (mirip screenshot WA dark mode)
  * Dipakai untuk forward feedback customer bermasalah ke grup ekspedisi
  *
- * Usage: const pngBuffer = await generateChatImage(messages, customerName, resi, ekspedisi)
+ * Usage: const pngBuffer = await generateChatImage(messages, customerName, customerPhone, resi, ekspedisi)
  */
 
 let _satori, _Resvg, _fontData;
@@ -25,29 +25,18 @@ async function loadDeps() {
   }
 }
 
-/**
- * Generate PNG screenshot of chat — WA dark mode style
- * @param {Array} messages - [{role:'customer'|'ai'|'cs', isi:string, created_at:string}]
- * @param {string} customerName
- * @param {string} customerPhone - nomor HP customer
- * @param {string} resi - nomor resi
- * @param {string} ekspedisi - nama kurir
- * @returns {Buffer} PNG buffer
- */
 async function generateChatImage(messages, customerName, customerPhone, resi, ekspedisi) {
   await loadDeps();
 
-  const WIDTH = 390; // phone-width portrait
-  const PAD = 12;
-  const BUBBLE_MAX = 270;
+  const WIDTH = 390;
+  const PAD = 10;
+  const BUBBLE_MAX = 268;
 
-  // ── Helper: format time WIB ──
   const fmtTime = (dt) => {
     if (!dt) return '';
     return new Date(dt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
   };
 
-  // ── Helper: date divider (Hari ini / Kemarin / tanggal) ──
   const fmtDate = (dt) => {
     if (!dt) return '';
     const d = new Date(dt);
@@ -62,10 +51,9 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
     return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
   };
 
-  // ── Build elements ──
   const elements = [];
 
-  // Header bar — dark WA style
+  // ── Header: simple, clean ──
   elements.push({
     type: 'div',
     props: {
@@ -75,42 +63,39 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
         gap: '10px',
         padding: '10px 14px',
         background: '#1F2C34',
-        color: '#e9edef',
       },
       children: [
         // Back arrow
-        { type: 'div', props: { style: { fontSize: '18px', color: '#00a884' }, children: '←' } },
-        // Avatar circle
+        { type: 'span', props: { style: { fontSize: '20px', color: '#aebac1' }, children: '\u2039' } },
+        // Avatar circle with initial
         {
           type: 'div',
           props: {
             style: {
-              width: '34px', height: '34px', borderRadius: '17px',
+              width: '38px', height: '38px', borderRadius: '19px',
               background: '#00a884',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '15px', fontWeight: '700', color: '#fff',
+              fontSize: '17px', fontWeight: '700', color: '#fff',
             },
             children: (customerName || '?')[0].toUpperCase(),
           },
         },
-        // Phone + status
+        // Name/phone + online
         {
           type: 'div',
           props: {
             style: { display: 'flex', flexDirection: 'column', flexGrow: '1' },
             children: [
-              { type: 'div', props: { style: { fontSize: '14px', fontWeight: '600', color: '#e9edef' }, children: customerPhone || customerName || 'Customer' } },
-              { type: 'div', props: { style: { fontSize: '11px', color: '#8696a0' }, children: 'online' } },
+              { type: 'div', props: { style: { fontSize: '15px', fontWeight: '600', color: '#e9edef' }, children: customerPhone || customerName || 'Customer' } },
+              { type: 'div', props: { style: { fontSize: '11px', color: '#00a884' }, children: 'online' } },
             ],
           },
         },
-        // Menu dots
-        { type: 'div', props: { style: { fontSize: '16px', color: '#aebac1' }, children: '⋮' } },
       ],
     },
   });
 
-  // Chat body
+  // ── Chat area ──
   const bubbles = [];
   let lastDateStr = '';
 
@@ -125,10 +110,7 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
       bubbles.push({
         type: 'div',
         props: {
-          style: {
-            display: 'flex', justifyContent: 'center',
-            padding: '6px 0', margin: '4px 0',
-          },
+          style: { display: 'flex', justifyContent: 'center', padding: '6px 0', margin: '2px 0' },
           children: {
             type: 'div',
             props: {
@@ -136,8 +118,8 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
                 background: '#182229',
                 color: '#8696a0',
                 fontSize: '11px',
-                padding: '4px 12px',
-                borderRadius: '6px',
+                padding: '5px 12px',
+                borderRadius: '7px',
               },
               children: dateStr,
             },
@@ -147,40 +129,57 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
     }
 
     const text = (msg.isi || '').slice(0, 400);
-
-    // Build bubble content
     const bubbleChildren = [];
 
     // Message text
     bubbleChildren.push({
       type: 'div',
       props: {
-        style: { fontSize: '13px', lineHeight: '1.45', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#e9edef' },
+        style: {
+          fontSize: '13.5px',
+          lineHeight: '1.4',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          color: isCustomer ? '#e9edef' : '#e9edef',
+        },
         children: text,
       },
     });
 
-    // Time row (same gray color both sides)
-    const timeText = time + (!isCustomer ? '  \u2713\u2713' : '');
+    // Time + checkmark
+    const timeRow = [];
+    timeRow.push({
+      type: 'span',
+      props: { style: { fontSize: '10px', color: isCustomer ? '#8696a0' : '#8696a0' }, children: time },
+    });
+    if (!isCustomer) {
+      // SVG double checkmark — drawn manually, mirip WA read receipt
+      timeRow.push({
+        type: 'svg',
+        props: {
+          width: '16',
+          height: '10',
+          viewBox: '0 0 16 10',
+          style: { marginLeft: '3px' },
+          children: [
+            // First check (back)
+            { type: 'path', props: { d: 'M1.5 5.5 L4.5 8.5 L11 2', fill: 'none', stroke: '#53bdeb', strokeWidth: '1.5', strokeLinecap: 'round', strokeLinejoin: 'round' } },
+            // Second check (front, offset right)
+            { type: 'path', props: { d: 'M5 5.5 L8 8.5 L14.5 2', fill: 'none', stroke: '#53bdeb', strokeWidth: '1.5', strokeLinecap: 'round', strokeLinejoin: 'round' } },
+          ],
+        },
+      });
+    }
 
     bubbleChildren.push({
       type: 'div',
       props: {
-        style: {
-          display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-          marginTop: '2px',
-        },
-        children: {
-          type: 'span',
-          props: {
-            style: { fontSize: '10px', color: '#8696a0' },
-            children: timeText,
-          },
-        },
+        style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '1px' },
+        children: timeRow,
       },
     });
 
-    // Bubble wrapper
+    // Bubble
     bubbles.push({
       type: 'div',
       props: {
@@ -196,11 +195,11 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
               display: 'flex',
               flexDirection: 'column',
               maxWidth: `${BUBBLE_MAX}px`,
-              padding: '6px 8px',
+              padding: '6px 8px 4px 8px',
               borderRadius: isCustomer ? '0px 8px 8px 8px' : '8px 0px 8px 8px',
               background: isCustomer ? '#202C33' : '#005C4B',
-              marginLeft: isCustomer ? '0' : '40px',
-              marginRight: isCustomer ? '40px' : '0',
+              marginLeft: isCustomer ? '0' : '50px',
+              marginRight: isCustomer ? '50px' : '0',
             },
             children: bubbleChildren,
           },
@@ -209,7 +208,6 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
     });
   }
 
-  // Chat area with dark wallpaper
   elements.push({
     type: 'div',
     props: {
@@ -217,40 +215,11 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
         display: 'flex',
         flexDirection: 'column',
         padding: `${PAD}px`,
-        gap: '3px',
+        gap: '2px',
         background: '#0B141A',
         flexGrow: '1',
-        minHeight: '200px',
       },
       children: bubbles,
-    },
-  });
-
-  // Bottom bar — input area hint
-  elements.push({
-    type: 'div',
-    props: {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '8px 10px',
-        background: '#1F2C34',
-      },
-      children: [
-        { type: 'div', props: { style: { fontSize: '16px' }, children: '😊' } },
-        {
-          type: 'div',
-          props: {
-            style: {
-              flexGrow: '1', background: '#2A3942', borderRadius: '20px',
-              padding: '8px 14px', fontSize: '13px', color: '#8696a0',
-            },
-            children: 'Ketik pesan',
-          },
-        },
-        { type: 'div', props: { style: { fontSize: '16px' }, children: '🎤' } },
-      ],
     },
   });
 
@@ -269,30 +238,29 @@ async function generateChatImage(messages, customerName, customerPhone, resi, ek
     },
   };
 
-  // Height estimation — taller portrait format
+  // Height estimation
   const msgHeights = messages.map(m => {
     const textLen = (m.isi || '').length;
-    const lines = Math.ceil(textLen / 32) + (m.isi || '').split('\n').length - 1;
-    return Math.max(50, lines * 20 + 36);
+    const lines = Math.ceil(textLen / 30) + (m.isi || '').split('\n').length - 1;
+    return Math.max(46, lines * 19 + 30);
   });
-  // Add date divider heights
   let dateDividers = 0;
   let prevDate = '';
   for (const m of messages) {
     const d = fmtDate(m.created_at);
     if (d && d !== prevDate) { dateDividers++; prevDate = d; }
   }
-  const bodyHeight = msgHeights.reduce((a, b) => a + b, 0) + dateDividers * 34;
-  const estimatedHeight = 54 + bodyHeight + PAD * 2 + 50; // header + body + bottom bar
+  const bodyHeight = msgHeights.reduce((a, b) => a + b, 0) + dateDividers * 30;
+  const estimatedHeight = 58 + bodyHeight + PAD * 2;
 
   const svg = await _satori(root, {
     width: WIDTH,
-    height: Math.min(Math.max(estimatedHeight, 300), 1600),
+    height: Math.min(Math.max(estimatedHeight, 250), 1600),
     fonts: [{ name: 'Inter', data: _fontData, weight: 400, style: 'normal' }],
   });
 
   const resvg = new _Resvg(svg, {
-    fitTo: { mode: 'width', value: WIDTH * 2 },
+    fitTo: { mode: 'width', value: WIDTH },
   });
   const pngData = resvg.render();
   return pngData.asPng();
