@@ -2587,6 +2587,11 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       systemPrompt += `\n\n[SISTEM - PENTING] Pesanan customer ini SUDAH SELESAI dan tercatat di sistem (Order ID: ${convState.closed_order_id}). DILARANG KERAS generate marker [ORDER_CONFIRMED] atau [ORDER_DATA] dalam conversation ini. Tugasmu sekarang hanya membalas chat customer secara natural — jawab pertanyaan, ucapkan terima kasih, bantu tanya status pengiriman, dll. JANGAN proses order baru di conversation ini.`;
     }
 
+    // Customer sudah cancel — bot harus hormat keputusan, JANGAN paksa beli lagi
+    if (convState.is_cancelled) {
+      systemPrompt += `\n\n[SISTEM] Customer ini SUDAH MEMBATALKAN pesanannya. Hormat keputusannya — ucapkan terima kasih, bilang pintunya selalu terbuka kalau mau order lagi. JANGAN coba persuade, rayu, atau tanya alasan berkali-kali. Cukup 1x tanya "boleh tau kenapa kak?" lalu terima jawabannya.`;
+    }
+
     // Inject data order (resi, status, ekspedisi) supaya bot bisa jawab kalau customer tanya
     if (convState.order_placed || convState.closed_order_id) {
       const recentOrders = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=5&select=no_resi,ekspedisi,status,status_tracking,tracking_lokasi,created_at`).catch(() => []);
@@ -4113,17 +4118,41 @@ ${ongkirInfo}`;
       }
     }
 
-    // ── Detect cancel: customer bilang batal/cancel 2x+ → label cancelled ────
-    const isCancelMsg = /\b(cancel|batal|tidak jadi|tdk jadi|ga jadi|gak jadi|gk jadi|ngga jadi)\b/i.test(message);
+    // ── Detect cancel ────
+    const isCancelMsg = /\b(cancel|batal|tidak jadi|tdk jadi|ga jadi|gak jadi|gk jadi|ngga jadi|gk mau|ga mau|gak mau|tidak mau)\b/i.test(message);
     if (isCancelMsg && !convState.is_cancelled) {
-      // Cek apakah customer sudah bilang cancel sebelumnya (2x baru label)
       const prevCancelCount = (convState.cancel_count || 0) + 1;
-      if (prevCancelCount >= 2) {
-        // Customer sudah 2x bilang cancel → tandai cancelled di state
+      const isPostClosing = !!(convState.closed_order_id || convState.order_placed);
+
+      if (isPostClosing) {
+        // ── Cancel post-closing: langsung cancel order + notif grup ──
+        await updateConvState(conversation.id, { is_cancelled: true, cancel_count: prevCancelCount, cancelled_at: new Date().toISOString() });
+        console.log(`[CANCEL-POST] Conv ${conversation.id} cancelled post-closing`);
+
+        // Update order di orders_new → cancelled
+        if (convState.closed_order_id) {
+          await sbPatch('orders_new', `?id=eq.${convState.closed_order_id}`, { status: 'cancelled' })
+            .catch(e => console.error('[CANCEL-POST] Gagal update order:', e.message));
+          console.log(`[CANCEL-POST] Order ${convState.closed_order_id} → cancelled`);
+        }
+
+        // Notif ke grup Operasional (OPS_GROUP_JID), fallback ke grup recap
+        try {
+          const opsGroupJid = process.env.OPS_GROUP_JID || userGroupJid || QC_GROUP_JID;
+          const cancelNotif = `❌ *Pembatalan Order*\n\n👤 ${customer?.nama || '-'} (${customer?.wa_number || '-'})\n🛒 ${product?.nama || '-'}\n💬 Alasan: "${message.slice(0, 100)}"\n\nOrder dibatalkan oleh customer setelah closing.`;
+          if (opsGroupJid) {
+            await sendWA(waSession, opsGroupJid, cancelNotif, true).catch(() => {});
+            console.log(`[CANCEL-POST] Notif terkirim ke grup ${opsGroupJid}`);
+          }
+        } catch (e) {
+          console.error('[CANCEL-POST] Notif error:', e.message);
+        }
+      } else if (prevCancelCount >= 2) {
+        // Pre-closing: 2x batal baru label
         await updateConvState(conversation.id, { is_cancelled: true, cancel_count: prevCancelCount });
         console.log(`[CANCEL] Conv ${conversation.id} ditandai cancelled (customer bilang ${prevCancelCount}x)`);
       } else {
-        // Pertama kali bilang cancel → catat tapi belum label (bot masih coba retain)
+        // Pre-closing: pertama kali bilang cancel → bot masih coba retain
         await updateConvState(conversation.id, { cancel_count: prevCancelCount });
         console.log(`[CANCEL] Conv ${conversation.id} cancel_count=${prevCancelCount} (bot akan coba retain)`);
       }
