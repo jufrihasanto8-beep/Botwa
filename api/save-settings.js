@@ -31,19 +31,19 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     const { userId, user_id, action, key } = req.query || {};
 
-    // Catalog/produk list dari Laporan Akuisisi (untuk dropdown di Edit Produk)
+    // Catalog/produk list dari Laporan Akuisisi Supabase (untuk dropdown di Edit Produk)
     if (action === 'catalog-list') {
-      const LAPORAN_URL = (process.env.LAPORAN_BRIDGE_URL || '').replace(/\/$/, '');
-      const BOTWA_SECRET = process.env.BOTWA_SYNC_SECRET || '';
-      if (!LAPORAN_URL || !BOTWA_SECRET) return res.status(500).json({ error: 'Laporan tidak dikonfigurasi' });
+      const LAPORAN_URL = (process.env.LAPORAN_SUPABASE_URL || '').replace(/\/$/, '');
+      const LAPORAN_KEY = process.env.LAPORAN_SUPABASE_ANON_KEY || '';
+      if (!LAPORAN_URL || !LAPORAN_KEY) return res.status(500).json({ error: 'Laporan Supabase tidak dikonfigurasi' });
       try {
-        const r = await fetch(`${LAPORAN_URL}/api/laporan-bridge?action=catalog-list`, {
-          headers: { 'x-botwa-secret': BOTWA_SECRET },
+        const r = await fetch(`${LAPORAN_URL}/rest/v1/catalog?select=id,name&order=name.asc`, {
+          headers: { apikey: LAPORAN_KEY, Authorization: `Bearer ${LAPORAN_KEY}` },
           signal: AbortSignal.timeout(8000)
         });
         if (!r.ok) throw new Error(await r.text());
-        const d = await r.json();
-        return res.json(d);
+        const rows = await r.json();
+        return res.json({ products: rows.map(c => ({ id: c.id, name: c.name })) });
       } catch(e) {
         return res.status(500).json({ error: e.message || 'Gagal memuat produk' });
       }
