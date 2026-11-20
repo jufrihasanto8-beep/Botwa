@@ -59,96 +59,84 @@ async function fetchMengantar(resi, courier) {
       'Referer': 'https://www.mengantar.com/',
       'Origin': 'https://www.mengantar.com',
     },
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) return null;
   const json = await res.json();
   return json?.data || json || null;
 }
 
+/* ── Proses data Mengantar yang sudah di-fetch → extract event ── */
+function processTrackingData(d, courier) {
+  if (!d) return null;
+
+  const history    = Array.isArray(d.history) ? d.history : (Array.isArray(d.connote_history) ? d.connote_history : []);
+  const statusCat  = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
+  const destCity   = (d.RECEIVER_CITY || d.destination_city || '').toUpperCase();
+
+  if (!statusCat) return null;
+
+  const lastHistory = [...history].reverse().find(h => h.desc || h.content || h.description);
+  const deskripsi   = (lastHistory?.desc || lastHistory?.content || lastHistory?.description || '').trim();
+  const lokasi      = (lastHistory?.location || lastHistory?.city || lastHistory?.city_name || '').trim();
+  const lastCode    = (lastHistory?.code || '').toUpperCase();
+  const lastStatusCode = lastHistory?.status_code ? Number(lastHistory.status_code) : null;
+  const descUp      = deskripsi.toUpperCase();
+  const lokasiFromDesc = lokasi || (deskripsi.match(/(?:DI|AT|HUB|KOTA)\s+([A-Z\s]+?)(?:\s*[-,]|$)/i)?.[1] || '').trim();
+
+  let eventType = 'update';
+
+  if (courier === 'JT') {
+    if (lastStatusCode === 200 || statusCat === 'PAKET TELAH DITERIMA') {
+      eventType = 'delivered';
+    } else if (lastStatusCode === 401 || statusCat.includes('DIRETUR') || statusCat.includes('AKAN DIRETUR')) {
+      eventType = 'retur';
+    } else if (lastStatusCode === 152) {
+      eventType = 'bermasalah';
+    } else if (statusCat.includes('AKAN DIKIRIM KE ALAMAT PENERIMA')) {
+      eventType = 'out_for_delivery';
+    }
+  } else {
+    if (statusCat === 'DELIVERED' || statusCat === 'POD') {
+      eventType = 'delivered';
+    } else if (statusCat.includes('RETUR') || statusCat.includes('RETURN')) {
+      eventType = 'retur';
+    } else if (['DEX','UNDELIVERED','FAILED','UNDELL'].some(s => statusCat.includes(s))) {
+      eventType = 'bermasalah';
+    } else {
+      const OTW_PATTERN = /WITH DELIVERY COURIER|OUT FOR DELIVERY|DIBAWA KURIR|ANTAR KE TUJUAN|ON DELIVERY|DRIVER PICKUP|SEDANG DIKIRIM|DALAM PENGIRIMAN/;
+      const TIBA_PATTERN = /RECEIVED AT|ARRIVED AT|MASUK HUB|TIBA DI|INBOUND|RECEIVED AT WAREHOUSE/;
+
+      const isOTW = OTW_PATTERN.test(descUp) || OTW_PATTERN.test(statusCat) || lastCode === 'IP3';
+
+      const lokasiUp  = (lokasiFromDesc || lokasi).toUpperCase();
+      const isDestLoc = destCity && lokasiUp && (
+        destCity.split(',').some(c => lokasiUp.includes(c.trim())) ||
+        lokasiUp.split(',').some(c => destCity.includes(c.trim()))
+      );
+      const isTibaKota = (
+        (TIBA_PATTERN.test(descUp) || TIBA_PATTERN.test(statusCat)) && isDestLoc
+      ) || /IP[12]/.test(lastCode);
+
+      if (isOTW)           eventType = 'out_for_delivery';
+      else if (isTibaKota) eventType = 'tiba_kota';
+    }
+  }
+
+  return { statusCat, eventType, lokasi, deskripsi, raw: d };
+}
+
+/* ── Fetch + proses resi (untuk cron & check-all) ── */
 async function cekResi(resi, ekspedisi) {
   if (!resi) return null;
   const courier = normalizeKurir(ekspedisi);
   try {
-    // Coba dengan kurir spesifik dulu
     let d = await fetchMengantar(resi, courier);
-
-    // Kalau tidak ada data, coba auto-detect (tanpa kurir)
     if (!d || !(d.statusCategory || d.status || d.connote_state)) {
       console.log(`[tracking] Retry auto-detect tanpa kurir: ${resi}`);
       d = await fetchMengantar(resi, null);
     }
-
-    if (!d) return null;
-
-    const history    = d.history || d.connote_history || [];
-    const statusCat  = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
-    const destCity   = (d.RECEIVER_CITY || d.destination_city || '').toUpperCase();
-
-    // Kalau tidak ada status sama sekali → API tidak kenal resi/kurir ini
-    if (!statusCat) {
-      console.warn(`[tracking] Tidak ada status dari API untuk ${resi} (kurir: ${ekspedisi}) — cek nama ekspedisi`);
-      return null;
-    }
-
-    // Ambil history entry terakhir yang punya desc
-    const lastHistory = [...history].reverse().find(h => h.desc || h.content || h.description);
-    const deskripsi   = (lastHistory?.desc || lastHistory?.content || lastHistory?.description || '').trim();
-    const lokasi      = (lastHistory?.location || lastHistory?.city || lastHistory?.city_name || '').trim();
-    const lastCode    = (lastHistory?.code || '').toUpperCase();
-    const lastStatusCode = lastHistory?.status_code ? Number(lastHistory.status_code) : null;
-    const descUp      = deskripsi.toUpperCase();
-    // Kalau lokasi kosong, coba ekstrak dari desc (banyak kurir tulis kota di desc)
-    const lokasiFromDesc = lokasi || (deskripsi.match(/(?:DI|AT|HUB|KOTA)\s+([A-Z\s]+?)(?:\s*[-,]|$)/i)?.[1] || '').trim();
-
-    // ── Deteksi event berdasarkan statusCategory (reliable semua kurir) ──
-    let eventType = 'update';
-
-    // ── Deteksi per kurir ───────────────────────────────────
-    if (courier === 'JT') {
-      // J&T: pakai status_code dari history (lebih reliable dari text)
-      // 200 = delivered, 401 = retur, 152 = gagal antar (simpan di gudang)
-      if (lastStatusCode === 200 || statusCat === 'PAKET TELAH DITERIMA') {
-        eventType = 'delivered';
-      } else if (lastStatusCode === 401 || statusCat.includes('DIRETUR') || statusCat.includes('AKAN DIRETUR')) {
-        eventType = 'retur';
-      } else if (lastStatusCode === 152) {
-        // 152 = kurir sudah coba antar tapi gagal, paket balik ke gudang
-        eventType = 'bermasalah';
-      } else if (statusCat.includes('AKAN DIKIRIM KE ALAMAT PENERIMA')) {
-        eventType = 'out_for_delivery';
-      }
-      // tiba_kota: J&T tidak return RECEIVER_CITY → skip untuk sekarang
-    } else {
-      // ── Kurir lain (JNE, SiCepat, dll) — pakai statusCategory normalized ──
-      if (statusCat === 'DELIVERED' || statusCat === 'POD') {
-        eventType = 'delivered';
-      } else if (statusCat.includes('RETUR') || statusCat.includes('RETURN')) {
-        eventType = 'retur';
-      } else if (['DEX','UNDELIVERED','FAILED','UNDELL'].some(s => statusCat.includes(s))) {
-        eventType = 'bermasalah';
-      } else {
-        // Untuk ON PROSES → cari granular event dari desc + statusCat
-        const OTW_PATTERN = /WITH DELIVERY COURIER|OUT FOR DELIVERY|DIBAWA KURIR|ANTAR KE TUJUAN|ON DELIVERY|DRIVER PICKUP|SEDANG DIKIRIM|DALAM PENGIRIMAN/;
-        const TIBA_PATTERN = /RECEIVED AT|ARRIVED AT|MASUK HUB|TIBA DI|INBOUND|RECEIVED AT WAREHOUSE/;
-
-        const isOTW = OTW_PATTERN.test(descUp) || OTW_PATTERN.test(statusCat) || lastCode === 'IP3';
-
-        const lokasiUp  = (lokasiFromDesc || lokasi).toUpperCase();
-        const isDestLoc = destCity && lokasiUp && (
-          destCity.split(',').some(c => lokasiUp.includes(c.trim())) ||
-          lokasiUp.split(',').some(c => destCity.includes(c.trim()))
-        );
-        const isTibaKota = (
-          (TIBA_PATTERN.test(descUp) || TIBA_PATTERN.test(statusCat)) && isDestLoc
-        ) || /IP[12]/.test(lastCode);
-
-        if (isOTW)           eventType = 'out_for_delivery';
-        else if (isTibaKota) eventType = 'tiba_kota';
-      }
-    }
-
-    return { statusCat, eventType, lokasi, deskripsi, raw: d };
+    return processTrackingData(d, courier);
   } catch (e) {
     console.error(`[tracking] cekResi error (${resi}):`, e.message);
     return null;
@@ -862,10 +850,7 @@ module.exports = async function handler(req, res) {
     if (!resi) return res.status(400).json({ error: 'resi wajib' });
     try {
       const courier = normalizeKurir(ekspedisi);
-      let d = await fetchMengantar(resi, courier);
-      if (!d || !(d.statusCategory || d.status || d.connote_state) || d.history === '-') {
-        d = await fetchMengantar(resi, null);
-      }
+      const d = await fetchMengantar(resi, courier || null);
 
       let records = [];
       let statusCat = '';
@@ -879,9 +864,9 @@ module.exports = async function handler(req, res) {
         })).reverse();
       }
 
-      // Update DB kalau ada data baru
+      // Update DB — reuse data yang sudah di-fetch (tanpa call API lagi)
       if (order_id && statusCat) {
-        const tracking = await cekResi(resi, ekspedisi);
+        const tracking = processTrackingData(d, courier);
         if (tracking) {
           const ordRows = await sbGet('orders_new', `?id=eq.${order_id}&select=id,tracking_events,status_tracking,tracking_lokasi&limit=1`);
           const order = ordRows[0];
