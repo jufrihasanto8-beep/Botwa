@@ -213,90 +213,63 @@ module.exports = async function handler(req, res) {
     await sbPatch('orders_new', `?id=eq.${order.id}`, patch);
     console.log(`[mng-webhook] ${cnote_no} → ${eventType} (${status_category})`);
 
-    // Respond segera ke Mengantar
-    res.status(200).json({ ok: true, resi: cnote_no, event: eventType });
-
-    // 9. Kirim notif WA ke customer (async, setelah respond)
+    // 9. Kirim notif WA ke customer (sebelum respond agar tidak di-cut Vercel)
     if (['tiba_kota', 'out_for_delivery', 'delivered', 'bermasalah', 'retur'].includes(eventType)) {
       try {
         const custs = await sbGet('customers', `?id=eq.${order.customer_id}&select=id,wa_number,nama,reply_jid&limit=1`);
         const cust = custs[0];
-        if (!cust?.wa_number) return;
+        if (cust?.wa_number) {
+          const waTarget = cust.reply_jid || cust.wa_number;
+          const namaKak  = (cust.nama || '').split(' ')[0];
+          const isCOD    = (order.metode || '').toLowerCase() === 'cod';
+          const urlLacak = trackingUrl(ekspedisi || order.ekspedisi, cnote_no);
 
-        const waTarget = cust.reply_jid || cust.wa_number;
-        const namaKak = (cust.nama || '').split(' ')[0];
-        const isCOD = (order.metode || '').toLowerCase() === 'cod';
-        const urlLacak = trackingUrl(ekspedisi || order.ekspedisi, cnote_no);
+          const userRows = await sbGet('users', `?id=eq.${order.user_id}&select=template_tiba_kota,template_out_for_delivery,template_delivered,template_bermasalah,template_retur&limit=1`).catch(() => []);
+          const tpl = userRows[0] || {};
+          const tplKey = { tiba_kota:'template_tiba_kota', out_for_delivery:'template_out_for_delivery', delivered:'template_delivered', bermasalah:'template_bermasalah', retur:'template_retur' };
+          const customTpl = tpl[tplKey[eventType]];
 
-        // Ambil template custom user
-        const userRows = await sbGet('users', `?id=eq.${order.user_id}&select=template_tiba_kota,template_out_for_delivery,template_delivered,template_bermasalah,template_retur&limit=1`).catch(() => []);
-        const tpl = userRows[0] || {};
-        const tplKey = { tiba_kota:'template_tiba_kota', out_for_delivery:'template_out_for_delivery', delivered:'template_delivered', bermasalah:'template_bermasalah', retur:'template_retur' };
-        const customTpl = tpl[tplKey[eventType]];
+          let pesan;
+          if (customTpl) {
+            pesan = customTpl
+              .replace(/{nama}/g, namaKak || '')
+              .replace(/{resi}/g, cnote_no)
+              .replace(/{kurir}/g, ekspedisi || order.ekspedisi || '')
+              .replace(/{link}/g, urlLacak);
+            if (eventType === 'tiba_kota' && isCOD) pesan += '\n\n⚠️ Siapkan uang COD-nya ya kak!';
+          } else {
+            const templates = {
+              tiba_kota:        `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket udah sampai di kota tujuan nih 📦${isCOD ? '\n\nMohon siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
+              out_for_delivery: `${namaKak ? 'Kak '+namaKak : 'Kak'}, kurir lagi otw ke rumah kak hari ini! 🚚${isCOD ? '\n\n⚠️ Siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
+              delivered:        `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket sudah sampai dan diterima nih! 🎉\n\nSemoga produknya langsung bisa dipakai dan manfaatnya terasa ya kak 🙏`,
+              bermasalah:       `${namaKak ? 'Kak '+namaKak : 'Kak'}, ada kendala pengiriman paket kakak nih 😟\n\nKurir tidak berhasil mengantar. Mohon pastikan alamat dan nomor HP aktif ya kak.\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
+              retur:            `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket kakak sedang dalam proses retur ke pengirim 😔\n\nResi: ${cnote_no}\nNanti kami hubungi untuk koordinasi lebih lanjut ya kak.`,
+            };
+            pesan = templates[eventType];
+          }
 
-        let pesan;
-        if (customTpl) {
-          pesan = customTpl
-            .replace(/{nama}/g, namaKak || '')
-            .replace(/{resi}/g, cnote_no)
-            .replace(/{kurir}/g, ekspedisi || order.ekspedisi || '')
-            .replace(/{link}/g, urlLacak);
-          if (eventType === 'tiba_kota' && isCOD) pesan += '\n\n⚠️ Siapkan uang COD-nya ya kak!';
-        } else {
-          // Fallback template
-          const templates = {
-            tiba_kota: `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket udah sampai di kota tujuan nih 📦${isCOD ? '\n\nMohon siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
-            out_for_delivery: `${namaKak ? 'Kak '+namaKak : 'Kak'}, kurir lagi otw ke rumah kak hari ini! 🚚${isCOD ? '\n\n⚠️ Siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
-            delivered: `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket sudah sampai dan diterima nih! 🎉\n\nSemoga produknya langsung bisa dipakai dan manfaatnya terasa ya kak 🙏`,
-            bermasalah: `${namaKak ? 'Kak '+namaKak : 'Kak'}, ada kendala pengiriman paket kakak nih 😟\n\nKurir tidak berhasil mengantar. Mohon pastikan alamat dan nomor HP aktif ya kak.\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
-            retur: `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket kakak sedang dalam proses retur ke pengirim 😔\n\nResi: ${cnote_no}\nNanti kami hubungi untuk koordinasi lebih lanjut ya kak.`,
-          };
-          pesan = templates[eventType];
-        }
+          if (pesan) {
+            const waSession = await getWaSession(order.user_id, order.product_id);
+            await kirimNotif(waSession, waTarget, pesan);
+            console.log(`[mng-webhook] Notif ${eventType} terkirim ke ${cust.wa_number}`);
 
-        if (pesan) {
-          const waSession = await getWaSession(order.user_id, order.product_id);
-          await kirimNotif(waSession, waTarget, pesan);
-          console.log(`[mng-webhook] Notif ${eventType} terkirim ke ${cust.wa_number}`);
-
-          // ── Bermasalah/Retur: simpan ke conv_messages + set state agar bot punya konteks ──
-          if (eventType === 'bermasalah' || eventType === 'retur') {
-            try {
-              // Cari conversation aktif customer ini
+            if (eventType === 'bermasalah' || eventType === 'retur') {
               const convs = await sbGet('conversations',
                 `?customer_id=eq.${order.customer_id}&user_id=eq.${order.user_id}&select=id,state&order=created_at.desc&limit=1`
-              );
+              ).catch(() => []);
               if (convs[0]) {
-                const convId = convs[0].id;
                 const convState = convs[0].state || {};
-
-                // Simpan pesan ke conv_messages supaya muncul di dashboard & bot punya konteks
                 await fetch(`${SUPABASE_URL}/rest/v1/conv_messages`, {
                   method: 'POST',
                   headers: { ...sbH(), 'Prefer': 'return=minimal' },
-                  body: JSON.stringify({ conversation_id: convId, role: 'ai', isi: pesan }),
+                  body: JSON.stringify({ conversation_id: convs[0].id, role: 'ai', isi: pesan }),
                 }).catch(() => {});
-
-                // Update state: delivery_issue + status_category
-                const issueData = {
-                  delivery_issue: true,
-                  delivery_issue_type: eventType,
-                  delivery_issue_at: now,
-                  delivery_issue_status: status_category,
-                  delivery_issue_resi: cnote_no,
-                };
-                // Patch conversation state
-                const newState = { ...convState, ...issueData };
-                await sbPatch('conversations', `?id=eq.${convId}`, {
-                  state: newState,
+                await sbPatch('conversations', `?id=eq.${convs[0].id}`, {
+                  state: { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: status_category, delivery_issue_resi: cnote_no },
                   last_msg_at: now,
-                  status: convState.order_placed ? 'diproses' : (convs[0].status || 'baru'),
                 }).catch(() => {});
-
-                console.log(`[mng-webhook] Conv ${convId}: delivery_issue=${eventType} set, pesan saved`);
+                console.log(`[mng-webhook] Conv ${convs[0].id}: delivery_issue=${eventType} set`);
               }
-            } catch (e) {
-              console.error('[mng-webhook] Conv update error:', e.message);
             }
           }
         }
@@ -304,6 +277,9 @@ module.exports = async function handler(req, res) {
         console.error('[mng-webhook] Notif error:', e.message);
       }
     }
+
+    // Respond ke Mengantar setelah semua proses selesai
+    return res.status(200).json({ ok: true, resi: cnote_no, event: eventType });
 
   } catch (e) {
     console.error('[mng-webhook] Error:', e.message);
