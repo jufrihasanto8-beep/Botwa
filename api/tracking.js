@@ -176,6 +176,7 @@ async function kirimNotif(sessionId, waNumber, pesan) {
     await fetch(`${BAILEYS_URL}/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10000),
       body: JSON.stringify({
         secret: WEBHOOK_SECRET,
         session_id: sessionId,
@@ -260,6 +261,7 @@ async function buildPesan({ namaKak, resi, ekspedisi, eventType, deskripsi, loka
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+      signal: AbortSignal.timeout(12000),
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
@@ -332,7 +334,7 @@ async function lookupDest(alamat) {
   const allAreas = [];
   for (const q of queries) {
     try {
-      const r = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(q)}`, { headers });
+      const r = await fetch(`https://app.mengantar.com/api/address/autofill?keyword=${encodeURIComponent(q)}`, { headers, signal: AbortSignal.timeout(8000) });
       const json = await r.json();
       const results = json.data || json;
       if (Array.isArray(results)) {
@@ -403,6 +405,7 @@ async function getTimeSlot(mngKey, originId) {
     // 1. Cek time slots yang sudah ada
     const r = await fetch(`https://app.mengantar.com/api/public/${mngKey}/time`, {
       headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(8000),
     });
     const json = await r.json();
     const times = json.data || json;
@@ -427,6 +430,7 @@ async function getTimeSlot(mngKey, originId) {
     const cr = await fetch(`https://app.mengantar.com/api/public/${mngKey}/time`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
         time: pickupTime,
         date: dateStr,
@@ -1006,15 +1010,9 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // Verifikasi cron secret
-  const CRON_SECRET = process.env.CRON_SECRET;
-  if (CRON_SECRET) {
-    const secret = req.headers['x-cron-secret'];
-    if (secret !== CRON_SECRET) return res.status(401).json({ error: 'unauthorized' });
-  }
-
-  try {
-    console.log('🚚 Mulai tracking resi dari orders_new...');
+  // Cron tracking sudah diganti oleh webhook Mengantar (mengantar-webhook.js)
+  // Tidak perlu polling lagi — Mengantar push status real-time ke webhook
+  return res.status(200).json({ ok: true, message: 'Tracking cron disabled — pakai mengantar-webhook' });
 
     // Ambil semua order yang status=dikirim dan punya no_resi
     const orders = await sbGet('orders_new',
