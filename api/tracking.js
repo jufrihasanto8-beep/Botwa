@@ -1010,8 +1010,123 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // Route: sync manual pakai STATUS_MAP webhook (konsisten dengan mengantar-webhook.js)
+  if (req.method === 'POST' && req.body?.action === 'sync-mengantar') {
+    const userId = req.body.user_id;
+    if (!userId) return res.status(400).json({ error: 'user_id wajib' });
+
+    const STATUS_MAP = {
+      'ACTIVE':'menunggu_pickup','WAITING NEXT PROCESS':'menunggu_pickup','PENDING PICKUP':'menunggu_pickup',
+      'MANIFESTED':'menunggu_pickup','PICKED UP':'dikirim','INBOUND PROCESS':'dikirim',
+      'OUTBOUND PROCESS':'dikirim','IN TRANSIT':'dikirim','ON SHIPPING':'dikirim',
+      'ORIGIN GATEWAY':'dikirim','GATEWAY PROCESS':'dikirim',
+      'DESTINATION GATEWAY':'tiba_kota','INCOMING':'tiba_kota',
+      'WITH DELIVERY COURIER':'out_for_delivery','ON DELIVERY':'out_for_delivery',
+      'DEL':'out_for_delivery','OUT FOR DELIVERY':'out_for_delivery',
+      'DELIVERED':'delivered',
+      'UNDELIVERED':'bermasalah','PICKUP FAILED':'bermasalah','REJECTED':'bermasalah',
+      'DELIVERY PROBLEM':'bermasalah','SHIPPING PROBLEM':'bermasalah',
+      'RTS':'retur','RETURN TO SHIPPER':'retur','DELIVERY RETURN':'retur',
+      'CANCELED':'retur','CANCELLED':'retur',
+    };
+
+    try {
+      const orders = await sbGet('orders_new',
+        `?user_id=eq.${userId}&status=eq.dikirim&no_resi=not.is.null&no_resi=neq.&select=id,user_id,customer_id,conversation_id,product_id,no_resi,ekspedisi,metode,status_tracking,tracking_events`
+      );
+      if (!orders.length) return res.status(200).json({ ok: true, total: 0, message: 'Tidak ada order aktif' });
+
+      const custIds = [...new Set(orders.map(o => o.customer_id))];
+      const [customers, userRows] = await Promise.all([
+        sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,wa_number,nama,reply_jid`),
+        sbGet('users', `?id=eq.${userId}&select=id,template_tiba_kota,template_out_for_delivery,template_delivered,template_bermasalah,template_retur&limit=1`),
+      ]);
+      const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
+      const userTpl = userRows[0] || {};
+
+      let updated = 0, notifSent = 0, errors = 0;
+      const startTime = Date.now();
+
+      async function syncOrder(order) {
+        try {
+          const courier = normalizeKurir(order.ekspedisi);
+          const d = await fetchMengantar(order.no_resi, courier || null);
+          if (!d) return;
+
+          const statusCat = (d.statusCategory || d.status || d.connote_state || '').toUpperCase();
+          if (!statusCat) return;
+
+          const eventType = STATUS_MAP[statusCat];
+          if (!eventType) return;
+
+          const doneEvents = order.tracking_events || {};
+          const now = new Date().toISOString();
+
+          // Anti-downgrade: jangan turun dari bermasalah ke in-transit
+          const wasProb = doneEvents.bermasalah && !doneEvents.delivered;
+          if (wasProb && ['menunggu_pickup','dikirim','tiba_kota','out_for_delivery'].includes(eventType)) return;
+
+          // Update status_tracking selalu, tracking_events kalau event baru
+          const patch = { status_tracking: statusCat };
+          const isNewEvent = !doneEvents[eventType];
+          if (isNewEvent || eventType === 'dikirim') {
+            patch.tracking_events = { ...doneEvents, [eventType]: now };
+          }
+          if (eventType === 'delivered') {
+            patch.status = 'selesai'; patch.sampai = true; patch.sampai_at = now;
+          }
+          await sbPatch('orders_new', `?id=eq.${order.id}`, patch);
+          updated++;
+
+          // Kirim notif WA hanya untuk event baru yang penting
+          if (isNewEvent && ['tiba_kota','out_for_delivery','delivered','bermasalah','retur'].includes(eventType)) {
+            const cust = custMap[order.customer_id];
+            if (cust?.wa_number) {
+              const waTarget = cust.reply_jid || cust.wa_number;
+              const namaKak  = (cust.nama || '').split(' ')[0];
+              const urlLacak = trackingUrl(order.ekspedisi, order.no_resi);
+              const isCOD    = (order.metode || '').toLowerCase() === 'cod';
+              const pesan = await buildPesan({ namaKak, resi: order.no_resi, ekspedisi: order.ekspedisi, eventType, deskripsi: '', lokasi: '', isCOD, urlLacak, userTpl });
+              if (pesan) {
+                const waSession = await getWaSession(order.user_id, order.product_id);
+                await kirimNotif(waSession, waTarget, pesan);
+                notifSent++;
+
+                if ((eventType === 'bermasalah' || eventType === 'retur') && order.conversation_id) {
+                  const convs = await sbGet('conversations', `?id=eq.${order.conversation_id}&select=id,state&limit=1`).catch(() => []);
+                  if (convs[0]) {
+                    const convState = convs[0].state || {};
+                    await sbPost('conv_messages', { conversation_id: convs[0].id, role: 'ai', isi: pesan }).catch(() => {});
+                    await sbPatch('conversations', `?id=eq.${convs[0].id}`, {
+                      state: { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: statusCat, delivery_issue_resi: order.no_resi },
+                      last_msg_at: now,
+                    }).catch(() => {});
+                  }
+                }
+              }
+            }
+          }
+        } catch(e) {
+          errors++;
+          console.error(`[sync-mng] Error ${order.no_resi}:`, e.message);
+        }
+      }
+
+      const BATCH = 10;
+      for (let i = 0; i < orders.length; i += BATCH) {
+        if (Date.now() - startTime > 50000) {
+          return res.status(200).json({ ok: true, total: orders.length, processed: i, updated, notifSent, errors, partial: true });
+        }
+        await Promise.all(orders.slice(i, i + BATCH).map(syncOrder));
+      }
+
+      return res.status(200).json({ ok: true, total: orders.length, updated, notifSent, errors });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // Cron tracking sudah diganti oleh webhook Mengantar (mengantar-webhook.js)
-  // Tidak perlu polling lagi — Mengantar push status real-time ke webhook
   return res.status(200).json({ ok: true, message: 'Tracking cron disabled — pakai mengantar-webhook' });
 
     // Ambil semua order yang status=dikirim dan punya no_resi
