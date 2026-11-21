@@ -209,16 +209,16 @@ const PESAN_TEMPLATE = {
     `${nama ? 'Kak ' + nama : 'Kak'}, paket udah sampai di kota tujuan nih 📦${isCOD ? '\n\nMohon siapkan uang COD-nya ya kak, sebentar lagi kurir datang!' : ''}\n\nResi: ${resi}${lokasi ? `\nLokasi: ${lokasi}` : ''}\nCek tracking: ${urlLacak}`,
 
   out_for_delivery: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
-    `${nama ? 'Kak ' + nama : 'Kak'}, kurir lagi otw ke rumah kak hari ini! 🚚${isCOD ? '\n\n⚠️ Siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${resi}\nCek tracking: ${urlLacak}`,
+    `${nama ? 'Kak ' + nama : 'Kak'}, kurir lagi otw ke rumah kak hari ini! 🚚${isCOD ? '\n\n⚠️ Siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${resi}`,
 
   delivered: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
     `${nama ? 'Kak ' + nama : 'Kak'}, paket sudah sampai dan diterima nih! 🎉\n\nSemoga produknya langsung bisa dipakai dan manfaatnya terasa ya kak 🙏 Kalau ada pertanyaan, kami siap bantu!`,
 
   bermasalah: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
-    `${nama ? 'Kak ' + nama : 'Kak'}, ada kendala pengiriman paket kakak nih 😟\n\nKurir tidak berhasil mengantar. Mohon pastikan alamat dan nomor HP aktif ya kak.\n\nResi: ${resi}\nCek tracking: ${urlLacak}`,
+    `${nama ? 'Kak ' + nama : 'Kak'}, ada kendala pengiriman paket kakak nih 😟\n\nKurir tidak berhasil mengantar. Mohon pastikan alamat dan nomor HP aktif ya kak.\n\nResi: ${resi}`,
 
   retur: (nama, resi, kurir, lokasi, isCOD, urlLacak) =>
-    `${nama ? 'Kak ' + nama : 'Kak'}, paket kakak sedang dalam proses retur ke pengirim 😔\n\nResi: ${resi}\n\nNanti kami hubungi untuk koordinasi lebih lanjut ya kak.`,
+    `${nama ? 'Kak ' + nama : 'Kak'}, kami mau kasih tau sesuatu nih 😢\n\nParaket kakak ternyata diretur (dikembalikan) ke kami. Biasanya ini terjadi karena kurir sudah beberapa kali coba antar tapi tidak ada yang terima, atau alamatnya kurang lengkap.\n\nTenang kak, kami bakal bantu cariin solusinya ya. Boleh kami hubungi kak untuk koordinasi pengiriman ulangnya? 🙏`,
 };
 
 /* ── Generate pesan via AI (dengan fallback ke template) ─── */

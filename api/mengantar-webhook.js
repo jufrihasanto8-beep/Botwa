@@ -239,11 +239,10 @@ module.exports = async function handler(req, res) {
             if (eventType === 'tiba_kota' && isCOD) pesan += '\n\n⚠️ Siapkan uang COD-nya ya kak!';
           } else {
             const templates = {
-              tiba_kota:        `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket udah sampai di kota tujuan nih 📦${isCOD ? '\n\nMohon siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
-              out_for_delivery: `${namaKak ? 'Kak '+namaKak : 'Kak'}, kurir lagi otw ke rumah kak hari ini! 🚚${isCOD ? '\n\n⚠️ Siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
+              out_for_delivery: `${namaKak ? 'Kak '+namaKak : 'Kak'}, kurir lagi otw ke rumah kak hari ini! 🚚${isCOD ? '\n\n⚠️ Siapkan uang COD-nya ya kak!' : ''}\n\nResi: ${cnote_no}`,
               delivered:        `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket sudah sampai dan diterima nih! 🎉\n\nSemoga produknya langsung bisa dipakai dan manfaatnya terasa ya kak 🙏`,
-              bermasalah:       `${namaKak ? 'Kak '+namaKak : 'Kak'}, ada kendala pengiriman paket kakak nih 😟\n\nKurir tidak berhasil mengantar. Mohon pastikan alamat dan nomor HP aktif ya kak.\n\nResi: ${cnote_no}\nCek tracking: ${urlLacak}`,
-              retur:            `${namaKak ? 'Kak '+namaKak : 'Kak'}, paket kakak sedang dalam proses retur ke pengirim 😔\n\nResi: ${cnote_no}\nNanti kami hubungi untuk koordinasi lebih lanjut ya kak.`,
+              bermasalah:       `${namaKak ? 'Kak '+namaKak : 'Kak'}, ada kendala pengiriman paket kakak nih 😟\n\nKurir tidak berhasil mengantar. Mohon pastikan alamat dan nomor HP aktif ya kak.\n\nResi: ${cnote_no}`,
+              retur:            `${namaKak ? 'Kak '+namaKak : 'Kak'}, kami mau kasih tau sesuatu nih 😢\n\nParaket kakak ternyata diretur (dikembalikan) ke kami. Biasanya ini terjadi karena kurir sudah beberapa kali coba antar tapi tidak ada yang terima, atau alamatnya kurang lengkap.\n\nTenang kak, kami bakal bantu cariin solusinya ya. Boleh kami hubungi kak untuk koordinasi pengiriman ulangnya? 🙏`,
             };
             pesan = templates[eventType];
           }
