@@ -1036,9 +1036,9 @@ module.exports = async function handler(req, res) {
       );
       if (!orders.length) return res.status(200).json({ ok: true, total: 0, message: 'Tidak ada order aktif' });
 
-      const custIds = [...new Set(orders.map(o => o.customer_id))];
+      const custIds = [...new Set(orders.map(o => o.customer_id).filter(Boolean))];
       const [customers, userRows] = await Promise.all([
-        sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,wa_number,nama,reply_jid`),
+        custIds.length ? sbGet('customers', `?id=in.(${custIds.join(',')})&select=id,wa_number,nama,reply_jid`) : Promise.resolve([]),
         sbGet('users', `?id=eq.${userId}&select=id,template_tiba_kota,template_out_for_delivery,template_delivered,template_bermasalah,template_retur&limit=1`),
       ]);
       const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
