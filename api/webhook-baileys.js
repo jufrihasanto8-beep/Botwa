@@ -592,7 +592,7 @@ async function getContextMessages(conversationId, afterTimestamp = null, limit =
 }
 
 /* ── UPDATE RINGKASAN BERJALAN (non-blocking) ─────────────── */
-async function updateRingkasan(conversationId) {
+async function updateRingkasan(conversationId, aiKey, aiBase) {
   try {
     const msgs = await sbGet('conv_messages',
       `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=50`
@@ -606,7 +606,9 @@ async function updateRingkasan(conversationId) {
     const ringkasan = await callClaude(
       'Buat ringkasan singkat percakapan CS ini dalam 3-5 kalimat bahasa Indonesia. Fokus pada: keluhan customer, produk yang dibahas, tahap percakapan (konsultasi/tertarik/mau beli/sudah order), dan data yang sudah terkumpul (nama/HP/alamat). Singkat dan padat.',
       [{ role: 'user', content: transcript }],
-      'claude-haiku-4-5-20251001'
+      'claude-haiku-4-5-20251001',
+      aiKey,
+      aiBase
     );
 
     if (ringkasan) {
@@ -4245,7 +4247,7 @@ ${ongkirInfo}`;
     // ── Update ringkasan berjalan (setiap 5 pesan) ──
     try {
       const allMsgs = await sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`);
-      if (allMsgs.length % 4 === 0) await updateRingkasan(conversation.id);
+      if (allMsgs.length % 4 === 0) await updateRingkasan(conversation.id, aiKey, aiBase);
     } catch(e) {
       console.error('Ringkasan error:', e.message);
     }
