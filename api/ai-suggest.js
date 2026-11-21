@@ -433,7 +433,7 @@ async function handleCustomerRisk(req, res) {
   const VALIDASI_KEY = process.env.VALIDASI_SUPABASE_KEY;
   const valH = { 'Content-Type': 'application/json', 'apikey': VALIDASI_KEY, 'Authorization': `Bearer ${VALIDASI_KEY}` };
   const valGet = async (path) => {
-    const r = await fetch(`${VALIDASI_URL}/rest/v1/${path}`, { headers: valH });
+    const r = await fetch(`${VALIDASI_URL}/rest/v1/${path}`, { headers: valH, signal: AbortSignal.timeout(8000) });
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   };
@@ -466,10 +466,10 @@ async function handleCustomerRisk(req, res) {
       const parts = wilayah.split(',').map(s => s.trim());
       const kecamatan = parts[0];
       const kota = parts[1] || parts[0];
-      let orders = await valGet(`all_orderan?kecamatan=ilike.*${encodeURIComponent(kecamatan)}*&select=status_akhir&limit=1000`);
+      let orders = await valGet(`all_orderan?kecamatan=ilike.${encodeURIComponent(kecamatan)}*&select=status_akhir&limit=1000`);
       let namaLabel = kecamatan;
       if (orders.length < 3 && kota !== kecamatan) {
-        orders = await valGet(`all_orderan?kabupaten=ilike.*${encodeURIComponent(kota)}*&select=status_akhir&limit=1000`);
+        orders = await valGet(`all_orderan?kabupaten=ilike.${encodeURIComponent(kota)}*&select=status_akhir&limit=1000`);
         namaLabel = kota;
       }
       const wTotal = orders.length;
