@@ -130,8 +130,9 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
       `?user_id=eq.${userId}&customer_id=eq.${customerId}&product_id=eq.${productId}&order=created_at.desc&limit=1`
     ).catch(() => []);
   }
-  // Fallback: cari conversation terbaru apapun produknya (backward compat / tanpa produk)
-  if (!existing.length) {
+  // Fallback ke conv product_id=null hanya kalau memang tidak ada productId
+  // Kalau productId ada tapi conv belum ada → buat baru (jangan pakai conv lama yang null)
+  if (!existing.length && !productId) {
     existing = await sbGet('conversations',
       `?user_id=eq.${userId}&customer_id=eq.${customerId}&product_id=is.null&order=created_at.desc&limit=1`
     ).catch(() => []);
@@ -1691,8 +1692,9 @@ module.exports = async function handler(req, res) {
       sumber  = resolved.sumber;
     }
 
-    // session WA yang dipakai untuk kirim balas (wa_session_id produk, fallback ke userId)
-    const waSession = product?.wa_session_id || userId;
+    // session WA yang dipakai untuk kirim balas — selalu pakai session yang nerima pesan
+    // bukan lookup dari produk, karena 1 session = 1 WA = balas lewat sini
+    const waSession = sessionId;
 
     // ── Pending Greeting: cek & kirim greeting form yang sudah lewat 3 menit ──
     // Skip kalau produk dalam Mode Pasif (warm up — bot hanya reply)

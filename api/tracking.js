@@ -580,7 +580,7 @@ async function handleCreateMengantar(req, res) {
         const hargaSatuan = o.harga || prod.harga || 0;
         const totalCOD   = o.total || (hargaSatuan * qty);
         const totalNilai = hargaSatuan * qty;
-        const berat      = ((prod.berat_gram || 1000) / 1000);
+        const berat      = (prod.berat_gram > 0 ? prod.berat_gram : 1000) / 1000;
 
         // Lookup dest ID — prioritas: override dari preview → cached → auto lookup
         let destId = dest_overrides?.[o.id] || al.mengantar_dest_id || null;
