@@ -587,7 +587,7 @@ module.exports = async function handler(req, res) {
     // ═══════════════════════════════════════════════════
 
     // 3a. Ambil conversation yang sudah di-FU hari ini (dedup)
-    const todayQueue = await sbGet('followup_schedule',
+    const todayQueue = await sbGet('followup_queue',
       `?fu_day=eq.${todayWIB}&status=eq.sent&select=conversation_id`
     ).catch(() => []);
     const sentTodaySet = new Set(todayQueue.map(q => q.conversation_id));
@@ -680,7 +680,7 @@ module.exports = async function handler(req, res) {
 
           if (pesan !== null) {
             // Insert ke queue — tandai sudah FU hari ini
-            await sbPost('followup_schedule', {
+            await sbPost('followup_queue', {
               conversation_id: conv.id,
               product_id: conv.product_id || null,
               fu_stage: stage,
