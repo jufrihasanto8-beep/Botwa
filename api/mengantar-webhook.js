@@ -253,23 +253,26 @@ module.exports = async function handler(req, res) {
             await kirimNotif(waSession, waTarget, pesan);
             console.log(`[mng-webhook] Notif ${eventType} terkirim ke ${cust.wa_number}`);
 
-            if (eventType === 'bermasalah' || eventType === 'retur') {
-              const convs = await sbGet('conversations',
-                `?customer_id=eq.${order.customer_id}&user_id=eq.${order.user_id}&select=id,state&order=created_at.desc&limit=1`
-              ).catch(() => []);
-              if (convs[0]) {
-                const convState = convs[0].state || {};
-                await fetch(`${SUPABASE_URL}/rest/v1/conv_messages`, {
-                  method: 'POST',
-                  headers: { ...sbH(), 'Prefer': 'return=minimal' },
-                  body: JSON.stringify({ conversation_id: convs[0].id, role: 'ai', isi: pesan }),
-                }).catch(() => {});
-                await sbPatch('conversations', `?id=eq.${convs[0].id}`, {
-                  state: { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: status_category, delivery_issue_resi: cnote_no },
-                  last_msg_at: now,
-                }).catch(() => {});
-                console.log(`[mng-webhook] Conv ${convs[0].id}: delivery_issue=${eventType} set`);
+            // Simpan pesan ke conv_messages + update conversation untuk semua event notif
+            const convs = await sbGet('conversations',
+              `?customer_id=eq.${order.customer_id}&user_id=eq.${order.user_id}&select=id,state&order=created_at.desc&limit=1`
+            ).catch(() => []);
+            if (convs[0]) {
+              const convState = convs[0].state || {};
+              await fetch(`${SUPABASE_URL}/rest/v1/conv_messages`, {
+                method: 'POST',
+                headers: { ...sbH(), 'Prefer': 'return=minimal' },
+                body: JSON.stringify({ conversation_id: convs[0].id, role: 'ai', isi: pesan }),
+              }).catch(() => {});
+
+              const convPatch = { last_msg_at: now };
+              if (eventType === 'delivered') {
+                convPatch.state = { ...convState, delivered: true, delivered_at: now, delivered_resi: cnote_no };
+              } else if (eventType === 'bermasalah' || eventType === 'retur') {
+                convPatch.state = { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: status_category, delivery_issue_resi: cnote_no };
               }
+              await sbPatch('conversations', `?id=eq.${convs[0].id}`, convPatch).catch(() => {});
+              console.log(`[mng-webhook] Conv ${convs[0].id}: ${eventType} logged`);
             }
           }
         }

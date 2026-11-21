@@ -1092,16 +1092,21 @@ module.exports = async function handler(req, res) {
                 await kirimNotif(waSession, waTarget, pesan);
                 notifSent++;
 
-                if ((eventType === 'bermasalah' || eventType === 'retur') && order.conversation_id) {
-                  const convs = await sbGet('conversations', `?id=eq.${order.conversation_id}&select=id,state&limit=1`).catch(() => []);
-                  if (convs[0]) {
-                    const convState = convs[0].state || {};
-                    await sbPost('conv_messages', { conversation_id: convs[0].id, role: 'ai', isi: pesan }).catch(() => {});
-                    await sbPatch('conversations', `?id=eq.${convs[0].id}`, {
-                      state: { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: statusCat, delivery_issue_resi: order.no_resi },
-                      last_msg_at: now,
-                    }).catch(() => {});
+                // Simpan ke conv_messages + update conversation untuk semua event notif
+                const convQuery = order.conversation_id
+                  ? `?id=eq.${order.conversation_id}&select=id,state&limit=1`
+                  : `?customer_id=eq.${order.customer_id}&user_id=eq.${order.user_id}&select=id,state&order=created_at.desc&limit=1`;
+                const convs = await sbGet('conversations', convQuery).catch(() => []);
+                if (convs[0]) {
+                  const convState = convs[0].state || {};
+                  await sbPost('conv_messages', { conversation_id: convs[0].id, role: 'ai', isi: pesan }).catch(() => {});
+                  const convPatch = { last_msg_at: now };
+                  if (eventType === 'delivered') {
+                    convPatch.state = { ...convState, delivered: true, delivered_at: now, delivered_resi: order.no_resi };
+                  } else if (eventType === 'bermasalah' || eventType === 'retur') {
+                    convPatch.state = { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: statusCat, delivery_issue_resi: order.no_resi };
                   }
+                  await sbPatch('conversations', `?id=eq.${convs[0].id}`, convPatch).catch(() => {});
                 }
               }
             }
