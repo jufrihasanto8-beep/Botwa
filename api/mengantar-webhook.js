@@ -127,10 +127,6 @@ module.exports = async function handler(req, res) {
   // 1. Baca raw body
   const rawBody = await readRawBody(req);
 
-  // DEBUG: log semua header dari Mengantar
-  console.log('[mng-webhook] Headers:', JSON.stringify(req.headers));
-  console.log('[mng-webhook] Raw body (100 char):', rawBody.slice(0, 100));
-
   // 2. Verifikasi HMAC-SHA256
   const secrets = [
     process.env.MENGANTAR_WEBHOOK_SECRET,
@@ -140,24 +136,17 @@ module.exports = async function handler(req, res) {
   const timestamp = req.headers['x-timestamp'] || '';
   const received  = req.headers['x-signature'] || '';
 
-  if (secrets.length > 0) {
+  if (secrets.length > 0 && received) {
     const valid = secrets.some(secret => {
-      // Coba format: timestamp.body (Stripe-style)
       const exp1 = crypto.createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
-      // Coba format: body saja (tanpa timestamp)
       const exp2 = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
       const match = (exp, recv) => exp.length === recv.length && crypto.timingSafeEqual(Buffer.from(exp), Buffer.from(recv));
       return match(exp1, received) || match(exp2, received);
     });
     if (!valid) {
-      console.error('[mng-webhook] Signature tidak valid. headers:', JSON.stringify({
-        'x-signature': received?.slice(0,20)+'...',
-        'x-timestamp': timestamp,
-        'content-type': req.headers['content-type'],
-      }));
+      console.error('[mng-webhook] Signature tidak valid');
       return res.status(401).json({ error: 'Invalid signature' });
     }
-    // Tolak replay > 5 menit
     if (timestamp && Math.abs(Date.now() - Number(timestamp)) > 5 * 60 * 1000) {
       console.error('[mng-webhook] Request kadaluarsa');
       return res.status(401).json({ error: 'Request expired' });
