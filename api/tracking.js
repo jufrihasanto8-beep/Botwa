@@ -31,6 +31,15 @@ async function sbPatch(table, query, body) {
   if (!res.ok) throw new Error(`sbPatch ${table}: ${await res.text()}`);
   return res.json();
 }
+async function sbPost(table, body) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...sbH(), 'Prefer': 'return=representation' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`sbPost ${table}: ${await res.text()}`);
+  return res.json();
+}
 
 /* ── Normalisasi nama kurir ke format Mengantar ─────────── */
 function normalizeKurir(eks) {
