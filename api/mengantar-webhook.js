@@ -214,7 +214,7 @@ module.exports = async function handler(req, res) {
     console.log(`[mng-webhook] ${cnote_no} → ${eventType} (${status_category})`);
 
     // 9. Kirim notif WA ke customer (sebelum respond agar tidak di-cut Vercel)
-    if (['tiba_kota', 'out_for_delivery', 'delivered', 'bermasalah', 'retur'].includes(eventType)) {
+    if (['out_for_delivery', 'delivered', 'bermasalah', 'retur'].includes(eventType)) {
       try {
         const custs = await sbGet('customers', `?id=eq.${order.customer_id}&select=id,wa_number,nama,reply_jid&limit=1`);
         const cust = custs[0];

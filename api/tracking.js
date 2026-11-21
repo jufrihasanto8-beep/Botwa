@@ -795,6 +795,7 @@ async function handleCreateMengantar(req, res) {
             message: pesan,
             is_outbound: true,
           }),
+          signal: AbortSignal.timeout(10000),
         });
         if (!waResp.ok) {
           const errText = await waResp.text().catch(() => '');
@@ -1079,7 +1080,7 @@ module.exports = async function handler(req, res) {
           updated++;
 
           // Kirim notif WA hanya untuk event baru yang penting
-          if (isNewEvent && ['tiba_kota','out_for_delivery','delivered','bermasalah','retur'].includes(eventType)) {
+          if (isNewEvent && ['out_for_delivery','delivered','bermasalah','retur'].includes(eventType)) {
             const cust = custMap[order.customer_id];
             if (cust?.wa_number) {
               const waTarget = cust.reply_jid || cust.wa_number;
