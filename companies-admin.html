@@ -267,10 +267,10 @@ function openForm(id) {
 
   checksEl.innerHTML = _users.map(u => {
     const checked = assignedIds.includes(u.id);
-    return `<label class="user-check${checked?' checked':''}" onclick="this.classList.toggle('checked')">
+    return `<div class="user-check${checked?' checked':''}" onclick="toggleUserCheck(this)">
       <input type="checkbox" value="${u.id}" ${checked?'checked':''}>
       ${esc(u.name)}
-    </label>`;
+    </div>`;
   }).join('');
 
   document.getElementById('form-overlay').classList.add('open');
@@ -309,6 +309,12 @@ async function submitForm() {
   if (data.error) return alert('Error: ' + data.error);
   closeForm();
   loadData();
+}
+
+function toggleUserCheck(el) {
+  const cb = el.querySelector('input');
+  cb.checked = !cb.checked;
+  el.classList.toggle('checked', cb.checked);
 }
 
 function editCompany(id) { openForm(id); }
