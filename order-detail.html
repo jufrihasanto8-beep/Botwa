@@ -650,15 +650,16 @@ function getOrderRow(c, idx) {
   const qty       = parseInt(c.qty || 1);
   const metode    = (c.metode || 'cod').toUpperCase();
   const isCOD     = metode !== 'TRANSFER';
-  const harga     = c.harga    || prod.harga || 0;
+  // c.harga dari DB sudah TOTAL (harga×qty dari resolveHargaBundling), prod.harga = per-unit
+  const hargaTotal = c.harga ? c.harga : (prod.harga || 0) * qty;
   const ongkir    = c.ongkir_after_promo ?? c.ongkir ?? 0;
   const feeCOD    = isCOD ? (c.fee_cod || 0) : 0;
-  const total     = c.total || (harga * qty) + ongkir + feeCOD;
+  const total     = c.total || (hargaTotal + ongkir + feeCOD);
   const ekspedisi = (c.ekspedisi || 'KURIR').toUpperCase();
   const keluhan   = c.keluhan || '';
 
-  // Rincian pembayaran
-  const parts = isCOD && feeCOD > 0 ? [harga*qty, ongkir, feeCOD] : [harga*qty, ongkir];
+  // Rincian pembayaran — hargaTotal sudah benar (tidak perlu ×qty lagi)
+  const parts = isCOD && feeCOD > 0 ? [hargaTotal, ongkir, feeCOD] : [hargaTotal, ongkir];
   const rincian = parts.join('+') + '=' + total;
 
   // Instruksi pengiriman
