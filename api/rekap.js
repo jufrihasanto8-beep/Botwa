@@ -62,15 +62,15 @@ async function companyLogin(req, res) {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Username dan password wajib' });
 
-  // SPV login
-  if (username === SPV_USERNAME && password === SPV_PASSWORD) {
+  // SPV login (case-insensitive username)
+  if (username.toLowerCase() === SPV_USERNAME.toLowerCase() && password === SPV_PASSWORD) {
     const token = crypto.randomUUID();
     setCookie(res, 'company_session', `spv_${token}`, 7 * 86400);
     return res.json({ ok: true, role: 'spv', name: 'SPV Admin' });
   }
 
-  // Company login
-  const rows = await sbGet('companies', `?username=eq.${encodeURIComponent(username)}&aktif=eq.true&limit=1`);
+  // Company login (case-insensitive username)
+  const rows = await sbGet('companies', `?username=ilike.${encodeURIComponent(username)}&aktif=eq.true&limit=1`);
   if (!rows.length) return res.status(401).json({ error: 'Username tidak ditemukan' });
 
   const company = rows[0];
