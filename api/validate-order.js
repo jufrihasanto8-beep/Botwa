@@ -81,7 +81,7 @@ async function validateOrder(order) {
   const [convRows, custRows, prodRows] = await Promise.all([
     order.conversation_id ? sbGet(`conversations?id=eq.${order.conversation_id}&select=id,state,status&limit=1`) : Promise.resolve([]),
     order.customer_id     ? sbGet(`customers?id=eq.${order.customer_id}&select=id,nama,wa_number,alamat&limit=1`) : Promise.resolve([]),
-    order.product_id      ? sbGet(`products?id=eq.${order.product_id}&select=id,nama,harga,wa_session_id,persona_cs_nama&limit=1`) : Promise.resolve([]),
+    order.product_id      ? sbGet(`products?id=eq.${order.product_id}&select=id,nama,harga,harga_bundling,diskon_ongkir_per_qty,wa_session_id,persona_cs_nama&limit=1`) : Promise.resolve([]),
   ]);
   const conv     = convRows[0];
   const customer = custRows[0];
@@ -221,7 +221,29 @@ Untuk qty/metode, "new" harus berupa string angka/kata (misal "2", "transfer")`;
       if (hasAlamatFix) {
         orderPatch.alamat = { ...alamat, ...alamatFixes };
       }
-      if (qtyFix) orderPatch.qty = qtyFix;
+      if (qtyFix) {
+        orderPatch.qty = qtyFix;
+        // Recalculate harga bundling sesuai qty baru
+        const bundling = Array.isArray(product?.harga_bundling) ? product.harga_bundling : [];
+        const exact = bundling.find(p => p.qty === qtyFix);
+        const newHarga = exact ? exact.harga : (product?.harga || 0) * qtyFix;
+
+        // Recalculate ongkir — apply diskon_ongkir_per_qty ke ongkir asli
+        const ongkirAsli = order.ongkir || 0;
+        const diskonList = Array.isArray(product?.diskon_ongkir_per_qty) ? product.diskon_ongkir_per_qty : [];
+        const diskonItem = diskonList.find(d => d.qty === qtyFix);
+        const diskonPct = diskonItem?.diskon || 0;
+        const newOngkir = diskonPct >= 100 ? 0 : diskonPct > 0 ? Math.round(ongkirAsli * (1 - diskonPct / 100)) : ongkirAsli;
+
+        const curMetode = (metodeFix || order.metode || 'cod').toLowerCase();
+        const isCOD = curMetode !== 'transfer';
+        const newFeeCod = isCOD ? Math.ceil((newHarga + newOngkir) * 0.03) : 0;
+        const newTotal = isCOD ? newHarga + newOngkir + newFeeCod : newHarga + newOngkir;
+        orderPatch.harga = newHarga;
+        orderPatch.ongkir_after_promo = newOngkir;
+        orderPatch.fee_cod = newFeeCod;
+        orderPatch.total = newTotal;
+      }
       if (metodeFix) orderPatch.metode = metodeFix;
 
       orderPatch.validated_at = new Date().toISOString();
