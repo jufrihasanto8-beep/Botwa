@@ -598,7 +598,7 @@ async function handleCreateMengantar(req, res) {
           ? [al.jalan, al.kodepos].filter(Boolean).join(', ')
           : [al.jalan, al.kelurahan, al.kecamatan, al.kabupaten, al.provinsi, al.kodepos].filter(Boolean).join(', ');
 
-        // Format customerName: Nama|SKU qty+BONUS_SKU qty
+        // Format customerName: Nama|SKU qty+BONUS_SKU qty|TF (kalau transfer)
         let custNameFormatted = cu.nama || '-';
         if (prod.sku) {
           const skuParts = [prod.sku + ' ' + qty];
@@ -610,6 +610,7 @@ async function handleCreateMengantar(req, res) {
           }
           custNameFormatted = (cu.nama || '-') + '|' + skuParts.join('+');
         }
+        if (!isCOD) custNameFormatted += '|TF';
 
         // Data tim untuk label Mengantar
         const csNama   = prod.persona_cs_nama || '';
