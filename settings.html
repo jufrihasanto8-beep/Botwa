@@ -283,7 +283,7 @@ body.light .grup-item-nama{color:#0f172a}
       <a href="#" onclick="showSection('kurir',this)">🚚 Ekspedisi</a>
       <a href="#" onclick="showSection('ai',this)">🤖 AI Key</a>
       <a href="#" onclick="showSection('gmail',this)">📧 Integrasi Gmail</a>
-      <a href="#" onclick="showSection('group',this)">💬 Grup WA Recap</a>
+      <a href="#" onclick="showSection('group',this)">💬 Grup WA</a>
       <a href="#" onclick="showSection('mengantar',this)">🚚 Mengantar</a>
       <a href="#" onclick="showSection('template',this)">📝 Template Pesan</a>
     </div>
@@ -462,34 +462,75 @@ Bisa isi lebih dari satu rekening."></textarea>
 
       <!-- ── Grup WA Recap ── -->
       <div class="settings-section" id="sec-group">
-        <div class="section-title">Grup WA Recap Order</div>
-        <div class="section-desc">Setiap ada order closing, bot akan kirim rekap ke grup WA ini. Pilih dari daftar grup yang sudah diikuti nomor WA kamu.</div>
+        <div class="section-title">Grup WA</div>
+        <div class="section-desc">Atur grup WA untuk notifikasi. Pilih dari daftar grup yang sudah diikuti nomor WA kamu.</div>
 
-        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:16px">
-
-          <!-- Grup terpilih -->
-          <div id="group-selected-card" style="display:none;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;align-items:center;justify-content:space-between">
-            <div>
-              <div style="font-size:12px;color:#64748b;margin-bottom:2px">Grup aktif</div>
-              <div id="group-selected-nama" style="font-weight:600;color:#e2e8f0;font-size:14px">—</div>
-            </div>
-            <button onclick="clearGroupJid()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;padding:4px">✕</button>
-          </div>
-
-          <!-- Tombol load + cari -->
-          <button class="btn" onclick="loadGrupList()" id="btn-load-grup" style="margin-bottom:12px">🔄 Muat Daftar Grup</button>
-
-          <div id="grup-search-area" style="display:none">
+        <!-- Tombol load grup (shared untuk semua) -->
+        <div style="margin-top:16px;margin-bottom:12px">
+          <button class="btn" onclick="loadGrupList()" id="btn-load-grup">🔄 Muat Daftar Grup</button>
+          <div id="grup-search-area" style="display:none;margin-top:10px">
             <input type="text" id="grup-search" placeholder="Cari nama grup..."
               oninput="filterGrup(this.value)"
               style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;margin-bottom:10px">
             <div id="grup-list" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
           </div>
+        </div>
 
-          <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
-            <button class="btn-primary" onclick="saveGroupJid()">Simpan</button>
-            <span id="group-jid-status" style="font-size:12px;color:#22c55e;display:none">✓ Tersimpan!</span>
+        <!-- 1. Grup Recap Order -->
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px 18px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Recap Order</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:10px">Notif setiap ada order closing</div>
+          <div id="group-selected-card" style="display:none;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:10px 14px;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:11px;color:#64748b">Grup aktif</div>
+              <div id="group-selected-nama" style="font-weight:600;color:#e2e8f0;font-size:13px">—</div>
+            </div>
+            <button onclick="clearGroupSlot('recap')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:4px">✕</button>
           </div>
+          <div id="group-recap-empty" style="font-size:12px;color:#64748b">Belum dipilih — klik grup di daftar atas</div>
+        </div>
+
+        <!-- 2. Grup QC Transfer -->
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px 18px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">QC Transfer</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:10px">Notif bukti transfer masuk untuk diverifikasi</div>
+          <div id="group-qc-card" style="display:none;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:10px 14px;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:11px;color:#64748b">Grup aktif</div>
+              <div id="group-qc-nama" style="font-weight:600;color:#e2e8f0;font-size:13px">—</div>
+            </div>
+            <button onclick="clearGroupSlot('qc')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:4px">✕</button>
+          </div>
+          <div id="group-qc-empty" style="font-size:12px;color:#64748b">Belum dipilih — klik grup di daftar atas</div>
+        </div>
+
+        <!-- 3. Grup Operasional -->
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px 18px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Operasional</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:10px">Notif paket bermasalah + screenshot chat</div>
+          <div id="group-ops-card" style="display:none;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);border-radius:10px;padding:10px 14px;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:11px;color:#64748b">Grup aktif</div>
+              <div id="group-ops-nama" style="font-weight:600;color:#e2e8f0;font-size:13px">—</div>
+            </div>
+            <button onclick="clearGroupSlot('ops')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:4px">✕</button>
+          </div>
+          <div id="group-ops-empty" style="font-size:12px;color:#64748b">Belum dipilih — klik grup di daftar atas</div>
+        </div>
+
+        <!-- Pilih target slot -->
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Pilih grup untuk:</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn" id="slot-btn-recap" onclick="setActiveSlot('recap')" style="font-size:11px;padding:5px 12px;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)">Recap Order</button>
+            <button class="btn" id="slot-btn-qc" onclick="setActiveSlot('qc')" style="font-size:11px;padding:5px 12px;background:rgba(255,255,255,.04);color:#64748b;border:1px solid rgba(255,255,255,.08)">QC Transfer</button>
+            <button class="btn" id="slot-btn-ops" onclick="setActiveSlot('ops')" style="font-size:11px;padding:5px 12px;background:rgba(255,255,255,.04);color:#64748b;border:1px solid rgba(255,255,255,.08)">Operasional</button>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="btn-primary" onclick="saveAllGroups()">Simpan Semua</button>
+          <span id="group-jid-status" style="font-size:12px;color:#22c55e;display:none">✓ Tersimpan!</span>
         </div>
       </div>
 
@@ -508,6 +549,17 @@ Bisa isi lebih dari satu rekening."></textarea>
               <button class="btn" onclick="toggleMengantarKey()" style="padding:8px 14px;flex-shrink:0">👁</button>
             </div>
             <div class="hint">Dapatkan API key dari dashboard Mengantar → Settings → API</div>
+          </div>
+
+          <!-- Webhook Secret -->
+          <div class="form-group">
+            <label>Webhook Secret</label>
+            <div style="display:flex;gap:8px">
+              <input type="password" id="f-mengantar-webhook-secret" placeholder="Masukkan webhook secret Mengantar..."
+                autocomplete="off" style="font-family:monospace">
+              <button class="btn" onclick="const el=document.getElementById('f-mengantar-webhook-secret');el.type=el.type==='password'?'text':'password'" style="padding:8px 14px;flex-shrink:0">👁</button>
+            </div>
+            <div class="hint">Secret untuk verifikasi webhook dari Mengantar → Settings → Webhook</div>
           </div>
 
           <!-- Pickup Address -->
@@ -1346,28 +1398,63 @@ async function toggleKurir(nama, aktif) {
 
 checkBotStatus();
 
-/* ── GRUP WA RECAP ── */
-let _selectedGroupJid = null;
+/* ── GRUP WA ── */
 let _allGroups = [];
+let _activeSlot = 'recap'; // recap | qc | ops
+let _groupSlots = {
+  recap: { jid: null, nama: null },
+  qc:    { jid: null, nama: null },
+  ops:   { jid: null, nama: null },
+};
+// Backward compat: recap = group_jid/group_nama, qc = qc_group_jid/qc_group_nama, ops = ops_group_jid/ops_group_nama
+const SLOT_DB_MAP = {
+  recap: { jid: 'group_jid', nama: 'group_nama' },
+  qc:    { jid: 'qc_group_jid', nama: 'qc_group_nama' },
+  ops:   { jid: 'ops_group_jid', nama: 'ops_group_nama' },
+};
 
 async function loadGroupJid() {
   try {
     const uid = Auth.getUser()?.id;
     if (!uid) return;
-    const rows = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=group_jid,group_nama&limit=1`, {
+    const rows = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=group_jid,group_nama,qc_group_jid,qc_group_nama,ops_group_jid,ops_group_nama&limit=1`, {
       headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.json());
-    const jid  = rows[0]?.group_jid  || null;
-    const nama = rows[0]?.group_nama || jid || null;
-    _selectedGroupJid = jid;
-    const card = document.getElementById('group-selected-card');
-    if (jid) {
+    const row = rows[0] || {};
+    _groupSlots.recap = { jid: row.group_jid || null, nama: row.group_nama || null };
+    _groupSlots.qc    = { jid: row.qc_group_jid || null, nama: row.qc_group_nama || null };
+    _groupSlots.ops   = { jid: row.ops_group_jid || null, nama: row.ops_group_nama || null };
+    renderGroupSlots();
+  } catch(e) { console.error('loadGroupJid error', e); }
+}
+
+function renderGroupSlots() {
+  ['recap','qc','ops'].forEach(slot => {
+    const s = _groupSlots[slot];
+    const cardId = slot === 'recap' ? 'group-selected-card' : `group-${slot}-card`;
+    const namaId = slot === 'recap' ? 'group-selected-nama' : `group-${slot}-nama`;
+    const emptyId = slot === 'recap' ? 'group-recap-empty' : `group-${slot}-empty`;
+    const card = document.getElementById(cardId);
+    const empty = document.getElementById(emptyId);
+    if (s.jid) {
       card.style.display = 'flex';
-      document.getElementById('group-selected-nama').textContent = nama;
+      document.getElementById(namaId).textContent = s.nama || s.jid;
+      if (empty) empty.style.display = 'none';
     } else {
       card.style.display = 'none';
+      if (empty) empty.style.display = '';
     }
-  } catch(e) { console.error('loadGroupJid error', e); }
+  });
+}
+
+function setActiveSlot(slot) {
+  _activeSlot = slot;
+  const colors = { recap: { bg:'rgba(34,197,94,.15)', c:'#22c55e', bd:'rgba(34,197,94,.3)' }, qc: { bg:'rgba(59,130,246,.15)', c:'#3b82f6', bd:'rgba(59,130,246,.3)' }, ops: { bg:'rgba(251,146,60,.15)', c:'#fb923c', bd:'rgba(251,146,60,.3)' } };
+  ['recap','qc','ops'].forEach(s => {
+    const btn = document.getElementById('slot-btn-'+s);
+    if (s === slot) { btn.style.background = colors[s].bg; btn.style.color = colors[s].c; btn.style.borderColor = colors[s].bd; }
+    else { btn.style.background = 'rgba(255,255,255,.04)'; btn.style.color = '#64748b'; btn.style.borderColor = 'rgba(255,255,255,.08)'; }
+  });
 }
 
 async function loadGrupList() {
@@ -1398,45 +1485,49 @@ function filterGrup(q) {
 function renderGrupList(groups) {
   const el = document.getElementById('grup-list');
   if (!groups.length) { el.innerHTML = '<div style="color:#64748b;font-size:12px;padding:8px">Tidak ada grup ditemukan</div>'; return; }
-  el.innerHTML = groups.map(g => `
-    <div onclick="pilihGrup('${g.jid}','${g.nama.replace(/'/g,"\\'")}',this)"
+  el.innerHTML = groups.map(g => {
+    // Check if this group is used by any slot
+    const usedBy = [];
+    if (_groupSlots.recap.jid === g.jid) usedBy.push('Recap');
+    if (_groupSlots.qc.jid === g.jid) usedBy.push('QC');
+    if (_groupSlots.ops.jid === g.jid) usedBy.push('OPS');
+    const badge = usedBy.length ? `<span style="font-size:9px;background:rgba(59,130,246,.15);color:#3b82f6;padding:1px 6px;border-radius:4px;margin-left:6px">${usedBy.join(', ')}</span>` : '';
+    return `<div onclick="pilihGrup('${g.jid}','${g.nama.replace(/'/g,"\\'")}')"
       style="padding:10px 12px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.06);
-             background:${_selectedGroupJid===g.jid?'rgba(59,130,246,.15)':'rgba(255,255,255,.03)'};
-             transition:background .12s"
+             background:rgba(255,255,255,.03);transition:background .12s"
       onmouseover="this.style.background='rgba(59,130,246,.1)'"
-      onmouseout="this.style.background='${_selectedGroupJid===g.jid?'rgba(59,130,246,.15)':'rgba(255,255,255,.03)'}'">
-      <div class="grup-item-nama" style="font-size:13px;font-weight:500">${g.nama}</div>
-    </div>
-  `).join('');
+      onmouseout="this.style.background='rgba(255,255,255,.03)'">
+      <div style="font-size:13px;font-weight:500">${g.nama}${badge}</div>
+    </div>`;
+  }).join('');
 }
 
-function pilihGrup(jid, nama, el) {
-  _selectedGroupJid = jid;
-  const card = document.getElementById('group-selected-card');
-  card.style.display = 'flex';
-  document.getElementById('group-selected-nama').textContent = nama;
+function pilihGrup(jid, nama) {
+  _groupSlots[_activeSlot] = { jid, nama };
+  renderGroupSlots();
   renderGrupList(_allGroups);
 }
 
-function clearGroupJid() {
-  _selectedGroupJid = null;
-  document.getElementById('group-selected-card').style.display = 'none';
+function clearGroupSlot(slot) {
+  _groupSlots[slot] = { jid: null, nama: null };
+  renderGroupSlots();
+  renderGrupList(_allGroups);
 }
 
-async function saveGroupJid() {
+async function saveAllGroups() {
   const uid = Auth.getUser()?.id;
   if (!uid) return;
-  const nama = document.getElementById('group-selected-nama')?.textContent || null;
+  const patch = {};
+  ['recap','qc','ops'].forEach(slot => {
+    const map = SLOT_DB_MAP[slot];
+    patch[map.jid]  = _groupSlots[slot].jid || null;
+    patch[map.nama] = _groupSlots[slot].nama || null;
+  });
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ group_jid: _selectedGroupJid || null, group_nama: _selectedGroupJid ? nama : null }),
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(patch),
     });
     const st = document.getElementById('group-jid-status');
     st.style.display = 'inline';
@@ -1468,9 +1559,10 @@ function gantiOrigin() {
 async function loadMengantarSettings() {
   const userId = Auth.getUser()?.id;
   try {
-    const data = await SB.get('users', `?id=eq.${userId}&select=mengantar_key,mengantar_origin_id&limit=1`);
+    const data = await SB.get('users', `?id=eq.${userId}&select=mengantar_key,mengantar_webhook_secret,mengantar_origin_id&limit=1`);
     const row = data[0] || {};
     document.getElementById('f-mengantar-key').value = row.mengantar_key || '';
+    document.getElementById('f-mengantar-webhook-secret').value = row.mengantar_webhook_secret || '';
 
     if (row.mengantar_origin_id && row.mengantar_key) {
       // Coba fetch detail alamat untuk tampilkan card
@@ -1600,7 +1692,7 @@ async function saveMengantarSettings() {
     const res = await fetch('/api/save-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, mengantar_key: key, mengantar_origin_id: origin, ...(area ? { mengantar_area_id: area } : {}) }),
+      body: JSON.stringify({ user_id: userId, mengantar_key: key, mengantar_webhook_secret: document.getElementById('f-mengantar-webhook-secret').value.trim(), mengantar_origin_id: origin, ...(area ? { mengantar_area_id: area } : {}) }),
     });
     if (!res.ok) throw new Error(await res.text());
     const st = document.getElementById('mengantar-status');
