@@ -471,19 +471,19 @@ Bisa isi lebih dari satu rekening."></textarea>
           <div id="grup-search-area" style="display:none;margin-top:10px">
             <input type="text" id="grup-search" placeholder="Cari nama grup..."
               oninput="filterGrup(this.value)"
-              style="width:100%;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;margin-bottom:10px">
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;margin-bottom:10px">
             <div id="grup-list" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
           </div>
         </div>
 
         <!-- 1. Grup Recap Order -->
-        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px 18px;margin-bottom:12px">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Recap Order</div>
           <div style="font-size:11px;color:#64748b;margin-bottom:10px">Notif setiap ada order closing</div>
           <div id="group-selected-card" style="display:none;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:10px 14px;align-items:center;justify-content:space-between">
             <div>
               <div style="font-size:11px;color:#64748b">Grup aktif</div>
-              <div id="group-selected-nama" style="font-weight:600;color:#e2e8f0;font-size:13px">—</div>
+              <div id="group-selected-nama" style="font-weight:600;color:var(--text);font-size:13px">—</div>
             </div>
             <button onclick="clearGroupSlot('recap')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:4px">✕</button>
           </div>
@@ -491,13 +491,13 @@ Bisa isi lebih dari satu rekening."></textarea>
         </div>
 
         <!-- 2. Grup QC Transfer -->
-        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px 18px;margin-bottom:12px">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">QC Transfer</div>
           <div style="font-size:11px;color:#64748b;margin-bottom:10px">Notif bukti transfer masuk untuk diverifikasi</div>
           <div id="group-qc-card" style="display:none;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:10px 14px;align-items:center;justify-content:space-between">
             <div>
               <div style="font-size:11px;color:#64748b">Grup aktif</div>
-              <div id="group-qc-nama" style="font-weight:600;color:#e2e8f0;font-size:13px">—</div>
+              <div id="group-qc-nama" style="font-weight:600;color:var(--text);font-size:13px">—</div>
             </div>
             <button onclick="clearGroupSlot('qc')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:4px">✕</button>
           </div>
@@ -505,13 +505,13 @@ Bisa isi lebih dari satu rekening."></textarea>
         </div>
 
         <!-- 3. Grup Operasional -->
-        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px 18px;margin-bottom:12px">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Operasional</div>
           <div style="font-size:11px;color:#64748b;margin-bottom:10px">Notif paket bermasalah + screenshot chat</div>
           <div id="group-ops-card" style="display:none;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);border-radius:10px;padding:10px 14px;align-items:center;justify-content:space-between">
             <div>
               <div style="font-size:11px;color:#64748b">Grup aktif</div>
-              <div id="group-ops-nama" style="font-weight:600;color:#e2e8f0;font-size:13px">—</div>
+              <div id="group-ops-nama" style="font-weight:600;color:var(--text);font-size:13px">—</div>
             </div>
             <button onclick="clearGroupSlot('ops')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:4px">✕</button>
           </div>
@@ -523,8 +523,8 @@ Bisa isi lebih dari satu rekening."></textarea>
           <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Pilih grup untuk:</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn" id="slot-btn-recap" onclick="setActiveSlot('recap')" style="font-size:11px;padding:5px 12px;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)">Recap Order</button>
-            <button class="btn" id="slot-btn-qc" onclick="setActiveSlot('qc')" style="font-size:11px;padding:5px 12px;background:rgba(255,255,255,.04);color:#64748b;border:1px solid rgba(255,255,255,.08)">QC Transfer</button>
-            <button class="btn" id="slot-btn-ops" onclick="setActiveSlot('ops')" style="font-size:11px;padding:5px 12px;background:rgba(255,255,255,.04);color:#64748b;border:1px solid rgba(255,255,255,.08)">Operasional</button>
+            <button class="btn" id="slot-btn-qc" onclick="setActiveSlot('qc')" style="font-size:11px;padding:5px 12px;background:var(--bg);color:var(--text-3);border:1px solid var(--border)">QC Transfer</button>
+            <button class="btn" id="slot-btn-ops" onclick="setActiveSlot('ops')" style="font-size:11px;padding:5px 12px;background:var(--bg);color:var(--text-3);border:1px solid var(--border)">Operasional</button>
           </div>
         </div>
 
@@ -1453,7 +1453,7 @@ function setActiveSlot(slot) {
   ['recap','qc','ops'].forEach(s => {
     const btn = document.getElementById('slot-btn-'+s);
     if (s === slot) { btn.style.background = colors[s].bg; btn.style.color = colors[s].c; btn.style.borderColor = colors[s].bd; }
-    else { btn.style.background = 'rgba(255,255,255,.04)'; btn.style.color = '#64748b'; btn.style.borderColor = 'rgba(255,255,255,.08)'; }
+    else { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
   });
 }
 
@@ -1463,10 +1463,24 @@ async function loadGrupList() {
   btn.textContent = 'Memuat...';
   btn.disabled = true;
   try {
-    const r = await fetch(`/api/baileys-proxy?path=/groups&session_id=${uid}`);
-    const data = await r.json();
-    if (!data.ok) throw new Error(data.error);
-    _allGroups = data.groups;
+    // Ambil semua WA session milik user ini (dari products)
+    const prods = await SB.get('products', `?user_id=eq.${uid}&aktif=eq.true&select=wa_session_id`);
+    const sessionIds = [...new Set((prods || []).map(p => p.wa_session_id).filter(Boolean))];
+    if (!sessionIds.length) sessionIds.push(uid); // fallback ke user id
+
+    // Fetch groups dari semua session
+    const allGroupsMap = {};
+    await Promise.all(sessionIds.map(async sid => {
+      try {
+        const r = await fetch(`/api/baileys-proxy?path=/groups&session_id=${sid}`);
+        const data = await r.json();
+        if (data.ok && data.groups) {
+          data.groups.forEach(g => { allGroupsMap[g.jid] = g; });
+        }
+      } catch {}
+    }));
+    _allGroups = Object.values(allGroupsMap);
+    _allGroups.sort((a, b) => a.nama.localeCompare(b.nama));
     renderGrupList(_allGroups);
     document.getElementById('grup-search-area').style.display = 'block';
     btn.textContent = '🔄 Refresh';
@@ -1493,11 +1507,11 @@ function renderGrupList(groups) {
     if (_groupSlots.ops.jid === g.jid) usedBy.push('OPS');
     const badge = usedBy.length ? `<span style="font-size:9px;background:rgba(59,130,246,.15);color:#3b82f6;padding:1px 6px;border-radius:4px;margin-left:6px">${usedBy.join(', ')}</span>` : '';
     return `<div onclick="pilihGrup('${g.jid}','${g.nama.replace(/'/g,"\\'")}')"
-      style="padding:10px 12px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.06);
-             background:rgba(255,255,255,.03);transition:background .12s"
+      style="padding:10px 12px;border-radius:8px;cursor:pointer;border:1px solid var(--border);
+             background:var(--white);transition:background .12s"
       onmouseover="this.style.background='rgba(59,130,246,.1)'"
-      onmouseout="this.style.background='rgba(255,255,255,.03)'">
-      <div style="font-size:13px;font-weight:500">${g.nama}${badge}</div>
+      onmouseout="this.style.background=''">
+      <div style="font-size:13px;font-weight:500;color:var(--text)">${g.nama}${badge}</div>
     </div>`;
   }).join('');
 }
