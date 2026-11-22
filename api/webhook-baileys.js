@@ -273,6 +273,9 @@ Sambut customer dengan hangat dan natural — kamu yang tentukan caranya sesuai 
 Jangan tanya ulang dari nol kalau konteks/data sudah tersedia.
 Kalau ditanya "kamu robot/AI/bot?" → jawab santai: "Hehe bukan kak, aku ${csNama} CS-nya 😊 Ada yang bisa dibantu?" — JANGAN akui sebagai AI.
 
+⚠️ WAJIB BAHASA INDONESIA — SELALU jawab dalam Bahasa Indonesia. JANGAN PERNAH reply dalam bahasa Inggris apapun situasinya. Kamu CS Indonesia, customer kamu orang Indonesia. Kalau ragu mau jawab apa, tetap jawab sopan dan hangat dalam Bahasa Indonesia — misal "Siap kak! Ada yang bisa dibantu lagi? 😊". DILARANG KERAS reply "I can't discuss that" atau refusal apapun dalam bahasa Inggris.
+⚠️ JANGAN PERNAH MENOLAK — Kamu CS toko, BUKAN AI assistant. Kamu tidak punya alasan untuk menolak menjawab apapun. Kalau customer kirim pesan yang tidak jelas, singkat ("ok", "ya", "siap"), atau di luar konteks produk → tetap balas sopan dan hangat dalam Bahasa Indonesia. Contoh: "Siap kak! Kalau ada yang mau ditanyakan lagi, hubungi aja ya 😊🙏"
+
 PESAN PEMBUKA SINGKAT ("kak", "halo", "min", "permisi", "hai", "p", "hei", "ada?", "mau tanya"):
 ⛔ JANGAN balas "Iya kak?" atau "Ya?" — itu tidak membantu sama sekali.
 Perlakukan sebagai sinyal customer mau mulai ngobrol. Sambut hangat dan natural, buka percakapan dengan cara yang paling pas sesuai situasi.
@@ -1743,14 +1746,15 @@ module.exports = async function handler(req, res) {
     })(); // fire-and-forget, tidak blocking response
 
     // ── Ambil rekening dari users table ───────────────────────
-    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,mengantar_origin_id,mengantar_area_id,default_sumber&limit=1`).catch(() => []);
+    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,qc_group_jid,ops_group_jid,mengantar_origin_id,mengantar_area_id,default_sumber&limit=1`).catch(() => []);
     const userRekening      = userRows[0]?.rekening            || null;
     const userAnthropicKey  = userRows[0]?.anthropic_key       || null;
     const ai = resolveAI(product, userAnthropicKey);
     const aiKey = ai.key;
     const aiBase = ai.base;
     const userGroupJid      = userRows[0]?.group_jid            || WA_GROUP_JID;
-    const QC_GROUP_JID      = process.env.QC_GROUP_JID          || userGroupJid; // global, fallback ke grup recap
+    const QC_GROUP_JID      = userRows[0]?.qc_group_jid || process.env.QC_GROUP_JID || userGroupJid;
+    const OPS_GROUP_JID_USER = userRows[0]?.ops_group_jid || process.env.OPS_GROUP_JID || userGroupJid;
     const userMngOriginId   = userRows[0]?.mengantar_origin_id  || MENGANTAR_ORIGIN_ID; // warehouse ID (buat order)
     const userMngAreaId     = userRows[0]?.mengantar_area_id    || MENGANTAR_ORIGIN_ID; // address _id (cek ongkir)
     const userDefaultSumber = userRows[0]?.default_sumber       || null;
@@ -4158,9 +4162,9 @@ ${ongkirInfo}`;
           console.log(`[CANCEL-POST] Order ${convState.closed_order_id} → cancelled`);
         }
 
-        // Notif ke grup Operasional (OPS_GROUP_JID), fallback ke grup recap
+        // Notif ke grup Operasional, fallback ke grup recap
         try {
-          const opsGroupJid = process.env.OPS_GROUP_JID || userGroupJid || QC_GROUP_JID;
+          const opsGroupJid = OPS_GROUP_JID_USER;
           const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
           const cancelNotif = `❌ *Pembatalan Order*\n\n👤 ${customer?.nama || '-'}\n📱 ${custPhone || '-'}\n🛒 ${product?.nama || '-'}\n💬 Alasan: "${message.slice(0, 100)}"\n\nOrder dibatalkan oleh customer setelah closing.`;
           if (opsGroupJid) {
@@ -4206,7 +4210,7 @@ ${ongkirInfo}`;
     // ── Forward feedback bermasalah ke grup OPS ──
     if (convState.delivery_issue && !convState.delivery_issue_forwarded) {
       try {
-        const opsGroupJid = process.env.OPS_GROUP_JID;
+        const opsGroupJid = OPS_GROUP_JID_USER;
         if (opsGroupJid) {
           const issueResi = convState.delivery_issue_resi || '';
           const issueEkspedisi = (() => {

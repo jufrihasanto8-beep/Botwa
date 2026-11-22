@@ -204,12 +204,22 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, result: {} });
       }
 
+      // ── Route: send-group-notif — kirim pesan ke group JID tertentu ──
+      if (action === 'send-group-notif') {
+        const { user_id, group_jid, message } = req.body;
+        if (!group_jid || !message) return res.status(400).json({ error: 'group_jid dan message wajib' });
+        const prodR = await sbGet(`products?user_id=eq.${user_id}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []);
+        const waSession = prodR[0]?.wa_session_id || user_id;
+        await sendWA(waSession, group_jid, message);
+        return res.status(200).json({ ok: true, sent: true });
+      }
+
       // ── Route: notify-qc-group — kirim notif bukti TF baru ke grup QC ──
       if (action === 'notify-qc-group') {
         const { user_id, customer_nama, customer_phone, product_nama, qty, total, metode, bukti_url } = req.body;
-        // Resolve group JID: user.group_jid → env QC_GROUP_JID → env WA_GROUP_JID
-        const userR = await sbGet(`users?id=eq.${user_id}&select=group_jid&limit=1`).catch(() => []);
-        const groupJid = userR[0]?.group_jid || process.env.QC_GROUP_JID || process.env.WA_GROUP_JID || null;
+        // Resolve group JID: user.qc_group_jid → user.group_jid → env QC_GROUP_JID → env WA_GROUP_JID
+        const userR = await sbGet(`users?id=eq.${user_id}&select=group_jid,qc_group_jid&limit=1`).catch(() => []);
+        const groupJid = userR[0]?.qc_group_jid || userR[0]?.group_jid || process.env.QC_GROUP_JID || process.env.WA_GROUP_JID || null;
         if (!groupJid) return res.status(200).json({ ok: true, skipped: 'no_group_jid' });
 
         // Resolve wa_session_id
@@ -244,7 +254,7 @@ module.exports = async function handler(req, res) {
 
         // 2. Fetch user, customer, product, conversation
         const [userRows, custRows, prodRows, convRows] = await Promise.all([
-          sbGet(`users?id=eq.${qc.user_id}&select=id,rekening,group_jid&limit=1`).catch(() => []),
+          sbGet(`users?id=eq.${qc.user_id}&select=id,rekening,group_jid,qc_group_jid&limit=1`).catch(() => []),
           sbGet(`customers?id=eq.${qc.customer_id}&select=*&limit=1`).catch(() => []),
           sbGet(`products?id=eq.${qc.product_id}&select=*&limit=1`).catch(() => []),
           sbGet(`conversations?id=eq.${qc.conversation_id}&select=id,state&limit=1`).catch(() => []),
@@ -469,12 +479,12 @@ async function handleReminder(res) {
     let sent = 0;
     for (const [userId, items] of Object.entries(byUser)) {
       const [userRows, prodRows] = await Promise.all([
-        sbGet(`users?id=eq.${userId}&select=group_jid&limit=1`).catch(() => []),
+        sbGet(`users?id=eq.${userId}&select=group_jid,qc_group_jid&limit=1`).catch(() => []),
         sbGet(`products?user_id=eq.${userId}&aktif=eq.true&order=created_at.asc&select=wa_session_id&limit=1`).catch(() => []),
       ]);
 
-      // Prioritas: user.group_jid dari DB → env QC_GROUP_JID → env WA_GROUP_JID
-      const groupJid = userRows[0]?.group_jid || process.env.QC_GROUP_JID || process.env.WA_GROUP_JID || null;
+      // Prioritas: user.qc_group_jid → user.group_jid → env QC_GROUP_JID → env WA_GROUP_JID
+      const groupJid = userRows[0]?.qc_group_jid || userRows[0]?.group_jid || process.env.QC_GROUP_JID || process.env.WA_GROUP_JID || null;
 
       // Pakai wa_session_id produk; kalau tidak aktif, fallback ke session aktif pertama
       let waSession = prodRows[0]?.wa_session_id || null;

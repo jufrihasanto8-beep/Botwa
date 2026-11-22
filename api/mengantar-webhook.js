@@ -12,6 +12,7 @@ const SUPABASE_URL         = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const BAILEYS_URL          = process.env.BAILEYS_URL;
 const WEBHOOK_SECRET       = process.env.WEBHOOK_SECRET;
+const GLOBAL_MNG_SECRETS   = [process.env.MENGANTAR_WEBHOOK_SECRET, process.env.MENGANTAR_WEBHOOK_SECRET_2].filter(Boolean);
 
 const sbH = () => ({
   'Content-Type': 'application/json',
@@ -127,31 +128,9 @@ module.exports = async function handler(req, res) {
   // 1. Baca raw body
   const rawBody = await readRawBody(req);
 
-  // 2. Verifikasi HMAC-SHA256
-  const secrets = [
-    process.env.MENGANTAR_WEBHOOK_SECRET,
-    process.env.MENGANTAR_WEBHOOK_SECRET_2,
-  ].filter(Boolean);
-
+  // 2. Simpan header signature untuk verifikasi nanti (setelah tau user)
   const timestamp = req.headers['x-timestamp'] || '';
   const received  = req.headers['x-signature'] || '';
-
-  if (secrets.length > 0 && received) {
-    const valid = secrets.some(secret => {
-      const exp1 = crypto.createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
-      const exp2 = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-      const match = (exp, recv) => exp.length === recv.length && crypto.timingSafeEqual(Buffer.from(exp), Buffer.from(recv));
-      return match(exp1, received) || match(exp2, received);
-    });
-    if (!valid) {
-      console.error('[mng-webhook] Signature tidak valid');
-      return res.status(401).json({ error: 'Invalid signature' });
-    }
-    if (timestamp && Math.abs(Date.now() - Number(timestamp)) > 5 * 60 * 1000) {
-      console.error('[mng-webhook] Request kadaluarsa');
-      return res.status(401).json({ error: 'Request expired' });
-    }
-  }
 
   // 3. Parse payload
   let payload;
@@ -186,6 +165,33 @@ module.exports = async function handler(req, res) {
     }
 
     const order = orders[0];
+
+    // 5b. Verifikasi HMAC-SHA256 (per-user secret + global fallback)
+    if (received) {
+      let secrets = [...GLOBAL_MNG_SECRETS];
+      // Ambil secret per-user dari DB
+      const userSecretRows = await sbGet('users', `?id=eq.${order.user_id}&select=mengantar_webhook_secret&limit=1`).catch(() => []);
+      const userSecret = userSecretRows[0]?.mengantar_webhook_secret;
+      if (userSecret) secrets.unshift(userSecret); // prioritas user secret dulu
+
+      if (secrets.length > 0) {
+        const valid = secrets.some(secret => {
+          const exp1 = crypto.createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
+          const exp2 = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+          const match = (exp, recv) => exp.length === recv.length && crypto.timingSafeEqual(Buffer.from(exp), Buffer.from(recv));
+          return match(exp1, received) || match(exp2, received);
+        });
+        if (!valid) {
+          console.error(`[mng-webhook] Signature tidak valid untuk user ${order.user_id}`);
+          return res.status(401).json({ error: 'Invalid signature' });
+        }
+      }
+      if (timestamp && Math.abs(Date.now() - Number(timestamp)) > 5 * 60 * 1000) {
+        console.error('[mng-webhook] Request kadaluarsa');
+        return res.status(401).json({ error: 'Request expired' });
+      }
+    }
+
     const doneEvents = order.tracking_events || {};
 
     // 6. Anti-downgrade: kalau sudah BERMASALAH, jangan turun ke dikirim/out_for_delivery/tiba_kota
