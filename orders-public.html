@@ -162,9 +162,35 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
   .top-bar{padding:10px}
   .drp-dropdown{min-width:calc(100vw - 10px);left:5px!important;right:5px!important}
 }
+/* Login overlay */
+.login-overlay{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.login-box{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;text-align:center}
+.login-box h2{font-size:20px;font-weight:800;color:var(--text);margin-bottom:6px}
+.login-box p{font-size:13px;color:var(--text-3);margin-bottom:24px}
+.login-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;margin-bottom:12px;outline:none;box-sizing:border-box}
+.login-input:focus{border-color:#3b82f6}
+.login-btn{width:100%;padding:10px;border:none;border-radius:8px;background:#3b82f6;color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
+.login-btn:hover{background:#2563eb}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-error{color:#ef4444;font-size:12px;margin-top:10px;display:none}
+.logout-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.logout-btn:hover{border-color:#ef4444;color:#ef4444}
+.company-name{font-size:12px;font-weight:600;color:#3b82f6;padding:4px 10px;background:rgba(59,130,246,.08);border-radius:8px}
 </style>
 </head>
 <body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>Closing Overview</h2>
+    <p>Login untuk melihat data</p>
+    <input class="login-input" id="login-user" type="text" placeholder="Username" autocomplete="username">
+    <input class="login-input" id="login-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Login</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
 
 <!-- TOP BAR -->
 <div class="top-bar">
@@ -218,8 +244,10 @@ tbody tr:hover td{background:rgba(59,130,246,.03)}
   </div>
 
   <div class="top-right">
+    <span class="company-name" id="company-label" style="display:none"></span>
     <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
     <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema">🌙</button>
+    <button class="logout-btn" id="logout-btn" style="display:none" onclick="doLogout()">Logout</button>
   </div>
 </div>
 
@@ -488,6 +516,76 @@ function drpNav(dir) {
   drpRender();
 }
 
+// ── AUTH ──────────────────────────────────────────────────
+let _authRole = null;         // 'spv' | 'company'
+let _authName = '';
+let _allowedUserIds = null;   // null = semua (spv), array = filtered (company)
+
+const API_BASE = '/api/rekap';
+
+async function apiPost(action, body) {
+  const r = await fetch(`${API_BASE}?action=${action}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', body: JSON.stringify(body),
+  });
+  return r.json();
+}
+async function apiGet(action) {
+  const r = await fetch(`${API_BASE}?action=${action}`, { credentials: 'include' });
+  return r.json();
+}
+
+async function checkAuth() {
+  const data = await apiGet('company-check');
+  if (!data.logged_in) {
+    document.getElementById('login-overlay').style.display = 'flex';
+    return false;
+  }
+  _authRole = data.role;
+  _authName = data.name;
+  _allowedUserIds = data.role === 'spv' ? null : (data.assigned_user_ids || []);
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('company-label').textContent = data.name;
+  document.getElementById('company-label').style.display = '';
+  document.getElementById('logout-btn').style.display = '';
+  return true;
+}
+
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (!user || !pass) { errEl.textContent = 'Isi username dan password'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Loading...';
+  errEl.style.display = 'none';
+  const data = await apiPost('company-login', { username: user, password: pass });
+  btn.disabled = false; btn.textContent = 'Login';
+  if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+  _authRole = data.role;
+  _authName = data.name;
+  _allowedUserIds = data.role === 'spv' ? null : (data.assigned_user_ids || []);
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('company-label').textContent = data.name;
+  document.getElementById('company-label').style.display = '';
+  document.getElementById('logout-btn').style.display = '';
+  init();
+}
+
+async function doLogout() {
+  await apiPost('company-logout', {});
+  _authRole = null; _authName = ''; _allowedUserIds = null;
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('company-label').style.display = 'none';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+// Enter key on login
+document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
+
 // ── DATA ──────────────────────────────────────────────────
 let allOrders = [], allLeads = [];
 let prodMap = {}, userMap = {};
@@ -507,7 +605,6 @@ function filterLeadsByRange(leads) {
 }
 
 async function init() {
-  // Fetch ALL data tanpa user_id filter — sama kayak all-orders.html
   const [orders, prods, users] = await Promise.all([
     sbFetch('orders_new', '?select=id,user_id,customer_id,conversation_id,product_id,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,metode,ekspedisi,customer_nama,customer_phone,product_nama,created_at&order=created_at.desc'),
     sbFetch('products', '?select=id,nama,harga'),
@@ -517,9 +614,16 @@ async function init() {
   (prods || []).forEach(p => { prodMap[p.id] = p; });
   (users || []).forEach(u => { userMap[u.id] = u; });
 
+  // Filter users by allowed IDs (company hanya lihat user yang di-assign)
+  let visibleUsers = users || [];
+  if (_allowedUserIds) {
+    visibleUsers = visibleUsers.filter(u => _allowedUserIds.includes(u.id));
+  }
+
   // Populate user filter dropdown
   const userSelect = document.getElementById('filter-user');
-  (users || []).forEach(u => {
+  userSelect.innerHTML = '<option value="">Semua User</option>';
+  visibleUsers.forEach(u => {
     const opt = document.createElement('option');
     opt.value = u.id;
     opt.textContent = u.name;
@@ -528,6 +632,7 @@ async function init() {
 
   // Populate product filter dropdown
   const prodSelect = document.getElementById('filter-product');
+  prodSelect.innerHTML = '<option value="">Semua Produk</option>';
   const seenProds = new Set();
   (prods || []).forEach(p => {
     if (!seenProds.has(p.id)) {
@@ -539,11 +644,15 @@ async function init() {
     }
   });
 
+  // Filter orders by allowed user IDs
   allOrders = orders || [];
+  if (_allowedUserIds) {
+    allOrders = allOrders.filter(o => _allowedUserIds.includes(o.user_id));
+  }
 
-  // Fetch lead per user (sama persis kayak orders.html)
+  // Fetch lead per user
   allLeads = [];
-  const userIds = (users || []).map(u => u.id);
+  const userIds = visibleUsers.map(u => u.id);
   const leadBatches = await Promise.all(
     userIds.map(uid =>
       sbFetch('conversations', `?user_id=eq.${uid}&select=id,user_id,product_id,state,created_at&order=last_msg_at.desc&limit=10000`)
@@ -557,6 +666,11 @@ async function init() {
 
   render();
 }
+
+// ── Boot ──
+(async () => {
+  if (await checkAuth()) init();
+})();
 
 function render() {
   const userFilter = document.getElementById('filter-user').value;
@@ -830,7 +944,6 @@ function exportCSV() {
   a.click();
 }
 
-init();
 </script>
 </body>
 </html>

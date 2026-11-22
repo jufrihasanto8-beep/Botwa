@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="img/logo-adsy.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kelola Company · Adsy CS</title>
+<script>if(localStorage.getItem('cs_theme')==='light')document.body.classList.add('light');</script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8}
+
+.top-bar{background:var(--white);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.page-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.4px}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
+.btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
+.btn-outline{background:none;border:1px solid var(--border);color:var(--text-2)}.btn-outline:hover{border-color:#3b82f6;color:#3b82f6}
+.btn-sm{padding:5px 10px;font-size:11px}
+.logout-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer}.logout-btn:hover{border-color:#ef4444;color:#ef4444}
+
+/* Login */
+.login-overlay{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.login-box{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;text-align:center}
+.login-box h2{font-size:20px;font-weight:800;color:var(--text);margin-bottom:6px}
+.login-box p{font-size:13px;color:var(--text-3);margin-bottom:24px}
+.login-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;margin-bottom:12px;outline:none;box-sizing:border-box}
+.login-input:focus{border-color:#3b82f6}
+.login-btn{width:100%;padding:10px;border:none;border-radius:8px;background:#3b82f6;color:#fff;font-size:14px;font-weight:700;cursor:pointer}.login-btn:hover{background:#2563eb}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-error{color:#ef4444;font-size:12px;margin-top:10px;display:none}
+
+/* Content */
+.content{padding:24px}
+.card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:20px 24px;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:16px}
+
+/* Company list */
+.c-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.c-row:last-child{border-bottom:none}
+.c-name{font-weight:700;font-size:14px;color:var(--text);min-width:120px}
+.c-user{font-size:11px;color:var(--text-3)}
+.c-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600}
+.c-badge.active{background:rgba(34,197,94,.1);color:#22c55e}
+.c-badge.inactive{background:rgba(239,68,68,.1);color:#ef4444}
+.c-actions{margin-left:auto;display:flex;gap:6px}
+.c-username{font-size:12px;color:var(--text-2);background:var(--bg);padding:2px 8px;border-radius:6px;font-family:monospace}
+
+/* Form */
+.form-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+.form-overlay.open{display:flex}
+.form-box{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:28px 24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.form-box h3{font-size:16px;font-weight:700;margin-bottom:18px;color:var(--text)}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.form-group input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none;box-sizing:border-box}
+.form-group input:focus{border-color:#3b82f6}
+
+/* User checkboxes */
+.user-checks{display:flex;flex-wrap:wrap;gap:8px}
+.user-check{display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-2);transition:all .12s;user-select:none}
+.user-check:hover{border-color:#3b82f6}
+.user-check.checked{background:rgba(59,130,246,.08);border-color:#3b82f6;color:#3b82f6;font-weight:600}
+.user-check input{display:none}
+
+.form-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.empty-msg{text-align:center;padding:40px;color:var(--text-3);font-size:13px}
+
+@media(max-width:600px){
+  .content{padding:14px}
+  .c-row{flex-wrap:wrap;gap:8px}
+  .c-actions{margin-left:0;width:100%}
+  .form-box{margin:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>Admin Company</h2>
+    <p>Login SPV untuk kelola company</p>
+    <input class="login-input" id="login-user" type="text" placeholder="Username SPV">
+    <input class="login-input" id="login-pass" type="password" placeholder="Password">
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Login</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="page-title">Kelola Company</div>
+  <div class="top-right">
+    <button class="btn btn-primary" onclick="openForm()">+ Tambah Company</button>
+    <button class="theme-btn" onclick="document.body.classList.toggle('light');localStorage.setItem('cs_theme',document.body.classList.contains('light')?'light':'dark')" title="Tema">🌙</button>
+    <button class="logout-btn" onclick="doLogout()">Logout</button>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+  <div class="card">
+    <div class="card-title">Daftar Company</div>
+    <div id="company-list"><div class="empty-msg">Memuat...</div></div>
+  </div>
+</div>
+
+<!-- FORM MODAL -->
+<div class="form-overlay" id="form-overlay" onclick="if(event.target===this)closeForm()">
+  <div class="form-box">
+    <h3 id="form-title">Tambah Company</h3>
+    <input type="hidden" id="form-id">
+    <div class="form-group">
+      <label>Nama Company</label>
+      <input id="form-name" placeholder="Contoh: Adsy">
+    </div>
+    <div class="form-group">
+      <label>Username (untuk login)</label>
+      <input id="form-username" placeholder="Contoh: adsy" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input id="form-password" type="password" placeholder="Minimal 6 karakter" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label>Assign User</label>
+      <div class="user-checks" id="user-checks"></div>
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-outline" onclick="closeForm()">Batal</button>
+      <button class="btn btn-primary" id="form-submit" onclick="submitForm()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+const SB_URL = window.SUPABASE_URL || '';
+const SB_KEY = window.SUPABASE_ANON_KEY || '';
+const API_BASE = '/api/rekap';
+
+let _companies = [];
+let _users = [];
+
+// ── API ──
+async function apiPost(action, body) {
+  const r = await fetch(`${API_BASE}?action=${action}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', body: JSON.stringify(body),
+  });
+  return r.json();
+}
+async function apiGet(action) {
+  const r = await fetch(`${API_BASE}?action=${action}`, { credentials: 'include' });
+  return r.json();
+}
+function sbFetch(table, query) {
+  return fetch(`${SB_URL}/rest/v1/${table}${query}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+  }).then(r => r.json()).catch(() => []);
+}
+
+// ── Auth ──
+async function checkAuth() {
+  const data = await apiGet('company-check');
+  if (!data.logged_in || data.role !== 'spv') {
+    document.getElementById('login-overlay').style.display = 'flex';
+    return false;
+  }
+  document.getElementById('login-overlay').style.display = 'none';
+  return true;
+}
+
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (!user || !pass) { errEl.textContent = 'Isi username dan password'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Loading...'; errEl.style.display = 'none';
+  const data = await apiPost('company-login', { username: user, password: pass });
+  btn.disabled = false; btn.textContent = 'Login';
+  if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+  if (data.role !== 'spv') { errEl.textContent = 'Hanya SPV yang bisa akses halaman ini'; errEl.style.display = 'block'; return; }
+  document.getElementById('login-overlay').style.display = 'none';
+  loadData();
+}
+
+async function doLogout() {
+  await apiPost('company-logout', {});
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
+
+// ── Data ──
+async function loadData() {
+  const [companies, users] = await Promise.all([
+    apiGet('company-list'),
+    sbFetch('users', '?select=id,name&order=name'),
+  ]);
+  _companies = Array.isArray(companies) ? companies : [];
+  _users = users || [];
+  renderList();
+}
+
+function renderList() {
+  const el = document.getElementById('company-list');
+  if (!_companies.length) {
+    el.innerHTML = '<div class="empty-msg">Belum ada company. Klik "+ Tambah Company" untuk mulai.</div>';
+    return;
+  }
+  el.innerHTML = _companies.map(c => {
+    const userNames = (c.assigned_user_ids || []).map(uid => {
+      const u = _users.find(u => u.id === uid);
+      return u ? u.name : uid.slice(0,8);
+    }).join(', ') || 'Belum di-assign';
+    const badge = c.aktif ? '<span class="c-badge active">Aktif</span>' : '<span class="c-badge inactive">Nonaktif</span>';
+    return `<div class="c-row">
+      <div>
+        <div class="c-name">${esc(c.name)} ${badge}</div>
+        <div style="margin-top:3px"><span class="c-username">${esc(c.username)}</span></div>
+        <div class="c-user" style="margin-top:4px">Users: ${esc(userNames)}</div>
+      </div>
+      <div class="c-actions">
+        <button class="btn btn-outline btn-sm" onclick="editCompany('${c.id}')">Edit</button>
+        <button class="btn btn-sm" style="background:${c.aktif?'rgba(239,68,68,.1);color:#ef4444':'rgba(34,197,94,.1);color:#22c55e'}" onclick="toggleAktif('${c.id}',${!c.aktif})">${c.aktif?'Nonaktifkan':'Aktifkan'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Form ──
+let _editId = null;
+
+function openForm(id) {
+  _editId = id || null;
+  document.getElementById('form-title').textContent = _editId ? 'Edit Company' : 'Tambah Company';
+  document.getElementById('form-id').value = _editId || '';
+  document.getElementById('form-name').value = '';
+  document.getElementById('form-username').value = '';
+  document.getElementById('form-password').value = '';
+  document.getElementById('form-password').placeholder = _editId ? 'Kosongkan kalau tidak ganti' : 'Minimal 6 karakter';
+
+  // Render user checkboxes
+  const checksEl = document.getElementById('user-checks');
+  let assignedIds = [];
+
+  if (_editId) {
+    const c = _companies.find(c => c.id === _editId);
+    if (c) {
+      document.getElementById('form-name').value = c.name;
+      document.getElementById('form-username').value = c.username;
+      assignedIds = c.assigned_user_ids || [];
+    }
+  }
+
+  checksEl.innerHTML = _users.map(u => {
+    const checked = assignedIds.includes(u.id);
+    return `<label class="user-check${checked?' checked':''}" onclick="this.classList.toggle('checked')">
+      <input type="checkbox" value="${u.id}" ${checked?'checked':''}>
+      ${esc(u.name)}
+    </label>`;
+  }).join('');
+
+  document.getElementById('form-overlay').classList.add('open');
+}
+
+function closeForm() {
+  document.getElementById('form-overlay').classList.remove('open');
+  _editId = null;
+}
+
+async function submitForm() {
+  const name = document.getElementById('form-name').value.trim();
+  const username = document.getElementById('form-username').value.trim();
+  const password = document.getElementById('form-password').value;
+  const checks = document.querySelectorAll('#user-checks input:checked');
+  const assigned_user_ids = Array.from(checks).map(cb => cb.value);
+
+  if (!name || !username) return alert('Nama dan username wajib diisi');
+  if (!_editId && !password) return alert('Password wajib diisi');
+  if (password && password.length < 6) return alert('Password minimal 6 karakter');
+
+  const btn = document.getElementById('form-submit');
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+  let data;
+  if (_editId) {
+    const body = { id: _editId, name, username, assigned_user_ids };
+    if (password) body.password = password;
+    data = await apiPost('company-update', body);
+  } else {
+    data = await apiPost('company-create', { name, username, password, assigned_user_ids });
+  }
+
+  btn.disabled = false; btn.textContent = 'Simpan';
+
+  if (data.error) return alert('Error: ' + data.error);
+  closeForm();
+  loadData();
+}
+
+function editCompany(id) { openForm(id); }
+
+async function toggleAktif(id, aktif) {
+  await apiPost('company-update', { id, aktif });
+  loadData();
+}
+
+// ── Boot ──
+(async () => {
+  if (await checkAuth()) loadData();
+})();
+</script>
+</body>
+</html>
