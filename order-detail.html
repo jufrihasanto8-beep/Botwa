@@ -260,6 +260,23 @@ tbody td{
 body.light .bdg-val-lolos{background:rgba(34,197,94,.08);color:#16a34a;border-color:rgba(34,197,94,.2)}
 body.light .bdg-val-gagal{background:rgba(239,68,68,.08);color:#dc2626;border-color:rgba(239,68,68,.2)}
 body.light .bdg-val-belum{background:rgba(100,116,139,.08);color:#64748b;border-color:rgba(100,116,139,.2)}
+.bdg-val-gagal{cursor:pointer}
+.btn-val-manual{font-size:9px;padding:2px 6px;margin-top:3px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:4px;color:#3b82f6;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn-val-manual:hover{background:rgba(59,130,246,.2)}
+.btn-val-manual:disabled{opacity:.5;cursor:not-allowed}
+body.light .btn-val-manual{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2);color:#2563eb}
+.val-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1300;align-items:center;justify-content:center}
+.val-overlay.open{display:flex}
+.val-modal{background:var(--white);border-radius:14px;width:480px;max-width:92vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.val-modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.val-modal-head h3{font-size:15px;font-weight:700;color:var(--text)}
+.val-modal-body{padding:16px 20px;overflow-y:auto;flex:1;font-size:13px;color:var(--text)}
+.val-fix-item{padding:10px 12px;margin-bottom:8px;border-radius:8px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12)}
+.val-fix-field{font-weight:700;color:#ef4444;font-size:12px;text-transform:uppercase;margin-bottom:4px}
+.val-fix-change{font-size:12px;color:var(--text-2);margin-bottom:2px}
+.val-fix-reason{font-size:11px;color:var(--text-3);font-style:italic}
+body.light .val-fix-item{background:rgba(239,68,68,.04);border-color:rgba(239,68,68,.1)}
+body.light .val-fix-field{color:#dc2626}
 body.light .bdg-cod{background:rgba(34,197,94,.1);color:#16a34a;border-color:rgba(34,197,94,.25)}
 body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgba(99,102,241,.25)}
 
@@ -365,6 +382,9 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
     <div class="sum-item">Total Nilai: <b id="sum-nilai" style="color:#22c55e">—</b></div>
     <div class="sum-item" style="color:var(--text-3)">|</div>
     <div class="sum-item">Total Qty: <b id="sum-qty">—</b></div>
+    <div class="sum-item" style="color:var(--text-3)">|</div>
+    <div class="sum-item">✓ Resi: <b id="sum-resi-ada" style="color:#22c55e">—</b></div>
+    <div class="sum-item">✗ Belum Resi: <b id="sum-resi-belum" style="color:#ef4444">—</b></div>
   </div>
 
   <!-- TABLE -->
@@ -401,6 +421,21 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
   </div>
 
 </div>
+</div>
+
+<!-- Validasi Detail Modal -->
+<div class="val-overlay" id="val-overlay" onclick="if(event.target===this)closeValDetail()">
+  <div class="val-modal">
+    <div class="val-modal-head">
+      <h3>⚠️ Detail Validasi</h3>
+      <button class="edit-modal-close" onclick="closeValDetail()">✕</button>
+    </div>
+    <div class="val-modal-body" id="val-modal-body"></div>
+    <div style="padding:12px 20px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-cancel" onclick="closeValDetail()">Tutup</button>
+      <button class="btn-save" id="val-btn-edit" onclick="valOpenEdit()">✏️ Edit Order</button>
+    </div>
+  </div>
 </div>
 
 <!-- Mengantar Modal -->
@@ -626,7 +661,7 @@ function filterByRange(list) {
 
 async function init() {
   const [orders, custs, prods] = await Promise.all([
-    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,mengantar_status,mengantar_error,mengantar_sent_at,created_at,validated_at,flag_risiko,validation_note&order=created_at.desc`),
+    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,mengantar_status,mengantar_error,mengantar_sent_at,created_at,validated_at,flag_risiko,validation_note,validation_fixes&order=created_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,catatan`),
     sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga,persona_cs_nama`),
   ]);
@@ -683,6 +718,7 @@ function getOrderRow(c, idx) {
   // Status validasi
   const validasi = !c.validated_at ? 'belum' : c.flag_risiko ? 'gagal' : 'lolos';
   const validasiNote = c.validation_note || '';
+  const validasiFixes = c.validation_fixes || [];
 
   return {
     id: c.id,
@@ -698,7 +734,7 @@ function getOrderRow(c, idx) {
     jumlah: prod.nama ? `${prod.nama} ×${qty}` : `×${qty}`,
     qty, metode, total, instruksi, keterangan, rincian, keluhan,
     isCOD, sudahDikirim, queueFailed, noResi, errorMsg,
-    validasi, validasiNote,
+    validasi, validasiNote, validasiFixes,
     _raw: c, _cu: cu
   };
 }
@@ -710,17 +746,20 @@ function render() {
   const rows = list.map((c, i) => getOrderRow(c, i));
 
   // Summary
-  let cod = 0, tf = 0, totalNilai = 0, totalQty = 0;
+  let cod = 0, tf = 0, totalNilai = 0, totalQty = 0, resiAda = 0, resiBelum = 0;
   rows.forEach(r => {
     if (r.isCOD) cod++; else tf++;
     totalNilai += r.total;
     totalQty   += r.qty;
+    if (r.noResi) resiAda++; else resiBelum++;
   });
   document.getElementById('sum-total').textContent = rows.length;
   document.getElementById('sum-cod').textContent   = cod;
   document.getElementById('sum-tf').textContent    = tf;
   document.getElementById('sum-nilai').textContent = rp(totalNilai);
   document.getElementById('sum-qty').textContent   = totalQty + ' unit';
+  document.getElementById('sum-resi-ada').textContent   = resiAda;
+  document.getElementById('sum-resi-belum').textContent = resiBelum;
 
   renderTable(rows);
 }
@@ -767,7 +806,14 @@ function renderTable(rows) {
     <td class="td-num">${rp(r.total)}</td>
     <td class="td-wrap-sm" style="font-size:11px">${escH(r.instruksi)}${resiTag}</td>
     <td class="td-wrap" style="font-size:11px">${escH(r.rincian)}</td>
-    <td style="text-align:center"><span class="bdg bdg-val-${r.validasi}" title="${escH(r.validasiNote)}">${r.validasi === 'lolos' ? '✓ Lolos' : r.validasi === 'gagal' ? '✗ Gagal' : '⏳ Belum'}</span></td>
+    <td style="text-align:center">
+      ${r.validasi === 'gagal'
+        ? `<span class="bdg bdg-val-gagal" onclick="openValDetail('${escH(r.id)}')" title="Klik untuk lihat detail">✗ Gagal</span>`
+        : r.validasi === 'lolos'
+          ? `<span class="bdg bdg-val-lolos">✓ Lolos</span>`
+          : `<span class="bdg bdg-val-belum">⏳ Belum</span><br><button class="btn-val-manual" id="vbtn-${escH(r.id)}" onclick="triggerValidasi('${escH(r.id)}')">Validasi</button>`
+      }
+    </td>
     <td><div class="td-wrap" title="${escH(r.keluhan)}">${escH(r.keluhan)||'—'}</div></td>
     <td><div class="td-wrap" title="${escH(r.keterangan)}">${escH(r.keterangan)||'—'}</div></td>
   </tr>`;
@@ -1220,6 +1266,82 @@ async function submitMengantar() {
     mngProcessing = false;
     cancelBtn.style.display = 'none';
   }
+}
+
+// ── VALIDASI MANUAL & DETAIL ──────────────────────────────
+let valDetailOrderId = null;
+
+async function triggerValidasi(orderId) {
+  const btn = document.getElementById('vbtn-' + orderId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+  try {
+    const resp = await fetch('/api/validate-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId, user_id: uid }),
+    });
+    const json = await resp.json();
+    // Refresh data order ini dari DB
+    const updated = await sbFetch('orders_new', `?id=eq.${orderId}&select=validated_at,flag_risiko,validation_note,validation_fixes&limit=1`);
+    if (updated[0]) {
+      const o = allOrders.find(x => x.id === orderId);
+      if (o) {
+        o.validated_at = updated[0].validated_at;
+        o.flag_risiko = updated[0].flag_risiko;
+        o.validation_note = updated[0].validation_note;
+        o.validation_fixes = updated[0].validation_fixes;
+      }
+    }
+    render();
+  } catch(e) {
+    alert('Gagal validasi: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Validasi'; }
+  }
+}
+
+function openValDetail(orderId) {
+  const list = filterByRange(allOrders);
+  const rows = list.map((c, i) => getOrderRow(c, i));
+  const r = rows.find(x => x.id === orderId);
+  if (!r) return;
+  valDetailOrderId = orderId;
+
+  const body = document.getElementById('val-modal-body');
+  const fixes = r.validasiFixes || [];
+  const fmtDate = r._raw.validated_at ? new Date(r._raw.validated_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+  let html = `<div style="margin-bottom:14px">
+    <div style="font-weight:600;margin-bottom:4px">${escH(r.nama)}</div>
+    <div style="font-size:11px;color:var(--text-3)">Divalidasi: ${fmtDate}</div>
+    <div style="font-size:12px;color:var(--text-2);margin-top:6px">${escH(r.validasiNote)}</div>
+  </div>`;
+
+  if (fixes.length) {
+    html += '<div style="font-weight:600;font-size:12px;margin-bottom:8px">🔧 Koreksi otomatis:</div>';
+    fixes.forEach(f => {
+      html += `<div class="val-fix-item">
+        <div class="val-fix-field">${escH(f.field)}</div>
+        <div class="val-fix-change">"${escH(f.old)}" → "${escH(f.new)}"</div>
+        <div class="val-fix-reason">${escH(f.reason)}</div>
+      </div>`;
+    });
+  } else {
+    html += '<div style="font-size:12px;color:var(--text-3)">Detail koreksi tidak tersedia.</div>';
+  }
+
+  body.innerHTML = html;
+  document.getElementById('val-overlay').classList.add('open');
+}
+
+function closeValDetail() {
+  document.getElementById('val-overlay').classList.remove('open');
+  valDetailOrderId = null;
+}
+
+function valOpenEdit() {
+  if (!valDetailOrderId) return;
+  closeValDetail();
+  openEdit(valDetailOrderId);
 }
 
 // ── EDIT ORDER ────────────────────────────────────────────
