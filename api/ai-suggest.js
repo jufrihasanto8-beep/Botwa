@@ -466,10 +466,10 @@ async function handleCustomerRisk(req, res) {
       const parts = wilayah.split(',').map(s => s.trim());
       const kecamatan = parts[0];
       const kota = parts[1] || parts[0];
-      let orders = await valGet(`all_orderan?kecamatan=ilike.${encodeURIComponent(kecamatan)}*&select=status_akhir&limit=1000`);
+      let orders = await valGet(`all_orderan?kecamatan=ilike.${encodeURIComponent(kecamatan)}&select=status_akhir&limit=500`);
       let namaLabel = kecamatan;
       if (orders.length < 3 && kota !== kecamatan) {
-        orders = await valGet(`all_orderan?kabupaten=ilike.${encodeURIComponent(kota)}*&select=status_akhir&limit=1000`);
+        orders = await valGet(`all_orderan?kabupaten=ilike.${encodeURIComponent(kota)}&select=status_akhir&limit=500`);
         namaLabel = kota;
       }
       const wTotal = orders.length;
