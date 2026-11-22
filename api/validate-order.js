@@ -108,7 +108,19 @@ async function validateOrder(order) {
   const formProduk = state.form_produk || '';
   const isFormLead = state.is_form_lead || false;
 
-  // 4. Panggil Haiku untuk validasi + extract data benar
+  // 4. Build info harga bundling untuk konteks validasi
+  const bundlingList = Array.isArray(product?.harga_bundling) ? product.harga_bundling : [];
+  const bundlingInfo = bundlingList.length > 0
+    ? bundlingList.map(b => `  - ${b.qty} pcs = Rp ${(b.harga||0).toLocaleString('id-ID')}${b.bonus ? ` + bonus ${b.bonus}` : ''}`).join('\n')
+    : '  (tidak ada bundling)';
+  const hargaSatuan = product?.harga || 0;
+  const expectedHarga = (() => {
+    const q = order.qty || 1;
+    const ex = bundlingList.find(b => b.qty === q);
+    return ex ? ex.harga : hargaSatuan * q;
+  })();
+
+  // Panggil Haiku untuk validasi + extract data benar
   const prompt = `Kamu adalah VALIDATOR ORDER yang sangat teliti. Tugasmu mengecek apakah data order yang tersimpan di database BENAR sesuai percakapan.
 
 ═══ DATA ORDER DI DATABASE ═══
@@ -122,8 +134,18 @@ Kode Pos: ${alamat.kodepos || '-'}
 Qty: ${order.qty || '-'}
 Metode: ${order.metode || '-'}
 Ekspedisi: ${order.ekspedisi || '-'}
-Produk: ${product?.nama || order.product_nama || '-'}
-Total: ${order.total || '-'}
+Produk DB: ${product?.nama || order.product_nama || '-'}
+Harga DB: Rp ${(order.harga||0).toLocaleString('id-ID')}
+Ongkir: Rp ${(order.ongkir_after_promo ?? order.ongkir ?? 0).toLocaleString('id-ID')}
+Fee COD: Rp ${(order.fee_cod||0).toLocaleString('id-ID')}
+Total: Rp ${(order.total||0).toLocaleString('id-ID')}
+
+═══ KATALOG PRODUK ═══
+Produk: ${product?.nama || '-'}
+Harga satuan: Rp ${hargaSatuan.toLocaleString('id-ID')}
+Harga bundling:
+${bundlingInfo}
+Harga seharusnya (qty ${order.qty||1}): Rp ${expectedHarga.toLocaleString('id-ID')}
 
 ${isFormLead ? `═══ DATA FORM LEAD (dari orderonline.id) ═══
 Alamat form: ${formAlamat}
@@ -143,11 +165,24 @@ Cek SEMUA hal berikut:
    - Kalau form lead ada → alamat form lead adalah sumber kebenaran
    - Kalau alamat jalan menyebut kecamatan/kabupaten tertentu tapi data wilayah beda → SALAH
 
-2. **QTY** — Apakah jumlah pesanan sesuai yang customer bilang di chat?
+2. **QTY** — Apakah jumlah pesanan sesuai yang customer bilang di chat? Cek paket mana yang customer setujui.
 
 3. **METODE BAYAR** — COD atau Transfer, sesuai yang customer pilih di chat?
 
 4. **ALAMAT LENGKAP** — Apakah ada field alamat yang kosong padahal informasinya ada di percakapan atau form lead?
+
+5. **HARGA** — Apakah harga di DB sudah sesuai katalog?
+   - Bandingkan "Harga DB" dengan "Harga seharusnya" di katalog.
+   - Kalau beda → fix qty ke qty yang benar (harga akan dihitung ulang otomatis).
+   - Contoh: qty=2 tapi harga=79000 (harga satuan) padahal bundling qty 2 = 139000 → fix qty=2 supaya trigger recalculate.
+
+6. **NAMA CUSTOMER** — Apakah nama customer di DB sesuai yang customer sebutkan di chat?
+   - Kalau customer menyebut nama berbeda dari yang tersimpan → fix.
+   - Kalau nama jelas typo atau terpotong → fix sesuai chat.
+   - JANGAN fix kalau nama di DB sudah mirip/benar dan hanya beda kapitalisasi.
+
+7. **PRODUK** — Apakah produk yang dipesan sesuai percakapan?
+   - Kalau customer di chat menyebut produk tertentu tapi di DB produknya beda → flag saja di summary (tidak bisa auto-fix product_id).
 
 ═══ FORMAT JAWABAN (WAJIB JSON) ═══
 Jawab HANYA dengan JSON, tanpa teks lain:
@@ -161,8 +196,13 @@ Kalau ada yang PERLU DIKOREKSI:
 Contoh fix alamat:
 {"status":"FIX","fixes":[{"field":"kelurahan","old":"Sudah","new":"Mekarbakti","reason":"'Sudah' bukan nama kelurahan, itu jawaban konfirmasi customer"},{"field":"kecamatan","old":"Malo","new":"Panongan","reason":"Alamat jalan menunjukkan Kec. Panongan, Tangerang"},{"field":"kabupaten","old":"Kabupaten Bojonegoro","new":"Kabupaten Tangerang","reason":"Sesuai alamat form lead"},{"field":"provinsi","old":"Jawa Timur","new":"Banten","reason":"Tangerang ada di Banten"},{"field":"kodepos","old":"62153","new":"15710","reason":"Kode pos Panongan Tangerang"}],"summary":"Wilayah salah total — 'Sudah' terdeteksi sebagai kelurahan padahal jawaban konfirmasi"}
 
-Field yang bisa di-fix: kelurahan, kecamatan, kabupaten, provinsi, kodepos, jalan, qty, metode
-Untuk qty/metode, "new" harus berupa string angka/kata (misal "2", "transfer")`;
+Contoh fix nama:
+{"status":"FIX","fixes":[{"field":"nama","old":"Erni","new":"Erni Kadir","reason":"Customer menyebut nama lengkap Erni Kadir di chat"}],"summary":"Nama customer tidak lengkap"}
+
+Field yang bisa di-fix: kelurahan, kecamatan, kabupaten, provinsi, kodepos, jalan, qty, metode, nama
+Untuk qty, "new" harus string angka (misal "2")
+Untuk metode, "new" harus "cod" atau "transfer"
+Untuk nama, "new" harus nama lengkap sesuai percakapan`;
 
   log('Calling Haiku for validation...');
   const result = await callClaude(
@@ -202,6 +242,7 @@ Untuk qty/metode, "new" harus berupa string angka/kata (misal "2", "transfer")`;
     const alamatFixes = {};
     let qtyFix = null;
     let metodeFix = null;
+    let namaFix = null;
 
     for (const fix of parsed.fixes) {
       if (alamatFields.includes(fix.field)) {
@@ -210,12 +251,14 @@ Untuk qty/metode, "new" harus berupa string angka/kata (misal "2", "transfer")`;
         qtyFix = parseInt(fix.new) || null;
       } else if (fix.field === 'metode') {
         metodeFix = (fix.new || '').toLowerCase();
+      } else if (fix.field === 'nama') {
+        namaFix = (fix.new || '').trim() || null;
       }
     }
 
-    // A. Fix orders_new.alamat
+    // A. Fix orders_new
     const hasAlamatFix = Object.keys(alamatFixes).length > 0;
-    if (hasAlamatFix || qtyFix || metodeFix) {
+    if (hasAlamatFix || qtyFix || metodeFix || namaFix) {
       const orderPatch = {};
 
       if (hasAlamatFix) {
@@ -245,9 +288,11 @@ Untuk qty/metode, "new" harus berupa string angka/kata (misal "2", "transfer")`;
         orderPatch.total = newTotal;
       }
       if (metodeFix) orderPatch.metode = metodeFix;
+      if (namaFix) orderPatch.customer_nama = namaFix;
 
       orderPatch.validated_at = new Date().toISOString();
       orderPatch.validation_note = `[Auto-fix] ${parsed.summary}`;
+      orderPatch.validation_fixes = parsed.fixes;
       orderPatch.flag_risiko = true;
       orderPatch.alasan_flag = `[Auto-fix] ${parsed.summary}`;
 
@@ -255,7 +300,14 @@ Untuk qty/metode, "new" harus berupa string angka/kata (misal "2", "transfer")`;
       log('Fixed orders_new');
     }
 
-    // B. Fix customers.alamat
+    // B. Fix customers (alamat + nama)
+    if ((hasAlamatFix || namaFix) && customer?.id) {
+      if (namaFix) {
+        await sbPatch('customers', `?id=eq.${customer.id}`, { nama: namaFix })
+          .catch(e => log(`Gagal fix customer nama: ${e.message}`));
+        log('Fixed customers.nama');
+      }
+    }
     if (hasAlamatFix && customer?.id) {
       const custAlamat = { ...(customer.alamat || {}), ...alamatFixes };
       await sbPatch('customers', `?id=eq.${customer.id}`, { alamat: custAlamat })
@@ -331,26 +383,28 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  // Auth
+  // Auth — cron secret ATAU user_id + order_id (manual trigger dari dashboard)
   const cronSecret = req.headers['x-cron-secret'];
-  if (CRON_SECRET && cronSecret !== CRON_SECRET) {
+  const isManual = !!(req.body?.order_id && req.body?.user_id);
+  if (!isManual && CRON_SECRET && cronSecret !== CRON_SECRET) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
   try {
     const specificOrderId = req.body?.order_id;
+    const manualUserId = req.body?.user_id;
 
     let orders;
     if (specificOrderId) {
       // Validasi 1 order spesifik
-      orders = await sbGet(
-        `orders_new?id=eq.${specificOrderId}&select=id,user_id,customer_id,conversation_id,product_id,metode,qty,harga,ongkir,fee_cod,total,ekspedisi,alamat,status,customer_nama,customer_phone,product_nama,created_at,validated_at`
-      );
+      let query = `orders_new?id=eq.${specificOrderId}&select=id,user_id,customer_id,conversation_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,status,customer_nama,customer_phone,product_nama,created_at,validated_at`;
+      if (manualUserId) query += `&user_id=eq.${manualUserId}`;
+      orders = await sbGet(query);
     } else {
       // Ambil order 3 hari terakhir yang belum divalidasi
       const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
       orders = await sbGet(
-        `orders_new?validated_at=is.null&created_at=gte.${threeDaysAgo}&status=neq.batal&select=id,user_id,customer_id,conversation_id,product_id,metode,qty,harga,ongkir,fee_cod,total,ekspedisi,alamat,status,customer_nama,customer_phone,product_nama,created_at,validated_at&order=created_at.asc&limit=10`
+        `orders_new?validated_at=is.null&created_at=gte.${threeDaysAgo}&status=neq.batal&select=id,user_id,customer_id,conversation_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,status,customer_nama,customer_phone,product_nama,created_at,validated_at&order=created_at.asc&limit=10`
       );
     }
 
