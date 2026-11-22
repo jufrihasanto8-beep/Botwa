@@ -176,9 +176,36 @@ body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
   .tbl-wrap{margin:10px 14px 14px}
   .page-title{font-size:15px}
 }
+
+/* Login overlay */
+.login-overlay{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.login-box{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;text-align:center}
+.login-box h2{font-size:20px;font-weight:800;color:var(--text);margin-bottom:6px}
+.login-box p{font-size:13px;color:var(--text-3);margin-bottom:24px}
+.login-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;margin-bottom:12px;outline:none;box-sizing:border-box}
+.login-input:focus{border-color:#3b82f6}
+.login-btn{width:100%;padding:10px;border:none;border-radius:8px;background:#3b82f6;color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
+.login-btn:hover{background:#2563eb}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-error{color:#ef4444;font-size:12px;margin-top:10px;display:none}
+.logout-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer}.logout-btn:hover{border-color:#ef4444;color:#ef4444}
+.company-name{font-size:12px;font-weight:600;color:#3b82f6;padding:4px 10px;background:rgba(59,130,246,.08);border-radius:8px}
 </style>
 </head>
 <body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>All Orders</h2>
+    <p>Login untuk melihat data</p>
+    <input class="login-input" id="login-user" type="text" placeholder="Username" autocomplete="username">
+    <input class="login-input" id="login-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Login</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
 <div class="page-wrap">
 
   <!-- TOP BAR -->
@@ -237,7 +264,9 @@ body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
       <button class="btn-export btn-csv" onclick="exportCSV()">&#x2B07; CSV</button>
       <button class="btn-export btn-xlsx" onclick="exportExcel()">&#x2B07; Excel (.xlsx)</button>
     </div>
+    <span class="company-name" id="company-label" style="display:none"></span>
     <button class="theme-btn" onclick="toggleTheme()" title="Ganti tema" id="theme-btn">&#x1F319;</button>
+    <button class="logout-btn" id="logout-btn" style="display:none" onclick="doLogout()">Logout</button>
   </div>
 
   <!-- SUMMARY BAR -->
@@ -433,12 +462,80 @@ function drpNav(dir){
   drpRender();
 }
 
+// ── AUTH ──────────────────────────────────────────────────
+let _authRole = null;
+let _authName = '';
+let _allowedUserIds = null;
+
+const API_BASE = '/api/rekap';
+
+async function apiPost(action, body) {
+  const r = await fetch(`${API_BASE}?action=${action}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', body: JSON.stringify(body),
+  });
+  return r.json();
+}
+async function apiGet(action) {
+  const r = await fetch(`${API_BASE}?action=${action}`, { credentials: 'include' });
+  return r.json();
+}
+
+async function checkAuth() {
+  const data = await apiGet('company-check');
+  if (!data.logged_in) {
+    document.getElementById('login-overlay').style.display = 'flex';
+    return false;
+  }
+  _authRole = data.role;
+  _authName = data.name;
+  _allowedUserIds = data.role === 'spv' ? null : (data.assigned_user_ids || []);
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('company-label').textContent = data.name;
+  document.getElementById('company-label').style.display = '';
+  document.getElementById('logout-btn').style.display = '';
+  return true;
+}
+
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (!user || !pass) { errEl.textContent = 'Isi username dan password'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Loading...'; errEl.style.display = 'none';
+  const data = await apiPost('company-login', { username: user, password: pass });
+  btn.disabled = false; btn.textContent = 'Login';
+  if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+  _authRole = data.role;
+  _authName = data.name;
+  _allowedUserIds = data.role === 'spv' ? null : (data.assigned_user_ids || []);
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('company-label').textContent = data.name;
+  document.getElementById('company-label').style.display = '';
+  document.getElementById('logout-btn').style.display = '';
+  init();
+}
+
+async function doLogout() {
+  await apiPost('company-logout', {});
+  _authRole = null; _authName = ''; _allowedUserIds = null;
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('company-label').style.display = 'none';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
+
 // ── DATA ───────────────────────────────────────────────────
 let allOrders = [], prodMap = {}, custMap = {}, prodList = [];
 
 async function init() {
   const [orders, custs, prods] = await Promise.all([
-    sbFetch('orders_new', '?select=id,customer_id,conversation_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,created_at&order=created_at.desc'),
+    sbFetch('orders_new', '?select=id,user_id,customer_id,conversation_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,created_at&order=created_at.desc'),
     sbFetch('customers', '?select=id,wa_number,nama,catatan'),
     sbFetch('products', '?select=id,nama,harga,persona_cs_nama'),
   ]);
@@ -457,6 +554,10 @@ async function init() {
   });
 
   allOrders = orders || [];
+  // Filter by allowed user IDs (company hanya lihat user yang di-assign)
+  if (_allowedUserIds) {
+    allOrders = allOrders.filter(o => _allowedUserIds.includes(o.user_id));
+  }
   render();
 }
 
@@ -676,7 +777,9 @@ async function openChat(customerId, conversationId, nama, phone) {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChatModal(); });
 
 // ── INIT ───────────────────────────────────────────────────
-init();
+(async () => {
+  if (await checkAuth()) init();
+})();
 </script>
 </body>
 </html>
