@@ -254,6 +254,12 @@ tbody td{
   padding:4px 10px;border-radius:20px;white-space:nowrap}
 .bdg-cod{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
 .bdg-tf{background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.3)}
+.bdg-val-lolos{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25)}
+.bdg-val-gagal{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)}
+.bdg-val-belum{background:rgba(148,163,184,.12);color:#94a3b8;border:1px solid rgba(148,163,184,.25)}
+body.light .bdg-val-lolos{background:rgba(34,197,94,.08);color:#16a34a;border-color:rgba(34,197,94,.2)}
+body.light .bdg-val-gagal{background:rgba(239,68,68,.08);color:#dc2626;border-color:rgba(239,68,68,.2)}
+body.light .bdg-val-belum{background:rgba(100,116,139,.08);color:#64748b;border-color:rgba(100,116,139,.2)}
 body.light .bdg-cod{background:rgba(34,197,94,.1);color:#16a34a;border-color:rgba(34,197,94,.25)}
 body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgba(99,102,241,.25)}
 
@@ -383,6 +389,7 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
           <th>Total</th>
           <th>Kurir</th>
           <th>Rincian</th>
+          <th>Validasi</th>
           <th>Keluhan</th>
           <th>Keterangan</th>
         </tr>
@@ -619,7 +626,7 @@ function filterByRange(list) {
 
 async function init() {
   const [orders, custs, prods] = await Promise.all([
-    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,mengantar_status,mengantar_error,mengantar_sent_at,created_at&order=created_at.desc`),
+    sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,mengantar_status,mengantar_error,mengantar_sent_at,created_at,validated_at,flag_risiko,validation_note&order=created_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,catatan`),
     sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga,persona_cs_nama`),
   ]);
@@ -673,6 +680,10 @@ function getOrderRow(c, idx) {
   const noResi       = c.no_resi || '';
   const errorMsg     = c.mengantar_error || '';
 
+  // Status validasi
+  const validasi = !c.validated_at ? 'belum' : c.flag_risiko ? 'gagal' : 'lolos';
+  const validasiNote = c.validation_note || '';
+
   return {
     id: c.id,
     conversation_id: c.conversation_id || null,
@@ -687,6 +698,7 @@ function getOrderRow(c, idx) {
     jumlah: prod.nama ? `${prod.nama} ×${qty}` : `×${qty}`,
     qty, metode, total, instruksi, keterangan, rincian, keluhan,
     isCOD, sudahDikirim, queueFailed, noResi, errorMsg,
+    validasi, validasiNote,
     _raw: c, _cu: cu
   };
 }
@@ -716,7 +728,7 @@ function render() {
 function renderTable(rows) {
   const tbody = document.getElementById('tbody');
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="18" class="empty-cell">
+    tbody.innerHTML = `<tr><td colspan="19" class="empty-cell">
       <div style="font-size:36px;margin-bottom:14px;opacity:.4">📭</div>
       <h4>Belum ada order di periode ini</h4>
       <p>Order yang sudah closing akan muncul di sini.</p>
@@ -755,6 +767,7 @@ function renderTable(rows) {
     <td class="td-num">${rp(r.total)}</td>
     <td class="td-wrap-sm" style="font-size:11px">${escH(r.instruksi)}${resiTag}</td>
     <td class="td-wrap" style="font-size:11px">${escH(r.rincian)}</td>
+    <td style="text-align:center"><span class="bdg bdg-val-${r.validasi}" title="${escH(r.validasiNote)}">${r.validasi === 'lolos' ? '✓ Lolos' : r.validasi === 'gagal' ? '✗ Gagal' : '⏳ Belum'}</span></td>
     <td><div class="td-wrap" title="${escH(r.keluhan)}">${escH(r.keluhan)||'—'}</div></td>
     <td><div class="td-wrap" title="${escH(r.keterangan)}">${escH(r.keterangan)||'—'}</div></td>
   </tr>`;
@@ -816,7 +829,7 @@ async function deleteSelected() {
 }
 
 // ── EXPORT ────────────────────────────────────────────────
-const HEADERS = ['No','Tanggal','Produk','Nama','No Telpon','Alamat','Kelurahan','Kecamatan','Kabupaten','Provinsi','Kode Pos','Qty','Tipe','Total Pembayaran','Kurir','Rincian Pembayaran','Keluhan','Keterangan'];
+const HEADERS = ['No','Tanggal','Produk','Nama','No Telpon','Alamat','Kelurahan','Kecamatan','Kabupaten','Provinsi','Kode Pos','Qty','Tipe','Total Pembayaran','Kurir','Rincian Pembayaran','Validasi','Keluhan','Keterangan'];
 
 function getExportRows() {
   const list = filterByRange(allOrders);
@@ -839,6 +852,7 @@ function getExportRows() {
       r.total,
       r.instruksi,
       r.rincian,
+      r.validasi === 'lolos' ? 'Lolos' : r.validasi === 'gagal' ? 'Gagal' : 'Belum',
       r.keluhan,
       r.keterangan
     ];
