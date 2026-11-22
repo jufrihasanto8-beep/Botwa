@@ -167,6 +167,13 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, ignored: true });
   }
 
+  // LION false alarm: Mengantar push UNDELIVERED saat kurir Lion baru mau antar,
+  // bukan hanya saat gagal. Yang beneran bermasalah cuma kode DEX.
+  if (eventType === 'bermasalah' && normCourier(courier) === 'LION' && status_category?.toUpperCase() !== 'DEX') {
+    console.log(`[mng-webhook] LION false alarm ${cnote_no} (${status_category}) — skip bermasalah`);
+    return res.status(200).json({ ok: true, resi: cnote_no, skipped: 'lion_not_dex' });
+  }
+
   const now = new Date().toISOString();
   const ekspedisi = normCourier(courier);
 
