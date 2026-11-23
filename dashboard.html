@@ -1561,7 +1561,7 @@ async function sendMsg() {
     appendBubble('bot', text, true, sentAt, 'cs');
     await fetch(`${PROXY}?path=${encodeURIComponent('/send')}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: userId, wa_number: activeCustomer.reply_jid || activeCustomer.wa_number, message: text, is_outbound: true }),
+      body: JSON.stringify({ session_id: activeSessionId, wa_number: activeCustomer.reply_jid || activeCustomer.wa_number, message: text, is_outbound: true }),
     });
   } catch(e) { showToast('Gagal kirim pesan: '+e.message); }
   finally { _sending = false; }
