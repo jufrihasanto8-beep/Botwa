@@ -2075,10 +2075,18 @@ Isi field yang berubah saja, sisanya null.` }],
 
       } else {
         // ── Awaiting confirm — cek jawaban customer ────────────
-        // Normalize repeated vowel di akhir: "yaa" → "ya", "iyaa" → "iya", "okee" → "oke"
-        const msgNorm = msgLower.replace(/([aeiou])\1+$/g, '$1').replace(/([aeiou])\1+\b/g, '$1');
-        const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|suda|udah|uda|siap|sip|fix|setuju|benar|yap|yep|yoi|mantap|mantab|jadi|boleh|lanjut|gas|okey|baik|deal|acc|gass)\b/i.test(msgNorm)
-                       || (msgLower.length <= 20 && /\b(oke|ok|iya|ya|suda|sudah|udah|siap|baik|bener|benar|betul|setuju|deal|fix|jadi|boleh|lanjut|mantap|sip|yoi|acc)\b/i.test(msgLower));
+        // Normalize: repeated vowel "yaa"→"ya", repeated consonant akhir "sipp"→"sip", "sdh"→"sudah"
+        const msgNorm = msgLower
+          .replace(/([aeiou])\1+$/g, '$1').replace(/([aeiou])\1+\b/g, '$1')
+          .replace(/([bcdfghjklmnpqrstvwxyz])\1+$/g, '$1').replace(/([bcdfghjklmnpqrstvwxyz])\1+\b/g, '$1');
+        // Expand common abbreviations
+        const msgExpand = msgNorm
+          .replace(/\bsdh\b/g, 'sudah').replace(/\budh\b/g, 'udah').replace(/\bdah\b/g, 'udah')
+          .replace(/\bbnr\b/g, 'benar').replace(/\bbner\b/g, 'bener')
+          .replace(/\biy\b/g, 'iya').replace(/\biyah\b/g, 'iya').replace(/\byah\b/g, 'ya')
+          .replace(/\blgsg\b/g, 'lanjut');
+        const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|suda|udah|uda|siap|sip|fix|setuju|benar|yap|yep|yup|yoi|yes|yess|mantap|mantab|jadi|boleh|lanjut|lanjutkan|lanjutin|gas|gass|okey|baik|deal|acc|done|cus|cuss|amin)\b/i.test(msgExpand)
+                       || (msgLower.length <= 20 && /\b(oke|ok|iya|ya|suda|sudah|sdh|udah|udh|dah|siap|baik|bener|benar|bnr|bner|betul|setuju|deal|fix|jadi|boleh|lanjut|mantap|sip|yoi|yup|yes|acc|done|cus|cuss|gas)\b/i.test(msgLower));
         // isDeny: nolak/cancel/minta ubah order
         const isDeny    = /\b(salah|ganti|ubah|bukan|koreksi|ralat|perbaiki|enggak|nggak|ngga|wrong|nope)\b/i.test(msgLower)
                        || /\b(tidak|belum)\s+(benar|bener|betul|sesuai|cocok|iya|ya|oke)\b/i.test(msgLower)
