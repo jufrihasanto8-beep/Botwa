@@ -130,12 +130,22 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
       `?user_id=eq.${userId}&customer_id=eq.${customerId}&product_id=eq.${productId}&order=created_at.desc&limit=1`
     ).catch(() => []);
   }
-  // Fallback ke conv product_id=null hanya kalau memang tidak ada productId
-  // Kalau productId ada tapi conv belum ada → buat baru (jangan pakai conv lama yang null)
+  // Fallback kalau productId null: cari conv APAPUN untuk customer ini (hindari duplikat)
+  // Prioritas: conv product_id=null dulu, lalu conv aktif terbaru mana pun
   if (!existing.length && !productId) {
     existing = await sbGet('conversations',
       `?user_id=eq.${userId}&customer_id=eq.${customerId}&product_id=is.null&order=created_at.desc&limit=1`
     ).catch(() => []);
+    // Kalau masih kosong, pakai conv aktif terbaru (apapun product_id-nya)
+    // Mencegah duplikat conversation untuk customer yang sama
+    if (!existing.length) {
+      existing = await sbGet('conversations',
+        `?user_id=eq.${userId}&customer_id=eq.${customerId}&order=last_msg_at.desc&limit=1`
+      ).catch(() => []);
+      if (existing.length) {
+        console.log(`[findConv] Reuse conv ${existing[0].id} (product=${existing[0].product_id}) untuk customer ${customerId} — productId null, hindari duplikat`);
+      }
+    }
   }
 
   if (existing.length) {
@@ -626,7 +636,16 @@ async function updateRingkasan(conversationId, aiKey, aiBase) {
 async function saveMessage(conversationId, role, isi, wamid = null) {
   const payload = { conversation_id: conversationId, role, isi };
   if (wamid) payload.wamid = wamid;
-  return sbPost('conv_messages', payload);
+  try {
+    return await sbPost('conv_messages', payload);
+  } catch (e) {
+    // 23505 = unique constraint violation (wamid sudah ada) — race condition, skip
+    if (e.message?.includes('23505')) {
+      console.log(`[saveMessage] Duplicate wamid ${wamid}, skip (race condition)`);
+      return [];
+    }
+    throw e;
+  }
 }
 
 /* ── RESOLVE AI ENDPOINT — product-level → user-level fallback ── */
@@ -1927,6 +1946,11 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
         : `[Gambar terkirim — ${imageAnalysis.is_bukti_tf ? `Bukti TF ${imageAnalysis.bank || ''} ${imageAnalysis.nominal || ''}`.trim() : 'Bukan bukti transfer'}]`
       : `[${messageType}]`);
     const savedMsg = await saveMessage(conversation.id, 'customer', msgText, msgId);
+    // Kalau duplicate wamid (race condition) → pesan sudah diproses webhook lain, stop
+    if (msgId && (!savedMsg || !savedMsg.length)) {
+      console.log(`[webhook] Duplicate wamid ${msgId} — pesan sudah diproses, skip`);
+      return res.status(200).json({ ok: true, skipped: 'duplicate_wamid' });
+    }
     const savedMsgId = savedMsg?.[0]?.id;
 
     // ── Debounce: kalau customer kirim 2+ pesan cepat, proses hanya yang terakhir ──
