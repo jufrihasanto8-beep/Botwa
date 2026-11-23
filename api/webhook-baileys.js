@@ -1978,7 +1978,8 @@ rekening_cocok: true jika cocok dengan rekening sistem, false jika tidak, null j
       convState.awaiting_bukti_tf = true;
       // Fall through ke bawah — imageAnalysis handler akan proses bukti TF
     }
-    else if (convState.awaiting_order_confirm || convState.awaiting_order_correction) {
+    else if ((convState.awaiting_order_confirm || convState.awaiting_order_correction)
+             && !convState.awaiting_bukti_tf && !convState.awaiting_qc_tf) {
       const msgLower = message.toLowerCase().trim();
       const snap     = convState.order_snapshot || {};
       const area     = snap.area || {};
@@ -3857,6 +3858,18 @@ ${ongkirInfo}`;
       // Order sudah selesai diproses sebelumnya — skip ORDER_CONFIRMED agar tidak kirim konfirmasi ulang
       console.log(`[ORDER_CONFIRMED] Diabaikan — order sudah placed (conv ${conversation.id})`);
       return res.status(200).json({ ok: true, action: 'order_already_placed' });
+    }
+
+    // Guard: kalau sudah dalam flow bukti TF (nunggu bukti atau nunggu QC ACC), jangan proses ORDER_CONFIRMED
+    if (orderConfirmed && (convState.awaiting_bukti_tf || convState.awaiting_qc_tf)) {
+      console.log(`[ORDER_CONFIRMED] Diabaikan — sedang awaiting_bukti_tf=${!!convState.awaiting_bukti_tf} / awaiting_qc_tf=${!!convState.awaiting_qc_tf} (conv ${conversation.id})`);
+      // Strip marker, kirim reply bersih
+      reply = (reply || rawReply || '').replace(/\[ORDER_CONFIRMED\]/g, '').replace(/\[ORDER_DATA:[^\]]+\]/g, '').trim();
+      if (reply) {
+        const { wamid: wamid_skip } = await sendWA(waSession, reply_jid, reply).catch(() => ({}));
+        await saveMessage(conversation.id, 'ai', reply, wamid_skip);
+      }
+      return res.status(200).json({ ok: true, action: 'blocked_awaiting_tf' });
     }
 
     // Hard block: conversation sudah pernah closing (closed_order_id ada) → jangan proses ORDER_CONFIRMED lagi
