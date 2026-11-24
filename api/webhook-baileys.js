@@ -4212,7 +4212,9 @@ ${ongkirInfo}`;
         try {
           const opsGroupJid = OPS_GROUP_JID_USER;
           const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
-          const cancelNotif = `❌ *Pembatalan Order*\n\n👤 ${customer?.nama || '-'}\n📱 ${custPhone || '-'}\n🛒 ${product?.nama || '-'}\n💬 Alasan: "${message.slice(0, 100)}"\n\nOrder dibatalkan oleh customer setelah closing.`;
+          const appUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://csadsy.vercel.app';
+          const chatLink = `${appUrl}/chat-share?conv=${conversation.id}`;
+          const cancelNotif = `❌ *Pembatalan Order*\n\n👤 ${customer?.nama || '-'} (${custPhone || '-'})\n🛒 ${product?.nama || '-'}\n💬 Alasan: "${message.slice(0, 100)}"\n\n🔗 Lihat percakapan:\n${chatLink}`;
           if (opsGroupJid) {
             await sendWA(waSession, opsGroupJid, cancelNotif, true).catch(() => {});
             console.log(`[CANCEL-POST] Notif terkirim ke grup ${opsGroupJid}`);
@@ -4250,49 +4252,6 @@ ${ongkirInfo}`;
         console.log(`[TESTI] ${testiList.length} foto testimoni terkirim`);
       } catch(e) {
         console.error(`[TESTI] Gagal kirim testimoni:`, e.message);
-      }
-    }
-
-    // ── Forward feedback bermasalah ke grup OPS ──
-    if (convState.delivery_issue && !convState.delivery_issue_forwarded) {
-      try {
-        const opsGroupJid = OPS_GROUP_JID_USER;
-        if (opsGroupJid) {
-          const issueResi = convState.delivery_issue_resi || '';
-          const issueEkspedisi = (() => {
-            // Cari ekspedisi dari order
-            const snap = convState.order_snapshot || {};
-            return snap.ekspedisi || '';
-          })();
-          const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
-          const custNama = customer?.nama || 'Customer';
-
-          // Ambil semua chat (konfirmasi + bermasalah), limit 15, potong jadi max 10 biar gambar ga kebesaran
-          const recentMsgs = await sbGet('conv_messages',
-            `?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=15&select=role,isi,created_at`
-          ).catch(() => []);
-          const chatMsgs = recentMsgs.reverse().slice(-10); // urut lama → baru, max 10
-
-          // A: Generate screenshot chat
-          try {
-            const { generateChatImage } = require('./_chat-image');
-            const pngBuffer = await generateChatImage(chatMsgs, custNama, custPhone, issueResi, issueEkspedisi);
-            const base64Img = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-            const caption = `📦 *${issueResi}*\n👤 ${custNama} (${custPhone})\n💬 "${(message || '').slice(0, 100)}"`;
-            await sendWA(waSession, opsGroupJid, null, true, base64Img, caption).catch(() => {});
-            console.log(`[BERMASALAH-FWD] Screenshot + caption terkirim ke grup OPS`);
-          } catch (imgErr) {
-            console.error(`[BERMASALAH-FWD] Image error, fallback ke teks:`, imgErr.message);
-            // B: Fallback teks kalau gambar gagal
-            const txtNotif = `📦 *${issueResi}*\n👤 ${custNama} (${custPhone})\n🚚 ${issueEkspedisi}\n\n💬 Customer bilang:\n"${(message || '').slice(0, 200)}"\n\n📋 Bot reply:\n"${(reply || '').slice(0, 200)}"`;
-            await sendWA(waSession, opsGroupJid, txtNotif, true).catch(() => {});
-          }
-
-          // Mark as forwarded biar ga kirim ulang tiap customer chat
-          await updateConvState(conversation.id, { delivery_issue_forwarded: true });
-        }
-      } catch (e) {
-        console.error('[BERMASALAH-FWD] Error:', e.message);
       }
     }
 
