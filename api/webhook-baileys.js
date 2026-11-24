@@ -1765,7 +1765,7 @@ module.exports = async function handler(req, res) {
     })(); // fire-and-forget, tidak blocking response
 
     // ── Ambil rekening dari users table ───────────────────────
-    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,qc_group_jid,ops_group_jid,mengantar_origin_id,mengantar_area_id,default_sumber&limit=1`).catch(() => []);
+    const userRows = await sbGet('users', `?id=eq.${userId}&select=rekening,anthropic_key,group_jid,qc_group_jid,ops_group_jid,pengiriman_group_jid,mengantar_origin_id,mengantar_area_id,default_sumber&limit=1`).catch(() => []);
     const userRekening      = userRows[0]?.rekening            || null;
     const userAnthropicKey  = userRows[0]?.anthropic_key       || null;
     const ai = resolveAI(product, userAnthropicKey);
@@ -1774,6 +1774,7 @@ module.exports = async function handler(req, res) {
     const userGroupJid      = userRows[0]?.group_jid            || WA_GROUP_JID;
     const QC_GROUP_JID      = userRows[0]?.qc_group_jid || process.env.QC_GROUP_JID || userGroupJid;
     const OPS_GROUP_JID_USER = userRows[0]?.ops_group_jid || process.env.OPS_GROUP_JID || userGroupJid;
+    const PENGIRIMAN_GROUP_JID = userRows[0]?.pengiriman_group_jid || null;
     const userMngOriginId   = userRows[0]?.mengantar_origin_id  || MENGANTAR_ORIGIN_ID; // warehouse ID (buat order)
     const userMngAreaId     = userRows[0]?.mengantar_area_id    || MENGANTAR_ORIGIN_ID; // address _id (cek ongkir)
     const userDefaultSumber = userRows[0]?.default_sumber       || null;
@@ -4292,6 +4293,26 @@ ${ongkirInfo}`;
         }
       } catch (e) {
         console.error('[BERMASALAH-FWD] Error:', e.message);
+      }
+    }
+
+    // ── Kirim link chat ke grup Pengiriman saat customer balas bermasalah ──
+    if (convState.delivery_issue && !convState.pengiriman_link_sent && PENGIRIMAN_GROUP_JID) {
+      try {
+        const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
+        const custNama = customer?.nama || 'Customer';
+        const issueResi = convState.delivery_issue_resi || '';
+        const issueType = convState.delivery_issue_type === 'retur' ? 'Retur' : 'Bermasalah';
+        const appUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://csadsy.vercel.app';
+        const chatLink = `${appUrl}/chat-share?phone=${encodeURIComponent(custPhone)}&conv=${conversation.id}&from=tracking`;
+
+        const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan lengkap:\n${chatLink}`;
+
+        await sendWA(waSession, PENGIRIMAN_GROUP_JID, linkMsg, true).catch(() => {});
+        await updateConvState(conversation.id, { pengiriman_link_sent: true });
+        console.log(`[PENGIRIMAN-LINK] Link terkirim ke grup pengiriman`);
+      } catch (e) {
+        console.error('[PENGIRIMAN-LINK] Error:', e.message);
       }
     }
 
