@@ -133,7 +133,8 @@ function getParams() {
   return {
     phone: u.get('phone') || u.get('hp') || u.get('wa') || '',
     conv: u.get('conv') || u.get('conversation_id') || '',
-    customer: u.get('customer') || u.get('customer_id') || ''
+    customer: u.get('customer') || u.get('customer_id') || '',
+    from: u.get('from') || ''
   };
 }
 
@@ -243,10 +244,20 @@ async function init() {
       return;
     }
 
-    // 6. Render chat bubbles
+    // 6. Filter messages — from=tracking: hanya dari notif pengiriman ke bawah
+    let filtered = msgs;
+    if (params.from === 'tracking') {
+      const trackingKeywords = /kendala pengiriman|bermasalah|tidak berhasil mengantar|diretur|dikembalikan|gagal antar|delivery problem/i;
+      const startIdx = msgs.findIndex(m => (m.role === 'ai' || m.role === 'cs') && trackingKeywords.test(m.isi || ''));
+      if (startIdx >= 0) {
+        filtered = msgs.slice(startIdx);
+      }
+    }
+
+    // 7. Render chat bubbles
     let html = '';
     let lastDate = '';
-    msgs.forEach(m => {
+    filtered.forEach(m => {
       const d = new Date(m.created_at);
       const dateStr = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' });
       if (dateStr !== lastDate) {
