@@ -4,101 +4,97 @@
 <meta charset="UTF-8">
 <link rel="icon" type="image/png" href="img/logo-adsy.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat Customer · Adsy CS AI</title>
-<script>if(localStorage.getItem('cs_theme')==='light')document.documentElement.classList.add('light');</script>
+<title>Chat Customer</title>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0d1117;--white:#161b22;--border:rgba(255,255,255,.08);--text:#e2e8f0;--text-2:#64748b;--text-3:#475569;--card-bg:#1c2333}
-body.light{--bg:#f1f5f9;--white:#ffffff;--border:rgba(0,0,0,.07);--text:#0f172a;--text-2:#475569;--text-3:#94a3b8;--card-bg:#ffffff}
-body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh}
+body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;background:#111b21;min-height:100vh}
 
 /* Container */
-.page-wrap{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--white);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.page-wrap{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative}
 
-/* Header */
-.chat-header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--white);position:sticky;top:0;z-index:10}
-.chat-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0}
-.chat-info{flex:1;min-width:0}
-.chat-name{font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chat-meta{font-size:11px;color:var(--text-3);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.chat-phone{font-family:monospace;font-size:11px}
-.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
-.badge-problem{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2)}
-.badge-product{background:rgba(59,130,246,.1);color:#3b82f6;border:1px solid rgba(59,130,246,.2)}
-.badge-resi{background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.2);font-family:monospace}
+/* WA Header */
+.wa-header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#1f2c34;position:sticky;top:0;z-index:10}
+.wa-back{color:#aebac1;font-size:20px;text-decoration:none;line-height:1}
+.wa-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-weight:600;font-size:17px;letter-spacing:-.5px}
+.wa-info{flex:1;min-width:0}
+.wa-dl-wrap{position:fixed;bottom:20px;right:20px;z-index:20}
+.wa-dl{display:flex;align-items:center;gap:6px;background:#005c4b;color:#e9edef;border:none;padding:10px 18px;border-radius:24px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.4);transition:background .15s}
+.wa-dl:hover{background:#007a63}
+.wa-dl:active{background:#004a3d}
+.wa-dl svg{flex-shrink:0}
+.wa-name{font-size:15px;font-weight:500;color:#e9edef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-status{font-size:12px;color:#8696a0;margin-top:1px}
 
-/* Order info card */
-.order-card{margin:12px 14px 4px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--text-2);display:none}
-.order-card.show{display:block}
-.order-card-title{font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-.order-row{display:flex;justify-content:space-between;padding:3px 0}
-.order-row .label{color:var(--text-3)}
-.order-row .val{color:var(--text);font-weight:500}
+/* Chat area — WA wallpaper */
+.wa-chat{flex:1;overflow-y:auto;padding:8px 12px 12px;position:relative;background-color:#0b141a}
+.wa-chat::before{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg width='300' height='300' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='p' patternUnits='userSpaceOnUse' width='60' height='60'%3E%3Cpath d='M15 3 L18 8 M42 7 L45 12 M5 25 L10 25 M50 30 L55 30 M20 45 L25 48 M38 50 L42 55 M12 55 L15 58 M48 18 L52 22 M30 15 L33 20 M25 35 L30 38' stroke='%23ffffff' stroke-width='.5' fill='none' opacity='.04'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23p)'/%3E%3C/svg%3E");z-index:0;pointer-events:none}
+.wa-chat>*{position:relative;z-index:1}
+.wa-chat::-webkit-scrollbar{width:6px}
+.wa-chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
 
-/* Chat body */
-.chat-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
-.chat-body::-webkit-scrollbar{width:4px}
-.chat-body::-webkit-scrollbar-thumb{background:rgba(100,100,100,.2);border-radius:4px}
+/* Date pill */
+.wa-date{text-align:center;margin:8px 0}
+.wa-date span{display:inline-block;background:#182229;color:#8696a0;font-size:11.5px;padding:5px 12px;border-radius:8px;box-shadow:0 1px 1px rgba(0,0,0,.15)}
+
+/* Bubble rows */
+.wa-row{display:flex;margin-bottom:8px;padding:0 8px}
+.wa-row.in{justify-content:flex-start}
+.wa-row.out{justify-content:flex-end}
+.wa-row.sys{justify-content:center}
 
 /* Bubbles */
-.chat-row{display:flex;margin-bottom:1px}
-.chat-row.from-customer{justify-content:flex-start}
-.chat-row.from-bot{justify-content:flex-end}
-.chat-bubble{max-width:82%;min-width:40px;padding:7px 11px;border-radius:10px;font-size:13px;line-height:1.5;word-break:break-word;white-space:pre-wrap;text-align:left}
-.chat-row.from-customer .chat-bubble{background:#f0f0f0;color:#1a1a1a;border-bottom-left-radius:3px}
-.chat-row.from-bot .chat-bubble{background:#3b82f6;color:#fff;border-bottom-right-radius:3px}
-.chat-row.from-system{justify-content:center}
-.chat-row.from-system .chat-bubble{background:rgba(100,116,139,.08);color:var(--text-2);font-size:11px;max-width:90%;text-align:center;border-radius:8px}
-.chat-time-inline{font-size:10px;color:rgba(0,0,0,.35);float:right;margin:6px 0 -3px 10px;line-height:1}
-.chat-time-bot{color:rgba(255,255,255,.55)}
-.chat-label{font-size:10px;font-weight:600;display:block;margin-bottom:2px}
-.chat-label.ai{color:rgba(255,255,255,.7)}
-.chat-label.cs{color:#fbbf24}
-.chat-date-div{text-align:center;font-size:10px;color:var(--text-3);margin:8px 0;font-weight:600}
-.chat-loading{text-align:center;padding:60px 20px;color:var(--text-3);font-size:13px}
-.chat-empty{text-align:center;padding:60px 20px;color:var(--text-3);font-size:13px}
-.chat-empty h3{font-size:16px;font-weight:700;color:var(--text-2);margin-bottom:8px}
+.wa-bubble{max-width:80%;min-width:80px;padding:6px 7px 8px 9px;border-radius:8px;font-size:14.2px;line-height:1.35;word-break:break-word;white-space:pre-wrap;position:relative;box-shadow:0 1px 0.5px rgba(0,0,0,.13)}
 
-body.light .chat-row.from-customer .chat-bubble{background:#f0f0f0;color:#1a1a1a}
-body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
+/* Incoming — customer */
+.wa-row.in .wa-bubble{background:#202c33;color:#e9edef;border-top-left-radius:0}
+.wa-row.in .wa-bubble::before{content:'';position:absolute;top:0;left:-8px;width:0;height:0;border-top:0 solid transparent;border-bottom:8px solid transparent;border-right:8px solid #202c33}
 
-/* Footer */
-.chat-footer{padding:10px 18px;border-top:1px solid var(--border);font-size:10px;color:var(--text-3);text-align:center;flex-shrink:0}
-.chat-footer a{color:#3b82f6;text-decoration:none}
+/* Outgoing — bot/cs */
+.wa-row.out .wa-bubble{background:#005c4b;color:#e9edef;border-top-right-radius:0}
+.wa-row.out .wa-bubble::before{content:'';position:absolute;top:0;right:-8px;width:0;height:0;border-top:0 solid transparent;border-bottom:8px solid transparent;border-left:8px solid #005c4b}
 
-/* Theme toggle */
-.theme-btn{position:fixed;top:14px;right:14px;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text-2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20}
+/* System */
+.wa-row.sys .wa-bubble{background:#182229;color:#8696a0;font-size:12px;max-width:85%;text-align:center;border-radius:8px;padding:5px 12px;box-shadow:none}
+
+/* Time + check */
+.wa-time{float:right;margin:4px 0 -4px 12px;font-size:11px;color:rgba(233,237,239,.5);line-height:1;display:flex;align-items:center;gap:3px}
+.wa-row.in .wa-time{color:rgba(134,150,160,.8)}
+.wa-check{display:inline-block;width:16px;height:11px}
+.wa-check svg{display:block}
+
+/* Loading / Empty */
+.wa-loading{text-align:center;padding:60px 20px;color:#8696a0;font-size:14px}
+.wa-empty{text-align:center;padding:60px 20px;color:#8696a0;font-size:14px}
+.wa-empty b{display:block;font-size:16px;color:#e9edef;margin-bottom:6px}
 
 @media(max-width:520px){
-  .page-wrap{border:none}
-  .chat-bubble{max-width:88%}
+  .page-wrap{max-width:100%}
+  .wa-bubble{max-width:88%}
 }
 </style>
 </head>
 <body>
 
-<button class="theme-btn" onclick="document.body.classList.toggle('light');localStorage.setItem('cs_theme',document.body.classList.contains('light')?'light':'dark')">🌓</button>
-
 <div class="page-wrap">
-  <div class="chat-header" id="chat-header">
-    <div class="chat-avatar" id="avatar">?</div>
-    <div class="chat-info">
-      <div class="chat-name" id="cust-name">Memuat...</div>
-      <div class="chat-meta" id="cust-meta"></div>
+  <div class="wa-header">
+    <span class="wa-back">&#8592;</span>
+    <div class="wa-avatar" id="avatar"></div>
+    <div class="wa-info">
+      <div class="wa-name" id="cust-name">Memuat...</div>
+      <div class="wa-status" id="cust-status"></div>
     </div>
   </div>
 
-  <div class="order-card" id="order-card">
-    <div class="order-card-title">Info Order</div>
-    <div id="order-rows"></div>
+  <div class="wa-dl-wrap">
+    <button class="wa-dl" onclick="downloadChat()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Chat
+    </button>
   </div>
 
-  <div class="chat-body" id="chat-body">
-    <div class="chat-loading">Memuat percakapan...</div>
-  </div>
-
-  <div class="chat-footer">
-    Adsy CS AI &middot; <span id="foot-time"></span>
+  <div class="wa-chat" id="chat-body">
+    <div class="wa-loading">Memuat percakapan...</div>
   </div>
 </div>
 
@@ -120,12 +116,8 @@ function normalizePhone(raw) {
 }
 
 function formatPhone(p) {
-  const s = (p || '').replace(/^62/, '0');
-  return s.replace(/(\d{4})(\d{4})(\d+)/, '$1-$2-$3');
-}
-
-function fmtRp(n) {
-  return 'Rp ' + (n || 0).toLocaleString('id-ID');
+  const s = (p || '').replace(/^62/, '+62 ');
+  return s.replace(/(\+62\s?)(\d{3})(\d{4})(\d+)/, '$1$2-$3-$4');
 }
 
 function getParams() {
@@ -138,22 +130,35 @@ function getParams() {
   };
 }
 
+// WA-style avatar colors
+const WA_COLORS = ['#25d366','#128c7e','#075e54','#34b7f1','#00a884','#5b72a7','#d4a76a','#e06c75','#7c8cbf','#c678dd','#56b6c2','#d19a66'];
+function getAvatarColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return WA_COLORS[Math.abs(hash) % WA_COLORS.length];
+}
+function getInitials(name) {
+  const parts = (name || '?').trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return parts[0].slice(0, 2).toUpperCase();
+}
+
+const CHECK_SVG = `<svg viewBox="0 0 16 11" width="16" height="11"><path d="M11.07.66L5.67 6.06 3.93 4.32c-.3-.3-.77-.3-1.06 0-.3.3-.3.77 0 1.06l2.27 2.27c.3.3.77.3 1.06 0l5.93-5.93c.3-.3.3-.77 0-1.06-.3-.3-.77-.3-1.06 0z" fill="rgba(83,189,236,.85)"/><path d="M7.07.66L1.67 6.06-.07 4.32c-.3-.3-.77-.3-1.06 0-.3.3-.3.77 0 1.06l2.27 2.27c.3.3.77.3 1.06 0l5.93-5.93c.3-.3.3-.77 0-1.06-.3-.3-.77-.3-1.06 0z" fill="rgba(83,189,236,.85)"/></svg>`;
+
 async function init() {
   const params = getParams();
   const body = document.getElementById('chat-body');
 
   if (!params.phone && !params.conv && !params.customer) {
-    body.innerHTML = '<div class="chat-empty"><h3>Link tidak valid</h3>Tambahkan parameter ?phone=08xxxx di URL</div>';
+    body.innerHTML = '<div class="wa-empty"><b>Link tidak valid</b>Tambahkan parameter ?phone=08xxxx di URL</div>';
     return;
   }
 
   try {
-    // 1. Find customer
     let customer = null;
     let conversations = [];
 
     if (params.conv) {
-      // Direct conversation ID
       const convs = await sbFetch('conversations', `?id=eq.${params.conv}&select=*`);
       if (convs[0]) {
         conversations = convs;
@@ -161,7 +166,6 @@ async function init() {
         customer = custs[0];
       }
     } else {
-      // Find by phone
       const phone = normalizePhone(params.phone || '');
       const custs = await sbFetch('customers', `?wa_number=eq.${phone}&select=*`);
       if (custs.length > 1 && params.customer) {
@@ -175,93 +179,51 @@ async function init() {
     }
 
     if (!customer && !conversations.length) {
-      body.innerHTML = '<div class="chat-empty"><h3>Customer tidak ditemukan</h3>Nomor ' + (params.phone || params.conv || '') + ' tidak ada di database</div>';
+      body.innerHTML = '<div class="wa-empty"><b>Customer tidak ditemukan</b>Nomor ' + (params.phone || params.conv || '') + ' tidak ada di database</div>';
       return;
     }
 
-    // 2. Render header
+    // Header
     const nama = customer?.nama || 'Customer';
     document.getElementById('cust-name').textContent = nama;
-    document.getElementById('avatar').textContent = nama.charAt(0).toUpperCase();
-    document.title = nama + ' · Chat · Adsy CS AI';
-
-    let metaHtml = '';
-    if (customer?.wa_number) metaHtml += `<span class="chat-phone">${formatPhone(customer.wa_number)}</span>`;
-
-    // 3. Find orders for this customer
-    const orders = customer ? await sbFetch('orders_new', `?customer_id=eq.${customer.id}&order=created_at.desc&limit=5&select=*`) : [];
-
-    // Check delivery issues
-    const problemOrders = orders.filter(o => o.status_tracking === 'bermasalah' || o.status_tracking === 'retur' || (conversations[0]?.state?.delivery_issue));
-    if (problemOrders.length) {
-      metaHtml += '<span class="badge badge-problem">Bermasalah</span>';
+    document.title = nama + ' · Chat';
+    const avatarEl = document.getElementById('avatar');
+    avatarEl.textContent = getInitials(nama);
+    avatarEl.style.background = getAvatarColor(nama);
+    if (customer?.wa_number) {
+      document.getElementById('cust-status').textContent = formatPhone(customer.wa_number);
     }
 
-    // Product badge
     const conv = conversations[0];
-    if (conv?.product_id) {
-      const prods = await sbFetch('products', `?id=eq.${conv.product_id}&select=nama`);
-      if (prods[0]) metaHtml += `<span class="badge badge-product">${prods[0].nama}</span>`;
-    }
-
-    // Resi badge
-    const resiOrder = orders.find(o => o.no_resi);
-    if (resiOrder) metaHtml += `<span class="badge badge-resi">${resiOrder.no_resi}</span>`;
-
-    document.getElementById('cust-meta').innerHTML = metaHtml;
-
-    // 4. Order info card
-    if (orders.length) {
-      const o = orders[0];
-      const card = document.getElementById('order-card');
-      let rows = '';
-      if (o.product_nama && o.product_nama !== '-') rows += `<div class="order-row"><span class="label">Produk</span><span class="val">${o.product_nama} x${o.qty || 1}</span></div>`;
-      if (o.metode) rows += `<div class="order-row"><span class="label">Metode</span><span class="val">${(o.metode || '').toUpperCase()}</span></div>`;
-      if (o.ekspedisi) rows += `<div class="order-row"><span class="label">Ekspedisi</span><span class="val">${o.ekspedisi}</span></div>`;
-      if (o.harga) rows += `<div class="order-row"><span class="label">Harga</span><span class="val">${fmtRp(o.harga)}</span></div>`;
-      if (o.ongkir) rows += `<div class="order-row"><span class="label">Ongkir</span><span class="val">${fmtRp(o.ongkir)}</span></div>`;
-      if (o.total) rows += `<div class="order-row"><span class="label">Total</span><span class="val" style="font-weight:700">${fmtRp(o.total)}</span></div>`;
-      if (o.no_resi) rows += `<div class="order-row"><span class="label">Resi</span><span class="val" style="font-family:monospace">${o.no_resi}</span></div>`;
-      if (o.status_tracking) rows += `<div class="order-row"><span class="label">Status</span><span class="val">${o.status_tracking}</span></div>`;
-      if (o.alamat?.jalan) rows += `<div class="order-row"><span class="label">Alamat</span><span class="val">${o.alamat.jalan}, ${o.alamat.kecamatan || ''}, ${o.alamat.kabupaten || ''}</span></div>`;
-      if (rows) {
-        document.getElementById('order-rows').innerHTML = rows;
-        card.classList.add('show');
-      }
-    }
-
-    // 5. Load messages — use conversation from param or latest
     const convId = params.conv || (conv?.id);
     if (!convId) {
-      body.innerHTML = '<div class="chat-empty">Belum ada percakapan untuk customer ini</div>';
+      body.innerHTML = '<div class="wa-empty">Belum ada percakapan</div>';
       return;
     }
 
     const msgs = await sbFetch('conv_messages', `?conversation_id=eq.${convId}&order=created_at.asc&limit=500&select=role,isi,created_at`);
 
     if (!msgs || !msgs.length) {
-      body.innerHTML = '<div class="chat-empty">Tidak ada pesan ditemukan</div>';
+      body.innerHTML = '<div class="wa-empty">Tidak ada pesan ditemukan</div>';
       return;
     }
 
-    // 6. Filter messages — from=tracking: hanya dari notif pengiriman ke bawah
+    // Filter — from=tracking: hanya dari notif pengiriman ke bawah
     let filtered = msgs;
     if (params.from === 'tracking') {
       const trackingKeywords = /kendala pengiriman|bermasalah|tidak berhasil mengantar|diretur|dikembalikan|gagal antar|delivery problem/i;
       const startIdx = msgs.findIndex(m => (m.role === 'ai' || m.role === 'cs') && trackingKeywords.test(m.isi || ''));
-      if (startIdx >= 0) {
-        filtered = msgs.slice(startIdx);
-      }
+      if (startIdx >= 0) filtered = msgs.slice(startIdx);
     }
 
-    // 7. Render chat bubbles
+    // Render
     let html = '';
     let lastDate = '';
     filtered.forEach(m => {
       const d = new Date(m.created_at);
-      const dateStr = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' });
+      const dateStr = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
       if (dateStr !== lastDate) {
-        html += `<div class="chat-date-div">${dateStr}</div>`;
+        html += `<div class="wa-date"><span>${dateStr}</span></div>`;
         lastDate = dateStr;
       }
 
@@ -269,25 +231,61 @@ async function init() {
       const safe = (m.isi || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
       if (m.role === 'system') {
-        html += `<div class="chat-row from-system"><div class="chat-bubble">${safe}</div></div>`;
+        html += `<div class="wa-row sys"><div class="wa-bubble">${safe}</div></div>`;
       } else if (m.role === 'customer') {
-        html += `<div class="chat-row from-customer"><div class="chat-bubble">${safe}<span class="chat-time-inline">${time}</span></div></div>`;
+        html += `<div class="wa-row in"><div class="wa-bubble">${safe}<span class="wa-time">${time}</span></div></div>`;
       } else {
-        const label = m.role === 'cs' ? 'CS' : 'AI';
-        const cls = m.role === 'cs' ? 'cs' : 'ai';
-        html += `<div class="chat-row from-bot"><div class="chat-bubble"><span class="chat-label ${cls}">${label}</span>${safe}<span class="chat-time-inline chat-time-bot">${time}</span></div></div>`;
+        html += `<div class="wa-row out"><div class="wa-bubble">${safe}<span class="wa-time">${time} <span class="wa-check">${CHECK_SVG}</span></span></div></div>`;
       }
     });
 
     body.innerHTML = html;
     body.scrollTop = body.scrollHeight;
 
-    // Footer time
-    document.getElementById('foot-time').textContent = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
-
   } catch(e) {
-    body.innerHTML = `<div class="chat-empty"><h3>Error</h3>${e.message}</div>`;
+    body.innerHTML = `<div class="wa-empty"><b>Error</b>${e.message}</div>`;
   }
+}
+
+async function downloadChat() {
+  const btn = document.querySelector('.wa-dl');
+  const origHTML = btn.innerHTML;
+  btn.innerHTML = '&#8987; Downloading...';
+  btn.disabled = true;
+  try {
+    const wrap = document.querySelector('.page-wrap');
+    const chat = document.getElementById('chat-body');
+    // Temporarily expand chat to full height so all messages are captured
+    const origH = chat.style.height;
+    const origO = chat.style.overflow;
+    chat.style.height = 'auto';
+    chat.style.overflow = 'visible';
+    wrap.style.height = 'auto';
+    wrap.style.minHeight = 'auto';
+
+    const canvas = await html2canvas(wrap, {
+      backgroundColor: '#0b141a',
+      scale: 2,
+      useCORS: true,
+      scrollY: 0
+    });
+
+    // Restore
+    chat.style.height = origH;
+    chat.style.overflow = origO;
+    wrap.style.height = '';
+    wrap.style.minHeight = '100vh';
+
+    const link = document.createElement('a');
+    const nama = document.getElementById('cust-name').textContent || 'chat';
+    link.download = `chat-${nama.replace(/\s+/g, '_')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('Gagal download: ' + e.message);
+  }
+  btn.innerHTML = origHTML;
+  btn.disabled = false;
 }
 
 init();
