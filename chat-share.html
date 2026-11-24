@@ -102,10 +102,9 @@ body.light .chat-row.from-bot .chat-bubble{background:#2563eb}
   </div>
 </div>
 
-<script src="js/config.js"></script>
 <script>
-const SB_URL = window.SUPABASE_URL || '';
-const SB_KEY = window.SUPABASE_ANON_KEY || '';
+const SB_URL = 'https://hdplngjvthwcmgkehmvy.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkcGxuZ2p2dGh3Y21na2VobXZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTcyMDIsImV4cCI6MjA5NjQ5MzIwMn0.1Q9L9J8txAtcJYq_B3grjpd3NWKskJX2lr5mpCjm9Qg';
 
 function sbFetch(table, query) {
   return fetch(`${SB_URL}/rest/v1/${table}${query}`, {
