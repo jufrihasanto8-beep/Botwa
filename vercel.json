@@ -16,7 +16,8 @@
     { "source": "/connect-wa", "destination": "/connect-wa.html" },
     { "source": "/leads", "destination": "/leads.html" },
     { "source": "/all-orders", "destination": "/all-orders.html" },
-    { "source": "/qc-transfer", "destination": "/qc-transfer.html" }
+    { "source": "/qc-transfer", "destination": "/qc-transfer.html" },
+    { "source": "/chat-share", "destination": "/chat-share.html" }
   ],
   "functions": {
     "api/webhook-baileys.js": {
