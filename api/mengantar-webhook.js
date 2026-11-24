@@ -287,13 +287,30 @@ module.exports = async function handler(req, res) {
                 body: JSON.stringify({ conversation_id: convs[0].id, role: 'ai', isi: pesan }),
               }).catch(() => {});
 
-              const convPatch = { last_msg_at: now };
+              // Pakai RPC atomic merge kalau ada, fallback ke direct patch
+              let stateFields = null;
               if (eventType === 'delivered') {
-                convPatch.state = { ...convState, delivered: true, delivered_at: now, delivered_resi: cnote_no };
+                stateFields = { delivered: true, delivered_at: now, delivered_resi: cnote_no };
               } else if (eventType === 'bermasalah' || eventType === 'retur') {
-                convPatch.state = { ...convState, delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: status_category, delivery_issue_resi: cnote_no };
+                stateFields = { delivery_issue: true, delivery_issue_type: eventType, delivery_issue_at: now, delivery_issue_status: status_category, delivery_issue_resi: cnote_no };
               }
-              await sbPatch('conversations', `?id=eq.${convs[0].id}`, convPatch).catch(() => {});
+
+              if (stateFields) {
+                // Try atomic RPC merge first
+                const rpcOk = await fetch(`${SUPABASE_URL}/rest/v1/rpc/merge_conv_state`, {
+                  method: 'POST', headers: sbH(),
+                  body: JSON.stringify({ p_conv_id: convs[0].id, p_state: stateFields }),
+                }).then(r => r.ok).catch(() => false);
+
+                if (!rpcOk) {
+                  // Fallback: direct patch (bisa race tapi best effort)
+                  await sbPatch('conversations', `?id=eq.${convs[0].id}`, {
+                    state: { ...convState, ...stateFields }, last_msg_at: now,
+                  }).catch(() => {});
+                }
+              } else {
+                await sbPatch('conversations', `?id=eq.${convs[0].id}`, { last_msg_at: now }).catch(() => {});
+              }
               console.log(`[mng-webhook] Conv ${convs[0].id}: ${eventType} logged`);
             }
           }

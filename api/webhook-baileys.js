@@ -1533,12 +1533,25 @@ Contoh: "Oke kak, pakai JNE ya! Total Transfer Rp X / COD Rp Y 😊 [GANTI_KURIR
 // Debounce 1500ms di handler utama sudah mitigasi sebagian besar kasus.
 // Untuk fix penuh, perlu pakai Supabase RPC dengan jsonb_concat atau optimistic locking.
 async function updateConvState(convId, stateUpdate) {
-  // Ambil state sekarang dulu
+  // Coba pakai RPC atomic merge dulu (race-condition safe)
+  try {
+    const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/merge_conv_state`, {
+      method: 'POST',
+      headers: sbH(),
+      body: JSON.stringify({ p_conv_id: convId, p_state: stateUpdate }),
+    });
+    if (rpcRes.ok) return; // sukses atomic merge
+    // RPC belum ada → fallback ke read-then-write
+  } catch (_) {}
+
+  // Fallback: read-then-write (bisa race tapi ada guard)
   const existing = await sbGet('conversations', `?id=eq.${convId}&limit=1`);
   if (!existing.length) return;
   const currentState = existing[0].state || {};
+  const merged = { ...currentState, ...stateUpdate };
+
   await sbPatch('conversations', `?id=eq.${convId}`, {
-    state: { ...currentState, ...stateUpdate },
+    state: merged,
     last_msg_at: new Date().toISOString(),
   });
 }
