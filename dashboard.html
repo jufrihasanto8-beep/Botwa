@@ -1227,12 +1227,17 @@ async function renderInbox() {
     custs.forEach(c => custMapCache[c.id] = c);
   }
 
-  // Fetch order status per conversation (batch)
+  // Fetch order status per conversation (batch, chunked to avoid URI too long)
   const convIds = convs.map(c => c.id);
   let orderMap = {}; // conversation_id → { no_resi, sampai, tracking_events }
   try {
-    const orders = await sbGet('orders_new', `?user_id=eq.${userId}&conversation_id=in.(${convIds.join(',')})&select=conversation_id,no_resi,sampai,tracking_events,metode`);
-    orders.forEach(o => { if (o.conversation_id) orderMap[o.conversation_id] = o; });
+    const CHUNK = 80;
+    const chunks = [];
+    for (let i = 0; i < convIds.length; i += CHUNK) chunks.push(convIds.slice(i, i + CHUNK));
+    const results = await Promise.all(chunks.map(ch =>
+      sbGet('orders_new', `?user_id=eq.${userId}&conversation_id=in.(${ch.join(',')})&select=conversation_id,no_resi,sampai,tracking_events,metode`)
+    ));
+    results.flat().forEach(o => { if (o.conversation_id) orderMap[o.conversation_id] = o; });
   } catch(e) { console.error('orderMap error:', e); }
 
   const lastMsgs = await Promise.all(convs.map(c =>
