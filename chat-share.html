@@ -149,8 +149,8 @@ async function init() {
   const params = getParams();
   const body = document.getElementById('chat-body');
 
-  if (!params.phone && !params.conv && !params.customer) {
-    body.innerHTML = '<div class="wa-empty"><b>Link tidak valid</b>Tambahkan parameter ?phone=08xxxx di URL</div>';
+  if (!params.conv) {
+    body.innerHTML = '<div class="wa-empty"><b>Link tidak valid</b>Halaman ini hanya bisa diakses melalui link yang dikirim ke grup</div>';
     return;
   }
 
@@ -158,30 +158,14 @@ async function init() {
     let customer = null;
     let conversations = [];
 
-    if (params.conv) {
-      const convs = await sbFetch('conversations', `?id=eq.${params.conv}&select=*`);
-      if (convs[0]) {
-        conversations = convs;
-        const custs = await sbFetch('customers', `?id=eq.${convs[0].customer_id}&select=*`);
-        customer = custs[0];
-      }
-    } else {
-      const phone = normalizePhone(params.phone || '');
-      const custs = await sbFetch('customers', `?wa_number=eq.${phone}&select=*`);
-      if (custs.length > 1 && params.customer) {
-        customer = custs.find(c => c.id === params.customer) || custs[0];
-      } else {
-        customer = custs[0];
-      }
-      if (customer) {
-        conversations = await sbFetch('conversations', `?customer_id=eq.${customer.id}&order=created_at.desc&select=*`);
-      }
-    }
-
-    if (!customer && !conversations.length) {
-      body.innerHTML = '<div class="wa-empty"><b>Customer tidak ditemukan</b>Nomor ' + (params.phone || params.conv || '') + ' tidak ada di database</div>';
+    const convs = await sbFetch('conversations', `?id=eq.${params.conv}&select=*`);
+    if (!convs[0]) {
+      body.innerHTML = '<div class="wa-empty"><b>Percakapan tidak ditemukan</b></div>';
       return;
     }
+    conversations = convs;
+    const custs = await sbFetch('customers', `?id=eq.${convs[0].customer_id}&select=*`);
+    customer = custs[0];
 
     // Header
     const nama = customer?.nama || 'Customer';
@@ -208,13 +192,11 @@ async function init() {
       return;
     }
 
-    // Filter — from=tracking: hanya dari notif pengiriman ke bawah
+    // Selalu filter — hanya dari notif pengiriman ke bawah
     let filtered = msgs;
-    if (params.from === 'tracking') {
-      const trackingKeywords = /kendala pengiriman|bermasalah|tidak berhasil mengantar|diretur|dikembalikan|gagal antar|delivery problem/i;
-      const startIdx = msgs.findIndex(m => (m.role === 'ai' || m.role === 'cs') && trackingKeywords.test(m.isi || ''));
-      if (startIdx >= 0) filtered = msgs.slice(startIdx);
-    }
+    const trackingKeywords = /kendala pengiriman|bermasalah|tidak berhasil mengantar|diretur|dikembalikan|gagal antar|delivery problem/i;
+    const startIdx = msgs.findIndex(m => (m.role === 'ai' || m.role === 'cs') && trackingKeywords.test(m.isi || ''));
+    if (startIdx >= 0) filtered = msgs.slice(startIdx);
 
     // Render
     let html = '';
