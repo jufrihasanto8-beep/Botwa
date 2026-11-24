@@ -574,6 +574,20 @@ Bisa isi lebih dari satu rekening."></textarea>
           <div id="group-ops-empty" style="font-size:12px;color:#64748b">Belum dipilih — klik grup di daftar atas</div>
         </div>
 
+        <!-- 4. Grup Pengiriman -->
+        <div class="grp-slot-card" style="background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px 18px;margin-bottom:12px">
+          <div class="grp-slot-title" style="font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:4px">Pengiriman</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:10px">Link chat customer saat paket bermasalah — untuk tim pengiriman</div>
+          <div id="group-pengiriman-card" style="display:none;background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:10px;padding:10px 14px;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:11px;color:#64748b">Grup aktif</div>
+              <div id="group-pengiriman-nama" class="grp-slot-nama" style="font-weight:600;color:#e2e8f0;font-size:13px">—</div>
+            </div>
+            <button onclick="clearGroupSlot('pengiriman')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:4px">✕</button>
+          </div>
+          <div id="group-pengiriman-empty" style="font-size:12px;color:#64748b">Belum dipilih — klik grup di daftar atas</div>
+        </div>
+
         <!-- Pilih target slot -->
         <div style="margin-bottom:12px">
           <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Pilih grup untuk:</div>
@@ -581,6 +595,7 @@ Bisa isi lebih dari satu rekening."></textarea>
             <button class="btn" id="slot-btn-recap" onclick="setActiveSlot('recap')" style="font-size:11px;padding:5px 12px;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)">Recap Order</button>
             <button class="btn slot-btn-inactive" id="slot-btn-qc" onclick="setActiveSlot('qc')" style="font-size:11px;padding:5px 12px">QC Transfer</button>
             <button class="btn slot-btn-inactive" id="slot-btn-ops" onclick="setActiveSlot('ops')" style="font-size:11px;padding:5px 12px">Operasional</button>
+            <button class="btn slot-btn-inactive" id="slot-btn-pengiriman" onclick="setActiveSlot('pengiriman')" style="font-size:11px;padding:5px 12px">Pengiriman</button>
           </div>
         </div>
 
@@ -1461,31 +1476,34 @@ let _groupSlots = {
   recap: { jid: null, nama: null },
   qc:    { jid: null, nama: null },
   ops:   { jid: null, nama: null },
+  pengiriman: { jid: null, nama: null },
 };
 // Backward compat: recap = group_jid/group_nama, qc = qc_group_jid/qc_group_nama, ops = ops_group_jid/ops_group_nama
 const SLOT_DB_MAP = {
   recap: { jid: 'group_jid', nama: 'group_nama' },
   qc:    { jid: 'qc_group_jid', nama: 'qc_group_nama' },
   ops:   { jid: 'ops_group_jid', nama: 'ops_group_nama' },
+  pengiriman: { jid: 'pengiriman_group_jid', nama: 'pengiriman_group_nama' },
 };
 
 async function loadGroupJid() {
   try {
     const uid = Auth.getUser()?.id;
     if (!uid) return;
-    const rows = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=group_jid,group_nama,qc_group_jid,qc_group_nama,ops_group_jid,ops_group_nama&limit=1`, {
+    const rows = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=group_jid,group_nama,qc_group_jid,qc_group_nama,ops_group_jid,ops_group_nama,pengiriman_group_jid,pengiriman_group_nama&limit=1`, {
       headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.json());
     const row = rows[0] || {};
     _groupSlots.recap = { jid: row.group_jid || null, nama: row.group_nama || null };
     _groupSlots.qc    = { jid: row.qc_group_jid || null, nama: row.qc_group_nama || null };
     _groupSlots.ops   = { jid: row.ops_group_jid || null, nama: row.ops_group_nama || null };
+    _groupSlots.pengiriman = { jid: row.pengiriman_group_jid || null, nama: row.pengiriman_group_nama || null };
     renderGroupSlots();
   } catch(e) { console.error('loadGroupJid error', e); }
 }
 
 function renderGroupSlots() {
-  ['recap','qc','ops'].forEach(slot => {
+  ['recap','qc','ops','pengiriman'].forEach(slot => {
     const s = _groupSlots[slot];
     const cardId = slot === 'recap' ? 'group-selected-card' : `group-${slot}-card`;
     const namaId = slot === 'recap' ? 'group-selected-nama' : `group-${slot}-nama`;
@@ -1505,8 +1523,8 @@ function renderGroupSlots() {
 
 function setActiveSlot(slot) {
   _activeSlot = slot;
-  const colors = { recap: { bg:'rgba(34,197,94,.15)', c:'#22c55e', bd:'rgba(34,197,94,.3)' }, qc: { bg:'rgba(59,130,246,.15)', c:'#3b82f6', bd:'rgba(59,130,246,.3)' }, ops: { bg:'rgba(251,146,60,.15)', c:'#fb923c', bd:'rgba(251,146,60,.3)' } };
-  ['recap','qc','ops'].forEach(s => {
+  const colors = { recap: { bg:'rgba(34,197,94,.15)', c:'#22c55e', bd:'rgba(34,197,94,.3)' }, qc: { bg:'rgba(59,130,246,.15)', c:'#3b82f6', bd:'rgba(59,130,246,.3)' }, ops: { bg:'rgba(251,146,60,.15)', c:'#fb923c', bd:'rgba(251,146,60,.3)' }, pengiriman: { bg:'rgba(234,179,8,.15)', c:'#eab308', bd:'rgba(234,179,8,.3)' } };
+  ['recap','qc','ops','pengiriman'].forEach(s => {
     const btn = document.getElementById('slot-btn-'+s);
     if (s === slot) { btn.style.background = colors[s].bg; btn.style.color = colors[s].c; btn.style.borderColor = colors[s].bd; btn.classList.remove('slot-btn-inactive'); }
     else { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; btn.classList.add('slot-btn-inactive'); }
@@ -1588,7 +1606,7 @@ async function saveAllGroups() {
   const uid = Auth.getUser()?.id;
   if (!uid) return;
   const patch = {};
-  ['recap','qc','ops'].forEach(slot => {
+  ['recap','qc','ops','pengiriman'].forEach(slot => {
     const map = SLOT_DB_MAP[slot];
     patch[map.jid]  = _groupSlots[slot].jid || null;
     patch[map.nama] = _groupSlots[slot].nama || null;
