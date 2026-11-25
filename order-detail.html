@@ -183,6 +183,9 @@ body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
 .summary-bar{display:flex;gap:16px;padding:12px 24px;flex-shrink:0;flex-wrap:wrap;align-items:center;background:var(--white);border-bottom:1px solid var(--border)}
 .sum-item{font-size:12px;color:var(--text-2)}
 .sum-item b{color:var(--text);font-weight:700}
+.sum-filter{cursor:pointer;padding:3px 8px;border-radius:6px;border:1px solid transparent;transition:all .15s;user-select:none}
+.sum-filter:hover{background:rgba(100,116,139,.08);border-color:var(--border)}
+.sum-filter.active{border-color:#3b82f6;background:rgba(59,130,246,.08)}
 
 /* ── CSS Variables dark (default) ── */
 :root {
@@ -384,8 +387,8 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
     <div class="sum-item" style="color:var(--text-3)">|</div>
     <div class="sum-item">Total Qty: <b id="sum-qty">—</b></div>
     <div class="sum-item" style="color:var(--text-3)">|</div>
-    <div class="sum-item">✓ Resi: <b id="sum-resi-ada" style="color:#22c55e">—</b></div>
-    <div class="sum-item">✗ Belum Resi: <b id="sum-resi-belum" style="color:#ef4444">—</b></div>
+    <div class="sum-item sum-filter" id="sf-resi" onclick="toggleResiFilter('resi')" title="Klik untuk filter yang sudah ada resi">✓ Resi: <b id="sum-resi-ada" style="color:#22c55e">—</b></div>
+    <div class="sum-item sum-filter" id="sf-belum" onclick="toggleResiFilter('belum')" title="Klik untuk filter yang belum ada resi">✗ Belum Resi: <b id="sum-resi-belum" style="color:#ef4444">—</b></div>
   </div>
 
   <!-- TABLE -->
@@ -740,6 +743,14 @@ function getOrderRow(c, idx) {
   };
 }
 
+window.__resiFilter = null; // null=semua, 'resi'=sudah resi, 'belum'=belum resi
+function toggleResiFilter(type) {
+  window.__resiFilter = window.__resiFilter === type ? null : type;
+  document.getElementById('sf-resi').classList.toggle('active', window.__resiFilter === 'resi');
+  document.getElementById('sf-belum').classList.toggle('active', window.__resiFilter === 'belum');
+  render();
+}
+
 function render() {
   const prodFilter = window.__activeProductFilter || null;
   const filtered = prodFilter ? allOrders.filter(c => c.product_id === prodFilter) : allOrders;
@@ -761,6 +772,10 @@ function render() {
       r.keluhan.toLowerCase().includes(q)
     );
   }
+
+  // Resi filter
+  if (window.__resiFilter === 'resi') rows = rows.filter(r => r.noResi);
+  if (window.__resiFilter === 'belum') rows = rows.filter(r => !r.noResi);
 
   // Summary
   let cod = 0, tf = 0, totalNilai = 0, totalQty = 0, resiAda = 0, resiBelum = 0;
