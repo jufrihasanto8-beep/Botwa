@@ -91,6 +91,8 @@ body.light #filter-bar{background:#fff;border-bottom-color:#e2e8f0}
 body.light .ftab{border-color:#e2e8f0;color:#64748b}
 body.light .ftab.active{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}
 body.light .ftab.eskalasi.active{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
+body.light #ftab-bermasalah{color:#dc2626}
+body.light #ftab-bermasalah.active{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
 body.light .filter-sort{background:#f8fafc;border-color:#e2e8f0;color:#64748b}
 body.light #inbox{background:#fff;border-right-color:#e2e8f0}
 body.light .inbox-title{color:#64748b}
@@ -304,6 +306,10 @@ body.light .drp-dropdown{box-shadow:0 8px 32px rgba(0,0,0,.12)}
 .ftab.active .fn{background:rgba(59,130,246,.3);color:#93c5fd}
 .ftab.eskalasi.active{background:rgba(239,68,68,.1);color:#fca5a5;border-color:rgba(239,68,68,.3)}
 .ftab.eskalasi.active .fn{background:rgba(239,68,68,.25)}
+#ftab-bermasalah{color:#f87171}
+#ftab-bermasalah .fn{background:rgba(239,68,68,.1);color:#f87171}
+#ftab-bermasalah.active{background:rgba(239,68,68,.1);color:#fca5a5;border-color:rgba(239,68,68,.3)}
+#ftab-bermasalah.active .fn{background:rgba(239,68,68,.25);color:#fca5a5}
 .filter-sort{margin-left:auto;font-size:12px;color:#64748b;background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:5px 10px;cursor:pointer;color:#94a3b8}
 
 /* ── CONTENT AREA ── */
@@ -641,6 +647,7 @@ body.light #cm-overlay .btn-cancel-cm{background:#f8fafc;border-color:#e2e8f0;co
     <button class="ftab eskalasi" onclick="setTab('eskalasi',this)" id="ftab-eskalasi">Eskalasi <span class="fn" id="fn-esc">0</span></button>
     <button class="ftab" onclick="setTab('live',this)" id="ftab-live">Live <span class="fn" id="fn-live">0</span></button>
     <button class="ftab" onclick="setTab('selesai',this)" id="ftab-selesai">Closing <span class="fn" id="fn-selesai">0</span></button>
+    <button class="ftab" onclick="setTab('bermasalah',this)" id="ftab-bermasalah" style="color:#f87171">⚠️ Bermasalah <span class="fn" id="fn-bermasalah">0</span></button>
     <select class="filter-sort" onchange="setSortOrder(this.value)">
       <option value="desc">Terbaru</option>
       <option value="asc">Terlama</option>
@@ -1164,10 +1171,12 @@ async function loadStats() {
   document.getElementById('st-aktif-sub').textContent = aktif + ' aktif dalam 24 jam';
 
   // Filter counts
-  document.getElementById('fn-all').textContent     = convs.length;
-  document.getElementById('fn-esc').textContent     = esc;
-  document.getElementById('fn-live').textContent    = convs.filter(c=>c.status==='baru'||c.status==='diproses').length;
-  document.getElementById('fn-selesai').textContent = selesai;
+  const bermasalahCount = convs.filter(c => c.state?.delivery_issue).length;
+  document.getElementById('fn-all').textContent        = convs.length;
+  document.getElementById('fn-esc').textContent        = esc;
+  document.getElementById('fn-live').textContent       = convs.filter(c=>c.status==='baru'||c.status==='diproses').length;
+  document.getElementById('fn-selesai').textContent    = selesai;
+  document.getElementById('fn-bermasalah').textContent = bermasalahCount;
   document.getElementById('inbox-count').textContent = convs.length;
 
   const badge = document.getElementById('unread-badge');
@@ -1205,6 +1214,15 @@ async function renderInbox() {
       const an = a.state?.has_new_message ? 1 : 0;
       const bn = b.state?.has_new_message ? 1 : 0;
       return bn - an;
+    });
+  } else if (tabFilter === 'bermasalah') {
+    // Filter conv yang punya delivery_issue di state
+    convs = convs.filter(c => c.state?.delivery_issue);
+    // Yang belum bales (belum pengiriman_link_sent) di atas
+    convs.sort((a, b) => {
+      const aS = a.state?.pengiriman_link_sent ? 1 : 0;
+      const bS = b.state?.pengiriman_link_sent ? 1 : 0;
+      return aS - bS;
     });
   }
 
