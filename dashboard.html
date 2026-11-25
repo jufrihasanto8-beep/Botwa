@@ -1171,7 +1171,13 @@ async function loadStats() {
   document.getElementById('st-aktif-sub').textContent = aktif + ' aktif dalam 24 jam';
 
   // Filter counts
-  const bermasalahCount = convs.filter(c => c.state?.delivery_issue && !c.state?.delivered).length;
+  const bermasalahCount = convs.filter(c => {
+    if (!c.state?.delivery_issue) return false;
+    if (c.state?.delivered) return false;
+    const ord = window._orderMap?.[c.id];
+    if (ord?.sampai || ord?.tracking_events?.delivered) return false;
+    return true;
+  }).length;
   document.getElementById('fn-all').textContent        = convs.length;
   document.getElementById('fn-esc').textContent        = esc;
   document.getElementById('fn-live').textContent       = convs.filter(c=>c.status==='baru'||c.status==='diproses').length;
@@ -1247,7 +1253,8 @@ async function renderInbox() {
 
   // Fetch order status per conversation (batch, chunked to avoid URI too long)
   const convIds = convs.map(c => c.id);
-  let orderMap = {}; // conversation_id → { no_resi, sampai, tracking_events }
+  window._orderMap = window._orderMap || {};
+  let orderMap = window._orderMap; // conversation_id → { no_resi, sampai, tracking_events }
   try {
     const CHUNK = 80;
     const chunks = [];
@@ -1257,6 +1264,16 @@ async function renderInbox() {
     ));
     results.flat().forEach(o => { if (o.conversation_id) orderMap[o.conversation_id] = o; });
   } catch(e) { console.error('orderMap error:', e); }
+
+  // Filter bermasalah: exclude yang udah sampai (cek order.sampai + tracking_events.delivered)
+  if (tabFilter === 'bermasalah') {
+    convs = convs.filter(c => {
+      const ord = orderMap[c.id];
+      if (ord?.sampai) return false;
+      if (ord?.tracking_events?.delivered) return false;
+      return true;
+    });
+  }
 
   const lastMsgs = await Promise.all(convs.map(c =>
     sbGet('conv_messages', `?conversation_id=eq.${c.id}&order=created_at.desc&limit=1`)
