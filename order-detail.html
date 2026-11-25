@@ -806,7 +806,7 @@ function renderTable(rows) {
         </div>`
         : '';
     return `<tr style="${r.sudahDikirim ? 'opacity:.65' : ''}">
-    <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()" ${r.sudahDikirim ? 'disabled title="Sudah dikirim — pakai tombol Kirim Ulang"' : ''}></td>
+    <td class="td-cb"><input type="checkbox" class="row-cb" value="${escH(r.id)}" onchange="updateSelectAll()"></td>
     <td style="text-align:center"><button onclick="openEdit('${escH(r.id)}')" style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;color:#64748b;font-size:14px" title="Edit order">✏️</button></td>
     <td class="td-no">${fmtDt(r.tanggal)}</td>
     <td><div class="td-wrap-sm td-bold" title="${escH(r.produkNama)}">${escH(r.produkNama)||'—'}</div></td>
