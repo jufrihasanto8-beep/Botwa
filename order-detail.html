@@ -363,6 +363,7 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
         </div>
       </div>
     </div>
+    <input type="text" id="od-search" placeholder="🔍 Cari nama / resi / telepon / alamat..." oninput="render()" style="flex:1;min-width:200px;max-width:360px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;outline:none;transition:border .15s" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor=''">
     <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
       <button id="btn-mengantar" class="btn-mengantar" onclick="openMengantar()" style="display:none">🚚 Kirim ke Mengantar (<span id="mng-count">0</span>)</button>
       <button id="btn-delete" class="btn-export" onclick="deleteSelected()" style="background:#ef4444;display:none">🗑 Hapus (<span id="del-count">0</span>)</button>
@@ -743,7 +744,23 @@ function render() {
   const prodFilter = window.__activeProductFilter || null;
   const filtered = prodFilter ? allOrders.filter(c => c.product_id === prodFilter) : allOrders;
   const list = filterByRange(filtered);
-  const rows = list.map((c, i) => getOrderRow(c, i));
+  let rows = list.map((c, i) => getOrderRow(c, i));
+
+  // Search filter
+  const q = (document.getElementById('od-search')?.value || '').toLowerCase().trim();
+  if (q) {
+    rows = rows.filter(r =>
+      r.nama.toLowerCase().includes(q) ||
+      r.notelp.includes(q) ||
+      r.noResi.toLowerCase().includes(q) ||
+      r.alamat.toLowerCase().includes(q) ||
+      r.kelurahan.toLowerCase().includes(q) ||
+      r.kecamatan.toLowerCase().includes(q) ||
+      r.kabupaten.toLowerCase().includes(q) ||
+      r.produkNama.toLowerCase().includes(q) ||
+      r.keluhan.toLowerCase().includes(q)
+    );
+  }
 
   // Summary
   let cod = 0, tf = 0, totalNilai = 0, totalQty = 0, resiAda = 0, resiBelum = 0;
