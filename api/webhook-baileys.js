@@ -35,9 +35,14 @@ const sbH = () => ({
   'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
 });
 
+function sbErrMsg(table, method, status, body) {
+  if (body.startsWith('<!') || body.startsWith('<html')) return `${method} ${table}: HTTP ${status} — Supabase unreachable (522/5xx)`;
+  return `${method} ${table}: ${body.slice(0, 300)}`;
+}
+
 async function sbGet(table, query = '') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { headers: sbH() });
-  if (!res.ok) throw new Error(`sbGet ${table}: ${await res.text()}`);
+  if (!res.ok) throw new Error(sbErrMsg(table, 'sbGet', res.status, await res.text()));
   return res.json();
 }
 
@@ -47,7 +52,7 @@ async function sbPost(table, body) {
     headers: { ...sbH(), 'Prefer': 'return=representation' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`sbPost ${table}: ${await res.text()}`);
+  if (!res.ok) throw new Error(sbErrMsg(table, 'sbPost', res.status, await res.text()));
   return res.json();
 }
 
@@ -57,7 +62,7 @@ async function sbPatch(table, query, body) {
     headers: { ...sbH(), 'Prefer': 'return=representation' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`sbPatch ${table}: ${await res.text()}`);
+  if (!res.ok) throw new Error(sbErrMsg(table, 'sbPatch', res.status, await res.text()));
   return res.json();
 }
 
@@ -189,6 +194,8 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
           delivery_issue_at:     prevState.delivery_issue_at,
           delivery_issue_status: prevState.delivery_issue_status,
           delivery_issue_resi:   prevState.delivery_issue_resi,
+          pengiriman_link_sent:  prevState.pengiriman_link_sent || false,
+          delivery_issue_fu_count: prevState.delivery_issue_fu_count || 0,
         } : {}),
       };
       const updated = await sbPatch('conversations', `?id=eq.${conv.id}`, {
@@ -4276,31 +4283,24 @@ ${ongkirInfo}`;
       }
     }
 
-    // ── Kirim link chat ke grup Pengiriman saat customer balas bermasalah ──
+    // ── Kirim link chat ke grup Pengiriman SEKALI saat customer balas bermasalah ──
+    // Flag pengiriman_link_sent dipertahankan di findOrCreateConversation → sekali kirim = selesai
     if (convState.delivery_issue && !convState.pengiriman_link_sent && PENGIRIMAN_GROUP_JID) {
       try {
-        // Atomic claim via SQL: UPDATE hanya match kalau flag belum true → return 1 row kalau berhasil claim, 0 kalau sudah di-claim
-        const claimRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_pengiriman_link`, {
-          method: 'POST',
-          headers: sbH(),
-          body: JSON.stringify({ p_conv_id: conversation.id }),
-        });
-        const claimed = claimRes.ok && (await claimRes.json().catch(() => false));
+        // Set flag DULU sebelum kirim — kalau pesan berikutnya masuk, flag sudah true
+        await updateConvState(conversation.id, { pengiriman_link_sent: true });
+        convState.pengiriman_link_sent = true; // update local state juga
 
-        if (claimed) {
-          const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
-          const custNama = customer?.nama || 'Customer';
-          const issueResi = convState.delivery_issue_resi || '';
-          const issueType = convState.delivery_issue_type === 'retur' ? 'Retur' : 'Bermasalah';
-          const chatLink = `https://csadsy.vercel.app/chat-share?conv=${conversation.id}`;
+        const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
+        const custNama = customer?.nama || 'Customer';
+        const issueResi = convState.delivery_issue_resi || '';
+        const issueType = convState.delivery_issue_type === 'retur' ? 'Retur' : 'Bermasalah';
+        const chatLink = `https://csadsy.vercel.app/chat-share?conv=${conversation.id}`;
 
-          const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan:\n${chatLink}`;
+        const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan:\n${chatLink}`;
 
-          await sendWA(waSession, PENGIRIMAN_GROUP_JID, linkMsg, true).catch(() => {});
-          console.log(`[PENGIRIMAN-LINK] Link terkirim ke grup pengiriman (atomic claim)`);
-        } else {
-          console.log(`[PENGIRIMAN-LINK] Skip — sudah di-claim request lain`);
-        }
+        await sendWA(waSession, PENGIRIMAN_GROUP_JID, linkMsg, true).catch(() => {});
+        console.log(`[PENGIRIMAN-LINK] Link terkirim ke grup pengiriman — flag sudah di-set, ga akan kirim lagi`);
       } catch (e) {
         console.error('[PENGIRIMAN-LINK] Error:', e.message);
       }
