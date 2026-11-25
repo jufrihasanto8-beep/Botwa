@@ -4233,7 +4233,7 @@ ${ongkirInfo}`;
         try {
           const opsGroupJid = OPS_GROUP_JID_USER;
           const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
-          const appUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://csadsy.vercel.app';
+          const appUrl = 'https://csadsy.vercel.app';
           const chatLink = `${appUrl}/chat-share?conv=${conversation.id}`;
           const cancelNotif = `❌ *Pembatalan Order*\n\n👤 ${customer?.nama || '-'} (${custPhone || '-'})\n🛒 ${product?.nama || '-'}\n💬 Alasan: "${message.slice(0, 100)}"\n\n🔗 Lihat percakapan:\n${chatLink}`;
           if (opsGroupJid) {
@@ -4283,7 +4283,7 @@ ${ongkirInfo}`;
         const custNama = customer?.nama || 'Customer';
         const issueResi = convState.delivery_issue_resi || '';
         const issueType = convState.delivery_issue_type === 'retur' ? 'Retur' : 'Bermasalah';
-        const appUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://csadsy.vercel.app';
+        const appUrl = 'https://csadsy.vercel.app';
         const chatLink = `${appUrl}/chat-share?phone=${encodeURIComponent(custPhone)}&conv=${conversation.id}&from=tracking`;
 
         const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan lengkap:\n${chatLink}`;
