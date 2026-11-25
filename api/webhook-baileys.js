@@ -182,6 +182,14 @@ async function findOrCreateConversation(userId, customerId, sumber, productId) {
         awaiting_order_confirm: false,
         awaiting_order_correction: false,
         foto_terkirim:          false,
+        // PERTAHANKAN delivery_issue fields — jangan sampai hilang saat re-open
+        ...(prevState.delivery_issue ? {
+          delivery_issue:        prevState.delivery_issue,
+          delivery_issue_type:   prevState.delivery_issue_type,
+          delivery_issue_at:     prevState.delivery_issue_at,
+          delivery_issue_status: prevState.delivery_issue_status,
+          delivery_issue_resi:   prevState.delivery_issue_resi,
+        } : {}),
       };
       const updated = await sbPatch('conversations', `?id=eq.${conv.id}`, {
         status: 'selesai', // tetap di tab Closing
