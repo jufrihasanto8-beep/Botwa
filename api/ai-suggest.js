@@ -464,25 +464,42 @@ async function handleCustomerRisk(req, res) {
   if (wilayah) {
     try {
       const parts = wilayah.split(',').map(s => s.trim());
-      const kecamatan = parts[0];
-      const kota = parts[1] || parts[0];
-      let orders = await valGet(`all_orderan?kecamatan=ilike.${encodeURIComponent(kecamatan)}&select=status_akhir&limit=500`);
-      let namaLabel = kecamatan;
-      if (orders.length < 3 && kota !== kecamatan) {
-        orders = await valGet(`all_orderan?kabupaten=ilike.${encodeURIComponent(kota)}&select=status_akhir&limit=500`);
-        namaLabel = kota;
-      }
-      const wTotal = orders.length;
-      const wRetur = orders.filter(r => (r.status_akhir || '').toLowerCase().includes('retur')).length;
-      if (wTotal >= 3) {
-        const pct = Math.round((wRetur / wTotal) * 100);
-        result.wilayah = {
-          nama: namaLabel, total: wTotal, retur: wRetur, pct,
-          label: pct === 0 ? 'Aman' : pct < 15 ? `Sedang (${pct}%)` : `Tinggi (${pct}%)`,
-          level: pct === 0 ? 'aman' : pct < 15 ? 'sedang' : 'tinggi',
-        };
+      const namaLabel = parts[0];
+      const kodepos = req.query.kodepos || '';
+
+      // Prioritas 1: pakai tabel kodepos_stats (pre-calculated, instan)
+      if (kodepos) {
+        const stats = await valGet(`kodepos_stats?kodepos=eq.${encodeURIComponent(kodepos)}&limit=1`).catch(() => []);
+        if (stats.length) {
+          const s = stats[0];
+          result.wilayah = {
+            nama: namaLabel, total: s.total, retur: s.retur, pct: s.pct,
+            label: s.pct === 0 ? 'Aman' : s.pct < 15 ? `Sedang (${s.pct}%)` : `Tinggi (${s.pct}%)`,
+            level: s.pct === 0 ? 'aman' : s.pct < 15 ? 'sedang' : 'tinggi',
+          };
+        } else {
+          result.wilayah = { nama: namaLabel, label: 'Data kurang', level: 'unknown', total: 0 };
+        }
       } else {
-        result.wilayah = { nama: namaLabel, label: 'Data kurang', level: 'unknown', total: wTotal };
+        // Fallback: scan all_orderan (lebih lambat, bisa timeout di DB besar)
+        const kecamatan = parts[0];
+        const kota = parts[1] || parts[0];
+        let orders = await valGet(`all_orderan?kecamatan=ilike.${encodeURIComponent(kecamatan)}&select=status_akhir&limit=500`);
+        if (orders.length < 3 && kota !== kecamatan) {
+          orders = await valGet(`all_orderan?kabupaten=ilike.${encodeURIComponent(kota)}&select=status_akhir&limit=500`);
+        }
+        const wTotal = orders.length;
+        const wRetur = orders.filter(r => (r.status_akhir || '').toLowerCase().includes('retur')).length;
+        if (wTotal >= 3) {
+          const pct = Math.round((wRetur / wTotal) * 100);
+          result.wilayah = {
+            nama: kecamatan, total: wTotal, retur: wRetur, pct,
+            label: pct === 0 ? 'Aman' : pct < 15 ? `Sedang (${pct}%)` : `Tinggi (${pct}%)`,
+            level: pct === 0 ? 'aman' : pct < 15 ? 'sedang' : 'tinggi',
+          };
+        } else {
+          result.wilayah = { nama: kecamatan, label: 'Data kurang', level: 'unknown', total: wTotal };
+        }
       }
     } catch(e) { console.error('Wilayah check error:', e.message); }
   }
