@@ -1218,11 +1218,11 @@ async function renderInbox() {
   } else if (tabFilter === 'bermasalah') {
     // Filter conv yang punya delivery_issue di state
     convs = convs.filter(c => c.state?.delivery_issue);
-    // Yang belum bales (belum pengiriman_link_sent) di atas
+    // Sort: customer udah bales di atas, belum bales di bawah
     convs.sort((a, b) => {
-      const aS = a.state?.pengiriman_link_sent ? 1 : 0;
-      const bS = b.state?.pengiriman_link_sent ? 1 : 0;
-      return aS - bS;
+      const aR = a.state?.has_new_message ? 2 : a.state?.delivery_issue ? 1 : 0;
+      const bR = b.state?.has_new_message ? 2 : b.state?.delivery_issue ? 1 : 0;
+      return bR - aR;
     });
   }
 
