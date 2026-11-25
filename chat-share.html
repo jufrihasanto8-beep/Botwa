@@ -224,6 +224,37 @@ async function init() {
     body.innerHTML = html;
     body.scrollTop = body.scrollHeight;
 
+    // Auto-refresh setiap 15 detik — pesan baru muncul otomatis
+    if (!window._chatRefreshStarted) {
+      window._chatRefreshStarted = true;
+      setInterval(async () => {
+        try {
+          const newMsgs = await sbFetch('conv_messages', `?conversation_id=eq.${convId}&order=created_at.asc&limit=500&select=role,isi,created_at`);
+          if (!newMsgs || newMsgs.length <= filtered.length) return;
+          // Ada pesan baru — re-render
+          let newFiltered = newMsgs;
+          const si = newMsgs.findIndex(m => (m.role === 'ai' || m.role === 'cs') && trackingKeywords.test(m.isi || ''));
+          if (si >= 0) newFiltered = newMsgs.slice(si);
+          filtered = newFiltered;
+
+          let h = '';
+          let ld = '';
+          newFiltered.forEach(m => {
+            const d = new Date(m.created_at);
+            const ds = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
+            if (ds !== ld) { h += `<div class="wa-date"><span>${ds}</span></div>`; ld = ds; }
+            const t = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+            const s = (m.isi || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            if (m.role === 'system') h += `<div class="wa-row sys"><div class="wa-bubble">${s}</div></div>`;
+            else if (m.role === 'customer') h += `<div class="wa-row in"><div class="wa-bubble">${s}<span class="wa-time">${t}</span></div></div>`;
+            else h += `<div class="wa-row out"><div class="wa-bubble">${s}<span class="wa-time">${t} <span class="wa-check">${CHECK_SVG}</span></span></div></div>`;
+          });
+          body.innerHTML = h;
+          body.scrollTop = body.scrollHeight;
+        } catch(_) {}
+      }, 15000);
+    }
+
   } catch(e) {
     body.innerHTML = `<div class="wa-empty"><b>Error</b>${e.message}</div>`;
   }
