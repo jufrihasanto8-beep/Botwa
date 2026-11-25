@@ -1171,7 +1171,7 @@ async function loadStats() {
   document.getElementById('st-aktif-sub').textContent = aktif + ' aktif dalam 24 jam';
 
   // Filter counts
-  const bermasalahCount = convs.filter(c => c.state?.delivery_issue).length;
+  const bermasalahCount = convs.filter(c => c.state?.delivery_issue && !c.state?.delivered).length;
   document.getElementById('fn-all').textContent        = convs.length;
   document.getElementById('fn-esc').textContent        = esc;
   document.getElementById('fn-live').textContent       = convs.filter(c=>c.status==='baru'||c.status==='diproses').length;
@@ -1216,8 +1216,8 @@ async function renderInbox() {
       return bn - an;
     });
   } else if (tabFilter === 'bermasalah') {
-    // Filter conv yang punya delivery_issue di state
-    convs = convs.filter(c => c.state?.delivery_issue);
+    // Filter conv yang delivery_issue tapi BELUM delivered
+    convs = convs.filter(c => c.state?.delivery_issue && !c.state?.delivered);
     // Sort: customer udah bales di atas, belum bales di bawah
     convs.sort((a, b) => {
       const aR = a.state?.has_new_message ? 2 : a.state?.delivery_issue ? 1 : 0;
