@@ -4279,13 +4279,15 @@ ${ongkirInfo}`;
     // ── Kirim link chat ke grup Pengiriman saat customer balas bermasalah ──
     if (convState.delivery_issue && !convState.pengiriman_link_sent && PENGIRIMAN_GROUP_JID) {
       try {
-        // Double-check: baca ulang state terbaru untuk hindari kirim 2x (race condition 2 pesan cepat)
-        const freshConv = await sbGet('conversations', `?id=eq.${conversation.id}&select=state&limit=1`).catch(() => []);
-        const freshState = freshConv[0]?.state || {};
-        if (!freshState.pengiriman_link_sent) {
-          // Set flag DULU sebelum kirim — biar request lain yang masuk bareng ga ikut kirim
-          await updateConvState(conversation.id, { pengiriman_link_sent: true });
+        // Atomic claim via SQL: UPDATE hanya match kalau flag belum true → return 1 row kalau berhasil claim, 0 kalau sudah di-claim
+        const claimRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_pengiriman_link`, {
+          method: 'POST',
+          headers: sbH(),
+          body: JSON.stringify({ p_conv_id: conversation.id }),
+        });
+        const claimed = claimRes.ok && (await claimRes.json().catch(() => false));
 
+        if (claimed) {
           const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
           const custNama = customer?.nama || 'Customer';
           const issueResi = convState.delivery_issue_resi || '';
@@ -4295,9 +4297,9 @@ ${ongkirInfo}`;
           const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan:\n${chatLink}`;
 
           await sendWA(waSession, PENGIRIMAN_GROUP_JID, linkMsg, true).catch(() => {});
-          console.log(`[PENGIRIMAN-LINK] Link terkirim ke grup pengiriman`);
+          console.log(`[PENGIRIMAN-LINK] Link terkirim ke grup pengiriman (atomic claim)`);
         } else {
-          console.log(`[PENGIRIMAN-LINK] Skip — sudah pernah dikirim`);
+          console.log(`[PENGIRIMAN-LINK] Skip — sudah di-claim request lain`);
         }
       } catch (e) {
         console.error('[PENGIRIMAN-LINK] Error:', e.message);
