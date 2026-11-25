@@ -4279,18 +4279,27 @@ ${ongkirInfo}`;
     // ── Kirim link chat ke grup Pengiriman saat customer balas bermasalah ──
     if (convState.delivery_issue && !convState.pengiriman_link_sent && PENGIRIMAN_GROUP_JID) {
       try {
-        const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
-        const custNama = customer?.nama || 'Customer';
-        const issueResi = convState.delivery_issue_resi || '';
-        const issueType = convState.delivery_issue_type === 'retur' ? 'Retur' : 'Bermasalah';
-        const appUrl = 'https://csadsy.vercel.app';
-        const chatLink = `${appUrl}/chat-share?phone=${encodeURIComponent(custPhone)}&conv=${conversation.id}&from=tracking`;
+        // Double-check: baca ulang state terbaru untuk hindari kirim 2x (race condition 2 pesan cepat)
+        const freshConv = await sbGet('conversations', `?id=eq.${conversation.id}&select=state&limit=1`).catch(() => []);
+        const freshState = freshConv[0]?.state || {};
+        if (!freshState.pengiriman_link_sent) {
+          // Set flag DULU sebelum kirim — biar request lain yang masuk bareng ga ikut kirim
+          await updateConvState(conversation.id, { pengiriman_link_sent: true });
 
-        const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan lengkap:\n${chatLink}`;
+          const custPhone = (customer?.wa_number || '').replace(/^62/, '0');
+          const custNama = customer?.nama || 'Customer';
+          const issueResi = convState.delivery_issue_resi || '';
+          const issueType = convState.delivery_issue_type === 'retur' ? 'Retur' : 'Bermasalah';
+          const appUrl = 'https://csadsy.vercel.app';
+          const chatLink = `${appUrl}/chat-share?phone=${encodeURIComponent(custPhone)}&conv=${conversation.id}&from=tracking`;
 
-        await sendWA(waSession, PENGIRIMAN_GROUP_JID, linkMsg, true).catch(() => {});
-        await updateConvState(conversation.id, { pengiriman_link_sent: true });
-        console.log(`[PENGIRIMAN-LINK] Link terkirim ke grup pengiriman`);
+          const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan lengkap:\n${chatLink}`;
+
+          await sendWA(waSession, PENGIRIMAN_GROUP_JID, linkMsg, true).catch(() => {});
+          console.log(`[PENGIRIMAN-LINK] Link terkirim ke grup pengiriman`);
+        } else {
+          console.log(`[PENGIRIMAN-LINK] Skip — sudah pernah dikirim`);
+        }
       } catch (e) {
         console.error('[PENGIRIMAN-LINK] Error:', e.message);
       }
