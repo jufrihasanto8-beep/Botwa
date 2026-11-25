@@ -2728,7 +2728,14 @@ JANGAN langsung kirim ulang ringkasan pesanan kalau customer tidak minta.`;
 
     // ── Ambil pesan terakhir — kalau ada ringkasan, cukup 10 pesan; kalau belum, 20 ───
     const historyLimit = conversation.ringkasan ? 10 : 20;
-    const history = await getContextMessages(conversation.id, null, historyLimit);
+    let history;
+    try {
+      history = await getContextMessages(conversation.id, null, historyLimit);
+    } catch (histErr) {
+      // Supabase down / timeout → jangan bales customer daripada bales aneh tanpa context
+      console.error(`[HISTORY] Gagal ambil history, skip AI response:`, histErr.message);
+      return res.status(200).json({ ok: true, skipped: 'history_fetch_failed' });
+    }
 
     // ── Inject hasil analisa gambar ke history ─────────────────
     if (imageAnalysis) {
