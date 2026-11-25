@@ -705,15 +705,15 @@ module.exports = async function handler(req, res) {
     // ═══════════════════════════════════════════════════
     if (!isTimeUp()) {
       try {
-        // Cari conversation dengan delivery_issue yang belum resolved
+        // Cari conversation dengan delivery_issue (termasuk status selesai — paket bermasalah biasanya post-closing)
         const issueConvs = await sbGet('conversations',
-          `?status=in.(baru,diproses)&select=id,user_id,customer_id,product_id,state,last_msg_at`
+          `?state->>delivery_issue=eq.true&select=id,user_id,customer_id,product_id,state,last_msg_at`
           + `&order=last_msg_at.asc&limit=100`
         ).catch(() => []);
 
         const bermasalahConvs = issueConvs.filter(c => {
           const s = c.state || {};
-          return s.delivery_issue && !s.delivery_issue_resolved
+          return s.delivery_issue && !s.delivery_issue_resolved && !s.delivered
             && (s.delivery_issue_fu_count || 0) < 3;
         });
 
