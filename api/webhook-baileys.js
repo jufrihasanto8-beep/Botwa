@@ -4290,10 +4290,9 @@ ${ongkirInfo}`;
           const custNama = customer?.nama || 'Customer';
           const issueResi = convState.delivery_issue_resi || '';
           const issueType = convState.delivery_issue_type === 'retur' ? 'Retur' : 'Bermasalah';
-          const appUrl = 'https://csadsy.vercel.app';
-          const chatLink = `${appUrl}/chat-share?phone=${encodeURIComponent(custPhone)}&conv=${conversation.id}&from=tracking`;
+          const chatLink = `https://csadsy.vercel.app/chat-share?conv=${conversation.id}`;
 
-          const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan lengkap:\n${chatLink}`;
+          const linkMsg = `⚠️ *Paket ${issueType}*\n\n👤 ${custNama} (${custPhone})\n📦 Resi: ${issueResi}\n\n💬 Customer balas:\n"${(message || '').slice(0, 150)}"\n\n🔗 Lihat percakapan:\n${chatLink}`;
 
           await sendWA(waSession, PENGIRIMAN_GROUP_JID, linkMsg, true).catch(() => {});
           console.log(`[PENGIRIMAN-LINK] Link terkirim ke grup pengiriman`);
