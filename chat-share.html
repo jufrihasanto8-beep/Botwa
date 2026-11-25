@@ -185,18 +185,27 @@ async function init() {
       return;
     }
 
-    const msgs = await sbFetch('conv_messages', `?conversation_id=eq.${convId}&order=created_at.asc&limit=500&select=role,isi,created_at`);
+    // Filter pesan berdasarkan timestamp state: dari delivery_issue_at sampai delivered_at
+    const st = conv.state || {};
+    const issueAt = st.delivery_issue_at || null;
+    const resolvedAt = st.delivered_at || null;
+
+    let msgQuery = `?conversation_id=eq.${convId}&order=created_at.asc&limit=500&select=role,isi,created_at`;
+    if (issueAt) msgQuery += `&created_at=gte.${issueAt}`;
+    if (resolvedAt) {
+      // Tambah 60 detik buffer supaya pesan notif delivered sendiri ikut tampil
+      const endTs = new Date(new Date(resolvedAt).getTime() + 60000).toISOString();
+      msgQuery += `&created_at=lte.${endTs}`;
+    }
+
+    const msgs = await sbFetch('conv_messages', msgQuery);
 
     if (!msgs || !msgs.length) {
       body.innerHTML = '<div class="wa-empty">Tidak ada pesan ditemukan</div>';
       return;
     }
 
-    // Selalu filter — hanya dari notif pengiriman ke bawah
     let filtered = msgs;
-    const trackingKeywords = /kendala pengiriman|bermasalah|tidak berhasil mengantar|diretur|dikembalikan|gagal antar|delivery problem/i;
-    const startIdx = msgs.findIndex(m => (m.role === 'ai' || m.role === 'cs') && trackingKeywords.test(m.isi || ''));
-    if (startIdx >= 0) filtered = msgs.slice(startIdx);
 
     // Render
     let html = '';
@@ -224,22 +233,36 @@ async function init() {
     body.innerHTML = html;
     body.scrollTop = body.scrollHeight;
 
-    // Auto-refresh setiap 15 detik — pesan baru muncul otomatis
+    // Auto-refresh setiap 15 detik — fetch conv state terbaru + pesan baru
+    // Kalau sudah resolved (delivered_at ada) dan semua pesan sudah tampil → stop refresh
     if (!window._chatRefreshStarted) {
       window._chatRefreshStarted = true;
-      setInterval(async () => {
+      const refreshId = setInterval(async () => {
         try {
-          const newMsgs = await sbFetch('conv_messages', `?conversation_id=eq.${convId}&order=created_at.asc&limit=500&select=role,isi,created_at`);
-          if (!newMsgs || newMsgs.length <= filtered.length) return;
-          // Ada pesan baru — re-render
-          let newFiltered = newMsgs;
-          const si = newMsgs.findIndex(m => (m.role === 'ai' || m.role === 'cs') && trackingKeywords.test(m.isi || ''));
-          if (si >= 0) newFiltered = newMsgs.slice(si);
-          filtered = newFiltered;
+          // Re-fetch conversation state (bisa berubah: delivered_at baru muncul)
+          const freshConv = await sbFetch('conversations', `?id=eq.${convId}&select=state`);
+          const freshSt = freshConv[0]?.state || {};
+          const freshIssueAt = freshSt.delivery_issue_at || issueAt;
+          const freshResolvedAt = freshSt.delivered_at || null;
+
+          let q = `?conversation_id=eq.${convId}&order=created_at.asc&limit=500&select=role,isi,created_at`;
+          if (freshIssueAt) q += `&created_at=gte.${freshIssueAt}`;
+          if (freshResolvedAt) {
+            const endTs = new Date(new Date(freshResolvedAt).getTime() + 60000).toISOString();
+            q += `&created_at=lte.${endTs}`;
+          }
+
+          const newMsgs = await sbFetch('conv_messages', q);
+          if (!newMsgs || newMsgs.length === filtered.length) {
+            // Kalau sudah resolved dan ga ada pesan baru → stop polling
+            if (freshResolvedAt) clearInterval(refreshId);
+            return;
+          }
+          filtered = newMsgs;
 
           let h = '';
           let ld = '';
-          newFiltered.forEach(m => {
+          filtered.forEach(m => {
             const d = new Date(m.created_at);
             const ds = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
             if (ds !== ld) { h += `<div class="wa-date"><span>${ds}</span></div>`; ld = ds; }
