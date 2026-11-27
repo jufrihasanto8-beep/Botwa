@@ -1096,8 +1096,21 @@ async function mengantarFetch(path, timeoutMs = 20000) {
 }
 
 /* ── HITUNG ONGKIR via Mengantar public API ───────────────── */
+// Request-level cache: hindari lookup Mengantar berulang untuk wilayah yang sama (termasuk null/gagal)
+const _ongkirCache = new Map(); // key → { result, ts }
+const ONGKIR_CACHE_TTL = 60_000; // 60 detik — cukup untuk 1 request + retry
+
 // Terima object {kelurahan, kecamatan, kabupaten, provinsi} ATAU string (backward compat)
 async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = null) {
+  // ── Cache check ──
+  const cacheKey = typeof wilayahInput === 'object'
+    ? `${(wilayahInput.kelurahan||'').toLowerCase()}|${(wilayahInput.kecamatan||'').toLowerCase()}|${qty}`
+    : `${String(wilayahInput||'').toLowerCase()}|${qty}`;
+  const cached = _ongkirCache.get(cacheKey);
+  if (cached && (Date.now() - cached.ts < ONGKIR_CACHE_TTL)) {
+    console.log(`[hitungOngkir] CACHE HIT "${cacheKey}" → ${cached.result ? 'ada ongkir' : 'null (gagal sebelumnya)'}`);
+    return cached.result;
+  }
   const stripKab = s => (s || '').replace(/^(kabupaten|kota|kab\.?)\s*/i, '').trim();
   let lokal = null;
 
@@ -1165,6 +1178,7 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
 
     if (!allAreas.length) {
       console.error(`[hitungOngkir] Semua search fallback gagal untuk "${queryDisplay}"`);
+      _ongkirCache.set(cacheKey, { result: null, ts: Date.now() });
       return null;
     }
 
@@ -1303,7 +1317,7 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
       return { nama: r.courier_name, ongkir: r.price, ongkirPromo: rPromo, totalTF: bulatkan(harga + rPromo), totalCOD: bulatkan(harga + rPromo + rFeeCOD), cod_supported: r.cod_supported };
     });
 
-    return {
+    const result = {
       ekspedisi, ongkirAsli, ongkirPromo,
       codEkspedisi, codOngkirAsli, codOngkirPromo,
       totalTransfer: totalTransferBulat,
@@ -1319,8 +1333,11 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
         kodePos:   bestArea.ZIP_CODE || bestArea.postal_code || bestArea.posCode || '',
       },
     };
+    _ongkirCache.set(cacheKey, { result, ts: Date.now() });
+    return result;
   } catch(e) {
     console.error('[hitungOngkir] error:', e.message);
+    _ongkirCache.set(cacheKey, { result: null, ts: Date.now() });
     return null;
   }
 }
@@ -4418,10 +4435,10 @@ ${ongkirInfo}`;
       }
     }
 
-    // ── Update ringkasan berjalan (setiap 5 pesan) ──
+    // ── Update ringkasan berjalan (setiap 12 pesan — dikurangi dari 4 untuk hemat rate limit) ──
     try {
       const allMsgs = await sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`);
-      if (allMsgs.length % 4 === 0) await updateRingkasan(conversation.id, aiKey, aiBase);
+      if (allMsgs.length % 12 === 0) await updateRingkasan(conversation.id, aiKey, aiBase);
     } catch(e) {
       console.error('Ringkasan error:', e.message);
     }
