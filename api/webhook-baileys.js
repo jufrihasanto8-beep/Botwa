@@ -4125,6 +4125,15 @@ ${ongkirInfo}`;
       const feeCODCalc  = isCOD ? Math.ceil((harga + ongkirPromo) * 0.03) : 0;
       const feeCOD      = isCOD ? (feeCODCalc || ongkirData?.feeCOD || custAlamat?.feeCOD || 0) : 0;
 
+      // ── Race condition guard: re-fetch state terbaru dari DB sebelum nulis order_snapshot ──
+      // Kalau request lain sudah set awaiting_order_confirm = true, skip supaya tidak overwrite
+      const freshConv = await sbGet('conversations', `?id=eq.${conversation.id}&select=state&limit=1`);
+      const freshState = freshConv[0]?.state || {};
+      if (freshState.awaiting_order_confirm) {
+        console.log(`[ORDER_CONFIRMED] Diabaikan — request lain sudah set awaiting_order_confirm (conv ${conversation.id})`);
+        return res.status(200).json({ ok: true, action: 'order_confirm_race_skipped' });
+      }
+
       // Simpan area & ekspedisi yang sudah confirmed ke ongkir state agar tersimpan permanen di Supabase
       const confirmedOngkir = { ...ongkirData, area, ekspedisi, harga, ongkirAsli, ongkirPromo, feeCOD };
       const totalOrder      = isCOD ? harga + ongkirPromo + feeCOD : harga + ongkirPromo;
