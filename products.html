@@ -573,16 +573,12 @@ body.light .fu-msg-lbl{color:#94a3b8}
           <div id="promo-wilayah-wrap" style="display:none"><input type="number" id="f-promo-jawa"><input type="number" id="f-promo-luar"></div>
         </div>
 
-        <div style="background:#0d1117;padding:16px;border-radius:8px;font-size:13px;color:#64748b;margin-top:8px;">
-          <strong style="color:#94a3b8">Preview:</strong> <span id="promo-preview">Tidak ada promo ongkir</span>
-        </div>
-
         <!-- Diskon Ongkir per Qty -->
-        <div style="margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06)">
+        <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <div>
               <div style="font-size:13px;font-weight:600;color:#e2e8f0">Diskon Ongkir per Jumlah Beli</div>
-              <div style="font-size:11px;color:#64748b;margin-top:2px">Atur potongan ongkir berbeda per qty. Akan override promo ongkir di atas untuk qty yang cocok.</div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px">Atur potongan ongkir per qty. Pilih % (persentase) atau Rp (potongan tetap).</div>
             </div>
             <button type="button" onclick="tambahDiskonOngkir()" style="font-size:11px;padding:4px 10px;border:1px solid rgba(52,211,153,.4);background:rgba(52,211,153,.08);color:#6ee7b7;border-radius:6px;cursor:pointer">+ Tambah</button>
           </div>
@@ -1274,47 +1270,9 @@ function renderTags(type) {
 function getPromoUnit() {
   return document.querySelector('input[name="promo-unit"]:checked')?.value || 'rp';
 }
-function togglePromoNilai() {
-  const tipe = document.getElementById('f-promo-tipe').value;
-  const isPotong = ['potong','potong_wilayah'].includes(tipe);
-  const unit = getPromoUnit();
-  const unitLabel = unit === 'persen' ? '%' : 'Rp';
-  const isPersen = unit === 'persen';
-
-  // Toggle unit selector
-  document.getElementById('promo-unit-wrap').style.display = isPotong ? 'block' : 'none';
-
-  // Toggle nilai fields
-  document.getElementById('promo-nilai-wrap').style.display = tipe === 'potong' ? 'flex' : 'none';
-  document.getElementById('promo-wilayah-wrap').style.display = tipe === 'potong_wilayah' ? 'block' : 'none';
-
-  // Update unit labels & placeholders
-  document.getElementById('promo-nilai-unit').textContent = unitLabel;
-  document.getElementById('promo-jawa-unit').textContent  = unitLabel;
-  document.getElementById('promo-luar-unit').textContent  = unitLabel;
-  document.getElementById('f-promo-nilai').placeholder = isPersen ? '10 (artinya 10%)' : '10000';
-  document.getElementById('f-promo-jawa').placeholder  = isPersen ? '10 (artinya 10%)' : '10000';
-  document.getElementById('f-promo-luar').placeholder  = isPersen ? '15 (artinya 15%)' : '15000';
-
-  const show = ['potong','gratis_sd'].includes(tipe);
-  document.getElementById('promo-nilai-wrap').style.display = show ? '' : 'none';
-  updatePromoPreview();
-}
-function updatePromoPreview() {
-  const tipe  = document.getElementById('f-promo-tipe').value;
-  const nilai = parseInt(document.getElementById('f-promo-nilai').value) || 0;
-  const unit     = getPromoUnit();
-  const isPersen = unit === 'persen';
-  const nilaiJawa = parseFloat(document.getElementById('f-promo-jawa').value) || 0;
-  const nilaiLuar = parseFloat(document.getElementById('f-promo-luar').value) || 0;
-  const fmt = v => isPersen ? `${v}%` : `Rp ${v.toLocaleString('id-ID')}`;
-  let text = 'Tidak ada promo ongkir';
-  if (tipe === 'gratis_penuh')   text = '✅ Gratis Ongkir Penuh';
-  if (tipe === 'potong')         text = `Hemat ${fmt(nilai)} dari ongkir (semua wilayah)`;
-  if (tipe === 'potong_wilayah') text = `Dalam Jawa: hemat ${fmt(nilaiJawa)} · Luar Jawa: hemat ${fmt(nilaiLuar)}`;
-  if (tipe === 'gratis_sd')      text = `Gratis ongkir s/d Rp ${nilai.toLocaleString('id-ID')}`;
-  document.getElementById('promo-preview').textContent = text;
-}
+// Promo ongkir global — deprecated, fungsi tetap ada biar ga error
+function togglePromoNilai() {}
+function updatePromoPreview() {}
 
 /* ── CTWA Mapping rows ── */
 function addMappingRow() {
