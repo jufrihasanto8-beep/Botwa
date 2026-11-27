@@ -675,7 +675,7 @@ async function init() {
   const [orders, custs, prods] = await Promise.all([
     sbFetch('orders_new', `?user_id=eq.${uid}&select=id,conversation_id,customer_id,product_id,metode,qty,harga,ongkir,ongkir_after_promo,fee_cod,total,ekspedisi,alamat,keluhan,no_resi,status,customer_nama,customer_phone,product_nama,berat_gram,mengantar_status,mengantar_error,mengantar_sent_at,created_at,validated_at,flag_risiko,validation_note,validation_fixes&order=created_at.desc`),
     sbFetch('customers', `?user_id=eq.${uid}&select=id,wa_number,nama,catatan`),
-    sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga,persona_cs_nama`),
+    sbFetch('products', `?user_id=eq.${uid}&aktif=eq.true&select=id,nama,harga,persona_cs_nama,harga_bundling,promo_ongkir,diskon_ongkir_per_qty`),
   ]);
 
   custs.forEach(c => { custMap[c.id] = c; });
@@ -1406,6 +1406,7 @@ function openEdit(id) {
   document.getElementById('ef-qty').value         = r.qty;
   document.getElementById('ef-metode').value      = r.isCOD ? 'cod' : 'transfer';
   document.getElementById('ef-ekspedisi').value   = r.instruksi === '—' ? '' : r.instruksi;
+  _editOngkirAsli = r._raw.ongkir || r._raw.ongkir_after_promo || 0;
   document.getElementById('ef-harga').value       = r._raw.harga || 0;
   document.getElementById('ef-ongkir').value      = r._raw.ongkir_after_promo ?? r._raw.ongkir ?? 0;
   document.getElementById('ef-feecod').value      = r._raw.fee_cod || 0;
@@ -1422,15 +1423,82 @@ function closeEdit() {
   editRowId = null;
 }
 
+/* ── Rincian Pembayaran: auto-recalc ── */
+function resolveHargaBundling(prod, qty) {
+  const satuan = prod?.harga || 0;
+  const bundling = prod?.harga_bundling;
+  if (!Array.isArray(bundling) || !bundling.length) return satuan * qty;
+  const exact = bundling.find(p => p.qty === qty);
+  return exact ? exact.harga : satuan * qty;
+}
+
+function bulatkan(nilai, kelipatan = 500) {
+  const bawah = Math.floor(nilai / kelipatan) * kelipatan;
+  const atas  = bawah + kelipatan;
+  return (nilai - bawah) <= (atas - nilai) ? bawah : atas;
+}
+
+function applyDiskonOngkir(ongkirAsli, prod, qty) {
+  const diskonList = Array.isArray(prod?.diskon_ongkir_per_qty) ? prod.diskon_ongkir_per_qty : [];
+  const diskonItem = diskonList.find(d => d.qty === qty);
+  const pct = diskonItem?.diskon || 0;
+  if (pct >= 100) return 0;
+  if (pct > 0) return Math.round(ongkirAsli * (1 - pct / 100));
+  // fallback promo_ongkir global
+  const promo = prod?.promo_ongkir;
+  if (!promo) return ongkirAsli;
+  if (promo.tipe === 'gratis_penuh') return 0;
+  if (promo.tipe === 'gratis_sd') return Math.max(0, ongkirAsli - (promo.nilai || 0));
+  if (promo.tipe === 'potong') {
+    const pot = promo.unit === 'persen' ? Math.round(ongkirAsli * (promo.nilai || 0) / 100) : (promo.nilai || 0);
+    return Math.max(0, ongkirAsli - pot);
+  }
+  return ongkirAsli;
+}
+
+let _editOngkirAsli = 0; // ongkir asli sebelum promo, disimpan saat openEdit
+
+function recalcFromQty() {
+  if (!editRowId) return;
+  const rawOrder = allOrders.find(c => c.id === editRowId);
+  if (!rawOrder) return;
+  const prod = prodMap[rawOrder.product_id] || {};
+  const qty = parseInt(document.getElementById('ef-qty').value) || 1;
+  const metode = document.getElementById('ef-metode').value;
+  const isCOD = metode === 'cod';
+
+  // Harga dari bundling
+  const harga = resolveHargaBundling(prod, qty);
+  document.getElementById('ef-harga').value = harga;
+
+  // Ongkir: apply diskon per qty
+  const ongkir = applyDiskonOngkir(_editOngkirAsli, prod, qty);
+  document.getElementById('ef-ongkir').value = ongkir;
+
+  // Fee COD
+  const feeCOD = isCOD ? Math.ceil((harga + ongkir) * 0.03) : 0;
+  document.getElementById('ef-feecod').value = feeCOD;
+
+  recalcTotal();
+}
+
 function recalcTotal() {
   const h = parseInt(document.getElementById('ef-harga').value) || 0;
   const o = parseInt(document.getElementById('ef-ongkir').value) || 0;
   const f = parseInt(document.getElementById('ef-feecod').value) || 0;
-  const t = h + o + f;
+  const metode = document.getElementById('ef-metode').value;
+  const raw = h + o + f;
+  const t = bulatkan(raw);
   document.getElementById('ef-total').value = t;
+  // Recalc fee COD supaya pas setelah bulatkan
+  if (metode === 'cod') document.getElementById('ef-feecod').value = t - h - o;
   const fmt = n => n.toLocaleString('id-ID');
-  document.getElementById('ef-rincian-info').textContent = `${fmt(h)} + ${fmt(o)} + ${fmt(f)} = ${fmt(t)}`;
+  const fFinal = parseInt(document.getElementById('ef-feecod').value) || 0;
+  document.getElementById('ef-rincian-info').textContent = `${fmt(h)} + ${fmt(o)} + ${fmt(fFinal)} = ${fmt(t)}`;
 }
+
+document.getElementById('ef-qty').addEventListener('input', recalcFromQty);
+document.getElementById('ef-metode').addEventListener('change', recalcFromQty);
 ['ef-harga','ef-ongkir','ef-feecod'].forEach(id => {
   document.getElementById(id).addEventListener('input', recalcTotal);
 });
