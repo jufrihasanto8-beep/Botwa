@@ -495,8 +495,16 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
           </select>
         </div>
         <div class="edit-field"><label>Kurir</label><input id="ef-ekspedisi" type="text"></div>
-        <div class="edit-field"><label>Total Pembayaran</label><input id="ef-total" type="number" min="0"></div>
       </div>
+
+      <div class="edit-section">Rincian Pembayaran</div>
+      <div class="edit-grid">
+        <div class="edit-field"><label>Harga Produk</label><input id="ef-harga" type="number" min="0"></div>
+        <div class="edit-field"><label>Ongkir</label><input id="ef-ongkir" type="number" min="0"></div>
+        <div class="edit-field"><label>Fee COD</label><input id="ef-feecod" type="number" min="0"></div>
+        <div class="edit-field"><label>Total Pembayaran</label><input id="ef-total" type="number" min="0" style="font-weight:700;background:var(--bg-2)"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px" id="ef-rincian-info"></div>
 
       <div class="edit-section">Catatan</div>
       <div class="edit-grid full">
@@ -1398,10 +1406,14 @@ function openEdit(id) {
   document.getElementById('ef-qty').value         = r.qty;
   document.getElementById('ef-metode').value      = r.isCOD ? 'cod' : 'transfer';
   document.getElementById('ef-ekspedisi').value   = r.instruksi === '—' ? '' : r.instruksi;
+  document.getElementById('ef-harga').value       = r._raw.harga || 0;
+  document.getElementById('ef-ongkir').value      = r._raw.ongkir_after_promo ?? r._raw.ongkir ?? 0;
+  document.getElementById('ef-feecod').value      = r._raw.fee_cod || 0;
   document.getElementById('ef-total').value       = r._raw.total || 0;
   document.getElementById('ef-keluhan').value     = r.keluhan;
   document.getElementById('ef-keterangan').value  = r._cu.catatan || '';
 
+  recalcTotal();
   document.getElementById('edit-overlay').classList.add('open');
 }
 
@@ -1409,6 +1421,19 @@ function closeEdit() {
   document.getElementById('edit-overlay').classList.remove('open');
   editRowId = null;
 }
+
+function recalcTotal() {
+  const h = parseInt(document.getElementById('ef-harga').value) || 0;
+  const o = parseInt(document.getElementById('ef-ongkir').value) || 0;
+  const f = parseInt(document.getElementById('ef-feecod').value) || 0;
+  const t = h + o + f;
+  document.getElementById('ef-total').value = t;
+  const fmt = n => n.toLocaleString('id-ID');
+  document.getElementById('ef-rincian-info').textContent = `${fmt(h)} + ${fmt(o)} + ${fmt(f)} = ${fmt(t)}`;
+}
+['ef-harga','ef-ongkir','ef-feecod'].forEach(id => {
+  document.getElementById(id).addEventListener('input', recalcTotal);
+});
 
 async function saveEdit() {
   if (!editRowId) return;
@@ -1432,6 +1457,9 @@ async function saveEdit() {
     const qty     = parseInt(document.getElementById('ef-qty').value) || 1;
     const metode  = document.getElementById('ef-metode').value;
     const ekspedisi = document.getElementById('ef-ekspedisi').value.trim().toUpperCase();
+    const harga   = parseInt(document.getElementById('ef-harga').value) || 0;
+    const ongkir  = parseInt(document.getElementById('ef-ongkir').value) || 0;
+    const fee_cod = parseInt(document.getElementById('ef-feecod').value) || 0;
     const total   = parseInt(document.getElementById('ef-total').value) || 0;
     const keluhan = document.getElementById('ef-keluhan').value.trim();
     const keterangan = document.getElementById('ef-keterangan').value.trim();
@@ -1447,7 +1475,7 @@ async function saveEdit() {
     const r1 = await fetch(`${SB_URL}/rest/v1/orders_new?id=eq.${editRowId}`, {
       method: 'PATCH',
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ qty, metode, ekspedisi, total, alamat: alamatBaru, keluhan })
+      body: JSON.stringify({ qty, metode, ekspedisi, harga, ongkir_after_promo: ongkir, fee_cod, total, alamat: alamatBaru, keluhan })
     });
     if (!r1.ok) throw new Error('Gagal update order: ' + await r1.text());
 
