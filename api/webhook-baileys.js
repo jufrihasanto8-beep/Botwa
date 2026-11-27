@@ -1227,17 +1227,28 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
     if (!rates.length) return null;
 
     // Step 4: Filter whitelist
-    const whitelist = await sbGet('courier_whitelist',
-      `?user_id=eq.${product?.user_id || ''}&aktif=eq.true`
-    ).catch(() => []);
-    console.log(`[hitungOngkir] whitelist=${whitelist.map(w=>w.nama).join(',')} rates=${rates.map(r=>`${r.courier_name}:${r.price}`).join(',')}`);
+    let whitelist = [];
+    if (product?.user_id) {
+      whitelist = await sbGet('courier_whitelist',
+        `?user_id=eq.${product.user_id}&aktif=eq.true`
+      ).catch(e => { console.log(`[hitungOngkir] whitelist fetch error: ${e.message}`); return []; });
+    } else {
+      console.log(`[hitungOngkir] WARN: product.user_id kosong, skip whitelist filter`);
+    }
+    console.log(`[hitungOngkir] whitelist=${whitelist.map(w=>w.nama).join(',')} user_id=${product?.user_id || 'EMPTY'} rates=${rates.map(r=>`${r.courier_name}:${r.price}`).join(',')}`);
     if (whitelist.length) {
       const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       const filtered = rates.filter(r => {
         const rn = norm(r.courier_name);
         return whitelist.some(w => { const wn = norm(w.nama); return rn === wn || rn.startsWith(wn) || wn.startsWith(rn); });
       });
-      if (filtered.length) rates = filtered;
+      if (filtered.length) {
+        rates = filtered;
+      } else {
+        // Whitelist ada tapi ga ada kurir yg match → JANGAN fallback ke semua kurir
+        console.log(`[hitungOngkir] ⚠️ Whitelist ${whitelist.map(w=>w.nama).join(',')} tapi ga ada match di rates — return null`);
+        return null;
+      }
     }
 
     // Step 5: Pilih termurah (Transfer) + termurah COD-capable
