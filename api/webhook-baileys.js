@@ -430,12 +430,13 @@ Catatan format: ~text~ adalah strikethrough di WhatsApp. Kalau tidak ada promo o
 ALUR CATAT ORDER
 Urutan WAJIB diikuti:
 1. Dapat wilayah → konfirmasi dengan [WILAYAH_OK:nama wilayah] → sistem tampilkan total TF & COD otomatis → tanya "Kakak enaknya COD atau transfer? 🙏"
-2. Customer pilih TF/COD → BARU minta data yang BELUM ADA saja
+2. Customer pilih TF/COD → CEK apakah alamat sudah ada DETAIL JALAN (jalan/gang, RT/RW, no rumah, patokan). Kalau BELUM ada detail jalan → tanya dulu: "Alamat lengkapnya di mana ya kak? Jalan, RT/RW, patokan rumah 🙏" — JANGAN tanya kelurahan/kecamatan lagi karena sudah diketahui dari wilayah.
 3. CEK dulu data dari form (nama/HP/alamat). Yang sudah ada → JANGAN ditanya ulang, cukup konfirmasi.
-4. Yang kurang: (1) nama (2) no HP (3) alamat lengkap (jalan/gang, no rumah, RT/RW, kelurahan, kecamatan, patokan).
+4. Yang kurang: (1) nama (2) no HP (3) alamat detail (jalan/gang, no rumah, RT/RW, patokan).
 5. Alamat kurang → minta yang kurang aja, jangan ulang dari nol.
 6. Ada jalan/gang → boleh proaktif tawarkan patokan dari maps.
-7. Setelah semua data terkumpul (nama ✓, alamat ✓, metode bayar ✓) dan total sudah ditampilkan → langsung tulis di akhir balasan:
+⚠️ PENTING: JANGAN tulis [ORDER_CONFIRMED] kalau alamat customer cuma berisi kelurahan/kecamatan/kabupaten tanpa detail jalan/RT/RW. Paket bisa RTS (retur) kalau alamat tidak detail!
+7. Setelah semua data terkumpul (nama ✓, alamat detail jalan ✓, metode bayar ✓) dan total sudah ditampilkan → langsung tulis di akhir balasan:
    [ORDER_CONFIRMED]
    [ORDER_DATA:alamat="ALAMAT LENGKAP DARI CUSTOMER" keluhan="KELUHAN UTAMA CUSTOMER" metode="COD atau Transfer" qty=JUMLAH_YANG_DIPESAN]
    ⚠️ qty WAJIB diisi angka sesuai jumlah box yang dipesan customer (contoh: qty=4). JANGAN biarkan qty=1 kalau customer pesan lebih dari 1.
@@ -443,7 +444,8 @@ Urutan WAJIB diikuti:
    Sistem akan otomatis kirim konfirmasi detail ke customer — JANGAN tulis ulang ringkasan order di pesanmu.
 ⛔ DILARANG tulis [ORDER_CONFIRMED] kecuali SEMUA kondisi ini terpenuhi:
    - Sudah tunjukkan total harga (termasuk ongkir)
-   - Sudah dapat nama + alamat lengkap + metode bayar dari customer
+   - Sudah dapat nama + metode bayar dari customer
+   - Sudah dapat ALAMAT DETAIL: jalan/gang + RT/RW atau nomor rumah atau patokan (bukan cuma kelurahan/kecamatan)
    Kirim rekening, tanya alamat, atau customer bilang "oke" untuk hal lain = BELUM boleh tulis [ORDER_CONFIRMED].
 JANGAN minta data diri SEBELUM tunjukkan total ongkir dan tanya pilihan bayar.
 
@@ -623,8 +625,20 @@ async function getContextMessages(conversationId, afterTimestamp = null, limit =
 }
 
 /* ── UPDATE RINGKASAN BERJALAN (non-blocking) ─────────────── */
+// Cooldown per user — hindari burst Claude call saat banyak conversation aktif bersamaan
+const _ringkasanCooldown = new Map(); // aiKey → timestamp terakhir
+const RINGKASAN_COOLDOWN_MS = 3 * 60 * 1000; // 3 menit antar ringkasan per user/key
+
 async function updateRingkasan(conversationId, aiKey, aiBase) {
   try {
+    // ── Cooldown check: skip kalau user baru panggil < 3 menit lalu ──
+    const lastCall = _ringkasanCooldown.get(aiKey) || 0;
+    if (Date.now() - lastCall < RINGKASAN_COOLDOWN_MS) {
+      console.log(`[updateRingkasan] skip — cooldown ${Math.round((RINGKASAN_COOLDOWN_MS - (Date.now() - lastCall)) / 1000)}s lagi`);
+      return;
+    }
+    _ringkasanCooldown.set(aiKey, Date.now());
+
     const msgs = await sbGet('conv_messages',
       `?conversation_id=eq.${conversationId}&order=created_at.desc&limit=50`
     );
@@ -1008,6 +1022,23 @@ async function cariWilayah(keyword, limit = 50) {
     console.error('cariWilayah error:', e.message);
     return [];
   }
+}
+
+// Cek apakah alamat jalan sudah cukup detail (ada RT/RW ATAU > 10 karakter)
+// Mencegah RTS karena alamat cuma kelurahan/kecamatan tanpa detail jalan
+function isAlamatLengkap(alamatObj, alamatStr) {
+  // Cek dari customers.alamat.jalan (object)
+  const jalan = (alamatObj?.jalan || '').trim();
+  if (jalan.length > 10) return true;
+  if (/\b(RT|RW)\b/i.test(jalan)) return true;
+
+  // Cek dari convState.alamat / ORDER_DATA alamat (string)
+  const str = (alamatStr || '').trim();
+  if (/\b(RT|RW)\b/i.test(str)) return true;
+  // Kalau string punya detail di luar wilayah admin (Jl, No, Gang, Blok, Dusun, Perum, dsb)
+  if (/\b(Jl\.?|Jln\.?|Jalan|No\.?|Gang|Gg\.?|Lorong|Lr\.?|Blok|Perum|Dusun|Dsn\.?|Kampung|Kp\.?|Komplek|Komp\.?)\b/i.test(str)) return true;
+
+  return false;
 }
 
 // Format wilayah untuk tampil ke Claude/customer (kecamatan + kabupaten + provinsi)
@@ -2633,6 +2664,14 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
       if (customer?.nama && customer.nama !== wa_number) ctx += `\n- Nama: ${customer.nama}`;
       if (savedKeluhan) ctx += `\n- Keluhan: ${savedKeluhan}`;
       if (savedAlamat)  ctx += `\n- Alamat: ${savedAlamat}`;
+      // Cek & inject status kelengkapan alamat detail (jalan/RT/RW)
+      const _alamatCukup = isAlamatLengkap(customer?.alamat, savedAlamat);
+      if (customer?.alamat?.jalan) {
+        ctx += `\n- Alamat detail (jalan): ${customer.alamat.jalan}`;
+      }
+      if (!_alamatCukup && (convState.ongkir || convState.wilayah_data)) {
+        ctx += `\n- ⚠️ ALAMAT DETAIL BELUM ADA — customer belum kasih jalan/RT/RW/patokan. WAJIB tanya alamat detail sebelum closing! Contoh: "Untuk alamat lengkapnya, jalannya di mana ya kak? RT/RW atau patokan rumahnya 🙏"`;
+      }
       if (convState.wilayah_data) {
         const wd = convState.wilayah_data;
         ctx += `\n- Wilayah pengiriman: ${wd.kelurahan}, ${wd.kecamatan}, ${wd.kabupaten}, ${wd.provinsi} (SUDAH VALID & DIKETAHUI — JANGAN tanya kelurahan/kecamatan/kabupaten lagi)`;
@@ -3884,9 +3923,10 @@ ${ongkirInfo}`;
       stateUpdate.keluhan = keluhanMatch[1].trim();
       console.log(`Keluhan tersimpan: ${stateUpdate.keluhan}`);
     }
-    if (alamatMatch && !convState.alamat) {
+    if (alamatMatch) {
+      // Selalu update alamat — bisa pertama kali ATAU update detail jalan setelah wilayah sudah ada
       stateUpdate.alamat = alamatMatch[1].trim();
-      console.log(`Alamat tersimpan: ${stateUpdate.alamat}`);
+      console.log(`Alamat tersimpan/diupdate: ${stateUpdate.alamat}`);
       // Simpan jalan ke customers.alamat (merge, tidak overwrite wilayah/ongkir)
       if (customer?.id) {
         const alamatBaru = {
@@ -3981,6 +4021,28 @@ ${ongkirInfo}`;
 
     // ── Update state jika order confirmed → kirim recap grup + konfirmasi customer ──
     // (dijalankan SEBELUM cek reply kosong agar tidak terlewat meski Claude hanya tulis marker)
+    // Guard: alamat belum lengkap (cuma kelurahan/kecamatan, tanpa detail jalan/RT/RW) → block, tanya alamat dulu
+    if (orderConfirmed && !convState.order_placed) {
+      const _custAlamat = customer?.alamat || {};
+      const _alamatOrder = rawReply?.match(/\[ORDER_DATA:.*?alamat="([^"]*?)"/)?.[1] || '';
+      const _savedAlamat = convState.alamat || '';
+      if (!isAlamatLengkap(_custAlamat, _alamatOrder || _savedAlamat)) {
+        console.log(`[ORDER_CONFIRMED] BLOCKED — alamat belum lengkap. jalan="${_custAlamat.jalan || ''}" alamatStr="${(_alamatOrder || _savedAlamat).slice(0,50)}"`);
+        const injeksi = `[SISTEM] ⚠️ ORDER BELUM BISA DIPROSES — alamat customer belum lengkap (tidak ada detail jalan/RT/RW/patokan).\n`
+          + `Wilayah sudah diketahui, JANGAN tanya kelurahan/kecamatan lagi.\n`
+          + `Tanya ke customer dengan ramah: "Untuk alamat lengkapnya, jalannya di mana ya kak? RT/RW atau patokan rumahnya biar kurir gampang nemuin 🙏"\n`
+          + `Setelah customer kasih detail, tulis [ALAMAT_OK:alamat detail lengkap dari customer].`;
+        const histGuard = [...history, { role: 'user', content: injeksi }];
+        const replyGuard = await callClaude(systemPrompt, histGuard, chatModel, aiKey, aiBase);
+        if (replyGuard) {
+          const replyClean = replyGuard.replace(/\[ORDER_CONFIRMED\]/g, '').replace(/\[ORDER_DATA:[^\]]+\]/g, '').trim();
+          const { wamid: wamid_ag } = await sendWA(waSession, reply_jid, replyClean).catch(() => ({}));
+          await saveMessage(conversation.id, 'ai', replyClean, wamid_ag);
+        }
+        return res.status(200).json({ ok: true, action: 'blocked_alamat_belum_lengkap' });
+      }
+    }
+
     if (orderConfirmed && convState.pending_kecamatan?.kecamatan) {
       // Guard: kelurahan belum resolved — block ORDER_CONFIRMED, paksa tanya kelurahan dulu
       const pendingKecGuard = convState.pending_kecamatan;
