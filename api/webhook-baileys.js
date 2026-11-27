@@ -267,7 +267,8 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
   const bundlingTxt   = hasBundling
     ? product.harga_bundling.map(p => {
         const dok = diskonOngkirPerQty.find(d => d.qty === p.qty);
-        return `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.bonus ? ` + bonus ${p.bonus}` : ''}${dok ? ` + ongkir -${dok.diskon}%${dok.diskon >= 100 ? ' (GRATIS)' : ''}` : ''}${p.prioritas ? ' ⭐PRIORITAS' : ''}`;
+        const dokLabel = dok ? (dok.tipe === 'rupiah' ? ` + ongkir -Rp ${(dok.diskon||0).toLocaleString('id-ID')}` : ` + ongkir -${dok.diskon}%${dok.diskon >= 100 ? ' (GRATIS)' : ''}`) : '';
+        return `${p.qty} box = Rp ${p.harga.toLocaleString('id-ID')}${p.bonus ? ` + bonus ${p.bonus}` : ''}${dokLabel}${p.prioritas ? ' ⭐PRIORITAS' : ''}`;
       }).join(' | ')
     : null;
 
@@ -279,8 +280,9 @@ function buildTemplatePrompt(product, customer, conversation, sumber, userRekeni
     ? product.keluhan_cocok.join(', ')
     : (product?.keluhan_cocok || '');
 
-  const promoOngkir = product?.promo_ongkir
-    ? formatPromoOngkir(product.promo_ongkir)
+  // Diskon ongkir per qty — tampilkan di system prompt
+  const diskonOngkirTxt = diskonOngkirPerQty.length
+    ? diskonOngkirPerQty.map(d => `beli ${d.qty} box = ${d.tipe === 'rupiah' ? `potongan Rp ${(d.diskon||0).toLocaleString('id-ID')}` : `${d.diskon}%${d.diskon >= 100 ? ' (GRATIS)' : ''}`}`).join(' | ')
     : 'tidak ada';
 
   const namaCustomer = customer?.nama || '';
@@ -333,7 +335,7 @@ Harga satuan    : Rp ${(product?.harga || 0).toLocaleString('id-ID')} per box (1
 Cocok untuk     : ${keluhan}
 Cara pakai      : ${product?.cara_pakai || '(lihat kemasan)'}
 Knowledge       : ${product?.product_knowledge || '(belum diisi — jangan klaim apapun)'}
-Promo ongkir    : ${promoOngkir}
+Diskon ongkir   : ${diskonOngkirTxt}
 Rekening TF     : ${rekeningInfo}
 Asal pengiriman : ${asalPengiriman || 'gudang kami'}
 Foto produk     : ${product?.gambar_url ? 'TERSEDIA. Kalau customer minta foto → CUKUP balas "Ini fotonya kak 😊" atau "Siap kak, ini ya!" lalu lanjut tanya keluhan. Foto PASTI terkirim otomatis bersamaan. ⛔ DILARANG: bilang kendala/error/teknis, suruh cek Google, bilang tidak bisa kirim, minta maaf soal foto, atau alasan apapun. Cukup balas singkat dan natural.' : 'Tidak ada — kalau ditanya foto, bilang "Belum ada fotonya kak, tapi bisa aku deskripsikan ya" lalu jelaskan produknya.'}
@@ -1252,23 +1254,19 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
     const codEkspedisi  = bestCod?.courier_name || ekspedisi;
     const codOngkirAsli = bestCod?.price || ongkirAsli;
 
-    // Step 6: Promo ongkir — cek diskon per bundling dulu, fallback ke promo_ongkir global
-    const promo    = product?.promo_ongkir;
-    const provinsi = lokal?.provinsi || bestArea.province || '';
+    // Step 6: Diskon ongkir per qty (format: [{qty, diskon, tipe:'persen'|'rupiah'}])
     const diskonQtyItem = Array.isArray(product?.diskon_ongkir_per_qty)
       ? product.diskon_ongkir_per_qty.find(d => d.qty === qty)
       : null;
-    const diskonOngkirPct = diskonQtyItem?.diskon || 0;
 
     function applyDiskon(ongkirRaw) {
-      if (diskonOngkirPct >= 100) return 0;
-      if (diskonOngkirPct > 0) return Math.round(ongkirRaw * (1 - diskonOngkirPct / 100));
-      // fallback ke promo_ongkir global
-      if (promo?.tipe === 'gratis_penuh')        return 0;
-      if (promo?.tipe === 'potong')              return Math.max(0, ongkirRaw - getPromoPotongan(promo, null, ongkirRaw));
-      if (promo?.tipe === 'potong_wilayah')      return Math.max(0, ongkirRaw - getPromoPotongan(promo, provinsi, ongkirRaw));
-      if (promo?.tipe === 'gratis_sd')           return Math.max(0, ongkirRaw - (promo.nilai || 0));
-      return ongkirRaw;
+      if (!diskonQtyItem) return ongkirRaw;
+      const val = diskonQtyItem.diskon || 0;
+      if (val <= 0) return ongkirRaw;
+      if (diskonQtyItem.tipe === 'rupiah') return Math.max(0, ongkirRaw - val);
+      // default persen (backward compat: kalau tipe belum diisi, anggap persen)
+      if (val >= 100) return 0;
+      return Math.round(ongkirRaw * (1 - val / 100));
     }
 
     let ongkirPromo = applyDiskon(ongkirAsli);
@@ -1438,17 +1436,15 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
 
   let hargaSection;
 
-  // Helper: hitung ongkir per qty (apply diskon_ongkir_per_qty kalau ada)
+  // Helper: hitung ongkir per qty (apply diskon_ongkir_per_qty — support persen & rupiah)
   const diskonOngkirPerQty = Array.isArray(product?.diskon_ongkir_per_qty) ? product.diskon_ongkir_per_qty : [];
-  const promo = product?.promo_ongkir;
   function ongkirPerQty(qty) {
     const dok = diskonOngkirPerQty.find(d => d.qty === qty);
-    if (dok) {
-      if (dok.diskon >= 100) return 0;
-      if (dok.diskon > 0) return Math.round(ongkirAsli * (1 - dok.diskon / 100));
-    }
-    // Fallback ke promo_ongkir global (sudah dihitung di ongkirPromo)
-    return ongkirPromo;
+    if (!dok || !dok.diskon || dok.diskon <= 0) return ongkirAsli; // tidak ada diskon → ongkir asli
+    if (dok.tipe === 'rupiah') return Math.max(0, ongkirAsli - dok.diskon);
+    // default persen (backward compat)
+    if (dok.diskon >= 100) return 0;
+    return Math.round(ongkirAsli * (1 - dok.diskon / 100));
   }
 
   const codOk = hasil.cod_available !== false; // default true kalau tidak ada info
@@ -3876,13 +3872,17 @@ ${ongkirInfo}`;
         requestedKurir.includes(r.nama.toLowerCase())
       );
       if (match) {
-        const promo = product?.promo_ongkir;
-        const provGantiKurir = convState.ongkir?.area?.provinsi || '';
+        // Apply diskon ongkir per qty (persen/rupiah) — tidak pakai promo_ongkir global lagi
+        const curQty = parseInt(convState.qty) || 1;
+        const dokGanti = Array.isArray(product?.diskon_ongkir_per_qty)
+          ? product.diskon_ongkir_per_qty.find(d => d.qty === curQty)
+          : null;
         let ongkirPromo = match.ongkir;
-        if (promo?.tipe === 'gratis_penuh')        ongkirPromo = 0;
-        else if (promo?.tipe === 'potong')         ongkirPromo = Math.max(0, match.ongkir - getPromoPotongan(promo, null, match.ongkir));
-        else if (promo?.tipe === 'potong_wilayah') ongkirPromo = Math.max(0, match.ongkir - getPromoPotongan(promo, provGantiKurir, match.ongkir));
-        else if (promo?.tipe === 'gratis_sd')      ongkirPromo = Math.max(0, match.ongkir - (promo.nilai || 0));
+        if (dokGanti && dokGanti.diskon > 0) {
+          if (dokGanti.tipe === 'rupiah') ongkirPromo = Math.max(0, match.ongkir - dokGanti.diskon);
+          else if (dokGanti.diskon >= 100) ongkirPromo = 0;
+          else ongkirPromo = Math.round(match.ongkir * (1 - dokGanti.diskon / 100));
+        }
 
         const harga = product?.harga || 0;
         const totalTransferBulat = bulatkan(harga + ongkirPromo);
