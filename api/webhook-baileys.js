@@ -1151,7 +1151,21 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
       lokal.kelurahan,
       lokal.kecamatan,
       lokal.kecamatan && lokal.kabupaten ? `${lokal.kecamatan} ${stripKab(lokal.kabupaten)}` : null,
-    ].filter(Boolean) : [String(wilayahInput || '')];
+    ].filter(Boolean) : (() => {
+      // lokal null — split comma-separated dan coba tiap bagian ke Mengantar
+      // Contoh: "Kadolokatapi, Wolio, Baubau, Sulawesi Tenggara"
+      //   → "Kadolokatapi Wolio", "Wolio Baubau", "Kadolokatapi", "Wolio", "Baubau"
+      const raw = String(wilayahInput || '');
+      const parts = raw.split(',').map(s => s.trim().replace(/^(kota|kabupaten|kab\.?|provinsi|prov\.?)\s*/i, '').trim()).filter(s => s.length >= 2);
+      if (parts.length >= 2) {
+        return [
+          `${parts[0]} ${parts[1]}`,
+          parts.length > 2 ? `${parts[1]} ${parts[2]}` : null,
+          ...parts.slice(0, 3),
+        ].filter(Boolean);
+      }
+      return [raw];
+    })();
 
     let queryDisplay = lokal ? formatWilayah(lokal) : String(wilayahInput || '');
     if (lokal) console.log(`[hitungOngkir] lokal: "${lokal.kelurahan}, ${lokal.kecamatan}, ${lokal.kabupaten}" → queries: ${queryFallbacks.join(' | ')}`);
