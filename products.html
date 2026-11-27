@@ -565,55 +565,12 @@ body.light .fu-msg-lbl{color:#94a3b8}
 
       <!-- Tab: Ongkir & Promo -->
       <div class="tab-pane" id="tab-ongkir">
-        <div class="form-group">
-          <label>Tipe Promo Ongkir</label>
-          <select id="f-promo-tipe" onchange="togglePromoNilai()">
-            <option value="none">Tidak ada promo</option>
-            <option value="gratis_penuh">Gratis Ongkir Penuh</option>
-            <option value="potong">Potongan Ongkir — Semua Wilayah</option>
-            <option value="potong_wilayah">Potongan Ongkir — Per Wilayah (Jawa / Luar Jawa)</option>
-            <option value="gratis_sd">Gratis s/d Rp X</option>
-          </select>
-        </div>
-
-        <!-- Toggle Rp / % — muncul saat potong atau potong_wilayah -->
-        <div id="promo-unit-wrap" style="display:none;margin-bottom:14px;">
-          <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px">Satuan Potongan</label>
-          <div style="display:flex;gap:8px">
-            <label style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid rgba(255,255,255,.1);border-radius:8px;cursor:pointer;font-size:13px;transition:all .12s" id="unit-rp-label">
-              <input type="radio" name="promo-unit" id="unit-rp" value="rp" checked onchange="togglePromoNilai()"> Rupiah (Rp)
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid rgba(255,255,255,.1);border-radius:8px;cursor:pointer;font-size:13px;transition:all .12s" id="unit-pct-label">
-              <input type="radio" name="promo-unit" id="unit-pct" value="persen" onchange="togglePromoNilai()"> Persentase (%)
-            </label>
-          </div>
-        </div>
-
-        <!-- Semua wilayah (satu nilai) -->
-        <div class="form-group" id="promo-nilai-wrap" style="display:none;">
-          <label id="promo-nilai-label">Nilai Potongan</label>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="number" id="f-promo-nilai" placeholder="10000" style="flex:1">
-            <span id="promo-nilai-unit" style="font-size:13px;color:#64748b;width:30px">Rp</span>
-          </div>
-        </div>
-
-        <!-- Per wilayah (dua nilai) -->
-        <div id="promo-wilayah-wrap" style="display:none;">
-          <div class="form-group">
-            <label id="promo-jawa-label">Dalam Jawa</label>
-            <div style="display:flex;align-items:center;gap:8px">
-              <input type="number" id="f-promo-jawa" placeholder="10000" style="flex:1">
-              <span id="promo-jawa-unit" style="font-size:13px;color:#64748b;width:30px">Rp</span>
-            </div>
-          </div>
-          <div class="form-group">
-            <label id="promo-luar-label">Luar Jawa</label>
-            <div style="display:flex;align-items:center;gap:8px">
-              <input type="number" id="f-promo-luar" placeholder="15000" style="flex:1">
-              <span id="promo-luar-unit" style="font-size:13px;color:#64748b;width:30px">Rp</span>
-            </div>
-          </div>
+        <!-- Promo Ongkir Global — DEPRECATED, hidden -->
+        <div id="promo-global-deprecated" style="display:none">
+          <select id="f-promo-tipe"><option value="none">Tidak ada promo</option></select>
+          <div id="promo-unit-wrap" style="display:none"><input type="radio" name="promo-unit" id="unit-rp" value="rp" checked><input type="radio" name="promo-unit" id="unit-pct" value="persen"></div>
+          <div id="promo-nilai-wrap" style="display:none"><input type="number" id="f-promo-nilai"></div>
+          <div id="promo-wilayah-wrap" style="display:none"><input type="number" id="f-promo-jawa"><input type="number" id="f-promo-luar"></div>
         </div>
 
         <div style="background:#0d1117;padding:16px;border-radius:8px;font-size:13px;color:#64748b;margin-top:8px;">
@@ -984,7 +941,9 @@ function renderGrid() {
 
   grid.innerHTML = data.map(p => {
     const keluhan = Array.isArray(p.keluhan_cocok) ? p.keluhan_cocok : [];
-    const promo = formatPromo(p.promo_ongkir);
+    const diskonOngkir = Array.isArray(p.diskon_ongkir_per_qty) && p.diskon_ongkir_per_qty.length
+      ? p.diskon_ongkir_per_qty.map(d => `${d.qty}box: ${d.tipe === 'rupiah' ? '-' + rp(d.diskon) : '-' + d.diskon + '%'}${d.diskon >= 100 && d.tipe !== 'rupiah' ? ' (GRATIS)' : ''}`).join(' · ')
+      : '-';
     return `<div class="prod-card">
       <div class="prod-card-header">
         <div>
@@ -995,7 +954,7 @@ function renderGrid() {
       </div>
       <div class="prod-body">
         ${keluhan.length ? `<div style="margin-bottom:10px;">${keluhan.slice(0,4).map(k=>`<span class="prod-tag">${k}</span>`).join('')}${keluhan.length>4?`<span class="prod-tag">+${keluhan.length-4}</span>`:''}</div>` : ''}
-        <div class="prod-meta">Ongkir: <span>${promo}</span></div>
+        <div class="prod-meta">Diskon Ongkir: <span>${diskonOngkir}</span></div>
         <div class="prod-meta">Berat: <span>${p.berat_gram || 500}g</span> · Persona CS: <span>${p.persona_cs_nama || 'Sari'}</span></div>
         ${Array.isArray(p.harga_bundling) && p.harga_bundling.length ? `
         <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
@@ -1098,21 +1057,24 @@ function loadBundling(data) {
 }
 
 // ── Diskon Ongkir per Qty ────────────────────────────────
-function tambahDiskonOngkir(qty = '', diskon = '') {
+function tambahDiskonOngkir(qty = '', diskon = '', tipe = 'persen') {
   const wrap = document.getElementById('diskon-ongkir-rows');
   const row  = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:center';
   row.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:13px;color:#64748b;white-space:nowrap">Beli</span>
-      <input type="number" placeholder="Qty" min="1" value="${qty}"
+      <input type="number" placeholder="Qty" min="1" value="${qty}" data-field="qty"
         style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;width:100%">
       <span style="font-size:13px;color:#64748b;white-space:nowrap">box</span>
     </div>
+    <select data-field="tipe" style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 6px;color:#6ee7b7;font-size:13px;cursor:pointer">
+      <option value="persen" ${tipe !== 'rupiah' ? 'selected' : ''}>%</option>
+      <option value="rupiah" ${tipe === 'rupiah' ? 'selected' : ''}>Rp</option>
+    </select>
     <div style="position:relative;display:flex;align-items:center">
-      <input type="number" placeholder="0" min="0" max="100" value="${diskon}"
-        style="background:#0d1117;border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:8px 32px 8px 10px;color:#6ee7b7;font-size:13px;width:100%">
-      <span style="position:absolute;right:10px;color:#6ee7b7;font-size:12px;pointer-events:none">% off</span>
+      <input type="number" placeholder="0" min="0" value="${diskon}" data-field="diskon"
+        style="background:#0d1117;border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:8px 10px;color:#6ee7b7;font-size:13px;width:100%">
     </div>
     <button type="button" onclick="this.closest('div').remove()"
       style="padding:7px 10px;border:1px solid rgba(248,113,113,.2);background:none;color:#f87171;border-radius:6px;cursor:pointer;font-size:13px">✕</button>
@@ -1124,17 +1086,17 @@ function getDiskonOngkirData() {
   const rows = document.querySelectorAll('#diskon-ongkir-rows > div');
   const result = [];
   rows.forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    const qty    = parseInt(inputs[0].value);
-    const diskon = parseInt(inputs[1].value) || 0;
-    if (qty > 0 && diskon > 0) result.push({ qty, diskon });
+    const qty    = parseInt(row.querySelector('[data-field="qty"]').value);
+    const tipe   = row.querySelector('[data-field="tipe"]').value;
+    const diskon = parseFloat(row.querySelector('[data-field="diskon"]').value) || 0;
+    if (qty > 0 && diskon > 0) result.push({ qty, diskon, tipe });
   });
   return result.length ? result.sort((a, b) => a.qty - b.qty) : null;
 }
 
 function loadDiskonOngkir(data) {
   document.getElementById('diskon-ongkir-rows').innerHTML = '';
-  if (Array.isArray(data)) data.forEach(d => tambahDiskonOngkir(d.qty, d.diskon));
+  if (Array.isArray(data)) data.forEach(d => tambahDiskonOngkir(d.qty, d.diskon, d.tipe || 'persen'));
 }
 
 /* ── Modal Produk ── */
@@ -1417,13 +1379,7 @@ async function saveProduk() {
     persona_cs_gaya: document.getElementById('f-persona-gaya').value.trim(),
     ai_provider: document.getElementById('f-ai-provider').value || 'anthropic',
     ai_api_key: document.getElementById('f-ai-api-key').value.trim() || null,
-    promo_ongkir: {
-      tipe:       document.getElementById('f-promo-tipe').value,
-      unit:       getPromoUnit(),
-      nilai:      parseFloat(document.getElementById('f-promo-nilai').value) || 0,
-      nilai_jawa: parseFloat(document.getElementById('f-promo-jawa').value) || 0,
-      nilai_luar: parseFloat(document.getElementById('f-promo-luar').value) || 0,
-    },
+    promo_ongkir: null, // deprecated — diskon sekarang lewat diskon_ongkir_per_qty
     harga_bundling: getBundlingData(),
   };
 
