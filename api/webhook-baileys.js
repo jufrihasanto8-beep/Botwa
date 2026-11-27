@@ -4435,10 +4435,10 @@ ${ongkirInfo}`;
       }
     }
 
-    // ── Update ringkasan berjalan (setiap 12 pesan — dikurangi dari 4 untuk hemat rate limit) ──
+    // ── Update ringkasan berjalan (setiap 8 pesan — dikurangi dari 4 untuk hemat rate limit) ──
     try {
       const allMsgs = await sbGet('conv_messages', `?conversation_id=eq.${conversation.id}&select=id`);
-      if (allMsgs.length % 12 === 0) await updateRingkasan(conversation.id, aiKey, aiBase);
+      if (allMsgs.length % 8 === 0) await updateRingkasan(conversation.id, aiKey, aiBase);
     } catch(e) {
       console.error('Ringkasan error:', e.message);
     }
