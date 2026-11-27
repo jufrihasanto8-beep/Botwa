@@ -1238,11 +1238,19 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
       if (filtered.length) rates = filtered;
     }
 
-    // Step 5: Pilih termurah
+    // Step 5: Pilih termurah (Transfer) + termurah COD-capable
     rates.sort((a, b) => a.price - b.price);
-    const best       = rates[0];
+    const best       = rates[0]; // termurah overall (untuk Transfer)
     const ekspedisi  = best.courier_name;
     const ongkirAsli = best.price;
+
+    // Cari kurir termurah yang bisa COD (bisa beda dari best)
+    const codRates   = rates.filter(r => r.cod_supported).sort((a, b) => a.price - b.price);
+    const bestCod    = codRates[0] || null;
+    const codAvailable = !!bestCod;
+    // Kalau kurir termurah COD beda dari termurah overall, pakai ongkir COD-nya sendiri
+    const codEkspedisi  = bestCod?.courier_name || ekspedisi;
+    const codOngkirAsli = bestCod?.price || ongkirAsli;
 
     // Step 6: Promo ongkir — cek diskon per bundling dulu, fallback ke promo_ongkir global
     const promo    = product?.promo_ongkir;
@@ -1265,13 +1273,20 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
 
     let ongkirPromo = applyDiskon(ongkirAsli);
 
+    // Hitung ongkir promo untuk kurir COD (bisa beda kalau kurir beda)
+    const codOngkirPromo = codOngkirAsli !== ongkirAsli ? applyDiskon(codOngkirAsli) : ongkirPromo;
+
     const harga = resolveHargaBundling(product, qty);
 
-    // Step 7: Hitung total
-    const feeCOD             = Math.ceil((harga + ongkirPromo) * 0.03);
+    // Step 7: Hitung total — Transfer pakai kurir termurah, COD pakai kurir termurah yang bisa COD
     const totalTransferBulat = bulatkan(harga + ongkirPromo);
-    const totalCODBulat      = bulatkan(harga + ongkirPromo + feeCOD);
-    const feeCODBulat        = totalCODBulat - harga - ongkirPromo;
+    const codFeeCOD          = codAvailable ? Math.ceil((harga + codOngkirPromo) * 0.03) : 0;
+    const totalCODBulat      = codAvailable ? bulatkan(harga + codOngkirPromo + codFeeCOD) : 0;
+    const feeCODBulat        = codAvailable ? totalCODBulat - harga - codOngkirPromo : 0;
+
+    if (codAvailable && codEkspedisi !== ekspedisi) {
+      console.log(`[hitungOngkir] Transfer: ${ekspedisi} Rp${ongkirAsli} | COD: ${codEkspedisi} Rp${codOngkirAsli} (kurir beda)`);
+    }
 
     const allRates = rates.map(r => {
       const rPromo  = applyDiskon(r.price);
@@ -1279,11 +1294,9 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
       return { nama: r.courier_name, ongkir: r.price, ongkirPromo: rPromo, totalTF: bulatkan(harga + rPromo), totalCOD: bulatkan(harga + rPromo + rFeeCOD), cod_supported: r.cod_supported };
     });
 
-    // Cek apakah ada kurir yang support COD
-    const codAvailable = allRates.some(r => r.cod_supported);
-
     return {
       ekspedisi, ongkirAsli, ongkirPromo,
+      codEkspedisi, codOngkirAsli, codOngkirPromo,
       totalTransfer: totalTransferBulat,
       totalCOD: totalCODBulat,
       feeCOD: feeCODBulat,
@@ -1456,22 +1469,43 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
       const hp     = p.harga;
       const pOngkir = ongkirPerQty(p.qty);
       const pOngkirInfo = ongkirAsli !== pOngkir ? ` (ongkir ${fmt(pOngkir)}, hemat ${fmt(ongkirAsli - pOngkir)})` : '';
-      const fee    = Math.ceil((hp + pOngkir) * 0.03);
       const tTF    = hp + pOngkir;
-      const tCOD   = hp + pOngkir + fee;
+      // COD pakai ongkir kurir COD (bisa beda)
+      const pCodOngkir = codKurirBeda ? codOngkirPerQtyFn(p.qty) : pOngkir;
+      const fee    = Math.ceil((hp + pCodOngkir) * 0.03);
+      const tCOD   = hp + pCodOngkir + fee;
       return codOk
         ? `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}${pOngkirInfo}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`
         : `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}${pOngkirInfo}: Transfer total ${fmt(tTF)}`;
     }).join('\n');
 
+    // Cek apakah kurir COD beda dari kurir Transfer
+    const codKurirBeda = hasil.codEkspedisi && hasil.codEkspedisi !== hasil.ekspedisi;
+    // Hitung harga COD pakai ongkir kurir COD (bisa beda dari kurir Transfer)
+    const codOngkirPerQtyFn = codKurirBeda ? (qty) => {
+      const dok = diskonOngkirPerQty.find(d => d.qty === qty);
+      if (dok) {
+        if (dok.diskon >= 100) return 0;
+        if (dok.diskon > 0) return Math.round((hasil.codOngkirAsli || ongkirAsli) * (1 - dok.diskon / 100));
+      }
+      return hasil.codOngkirPromo || ongkirPromo;
+    } : ongkirPerQty;
+
     if (codOk) {
+      const codDefaultOngkir = codKurirBeda ? codOngkirPerQtyFn(defaultPaket.qty) : defaultOngkir;
+      const codDefaultFeeCOD = Math.ceil((defaultHarga + codDefaultOngkir) * 0.03);
+      const codDefaultTotal  = defaultHarga + codDefaultOngkir + codDefaultFeeCOD;
+      const viaInfo = codKurirBeda
+        ? `Transfer via ${hasil.ekspedisi}, COD via ${hasil.codEkspedisi} ya kak 🚗`
+        : `Via ${hasil.ekspedisi} ya kak 🚗`;
+
       hargaSection = `Tampilkan HANYA paket PRIORITAS ini ke customer (jangan ubah angka):
 
 Paket ${defaultPaket.qty} box ${product?.nama || 'Produk'}:
 💳 Transfer: ${fmt(defaultHarga)} + ongkir ${defaultOngkirDisplay} = TOTAL ${fmt(defaultTotalTF)}
-📦 COD: ${fmt(defaultHarga)} + ongkir ${fmt(defaultOngkir + defaultFeeCOD)} = TOTAL ${fmt(defaultTotalCOD)}
+📦 COD: ${fmt(defaultHarga)} + ongkir ${fmt(codDefaultOngkir + codDefaultFeeCOD)} = TOTAL ${fmt(codDefaultTotal)}
 
-Via ${hasil.ekspedisi} ya kak 🚗
+${viaInfo}
 
 Setelah tampilkan harga, tanya metode bayar: "Kakak enaknya COD atau Transfer? 😊"`;
     } else {
@@ -1490,9 +1524,10 @@ Langsung lanjut minta data (nama, alamat) tanpa tanya COD/Transfer.`;
     // Info harga satuan untuk kalau customer minta qty di luar bundling
     const satuanHarga = product?.harga || 0;
     const satuanOngkir = ongkirPerQty(1);
-    const satuanFeeCOD = Math.ceil((satuanHarga + satuanOngkir) * 0.03);
+    const satuanCodOngkir = codKurirBeda ? codOngkirPerQtyFn(1) : satuanOngkir;
+    const satuanFeeCOD = Math.ceil((satuanHarga + satuanCodOngkir) * 0.03);
     const satuanTotalTF = satuanHarga + satuanOngkir;
-    const satuanTotalCOD = satuanHarga + satuanOngkir + satuanFeeCOD;
+    const satuanTotalCOD = satuanHarga + satuanCodOngkir + satuanFeeCOD;
 
     hargaSection += `\n\nPAKET LAIN (jangan sebut ke customer kecuali customer nanya ada paket/harga lain):
 ${tabelSemuaPaket}
@@ -1500,21 +1535,28 @@ ${tabelSemuaPaket}
 HARGA 1 BOX (kalau customer minta 1 saja):
 ${codOk
   ? `💳 Transfer: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} = TOTAL ${fmt(satuanTotalTF)}
-📦 COD: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir + satuanFeeCOD)} = TOTAL ${fmt(satuanTotalCOD)}`
+📦 COD: ${fmt(satuanHarga)} + ongkir ${fmt(satuanCodOngkir + satuanFeeCOD)} = TOTAL ${fmt(satuanTotalCOD)}`
   : `💳 Transfer: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} = TOTAL ${fmt(satuanTotalTF)}`}
 Kalau customer pilih 1 box: berikan harga di atas, lalu SEKALI rekomendasikan paket bundling lebih hemat. Kalau tetap pilih 1 → langsung proses, jangan paksa.`;
 
   } else {
     if (codOk) {
       // Produk tanpa bundling — tampilkan harga satuan normal
+      // COD pakai kurir COD (bisa beda dari Transfer)
+      const nbCodOngkir = hasil.codOngkirPromo || hasil.ongkirPromo || 0;
+      const nbCodFee    = hasil.feeCOD || 0;
+      const nbViaInfo   = (hasil.codEkspedisi && hasil.codEkspedisi !== hasil.ekspedisi)
+        ? `Transfer via ${hasil.ekspedisi}, COD via ${hasil.codEkspedisi} ya kak 🚗`
+        : `Via ${hasil.ekspedisi} ya kak 🚗`;
+
       hargaSection = `Tampilkan PERSIS ini ke customer (jangan ubah angka):
 
 ${product?.nama || 'Produk'} ${fmt(hasil.harga)}
 
 💳 Transfer: ${fmt(hasil.harga)} + ongkir ${ongkirDisplay} = TOTAL ${fmt(hasil.totalTransfer)}
-📦 COD: ${fmt(hasil.harga)} + ongkir ${fmt((hasil.ongkirPromo || hasil.ongkirAsli || 0) + (hasil.feeCOD || 0))} = TOTAL ${fmt(hasil.totalCOD)}
+📦 COD: ${fmt(hasil.harga)} + ongkir ${fmt(nbCodOngkir + nbCodFee)} = TOTAL ${fmt(hasil.totalCOD)}
 
-Via ${hasil.ekspedisi} ya kak 🚗
+${nbViaInfo}
 
 SETELAH tampilkan harga di atas, tanya dengan santai: "Biasanya kakak lebih suka pakai kurir apa kak? Bisa aku cekkan juga 😊"`;
     } else {
@@ -4099,9 +4141,6 @@ ${ongkirInfo}`;
       const alamat      = orderDataParsed.alamat  || latestState.alamat       || '-';
       const isCOD       = metode.toLowerCase() !== 'transfer';
 
-      // Fallback ongkir detail dari customers.alamat kalau state kosong
-      const ekspedisi   = ongkirData?.ekspedisi   || custAlamat?.ekspedisi   || 'KURIR';
-      const ekspLabel   = ekspedisi.toUpperCase();
       // Resolve harga bundling sesuai qty yang confirmed (lebih akurat dari ongkirData.harga yg dihitung saat WILAYAH_OK)
       const harga       = resolveHargaBundling(product, qty) || ongkirData?.harga || custAlamat?.harga || product?.harga || 0;
 
@@ -4119,8 +4158,51 @@ ${ongkirInfo}`;
         } catch(e) { console.error('[ORDER_CONFIRMED] Ongkir re-calc error:', e.message); }
       }
 
-      const ongkirAsli  = ongkirData?.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
-      const ongkirPromo = ongkirData?.ongkirPromo || custAlamat?.ongkirPromo || 0;
+      // ── COD-safe courier selection ──
+      // Kalau COD, pakai codEkspedisi (kurir termurah yg bisa COD) dari hitungOngkir
+      // Kalau Transfer, pakai ekspedisi termurah overall
+      let ekspedisi, ongkirAsli, ongkirPromo;
+
+      if (isCOD && ongkirData?.codEkspedisi) {
+        // Pakai kurir COD dari hitungOngkir
+        ekspedisi   = ongkirData.codEkspedisi;
+        ongkirAsli  = ongkirData.codOngkirAsli  || ongkirData.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
+        ongkirPromo = ongkirData.codOngkirPromo || ongkirData.ongkirPromo || custAlamat?.ongkirPromo || 0;
+        if (ekspedisi !== ongkirData.ekspedisi) {
+          console.log(`[ORDER_CONFIRMED] COD pakai ${ekspedisi} (bukan ${ongkirData.ekspedisi} yg ga support COD)`);
+        }
+      } else if (isCOD && ongkirData?.allRates?.length) {
+        // Fallback: codEkspedisi belum ada (data lama), cari dari allRates
+        ekspedisi   = ongkirData.ekspedisi || custAlamat?.ekspedisi || 'KURIR';
+        ongkirAsli  = ongkirData.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
+        ongkirPromo = ongkirData.ongkirPromo || custAlamat?.ongkirPromo || 0;
+        const currentRate = ongkirData.allRates.find(r => r.nama.toLowerCase() === ekspedisi.toLowerCase());
+        if (currentRate && !currentRate.cod_supported) {
+          const codRates = ongkirData.allRates.filter(r => r.cod_supported).sort((a, b) => a.ongkir - b.ongkir);
+          if (codRates.length) {
+            console.log(`[ORDER_CONFIRMED] ⚠️ ${ekspedisi} tidak support COD → switch ke ${codRates[0].nama}`);
+            ekspedisi   = codRates[0].nama;
+            ongkirAsli  = codRates[0].ongkir;
+            ongkirPromo = codRates[0].ongkirPromo;
+          } else {
+            // Tidak ada kurir yang bisa COD → arahkan Transfer
+            console.log(`[ORDER_CONFIRMED] ⚠️ Tidak ada kurir yang support COD — arahkan Transfer`);
+            const noCodMsg = `Mohon maaf kak, untuk wilayah kakak belum tersedia pengiriman COD 🙏\n\nKakak bisa order dengan metode *Transfer* ya. Apakah kakak mau lanjut dengan Transfer?`;
+            const { wamid: wamid_nocod } = await sendWA(waSession, reply_jid, noCodMsg).catch(() => ({}));
+            await saveMessage(conversation.id, 'ai', noCodMsg, wamid_nocod);
+            await updateConvState(conversation.id, { metode_bayar: null, cod_not_available: true });
+            return res.status(200).json({ ok: true, action: 'cod_not_available' });
+          }
+        }
+      } else {
+        // Transfer atau tidak ada data ongkir
+        ekspedisi   = ongkirData?.ekspedisi   || custAlamat?.ekspedisi   || 'KURIR';
+        ongkirAsli  = ongkirData?.ongkirAsli  || custAlamat?.ongkirAsli  || 0;
+        ongkirPromo = ongkirData?.ongkirPromo || custAlamat?.ongkirPromo || 0;
+      }
+
+      const ekspLabel = ekspedisi.toUpperCase();
+
       // Recalculate feeCOD pakai harga bundling yang benar — Transfer selalu 0
       const feeCODCalc  = isCOD ? Math.ceil((harga + ongkirPromo) * 0.03) : 0;
       const feeCOD      = isCOD ? (feeCODCalc || ongkirData?.feeCOD || custAlamat?.feeCOD || 0) : 0;
