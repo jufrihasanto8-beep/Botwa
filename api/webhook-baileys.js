@@ -666,11 +666,14 @@ async function saveMessage(conversationId, role, isi, wamid = null) {
 /* ── RESOLVE AI ENDPOINT — product-level → user-level fallback ── */
 const MWAPI_BASE = 'https://api.mwapi.dev';
 const ANTHROPIC_BASE = 'https://api.anthropic.com';
+const FABLEAI_BASE = 'https://api.fableaiapi.com';
+
+const PROVIDER_BASE = { mwapi: MWAPI_BASE, fableai: FABLEAI_BASE };
 
 function resolveAI(product, userAnthropicKey) {
   // 1. Product punya ai_api_key → pakai sesuai provider
   if (product?.ai_api_key) {
-    const base = product.ai_provider === 'mwapi' ? MWAPI_BASE : ANTHROPIC_BASE;
+    const base = PROVIDER_BASE[product.ai_provider] || ANTHROPIC_BASE;
     return { key: product.ai_api_key, base };
   }
   // 2. Fallback ke user anthropic_key dari Settings
