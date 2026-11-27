@@ -500,7 +500,9 @@ body.light .bdg-tf{background:rgba(99,102,241,.1);color:#4f46e5;border-color:rgb
       <div class="edit-section">Rincian Pembayaran</div>
       <div class="edit-grid">
         <div class="edit-field"><label>Harga Produk</label><input id="ef-harga" type="number" min="0"></div>
-        <div class="edit-field"><label>Ongkir</label><input id="ef-ongkir" type="number" min="0"></div>
+        <div class="edit-field"><label>Ongkir Asli</label><input id="ef-ongkir-asli" type="number" min="0"></div>
+        <div class="edit-field"><label>Potongan Ongkir</label><input id="ef-pot-ongkir" type="number" min="0" readonly style="background:var(--bg-2)"></div>
+        <div class="edit-field"><label>Ongkir Final</label><input id="ef-ongkir" type="number" min="0" readonly style="background:var(--bg-2)"></div>
         <div class="edit-field"><label>Fee COD</label><input id="ef-feecod" type="number" min="0"></div>
         <div class="edit-field"><label>Total Pembayaran</label><input id="ef-total" type="number" min="0" style="font-weight:700;background:var(--bg-2)"></div>
       </div>
@@ -1407,8 +1409,12 @@ function openEdit(id) {
   document.getElementById('ef-metode').value      = r.isCOD ? 'cod' : 'transfer';
   document.getElementById('ef-ekspedisi').value   = r.instruksi === '—' ? '' : r.instruksi;
   _editOngkirAsli = r._raw.ongkir || r._raw.ongkir_after_promo || 0;
+  const ongkirFinal = r._raw.ongkir_after_promo ?? r._raw.ongkir ?? 0;
+  const potOngkir = Math.max(0, _editOngkirAsli - ongkirFinal);
   document.getElementById('ef-harga').value       = r._raw.harga || 0;
-  document.getElementById('ef-ongkir').value      = r._raw.ongkir_after_promo ?? r._raw.ongkir ?? 0;
+  document.getElementById('ef-ongkir-asli').value = _editOngkirAsli;
+  document.getElementById('ef-pot-ongkir').value  = potOngkir;
+  document.getElementById('ef-ongkir').value      = ongkirFinal;
   document.getElementById('ef-feecod').value      = r._raw.fee_cod || 0;
   document.getElementById('ef-total').value       = r._raw.total || 0;
   document.getElementById('ef-keluhan').value     = r.keluhan;
@@ -1473,7 +1479,10 @@ function recalcFromQty() {
 
   // Ongkir: apply diskon per qty
   const ongkir = applyDiskonOngkir(_editOngkirAsli, prod, qty);
-  document.getElementById('ef-ongkir').value = ongkir;
+  const potOngkir = Math.max(0, _editOngkirAsli - ongkir);
+  document.getElementById('ef-ongkir-asli').value = _editOngkirAsli;
+  document.getElementById('ef-pot-ongkir').value  = potOngkir;
+  document.getElementById('ef-ongkir').value      = ongkir;
 
   // Fee COD
   const feeCOD = isCOD ? Math.ceil((harga + ongkir) * 0.03) : 0;
@@ -1494,12 +1503,18 @@ function recalcTotal() {
   if (metode === 'cod') document.getElementById('ef-feecod').value = t - h - o;
   const fmt = n => n.toLocaleString('id-ID');
   const fFinal = parseInt(document.getElementById('ef-feecod').value) || 0;
-  document.getElementById('ef-rincian-info').textContent = `${fmt(h)} + ${fmt(o)} + ${fmt(fFinal)} = ${fmt(t)}`;
+  const pot = parseInt(document.getElementById('ef-pot-ongkir').value) || 0;
+  const potInfo = pot > 0 ? ` (ongkir ${fmt(parseInt(document.getElementById('ef-ongkir-asli').value)||0)} - pot ${fmt(pot)})` : '';
+  document.getElementById('ef-rincian-info').textContent = `${fmt(h)} + ${fmt(o)}${potInfo} + ${fmt(fFinal)} = ${fmt(t)}`;
 }
 
 document.getElementById('ef-qty').addEventListener('input', recalcFromQty);
 document.getElementById('ef-metode').addEventListener('change', recalcFromQty);
-['ef-harga','ef-ongkir','ef-feecod'].forEach(id => {
+document.getElementById('ef-ongkir-asli').addEventListener('input', function() {
+  _editOngkirAsli = parseInt(this.value) || 0;
+  recalcFromQty();
+});
+['ef-harga','ef-feecod'].forEach(id => {
   document.getElementById(id).addEventListener('input', recalcTotal);
 });
 
