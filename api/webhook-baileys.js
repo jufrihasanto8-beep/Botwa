@@ -1449,6 +1449,20 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
 
   const codOk = hasil.cod_available !== false; // default true kalau tidak ada info
 
+  // Cek apakah kurir COD beda dari kurir Transfer
+  const codKurirBeda = hasil.codEkspedisi && hasil.codEkspedisi !== hasil.ekspedisi;
+  const codOngkirAsliBase = hasil.codOngkirAsli || ongkirAsli;
+
+  // Helper: hitung ongkir COD per qty (pakai ongkir kurir COD sebagai base, support persen & rupiah)
+  function codOngkirPerQty(qty) {
+    if (!codKurirBeda) return ongkirPerQty(qty); // kurir sama, pakai fungsi biasa
+    const dok = diskonOngkirPerQty.find(d => d.qty === qty);
+    if (!dok || !dok.diskon || dok.diskon <= 0) return codOngkirAsliBase;
+    if (dok.tipe === 'rupiah') return Math.max(0, codOngkirAsliBase - dok.diskon);
+    if (dok.diskon >= 100) return 0;
+    return Math.round(codOngkirAsliBase * (1 - dok.diskon / 100));
+  }
+
   if (hasBundling) {
     const defaultPaket  = paketPrioritas || product.harga_bundling[0];
     const defaultHarga  = defaultPaket.harga;
@@ -1456,41 +1470,28 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
     const defaultOngkirDisplay = ongkirAsli !== defaultOngkir
       ? `~${fmt(ongkirAsli)}~ ${fmt(defaultOngkir)} 🎉`
       : fmt(defaultOngkir);
-    const defaultFeeCOD = Math.ceil((defaultHarga + defaultOngkir) * 0.03);
     const defaultTotalTF  = defaultHarga + defaultOngkir;
-    const defaultTotalCOD = defaultHarga + defaultOngkir + defaultFeeCOD;
 
-    // Tabel semua paket — tiap paket punya ongkir sendiri sesuai diskon qty-nya
+    // COD: pakai ongkir kurir COD + fee 3%
+    const codDefOngkir  = codOngkirPerQty(defaultPaket.qty);
+    const codDefFee     = Math.ceil((defaultHarga + codDefOngkir) * 0.03);
+    const codDefTotal   = defaultHarga + codDefOngkir + codDefFee;
+
+    // Tabel semua paket
     const tabelSemuaPaket = product.harga_bundling.map(p => {
-      const hp     = p.harga;
+      const hp      = p.harga;
       const pOngkir = ongkirPerQty(p.qty);
       const pOngkirInfo = ongkirAsli !== pOngkir ? ` (ongkir ${fmt(pOngkir)}, hemat ${fmt(ongkirAsli - pOngkir)})` : '';
-      const tTF    = hp + pOngkir;
-      // COD pakai ongkir kurir COD (bisa beda)
-      const pCodOngkir = codKurirBeda ? codOngkirPerQtyFn(p.qty) : pOngkir;
-      const fee    = Math.ceil((hp + pCodOngkir) * 0.03);
-      const tCOD   = hp + pCodOngkir + fee;
+      const tTF     = hp + pOngkir;
+      const pCodOng = codOngkirPerQty(p.qty);
+      const pCodFee = Math.ceil((hp + pCodOng) * 0.03);
+      const tCOD    = hp + pCodOng + pCodFee;
       return codOk
         ? `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}${pOngkirInfo}: TF total ${fmt(tTF)} | COD total ${fmt(tCOD)}`
         : `- Paket ${p.qty} box${p.bonus ? ` + bonus ${p.bonus}` : ''}${p.prioritas ? ' ⭐' : ''}${pOngkirInfo}: Transfer total ${fmt(tTF)}`;
     }).join('\n');
 
-    // Cek apakah kurir COD beda dari kurir Transfer
-    const codKurirBeda = hasil.codEkspedisi && hasil.codEkspedisi !== hasil.ekspedisi;
-    // Hitung harga COD pakai ongkir kurir COD (bisa beda dari kurir Transfer)
-    const codOngkirPerQtyFn = codKurirBeda ? (qty) => {
-      const dok = diskonOngkirPerQty.find(d => d.qty === qty);
-      if (dok) {
-        if (dok.diskon >= 100) return 0;
-        if (dok.diskon > 0) return Math.round((hasil.codOngkirAsli || ongkirAsli) * (1 - dok.diskon / 100));
-      }
-      return hasil.codOngkirPromo || ongkirPromo;
-    } : ongkirPerQty;
-
     if (codOk) {
-      const codDefaultOngkir = codKurirBeda ? codOngkirPerQtyFn(defaultPaket.qty) : defaultOngkir;
-      const codDefaultFeeCOD = Math.ceil((defaultHarga + codDefaultOngkir) * 0.03);
-      const codDefaultTotal  = defaultHarga + codDefaultOngkir + codDefaultFeeCOD;
       const viaInfo = codKurirBeda
         ? `Transfer via ${hasil.ekspedisi}, COD via ${hasil.codEkspedisi} ya kak 🚗`
         : `Via ${hasil.ekspedisi} ya kak 🚗`;
@@ -1499,7 +1500,7 @@ function buildOngkirInjeksi(hasil, product, konteks = '') {
 
 Paket ${defaultPaket.qty} box ${product?.nama || 'Produk'}:
 💳 Transfer: ${fmt(defaultHarga)} + ongkir ${defaultOngkirDisplay} = TOTAL ${fmt(defaultTotalTF)}
-📦 COD: ${fmt(defaultHarga)} + ongkir ${fmt(codDefaultOngkir + codDefaultFeeCOD)} = TOTAL ${fmt(codDefaultTotal)}
+📦 COD: ${fmt(defaultHarga)} + ongkir ${fmt(codDefOngkir + codDefFee)} = TOTAL ${fmt(codDefTotal)}
 
 ${viaInfo}
 
@@ -1517,13 +1518,13 @@ Sampaikan ke customer: "Untuk wilayah kak, pengiriman via Transfer ya kak 🙏 C
 Langsung lanjut minta data (nama, alamat) tanpa tanya COD/Transfer.`;
     }
 
-    // Info harga satuan untuk kalau customer minta qty di luar bundling
-    const satuanHarga = product?.harga || 0;
-    const satuanOngkir = ongkirPerQty(1);
-    const satuanCodOngkir = codKurirBeda ? codOngkirPerQtyFn(1) : satuanOngkir;
-    const satuanFeeCOD = Math.ceil((satuanHarga + satuanCodOngkir) * 0.03);
-    const satuanTotalTF = satuanHarga + satuanOngkir;
-    const satuanTotalCOD = satuanHarga + satuanCodOngkir + satuanFeeCOD;
+    // Info harga satuan
+    const satuanHarga    = product?.harga || 0;
+    const satuanOngkir   = ongkirPerQty(1);
+    const satuanCodOng   = codOngkirPerQty(1);
+    const satuanCodFee   = Math.ceil((satuanHarga + satuanCodOng) * 0.03);
+    const satuanTotalTF  = satuanHarga + satuanOngkir;
+    const satuanTotalCOD = satuanHarga + satuanCodOng + satuanCodFee;
 
     hargaSection += `\n\nPAKET LAIN (jangan sebut ke customer kecuali customer nanya ada paket/harga lain):
 ${tabelSemuaPaket}
@@ -1531,17 +1532,16 @@ ${tabelSemuaPaket}
 HARGA 1 BOX (kalau customer minta 1 saja):
 ${codOk
   ? `💳 Transfer: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} = TOTAL ${fmt(satuanTotalTF)}
-📦 COD: ${fmt(satuanHarga)} + ongkir ${fmt(satuanCodOngkir + satuanFeeCOD)} = TOTAL ${fmt(satuanTotalCOD)}`
+📦 COD: ${fmt(satuanHarga)} + ongkir ${fmt(satuanCodOng + satuanCodFee)} = TOTAL ${fmt(satuanTotalCOD)}`
   : `💳 Transfer: ${fmt(satuanHarga)} + ongkir ${fmt(satuanOngkir)} = TOTAL ${fmt(satuanTotalTF)}`}
 Kalau customer pilih 1 box: berikan harga di atas, lalu SEKALI rekomendasikan paket bundling lebih hemat. Kalau tetap pilih 1 → langsung proses, jangan paksa.`;
 
   } else {
     if (codOk) {
       // Produk tanpa bundling — tampilkan harga satuan normal
-      // COD pakai kurir COD (bisa beda dari Transfer)
       const nbCodOngkir = hasil.codOngkirPromo || hasil.ongkirPromo || 0;
       const nbCodFee    = hasil.feeCOD || 0;
-      const nbViaInfo   = (hasil.codEkspedisi && hasil.codEkspedisi !== hasil.ekspedisi)
+      const nbViaInfo   = codKurirBeda
         ? `Transfer via ${hasil.ekspedisi}, COD via ${hasil.codEkspedisi} ya kak 🚗`
         : `Via ${hasil.ekspedisi} ya kak 🚗`;
 
