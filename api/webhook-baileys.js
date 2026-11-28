@@ -2966,7 +2966,8 @@ Konfirmasi ke customer bahwa bukti TF sudah diterima dan sedang dicek oleh tim f
             const ongkirSnap = convState.ongkir || {};
             const qtySnap    = parseInt(snap.qty || convState.qty || 1) || 1;
             const hargaSnap  = snap.harga || resolveHargaBundling(product, qtySnap) || product?.harga || 0;
-            const ongkirPromoSnap = snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0;
+            // Prioritas: ongkir dari hitungOngkir (sudah include diskon) > snapshot ORDER_CONFIRMED
+            const ongkirPromoSnap = ongkirSnap.ongkirPromo ?? snap.ongkirPromo ?? 0;
             const totalSnap  = hargaSnap + ongkirPromoSnap; // Transfer = no feeCOD
 
             const qcData = {
