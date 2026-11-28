@@ -3441,6 +3441,33 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
       }
     }
 
+    // ── Deteksi qty berubah → recalc ongkir (berat beda = ongkir beda) ──
+    if (convState.ongkir && !autoOngkirResult) {
+      const qtyMatch = message.match(/\b(\d+)\s*(?:box|botol|pcs|buah|paket|biji|butir)\b/i)
+                     || message.match(/\b(?:mau|beli|ambil|pesan|order|qty)\s*(\d+)\b/i);
+      if (qtyMatch) {
+        const qtyBaru = parseInt(qtyMatch[1] || qtyMatch[2]);
+        const qtyLama = parseInt(convState.qty) || 0;
+        if (qtyBaru > 0 && qtyBaru !== qtyLama) {
+          console.log(`[qty-change] Customer ganti qty: ${qtyLama} → ${qtyBaru}, recalc ongkir (berat berubah)`);
+          await updateConvState(conversation.id, { qty: qtyBaru });
+          convState.qty = qtyBaru;
+          // Recalc ongkir dengan berat baru
+          const wilayahRecalc = convState.wilayah_data || convState.wilayah;
+          if (wilayahRecalc && product) {
+            try {
+              const freshOngkir = await hitungOngkir(wilayahRecalc, product, qtyBaru, userMngAreaId);
+              if (freshOngkir) {
+                await updateConvState(conversation.id, { ongkir: freshOngkir });
+                convState.ongkir = freshOngkir;
+                console.log(`[qty-change] Ongkir recalc qty=${qtyBaru}: asli=${freshOngkir.ongkirAsli} promo=${freshOngkir.ongkirPromo} (berat ${((product.berat_gram||1000)/1000)*qtyBaru}kg)`);
+              }
+            } catch(e) { console.error('[qty-change] Recalc error:', e.message); }
+          }
+        }
+      }
+    }
+
     // ── HINT: Customer pilih metode bayar → inject total reminder ke Claude ──
     if (convState.ongkir && !autoOngkirResult) {
       const pilihCOD = /\bcod\b/i.test(message);
