@@ -577,9 +577,11 @@ async function handleCreateMengantar(req, res) {
         const al   = o.alamat || {};
         const isCOD      = (o.metode || '').toLowerCase() === 'cod';
         const qty        = o.qty || 1;
-        const hargaSatuan = o.harga || prod.harga || 0;
-        const totalCOD   = o.total || (hargaSatuan * qty);
-        const totalNilai = hargaSatuan * qty;
+        // o.harga = harga bundling total (sudah untuk qty tsb), bukan per unit
+        const hargaTotal  = o.harga || (prod.harga * qty) || 0;
+        const hargaSatuan = qty > 1 ? Math.round(hargaTotal / qty) : hargaTotal;
+        const totalCOD   = o.total || hargaTotal;
+        const totalNilai = hargaTotal;
         const berat      = (prod.berat_gram > 0 ? prod.berat_gram : 1000) / 1000;
 
         // Lookup dest ID — prioritas: override dari preview → cached → auto lookup
@@ -652,7 +654,7 @@ async function handleCreateMengantar(req, res) {
         const potOngkir    = ongkirAsli - ongkirPromo;
         const feeCod       = o.fee_cod || 0;
         const potAdmin     = 0;
-        const hargaProdukTotal = hargaSatuan * qty;
+        const hargaProdukTotal = hargaTotal;
         item.deliveryInstruction = `${pengirim}|${ongkirAsli}|${potOngkir}|${feeCod}|${potAdmin}|${hargaProdukTotal}`;
 
         // Lengkapi orders_new dengan data flat sebelum kirim
