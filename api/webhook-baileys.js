@@ -1369,6 +1369,7 @@ async function hitungOngkir(wilayahInput, product, qty = 1, userMngOriginId = nu
       totalCOD: totalCODBulat,
       feeCOD: feeCODBulat,
       harga, allRates,
+      _ongkirQty: qty,
       cod_available: codAvailable,
       area: {
         kelurahan: lokal?.kelurahan || bestArea.SUBDISTRICT_NAME || bestArea.subdistrict || '',
@@ -3657,15 +3658,29 @@ Minta customer konfirmasi apakah sudah transfer ke rekening yang benar: ${userRe
             convState.alamat = alamatStr;
           }
 
-          // Coba deteksi qty dari pesan AI (misal: "4 box", "2 pcs", "qty=4")
+          // Coba deteksi qty dari: 1) pesan customer, 2) reply AI, 3) state, 4) bundling prioritas
           let qtyFromReply = null;
-          const qtyReplyMatch = rawReply.match(/\b(\d+)\s*(?:box|pcs|buah|paket)\b/i) || rawReply.match(/qty=(\d+)/i);
-          if (qtyReplyMatch) qtyFromReply = parseInt(qtyReplyMatch[1]);
-          const qtyState = qtyFromReply || parseInt(convState.qty) || 1;
+          // 1. Dari pesan customer (misal: "2 botol", "mau 3 box")
+          const qtyMsgMatch = message.match(/\b(\d+)\s*(?:box|botol|pcs|buah|paket|biji|butir)\b/i);
+          if (qtyMsgMatch) qtyFromReply = parseInt(qtyMsgMatch[1]);
+          // 2. Dari reply AI (misal: "4 box", "qty=4")
+          if (!qtyFromReply) {
+            const qtyReplyMatch = rawReply.match(/\b(\d+)\s*(?:box|pcs|buah|paket)\b/i) || rawReply.match(/qty=(\d+)/i);
+            if (qtyReplyMatch) qtyFromReply = parseInt(qtyReplyMatch[1]);
+          }
+          // 3. Dari state (kalau sudah di-set sebelumnya)
+          let qtyState = qtyFromReply || parseInt(convState.qty) || 0;
+          // 4. Fallback ke bundling prioritas (kalau qty belum diketahui sama sekali)
+          if (!qtyState && Array.isArray(product?.harga_bundling) && product.harga_bundling.length) {
+            const prio = product.harga_bundling.find(p => p.prioritas);
+            qtyState = prio?.qty || product.harga_bundling[0].qty || 1;
+            console.log(`[WILAYAH_OK] qty fallback dari bundling prioritas: ${qtyState}`);
+          }
+          if (!qtyState) qtyState = 1;
           if (qtyFromReply && qtyFromReply !== parseInt(convState.qty)) {
             await updateConvState(conversation.id, { qty: qtyFromReply });
             convState.qty = qtyFromReply;
-            console.log(`[WILAYAH_OK] qty deteksi dari reply: ${qtyFromReply}`);
+            console.log(`[WILAYAH_OK] qty deteksi: ${qtyFromReply} (dari ${qtyMsgMatch ? 'pesan customer' : 'reply AI'})`);
           }
           const hasil = await hitungOngkir(wilayah, product, qtyState, userMngAreaId);
           if (hasil) {
@@ -4240,6 +4255,19 @@ ${ongkirInfo}`;
         }
       }
 
+      // Safeguard: area masih kosong → re-fetch customer alamat dari DB
+      if (!area.kecamatan && customer?.id) {
+        try {
+          const freshCust = await sbGet('customers', `?id=eq.${customer.id}&select=alamat&limit=1`);
+          const ca = freshCust[0]?.alamat || {};
+          if (ca.kecamatan) {
+            area = { kelurahan: ca.kelurahan || '', kecamatan: ca.kecamatan || '', kota: ca.kabupaten || '', provinsi: ca.provinsi || '', kodePos: ca.kodepos || '' };
+            console.log(`[ORDER_CONFIRMED] Area dari re-fetch customer: ${ca.kecamatan}, ${ca.kabupaten}`);
+          }
+        } catch(_) {}
+      }
+      if (!area.kecamatan) console.warn(`[ORDER_CONFIRMED] ⚠️ Area masih kosong setelah semua fallback — konfirmasi tanpa area detail`);
+
       const metode      = orderDataParsed.metode  || latestState.metode_bayar || 'COD';
       const qty         = orderDataParsed.qty     || latestState.qty          || 1;
       const alamat      = orderDataParsed.alamat  || latestState.alamat       || '-';
@@ -4250,9 +4278,13 @@ ${ongkirInfo}`;
 
       // ── Recalculate ongkir jika qty berubah (diskon ongkir per qty bisa beda) ──
       // Ongkir di state dihitung saat wilayah dikonfirmasi — qty saat itu mungkin berbeda
+      // Cek 2 kondisi: (1) harga produk berubah (bundling beda), (2) qty berubah dari yg dipakai hitungOngkir
       const ongkirQtyLama = ongkirData?.harga || 0;
-      if (ongkirData && product && harga !== ongkirQtyLama && (convState.wilayah_data || convState.wilayah || latestState.wilayah)) {
+      const ongkirQtyUsed = ongkirData?._ongkirQty || 0;
+      const qtyBerubah    = ongkirQtyUsed > 0 && ongkirQtyUsed !== qty;
+      if (ongkirData && product && (harga !== ongkirQtyLama || qtyBerubah) && (convState.wilayah_data || convState.wilayah || latestState.wilayah)) {
         try {
+          console.log(`[ORDER_CONFIRMED] Ongkir re-calc needed: harga=${harga} vs lama=${ongkirQtyLama}, qty=${qty} vs ongkirQty=${ongkirQtyUsed}`);
           const wilayahInput = latestState.wilayah_data || convState.wilayah_data || latestState.wilayah || convState.wilayah;
           const freshOngkir = await hitungOngkir(wilayahInput, product, qty, userMngAreaId);
           if (freshOngkir) {
