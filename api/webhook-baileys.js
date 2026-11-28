@@ -1735,6 +1735,166 @@ ${(product?.nama || 'PRODUK').toUpperCase()} ${qty} CS ${cs}
 KELUHAN: ${keluhan || 'tidak disebutkan'}`.trim();
 }
 
+// ── Helper: COD Closing flow — dipakai oleh isConfirm regex & Sonnet classifier ──
+async function handleCODClosing({ conversation, convState, customer, product, userId, waSession, reply_jid, wa_number, userGroupJid, aiKey, aiBase, req, res }) {
+  const nomorUrutClosing = await getOrderNumber(userId);
+  await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
+  await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
+
+  // Generate closing personal
+  const keluhanSnap = convState.order_snapshot?.keluhan || convState.keluhan || '';
+  const namaSnap    = customer?.nama || 'kak';
+  const closingPrompt = `Buat pesan penutup WhatsApp yang hangat dan personal untuk customer yang baru saja order.
+Nama customer: ${namaSnap}
+Keluhan/kondisi customer: ${keluhanSnap || 'tidak diketahui'}
+
+Isi pesan:
+1. Konfirmasi pesanan sedang diproses
+2. Doakan kesembuhan customer sesuai keluhannya (natural, tidak lebay)
+3. Bilang akan dikabari kalau sudah dikirim
+4. Ucapan terima kasih
+
+Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet point.`;
+
+  let closingCustomer;
+  try {
+    closingCustomer = await callClaude(
+      'Kamu CS herbal yang hangat dan peduli. Balas singkat, natural, gaya WA.',
+      [{ role: 'user', content: closingPrompt }],
+      'claude-haiku-4-5-20251001',
+      aiKey, aiBase
+    );
+  } catch(e) { closingCustomer = null; }
+  if (!closingCustomer) {
+    closingCustomer = `Siap kak! Pesanan sedang kami proses 🚀\n\nNanti kami kabarin kalau barang udah dikirim ya kak.\nTerima kasih sudah belanja! 🙏`;
+  }
+
+  const { wamid: wamid_cl } = await sendWA(waSession, reply_jid, closingCustomer).catch(()=>({}));
+  await saveMessage(conversation.id, 'ai', closingCustomer, wamid_cl);
+
+  // Guard: anti-double order
+  const existingOrder = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&limit=1`).catch(() => []);
+  if (existingOrder.length) {
+    console.warn(`[closing] Order untuk conv ${conversation.id} sudah ada — skip insert & recap`);
+    return { action: 'order_already_exists', orderId: existingOrder[0].id };
+  }
+
+  // Insert orders_new
+  let insertedOrderId = null;
+  try {
+    const snap       = convState.order_snapshot || {};
+    const ongkirSnap = convState.ongkir || {};
+    const alamatSnap = {
+      jalan:      snap.alamat       || convState.alamat              || '',
+      kelurahan:  ongkirSnap.area?.kelurahan || customer.alamat?.kelurahan || '',
+      kecamatan:  ongkirSnap.area?.kecamatan || customer.alamat?.kecamatan || '',
+      kabupaten:  ongkirSnap.area?.kota      || customer.alamat?.kabupaten || '',
+      provinsi:   ongkirSnap.area?.provinsi  || customer.alamat?.provinsi  || '',
+      kodepos:    ongkirSnap.area?.kodePos   || customer.alamat?.kodepos   || '',
+      ...(ongkirSnap.mengantar_dest_id ? { mengantar_dest_id: ongkirSnap.mengantar_dest_id } : {}),
+    };
+    const insertedRows = await sbPost('orders_new', {
+      user_id:           userId,
+      customer_id:       customer.id,
+      conversation_id:   conversation.id,
+      product_id:        product?.id || null,
+      metode:            (snap.metode || convState.metode_bayar || 'cod').toLowerCase(),
+      qty:               parseInt(snap.qty || convState.qty || 1),
+      harga:             snap.harga        || product?.harga || 0,
+      ongkir:            snap.ongkirAsli   || ongkirSnap.ongkirAsli   || 0,
+      ongkir_after_promo: snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0,
+      fee_cod:           snap.feeCOD       || ongkirSnap.feeCOD       || 0,
+      total:             snap.total        || (() => {
+        const h = snap.harga || product?.harga || 0;
+        const op = snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0;
+        const fc = snap.feeCOD || ongkirSnap.feeCOD || 0;
+        const cod = (snap.metode || '').toLowerCase() !== 'transfer';
+        return cod ? h + op + fc : h + op;
+      })(),
+      ekspedisi:         snap.ekspedisi    || ongkirSnap.ekspedisi    || '',
+      alamat:            alamatSnap,
+      keluhan:           snap.keluhan      || convState.keluhan        || '',
+      status:            'pending',
+      customer_nama:     customer.nama     || '',
+      customer_phone:    (customer.wa_number || '').replace(/^62/, '0'),
+      product_nama:      product?.nama     || '',
+      berat_gram:        product?.berat_gram || 0,
+    });
+    insertedOrderId = insertedRows?.[0]?.id || null;
+    console.log(`[closing] Insert orders_new OK — conv ${conversation.id}, order_id: ${insertedOrderId}`);
+  } catch(e) {
+    console.error('[closing] Gagal insert orders_new:', e.message);
+  }
+
+  if (insertedOrderId) {
+    await updateConvState(conversation.id, { closed_order_id: insertedOrderId }).catch(() => {});
+  }
+
+  // Update total_order
+  await sbPatch('customers', `?id=eq.${customer.id}`, {
+    total_order:   (customer.total_order || 0) + 1,
+    last_order_at: new Date().toISOString(),
+  }).catch(e => console.error('[closing] Gagal update total_order:', e.message));
+
+  // Generate catatan
+  try {
+    const snap        = convState.order_snapshot || {};
+    const keluhan     = snap.keluhan  || convState.keluhan  || '-';
+    const metode      = snap.metode   || convState.metode_bayar || '-';
+    const wilayah     = convState.wilayah || '-';
+    const kurir       = snap.ekspedisi || convState.ongkir?.ekspedisi || '-';
+    const catatanLama = customer.catatan || '';
+    const orderKe     = (customer.total_order || 0) + 1;
+    const catatanPrompt = `Buat catatan singkat (1-2 kalimat, max 150 karakter) untuk database CRM customer herbal.
+Data order:
+- Keluhan: ${keluhan}
+- Metode bayar: ${metode}
+- Kurir: ${kurir}
+- Wilayah: ${wilayah}
+- Order ke: ${orderKe}
+${catatanLama ? `- Catatan sebelumnya: ${catatanLama}` : ''}
+
+Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi kurir/bayar, dan info unik yang berguna untuk order berikutnya.`;
+    const catatanBaru = await callClaude('Kamu asisten CRM. Buat catatan singkat dan padat.', [{ role: 'user', content: catatanPrompt }], 'claude-haiku-4-5-20251001', aiKey, aiBase);
+    if (catatanBaru) {
+      const catatanFinal = catatanLama ? `[Order ${orderKe}] ${catatanBaru.trim()}\n---\n${catatanLama}` : `[Order ${orderKe}] ${catatanBaru.trim()}`;
+      await sbPatch('customers', `?id=eq.${customer.id}`, { catatan: catatanFinal }).catch(e => console.error('[closing] Gagal save catatan:', e.message));
+    }
+  } catch(e) { console.error('[closing] Generate catatan error:', e.message); }
+
+  // Recap ke grup
+  if (userGroupJid) {
+    try {
+      const snap      = convState.order_snapshot || {};
+      const ongkirSnap = convState.ongkir || {};
+      const csNama    = product?.persona_cs_nama || 'CS';
+      const closingMsg = buildClosingMessage({
+        nomorUrut: nomorUrutClosing, customer,
+        alamat:  snap.alamat  || convState.alamat || '-',
+        ongkir:  ongkirSnap, product,
+        keluhan: snap.keluhan || convState.keluhan || '-',
+        metode:  snap.metode  || convState.metode_bayar || 'COD',
+        qty:     snap.qty     || 1, csNama,
+      });
+      await sendWA(waSession, userGroupJid, closingMsg, true);
+      console.log(`Recap order #${nomorUrutClosing} terkirim ke grup`);
+    } catch(e) { console.error('Send recap ke grup error:', e.message); }
+  }
+
+  // Trigger validation
+  if (insertedOrderId) {
+    const validateUrl = `https://${req.headers.host}/api/validate-order`;
+    fetch(validateUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cron-secret': process.env.CRON_SECRET || '' },
+      body: JSON.stringify({ order_id: insertedOrderId }),
+    }).catch(e => console.error('[validate-trigger] Fire-and-forget error:', e.message));
+  }
+
+  console.log(`Order confirmed oleh customer ${wa_number} — percakapan ditutup`);
+  return { action: 'order_closed', orderId: insertedOrderId };
+}
+
 function buildCustomerConfirmMsg({ customer, alamat, area, qty, productNama, satuan, isCOD, ekspLabel, harga, ongkirAsli, ongkirPromo, feeCOD, rekening }) {
   const satuanLabel = satuan || 'pcs';
   const h  = harga       || 0;
@@ -2253,9 +2413,10 @@ Isi field yang berubah saja, sisanya null.` }],
           .replace(/\bsdh\b/g, 'sudah').replace(/\budh\b/g, 'udah').replace(/\bdah\b/g, 'udah')
           .replace(/\bbnr\b/g, 'benar').replace(/\bbner\b/g, 'bener')
           .replace(/\biy\b/g, 'iya').replace(/\biyah\b/g, 'iya').replace(/\byah\b/g, 'ya')
+          .replace(/\bia\b/g, 'iya').replace(/\biyaa+\b/g, 'iya')
           .replace(/\blgsg\b/g, 'lanjut');
-        const isConfirm = /^(iya|ya|oke|ok|bener|betul|beres|sudah|suda|udah|uda|siap|sip|fix|setuju|benar|yap|yep|yup|yoi|yes|yess|mantap|mantab|jadi|boleh|lanjut|lanjutkan|lanjutin|gas|gass|okey|baik|deal|acc|done|cus|cuss|amin)\b/i.test(msgExpand)
-                       || (msgLower.length <= 20 && /\b(oke|ok|iya|ya|suda|sudah|sdh|udah|udh|dah|siap|baik|bener|benar|bnr|bner|betul|setuju|deal|fix|jadi|boleh|lanjut|mantap|sip|yoi|yup|yes|acc|done|cus|cuss|gas)\b/i.test(msgLower));
+        const isConfirm = /^(iya|ia|ya|oke|ok|bener|betul|beres|sudah|suda|udah|uda|siap|sip|fix|setuju|benar|yap|yep|yup|yoi|yes|yess|mantap|mantab|jadi|boleh|lanjut|lanjutkan|lanjutin|gas|gass|okey|baik|deal|acc|done|cus|cuss|amin|iyalah|yalah|okelah|siyap|sikat|hayuk|ayuk|yok|yuk|monggo)\b/i.test(msgExpand)
+                       || (msgLower.length <= 20 && /\b(oke|ok|iya|ia|ya|suda|sudah|sdh|udah|udh|dah|siap|baik|bener|benar|bnr|bner|betul|setuju|deal|fix|jadi|boleh|lanjut|mantap|sip|yoi|yup|yes|acc|done|cus|cuss|gas|sikat|hayuk|ayuk|yok|yuk|monggo)\b/i.test(msgLower));
         // isDeny: nolak/cancel/minta ubah order
         const isDeny    = /\b(salah|ganti|ubah|bukan|koreksi|ralat|perbaiki|enggak|nggak|ngga|wrong|nope)\b/i.test(msgLower)
                        || /\b(tidak|belum)\s+(benar|bener|betul|sesuai|cocok|iya|ya|oke)\b/i.test(msgLower)
@@ -2290,185 +2451,9 @@ Isi field yang berubah saja, sisanya null.` }],
           }
 
           // ✅ COD → langsung Closing!
-          const nomorUrutClosing = await getOrderNumber(userId);
-          await sbPatch('conversations', `?id=eq.${conversation.id}`, { status: 'selesai' });
-          await updateConvState(conversation.id, { awaiting_order_confirm: false, order_placed: true });
-
-          // Generate closing personal berdasarkan keluhan customer
-          const keluhanSnap = convState.order_snapshot?.keluhan || convState.keluhan || '';
-          const namaSnap    = customer?.nama || 'kak';
-          const closingPrompt = `Buat pesan penutup WhatsApp yang hangat dan personal untuk customer yang baru saja order.
-Nama customer: ${namaSnap}
-Keluhan/kondisi customer: ${keluhanSnap || 'tidak diketahui'}
-
-Isi pesan:
-1. Konfirmasi pesanan sedang diproses
-2. Doakan kesembuhan customer sesuai keluhannya (natural, tidak lebay)
-3. Bilang akan dikabari kalau sudah dikirim
-4. Ucapan terima kasih
-
-Gaya: hangat, santai, WhatsApp, 3-4 kalimat. Gunakan "kak". Jangan pakai bullet point.`;
-
-          let closingCustomer;
-          try {
-            closingCustomer = await callClaude(
-              'Kamu CS herbal yang hangat dan peduli. Balas singkat, natural, gaya WA.',
-              [{ role: 'user', content: closingPrompt }],
-              'claude-haiku-4-5-20251001',
-              aiKey, aiBase
-            );
-          } catch(e) {
-            closingCustomer = null;
-          }
-          if (!closingCustomer) {
-            closingCustomer = `Siap kak! Pesanan sedang kami proses 🚀\n\nNanti kami kabarin kalau barang udah dikirim ya kak.\nTerima kasih sudah belanja! 🙏`;
-          }
-
-          const { wamid: wamid_cl } = await sendWA(waSession, reply_jid, closingCustomer).catch(()=>({}));
-          await saveMessage(conversation.id, 'ai', closingCustomer, wamid_cl);
-
-          // ── Guard: cek dulu apakah order untuk conversation ini sudah ada (anti-double) ──
-          const existingOrder = await sbGet('orders_new', `?conversation_id=eq.${conversation.id}&limit=1`).catch(() => []);
-          if (existingOrder.length) {
-            console.warn(`[closing] Order untuk conv ${conversation.id} sudah ada — skip insert & recap`);
-            return res.status(200).json({ ok: true, skipped: 'order_already_exists' });
-          }
-
-          // ── Insert ke orders_new ──
-          let insertedOrderId = null;
-          try {
-            const snap       = convState.order_snapshot || {};
-            const ongkirSnap = convState.ongkir || {};
-            const alamatSnap = {
-              jalan:      snap.alamat       || convState.alamat              || '',
-              kelurahan:  ongkirSnap.area?.kelurahan || customer.alamat?.kelurahan || '',
-              kecamatan:  ongkirSnap.area?.kecamatan || customer.alamat?.kecamatan || '',
-              kabupaten:  ongkirSnap.area?.kota      || customer.alamat?.kabupaten || '',
-              provinsi:   ongkirSnap.area?.provinsi  || customer.alamat?.provinsi  || '',
-              kodepos:    ongkirSnap.area?.kodePos   || customer.alamat?.kodepos   || '',
-              ...(ongkirSnap.mengantar_dest_id ? { mengantar_dest_id: ongkirSnap.mengantar_dest_id } : {}),
-            };
-            const insertedRows = await sbPost('orders_new', {
-              user_id:           userId,
-              customer_id:       customer.id,
-              conversation_id:   conversation.id,
-              product_id:        product?.id || null,
-              metode:            (snap.metode || convState.metode_bayar || 'cod').toLowerCase(),
-              qty:               parseInt(snap.qty || convState.qty || 1),
-              harga:             snap.harga        || product?.harga || 0,
-              ongkir:            snap.ongkirAsli   || ongkirSnap.ongkirAsli   || 0,
-              ongkir_after_promo: snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0,
-              fee_cod:           snap.feeCOD       || ongkirSnap.feeCOD       || 0,
-              total:             snap.total        || (() => {
-                const h = snap.harga || product?.harga || 0;
-                const op = snap.ongkirPromo ?? ongkirSnap.ongkirPromo ?? 0;
-                const fc = snap.feeCOD || ongkirSnap.feeCOD || 0;
-                const cod = (snap.metode || '').toLowerCase() !== 'transfer';
-                return cod ? h + op + fc : h + op;
-              })(),
-              ekspedisi:         snap.ekspedisi    || ongkirSnap.ekspedisi    || '',
-              alamat:            alamatSnap,
-              keluhan:           snap.keluhan      || convState.keluhan        || '',
-              status:            'pending',
-              // Data flat untuk kemudahan tracking & Mengantar
-              customer_nama:     customer.nama     || '',
-              customer_phone:    (customer.wa_number || '').replace(/^62/, '0'),
-              product_nama:      product?.nama     || '',
-              berat_gram:        product?.berat_gram || 0,
-            });
-            insertedOrderId = insertedRows?.[0]?.id || null;
-            console.log(`[closing] Insert orders_new OK — conv ${conversation.id}, order_id: ${insertedOrderId}`);
-          } catch(e) {
-            console.error('[closing] Gagal insert orders_new:', e.message);
-          }
-
-          // ── Tandai conversation sudah closing — permanen, tidak di-reset saat re-open ──
-          if (insertedOrderId) {
-            await updateConvState(conversation.id, { closed_order_id: insertedOrderId }).catch(() => {});
-          }
-
-          // ── Update total_order & last_order_at di customers ──
-          await sbPatch('customers', `?id=eq.${customer.id}`, {
-            total_order:   (customer.total_order || 0) + 1,
-            last_order_at: new Date().toISOString(),
-          }).catch(e => console.error('[closing] Gagal update total_order:', e.message));
-
-          // ── Generate & simpan catatan customer ──
-          try {
-            const snap        = convState.order_snapshot || {};
-            const keluhan     = snap.keluhan  || convState.keluhan  || '-';
-            const metode      = snap.metode   || convState.metode_bayar || '-';
-            const wilayah     = convState.wilayah || '-';
-            const kurir       = snap.ekspedisi || convState.ongkir?.ekspedisi || '-';
-            const catatanLama = customer.catatan || '';
-            const orderKe     = (customer.total_order || 0) + 1;
-
-            const catatanPrompt = `Buat catatan singkat (1-2 kalimat, max 150 karakter) untuk database CRM customer herbal.
-Data order:
-- Keluhan: ${keluhan}
-- Metode bayar: ${metode}
-- Kurir: ${kurir}
-- Wilayah: ${wilayah}
-- Order ke: ${orderKe}
-${catatanLama ? `- Catatan sebelumnya: ${catatanLama}` : ''}
-
-Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi kurir/bayar, dan info unik yang berguna untuk order berikutnya.`;
-
-            const catatanBaru = await callClaude(
-              'Kamu asisten CRM. Buat catatan singkat dan padat.',
-              [{ role: 'user', content: catatanPrompt }],
-              'claude-haiku-4-5-20251001',
-              aiKey, aiBase
-            );
-
-            if (catatanBaru) {
-              const catatanFinal = catatanLama
-                ? `[Order ${orderKe}] ${catatanBaru.trim()}\n---\n${catatanLama}`
-                : `[Order ${orderKe}] ${catatanBaru.trim()}`;
-
-              await sbPatch('customers', `?id=eq.${customer.id}`, { catatan: catatanFinal })
-                .catch(e => console.error('[closing] Gagal save catatan:', e.message));
-            }
-          } catch(e) {
-            console.error('[closing] Generate catatan error:', e.message);
-          }
-
-          // ── Kirim recap ke grup WA setelah customer konfirmasi ──
-          if (userGroupJid) {
-            try {
-              const snap      = convState.order_snapshot || {};
-              const ongkirSnap = convState.ongkir || {};
-              const csNama    = product?.persona_cs_nama || 'CS';
-              const closingMsg = buildClosingMessage({
-                nomorUrut: nomorUrutClosing, customer,
-                alamat:  snap.alamat  || convState.alamat || '-',
-                ongkir:  ongkirSnap,
-                product,
-                keluhan: snap.keluhan || convState.keluhan || '-',
-                metode:  snap.metode  || convState.metode_bayar || 'COD',
-                qty:     snap.qty     || 1,
-                csNama,
-              });
-              await sendWA(waSession, userGroupJid, closingMsg, true);
-              console.log(`Recap order #${nomorUrutClosing} terkirim ke grup (setelah customer konfirmasi)`);
-            } catch(e) {
-              console.error('Send recap ke grup error:', e.message);
-            }
-          }
-
-          // ── Trigger validation agent (fire-and-forget) ──
-          if (insertedOrderId) {
-            const validateUrl = `https://${req.headers.host}/api/validate-order`;
-            fetch(validateUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET || '' },
-              body: JSON.stringify({ order_id: insertedOrderId }),
-            }).catch(e => console.error('[validate-trigger] Fire-and-forget error:', e.message));
-            console.log(`[validate-trigger] Triggered for order ${insertedOrderId}`);
-          }
-
-          console.log(`Order confirmed oleh customer ${wa_number} — percakapan ditutup`);
-          return res.status(200).json({ ok: true, action: 'order_closed' });
+          const closingResult = await handleCODClosing({ conversation, convState, customer, product, userId, waSession, reply_jid, wa_number, userGroupJid, aiKey, aiBase, req, res });
+          console.log(`[isConfirm] COD closing: ${closingResult.action}`);
+          return res.status(200).json({ ok: true, action: closingResult.action });
 
         } else if (isDeny) {
           // Bedakan cancel (tidak jadi, batal) vs koreksi (salah, ganti, ubah)
@@ -2495,12 +2480,87 @@ Format: langsung isinya saja, tanpa label/prefix. Fokus pada keluhan, preferensi
             await saveMessage(conversation.id, 'ai', tanyaKoreksi, wamid_tk);
             return res.status(200).json({ ok: true, action: 'awaiting_correction' });
           }
-        }
-        // Kalau ambigu (tidak jelas iya/tidak) → reset timer FU, lanjut ke Claude biasa
+        } else {
+          // ── Ambigu: regex ga match → Sonnet klasifikasi ──
+          console.log(`[confirm-classify] Pesan ambigu: "${message}" — panggil Sonnet klasifikasi`);
+          try {
+            const snapForClassify = convState.order_snapshot || {};
+            const classifyResult = await callClaude(
+              'Kamu classifier pesan customer. Jawab HANYA satu kata: KONFIRMASI / KOREKSI / CANCEL / LAINNYA',
+              [{ role: 'user', content:
+                `Customer baru saja menerima pesan konfirmasi order berikut:
+- Produk: ${product?.nama || '-'} x${snapForClassify.qty || 1}
+- Total: Rp ${(snapForClassify.total || 0).toLocaleString('id-ID')}
+- Metode: ${snapForClassify.metode || 'COD'}
+
+Lalu customer membalas: "${message}"
+
+Klasifikasi pesan customer:
+- KONFIRMASI = setuju/iya/benar/lanjut (termasuk konfirmasi alamat benar, data benar, dll)
+- KOREKSI = minta ubah data (qty, alamat, nama, ekspedisi, metode bayar, dll)
+- CANCEL = tidak jadi / batal order
+- LAINNYA = pertanyaan, ngobrol, atau tidak terkait konfirmasi order
+
+Jawab SATU KATA saja.` }],
+              'claude-sonnet-4-6',
+              aiKey, aiBase
+            );
+            const cls = (classifyResult || '').trim().toUpperCase();
+            console.log(`[confirm-classify] Hasil: ${cls}`);
+
+            if (cls.includes('KONFIRMASI')) {
+              // Sonnet bilang konfirmasi → inject pesan seolah isConfirm = true
+              // Redirect ke flow isConfirm: set flag lalu re-trigger closing
+              // Simpelnya: langsung proses closing di sini
+              const snapMetode = (convState.order_snapshot?.metode || convState.metode_bayar || 'cod').toLowerCase();
+              if (snapMetode === 'transfer' || snapMetode === 'tf') {
+                await updateConvState(conversation.id, {
+                  awaiting_order_confirm: false,
+                  awaiting_bukti_tf: true,
+                  order_snapshot: convState.order_snapshot,
+                });
+                const tfMsg = `Siap kak, pesanannya sudah kami catat! 📝 Ditunggu bukti TF-nya ya kak 🙏`;
+                const { wamid: wamid_tf } = await sendWA(waSession, reply_jid, tfMsg).catch(()=>({}));
+                await saveMessage(conversation.id, 'ai', tfMsg, wamid_tf);
+                return res.status(200).json({ ok: true, action: 'sonnet_confirm_awaiting_tf' });
+              }
+              // COD → langsung closing via helper
+              const closingResult = await handleCODClosing({ conversation, convState, customer, product, userId, waSession, reply_jid, wa_number, userGroupJid, aiKey, aiBase, req, res });
+              console.log(`[confirm-classify] Sonnet KONFIRMASI COD closing: ${closingResult.action}`);
+              return res.status(200).json({ ok: true, action: `sonnet_${closingResult.action}` });
+            } else if (cls.includes('KOREKSI')) {
+              await updateConvState(conversation.id, {
+                awaiting_order_confirm: false,
+                awaiting_order_correction: true,
+              });
+              const tanyaKoreksi = `Maaf kak! 🙏 Bagian mana yang perlu diperbaiki?\nSilakan sebutkan ya kak (misal: alamatnya, nama, jumlah pesanan, dll).`;
+              const { wamid: wamid_tk } = await sendWA(waSession, reply_jid, tanyaKoreksi).catch(()=>({}));
+              await saveMessage(conversation.id, 'ai', tanyaKoreksi, wamid_tk);
+              return res.status(200).json({ ok: true, action: 'sonnet_correction' });
+            } else if (cls.includes('CANCEL')) {
+              await updateConvState(conversation.id, {
+                awaiting_order_confirm: false,
+                awaiting_order_correction: false,
+                order_snapshot: null,
+                cancel_count: (convState.cancel_count || 0) + 1,
+              });
+              console.log(`[confirm-classify] Sonnet: cancel`);
+              // Fall through ke Claude — bot respon natural
+            } else {
+              // LAINNYA — pertanyaan atau ngobrol biasa
+              console.log(`[confirm-classify] Sonnet: lainnya — fall through ke Claude`);
+            }
+          } catch(e) {
+            console.error('[confirm-classify] Sonnet error:', e.message);
+            // Fallback: tetap fall through ke Claude biasa
+          }
+
+          // Reset timer FU, lanjut ke Claude biasa
           await updateConvState(conversation.id, {
             order_confirmed_at: new Date().toISOString(),
             confirm_fu_stage: 0,
           });
+        }
       }
     }
 
@@ -4376,8 +4436,14 @@ ${ongkirInfo}`;
       const freshConv = await sbGet('conversations', `?id=eq.${conversation.id}&select=state&limit=1`);
       const freshState = freshConv[0]?.state || {};
       if (freshState.awaiting_order_confirm) {
-        console.log(`[ORDER_CONFIRMED] Diabaikan — request lain sudah set awaiting_order_confirm (conv ${conversation.id})`);
-        return res.status(200).json({ ok: true, action: 'order_confirm_race_skipped' });
+        console.log(`[ORDER_CONFIRMED] Race guard — awaiting_order_confirm sudah true, skip ORDER_CONFIRMED tapi tetap kirim reply (conv ${conversation.id})`);
+        // Strip tag ORDER_CONFIRMED, kirim reply bersih ke customer (jangan silent)
+        const replyClean = (reply || rawReply || '').replace(/\[ORDER_CONFIRMED\]/g, '').replace(/\[ORDER_DATA:[^\]]+\]/g, '').trim();
+        if (replyClean) {
+          const { wamid: wamid_race } = await sendWA(waSession, reply_jid, replyClean).catch(() => ({}));
+          await saveMessage(conversation.id, 'ai', replyClean, wamid_race);
+        }
+        return res.status(200).json({ ok: true, action: 'order_confirm_race_skipped_with_reply' });
       }
 
       // Simpan area & ekspedisi yang sudah confirmed ke ongkir state agar tersimpan permanen di Supabase
